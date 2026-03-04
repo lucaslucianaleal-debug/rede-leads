@@ -108,7 +108,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
                   transition={{ delay: i * 0.03 }}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-background/50 hover:bg-muted/50 transition-colors"
+                  className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-lg bg-background/50 hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -138,7 +138,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                       <span className="text-xs text-muted-foreground">• {lead.etapaLead}</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1 shrink-0">
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-1 shrink-0 w-full sm:w-auto">
                     <Button size="sm" variant="outline" onClick={() => setCallLead(lead)}>
                       <Phone className="h-3.5 w-3.5 mr-1" />
                       Registrar Ligação

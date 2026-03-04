@@ -23,7 +23,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -123,13 +124,13 @@ const CRMDashboard = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary rounded-lg p-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="bg-primary rounded-lg p-2 shrink-0">
               <FunnelIcon className="h-5 w-5 text-primary-foreground" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-xl font-heading font-bold text-foreground">Rede Leads</h1>
-              <p className="text-xs text-muted-foreground">Central de Conversão de Leads • WhatsApp: (17) 99115-4763</p>
+              <p className="text-xs text-muted-foreground hidden sm:block">Central de Conversão de Leads • WhatsApp: (17) 99115-4763</p>
             </div>
           </div>
           <div className="flex gap-2 items-center">
@@ -137,49 +138,95 @@ const CRMDashboard = () => {
             {!isReceptionist && (
               <>
                 <input type="file" ref={fileRef} accept=".csv" onChange={handleImport} className="hidden" />
-                {permissions?.canImport && (
-                  <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Importar CSV
-                  </Button>
-                )}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <CalendarIcon className="h-4 w-4 mr-1" />
-                      {format(reportDate, "dd/MM/yyyy")}
+
+                {/* Desktop buttons — hidden on mobile */}
+                <div className="hidden md:flex gap-2 items-center">
+                  {permissions?.canImport && (
+                    <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                      <Download className="h-4 w-4 mr-1" />
+                      Importar CSV
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={reportDate}
-                      onSelect={(date) => date && setReportDate(date)}
-                      locale={ptBR}
-                    />
-                  </PopoverContent>
-                </Popover>
-                <Button variant="default" size="sm" onClick={() => exportDailyReport(reportDate)}>
-                  <FileText className="h-4 w-4 mr-1" />
-                  Relatório Diário
-                </Button>
-                <Button variant="default" size="sm" onClick={() => exportWeeklyReport(reportDate)}>
-                  <FileSpreadsheet className="h-4 w-4 mr-1" />
-                  Relatório Semanal
-                </Button>
-                {duplicatesInfo.has && permissions?.canDelete && (
-                  <Button variant="outline" size="sm" onClick={() => setShowClearDuplicatesDialog(true)} className="border-amber-500 text-amber-700 hover:bg-amber-50">
-                    <Copy className="h-4 w-4 mr-1" />
-                    Limpar Duplicatas ({duplicatesInfo.count})
+                  )}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <CalendarIcon className="h-4 w-4 mr-1" />
+                        {format(reportDate, "dd/MM/yyyy")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={reportDate}
+                        onSelect={(date) => date && setReportDate(date)}
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button variant="default" size="sm" onClick={() => exportDailyReport(reportDate)}>
+                    <FileText className="h-4 w-4 mr-1" />
+                    Relatório Diário
                   </Button>
-                )}
-                {permissions?.canDelete && (
-                  <Button variant="destructive" size="sm" onClick={() => setShowClearDialog(true)}>
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Limpar Base
+                  <Button variant="default" size="sm" onClick={() => exportWeeklyReport(reportDate)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-1" />
+                    Relatório Semanal
                   </Button>
-                )}
-                {user && <AdminPanel />}
+                  {duplicatesInfo.has && permissions?.canDelete && (
+                    <Button variant="outline" size="sm" onClick={() => setShowClearDuplicatesDialog(true)} className="border-amber-500 text-amber-700 hover:bg-amber-50">
+                      <Copy className="h-4 w-4 mr-1" />
+                      Limpar Duplicatas ({duplicatesInfo.count})
+                    </Button>
+                  )}
+                  {permissions?.canDelete && (
+                    <Button variant="destructive" size="sm" onClick={() => setShowClearDialog(true)}>
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Limpar Base
+                    </Button>
+                  )}
+                  {user && <AdminPanel />}
+                </div>
+
+                {/* Mobile dropdown — hidden on desktop */}
+                <div className="flex md:hidden items-center gap-1">
+                  {user && <AdminPanel />}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      {permissions?.canImport && (
+                        <DropdownMenuItem onClick={() => fileRef.current?.click()}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Importar CSV
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => exportDailyReport(reportDate)}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Relatório Diário
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => exportWeeklyReport(reportDate)}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        Relatório Semanal
+                      </DropdownMenuItem>
+                      {(duplicatesInfo.has || permissions?.canDelete) && <DropdownMenuSeparator />}
+                      {duplicatesInfo.has && permissions?.canDelete && (
+                        <DropdownMenuItem onClick={() => setShowClearDuplicatesDialog(true)} className="text-amber-700">
+                          <Copy className="h-4 w-4 mr-2" />
+                          Limpar Duplicatas ({duplicatesInfo.count})
+                        </DropdownMenuItem>
+                      )}
+                      {permissions?.canDelete && (
+                        <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-destructive">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Limpar Base
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </>
             )}
           </div>
@@ -194,22 +241,22 @@ const CRMDashboard = () => {
           />
         ) : (
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full max-w-[750px] grid-cols-4">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
+          <TabsList className="grid w-full sm:max-w-[750px] grid-cols-4">
+            <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
+              <LayoutDashboard className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="agenda" className="flex items-center gap-2">
-              <CalendarCheck className="h-4 w-4" />
-              Agenda do Dia
+            <TabsTrigger value="agenda" className="flex items-center gap-1.5">
+              <CalendarCheck className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Agenda do Dia</span>
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4" />
-              Calendário
+            <TabsTrigger value="calendar" className="flex items-center gap-1.5">
+              <CalendarIcon className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Calendário</span>
             </TabsTrigger>
-            <TabsTrigger value="all-leads" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Todos os Leads
+            <TabsTrigger value="all-leads" className="flex items-center gap-1.5">
+              <Database className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Todos os Leads</span>
             </TabsTrigger>
           </TabsList>
 

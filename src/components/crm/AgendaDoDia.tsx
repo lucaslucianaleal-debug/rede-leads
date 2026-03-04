@@ -47,16 +47,16 @@ export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
     <div className="space-y-6">
       {/* Header do dia */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedDate(d => subDays(d, 1))}>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setSelectedDate(d => subDays(d, 1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-8 px-3 gap-2 font-normal">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <span className="font-semibold">
-                  {isToday(selectedDate) ? "Hoje — " : ""}{format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
+              <Button variant="outline" className="h-8 px-3 gap-2 font-normal min-w-0 flex-1 sm:flex-none justify-start">
+                <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="font-semibold truncate">
+                  {isToday(selectedDate) ? "Hoje — " : ""}{format(selectedDate, "EEE, d MMM yyyy", { locale: ptBR })}
                 </span>
               </Button>
             </PopoverTrigger>
@@ -69,11 +69,11 @@ export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
               />
             </PopoverContent>
           </Popover>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedDate(d => addDays(d, 1))}>
+          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setSelectedDate(d => addDays(d, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
           {!isToday(selectedDate) && (
-            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setSelectedDate(new Date())}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs shrink-0" onClick={() => setSelectedDate(new Date())}>
               Hoje
             </Button>
           )}

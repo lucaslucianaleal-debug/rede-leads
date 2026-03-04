@@ -221,11 +221,11 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Month and Source Filters */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Mês de Contato:</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Mês Contato:</span>
               <Select value={selectedContactMonth} onValueChange={setSelectedContactMonth}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-[130px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -239,10 +239,10 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
               </Select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Mês de Agendamento:</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Mês Agenda:</span>
               <Select value={selectedAppointmentMonth} onValueChange={setSelectedAppointmentMonth}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-[130px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
