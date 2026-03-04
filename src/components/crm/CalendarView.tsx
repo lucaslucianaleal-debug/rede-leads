@@ -3,22 +3,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Lead } from "@/types/crm";
 import { useState, useMemo } from "react";
 import { format, parse, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Clock, Phone, Calendar as CalendarIcon } from "lucide-react";
+import { Clock, Phone, Calendar as CalendarIcon, Pencil, Check } from "lucide-react";
 import { generateWhatsAppLink } from "@/lib/whatsapp";
 import { toast } from "sonner";
 
 interface CalendarViewProps {
   leads: Lead[];
   onMarkReminder: (id: string, type: "h24" | "today") => void;
+  onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
 }
 
-export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
+export function CalendarView({ leads, onMarkReminder, onUpdateLead }: CalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTimeId, setEditingTimeId] = useState<string | null>(null);
+  const [editingTimeValue, setEditingTimeValue] = useState<string>("");
+
+  const handleSaveTime = (lead: Lead) => {
+    if (!editingTimeValue || !onUpdateLead) return;
+    const datePart = lead.dataAgendamento.split(" ")[0];
+    const newDataAgendamento = `${datePart} ${editingTimeValue}`;
+    onUpdateLead(lead.id, { dataAgendamento: newDataAgendamento });
+    setEditingTimeId(null);
+    toast.success(`Horário de ${lead.nome} alterado para ${editingTimeValue}`);
+  };
 
   // Get all dates with appointments
   const appointmentDates = useMemo(() => {
@@ -150,9 +163,39 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <Clock className="h-4 w-4 text-primary" />
-                            <span className="text-lg font-bold text-primary">
-                              {lead.dataAgendamento?.split(" ")[1] || "—"}
-                            </span>
+                            {editingTimeId === lead.id ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="time"
+                                  value={editingTimeValue}
+                                  onChange={(e) => setEditingTimeValue(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveTime(lead); if (e.key === "Escape") setEditingTimeId(null); }}
+                                  className="h-7 w-28 text-sm font-bold text-primary"
+                                  autoFocus
+                                />
+                                <Button size="icon" className="h-6 w-6" onClick={() => handleSaveTime(lead)}>
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <span className="text-lg font-bold text-primary">
+                                  {lead.dataAgendamento?.split(" ")[1] || "—"}
+                                </span>
+                                {onUpdateLead && (
+                                  <button
+                                    className="text-muted-foreground hover:text-primary"
+                                    title="Alterar horário"
+                                    onClick={() => {
+                                      setEditingTimeId(lead.id);
+                                      setEditingTimeValue(lead.dataAgendamento?.split(" ")[1] || "");
+                                    }}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <h3 className="font-semibold text-lg">{lead.nome}</h3>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">

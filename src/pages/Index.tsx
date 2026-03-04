@@ -295,7 +295,7 @@ const CRMDashboard = () => {
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-6">
-            <CalendarView leads={leads} onMarkReminder={markReminder} />
+            <CalendarView leads={leads} onMarkReminder={markReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} />
           </TabsContent>
 
           <TabsContent value="all-leads" className="mt-6">
