@@ -42,6 +42,7 @@ const CRMDashboard = () => {
     sendFollowUp,
     markReminder,
     updateLead,
+    registerCall,
     exportAppointments,
     exportDailyReport,
     exportWeeklyReport,
@@ -76,9 +77,12 @@ const CRMDashboard = () => {
     return { count: duplicateCount, has: hasDuplicates };
   }, [allLeads]);
 
-  const handleFollowUp = (id: string) => {
-    sendFollowUp(id);
-    toast.success("Follow-up registrado com sucesso!");
+  const handleFollowUp = (id: string, observacao?: string) => {
+    sendFollowUp(id, observacao || "");
+  };
+
+  const handleRegisterCall = (leadId: string, outcome: string, obs: string) => {
+    registerCall(leadId, outcome, obs);
   };
 
   const handleReminder = (id: string, type: "h24" | "h12" | "h3" | "h1") => {
@@ -204,6 +208,7 @@ const CRMDashboard = () => {
               <FollowUpQueue 
                 leads={followUpQueue} 
                 onSendFollowUp={handleFollowUp}
+                onRegisterCall={handleRegisterCall}
                 followUpsDoneToday={followUpsDoneToday}
                 followUpGoal={followUpGoal}
               />

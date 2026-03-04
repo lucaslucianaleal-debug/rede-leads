@@ -301,6 +301,21 @@ export function useLeads() {
     setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, ...updates } : l)));
   };
 
+  const registerCall = (leadId: string, outcome: string, obs: string) => {
+    const now = new Date();
+    const timestamp = `${now.getDate().toString().padStart(2, "0")}/${(now.getMonth() + 1).toString().padStart(2, "0")}/${now.getFullYear()} ${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+    const nota = obs ? `📞 ${outcome} (${timestamp}) — ${obs}` : `📞 ${outcome} (${timestamp})`;
+    setLeads((prev) =>
+      prev.map((l) => {
+        if (l.id !== leadId) return l;
+        return {
+          ...l,
+          observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
+        };
+      })
+    );
+  };
+
   // return leads whose `dataAgendamento` matches the given date (formatted as dd/MM/yyyy)
   const getAppointmentsFor = (date: Date = new Date()) => {
     const formatted = format(date, "dd/MM/yyyy");
@@ -726,6 +741,7 @@ export function useLeads() {
     sendFollowUp,
     markReminder,
     updateLead,
+    registerCall,
     exportCSV,
     importCSV,
     getAppointmentsFor,

@@ -5,10 +5,12 @@ import { Send, Phone, User, ExternalLink, Check, Target } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
 import { FollowUpDialog } from "./FollowUpDialog";
+import { CallLogDialog } from "./CallLogDialog";
 
 interface FollowUpQueueProps {
   leads: Lead[];
   onSendFollowUp: (leadId: string, observacao?: string) => void;
+  onRegisterCall?: (leadId: string, outcome: string, obs: string) => void;
   followUpsDoneToday?: number;
   followUpGoal?: number;
 }
@@ -26,13 +28,19 @@ const getDaysSince = (dateString: string): number => {
   return diffDays;
 };
 
-export function FollowUpQueue({ leads, onSendFollowUp, followUpsDoneToday = 0, followUpGoal = 20 }: FollowUpQueueProps) {
+export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20 }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [callLead, setCallLead] = useState<Lead | null>(null);
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
   
   const handleConfirmFollowUp = (leadId: string, observacao: string) => {
     onSendFollowUp(leadId, observacao);
     setSelectedLead(null);
+  };
+
+  const handleConfirmCall = (leadId: string, outcome: string, obs: string) => {
+    onRegisterCall?.(leadId, outcome, obs);
+    setCallLead(null);
   };
   
   return (
@@ -110,7 +118,16 @@ export function FollowUpQueue({ leads, onSendFollowUp, followUpsDoneToday = 0, f
                       <span className="text-xs text-muted-foreground">• {lead.etapaLead}</span>
                     </div>
                   </div>
-                  <div className="flex gap-1 shrink-0">
+                  <div className="flex flex-wrap gap-1 shrink-0">
+                    <a href={`tel:${lead.telefone.replace(/\D/g, '')}`}>
+                      <Button size="sm" variant="outline" className="text-primary border-primary/30 hover:bg-primary/10">
+                        <Phone className="h-3.5 w-3.5 mr-1" />
+                        Ligar
+                      </Button>
+                    </a>
+                    <Button size="sm" variant="outline" onClick={() => setCallLead(lead)}>
+                      Registrar Ligação
+                    </Button>
                     <a href={whatsLink} target="_blank" rel="noopener noreferrer">
                       <Button size="sm" variant="outline" className="text-success border-success/30 hover:bg-success/10">
                         <ExternalLink className="h-3.5 w-3.5 mr-1" />
@@ -138,6 +155,13 @@ export function FollowUpQueue({ leads, onSendFollowUp, followUpsDoneToday = 0, f
         open={!!selectedLead}
         onClose={() => setSelectedLead(null)}
         onConfirm={handleConfirmFollowUp}
+      />
+
+      <CallLogDialog
+        lead={callLead}
+        open={!!callLead}
+        onClose={() => setCallLead(null)}
+        onConfirm={handleConfirmCall}
       />
     </div>
   );
