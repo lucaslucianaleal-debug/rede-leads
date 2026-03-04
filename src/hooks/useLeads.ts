@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Lead, ClinicFilter, DashboardStats, LeadStage } from "@/types/crm";
+import { Lead, ClinicFilter, DashboardStats, LeadStage, LeadComparecimento } from "@/types/crm";
 import { mockLeads } from "@/data/mockLeads";
 import { format } from "date-fns";
 import Papa from "papaparse";
@@ -278,6 +278,22 @@ export function useLeads() {
     setLeads((prev) =>
       prev.map((l) => {
         if (l.id !== leadId) return l;
+
+        const newObservacao = observacao 
+          ? (l.observacao ? `${l.observacao} | [${todayFormatted}] ${observacao}` : `[${todayFormatted}] ${observacao}`)
+          : l.observacao;
+
+        // Se lead tem agendamento, mover para Avaliação agendada
+        if (l.dataAgendamento) {
+          return {
+            ...l,
+            etapaLead: "Avaliação agendada" as LeadStage,
+            comparecimento: "AGUARDANDO DATA" as LeadComparecimento,
+            dataFollowUp: todayFormatted,
+            observacao: newObservacao,
+          };
+        }
+
         const nextCount = l.followUpCount + 1;
         
         // After Follow-Up 12, mark as Desistência
@@ -300,9 +316,6 @@ export function useLeads() {
         const nextFollowUpFormatted = format(nextFollowUpDate, "dd/MM/yyyy");
         
         const nextStage = `Follow-Up ${nextCount}` as LeadStage;
-        const newObservacao = observacao 
-          ? (l.observacao ? `${l.observacao} | [${todayFormatted}] ${observacao}` : `[${todayFormatted}] ${observacao}`)
-          : l.observacao;
         
         return {
           ...l,

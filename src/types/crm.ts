@@ -21,7 +21,7 @@ export type LeadStatus = "QUENTE" | "MORNO" | "FRIO" | "";
 
 export type LeadResposta = "RESPONDEU" | "NÃO RESPONDEU" | "";
 
-export type LeadComparecimento = "COMPARECEU" | "NÃO COMPARECEU" | "";
+export type LeadComparecimento = "COMPARECEU" | "NÃO COMPARECEU" | "AGUARDANDO DATA" | "";
 
 export type LeadSource =
   | "Online"

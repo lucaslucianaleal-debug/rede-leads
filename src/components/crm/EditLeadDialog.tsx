@@ -143,6 +143,7 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>—</SelectItem>
+                <SelectItem value="AGUARDANDO DATA">AGUARDANDO DATA</SelectItem>
                 <SelectItem value="COMPARECEU">COMPARECEU</SelectItem>
                 <SelectItem value="NÃO COMPARECEU">NÃO COMPARECEU</SelectItem>
               </SelectContent>

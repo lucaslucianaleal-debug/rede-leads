@@ -261,6 +261,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                   <TableCell className="text-xs flex items-center gap-2">
                     {lead.comparecimento === "COMPARECEU" && <span className="text-success font-medium">✓ Compareceu</span>}
                     {lead.comparecimento === "NÃO COMPARECEU" && <span className="text-destructive font-medium">✗ Não compareceu</span>}
+                    {lead.comparecimento === "AGUARDANDO DATA" && <span className="text-warning font-medium">⏳ Aguardando</span>}
                     {!lead.comparecimento && "—"}
                     {onMarkAttendance && (
                       <div className="flex gap-1 ml-2">
