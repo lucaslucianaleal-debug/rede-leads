@@ -124,13 +124,13 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
       </div>
 
       <div className="space-y-2 max-h-[400px] overflow-y-auto">
-        <AnimatePresence>
-          {filteredLeads.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              {search ? "Nenhum lead encontrado" : "Nenhum follow-up pendente 🎉"}
-            </p>
-          ) : (
-            filteredLeads.map((lead, i) => {
+        {filteredLeads.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            {search ? "Nenhum lead encontrado" : "Nenhum follow-up pendente 🎉"}
+          </p>
+        ) : (
+          <AnimatePresence initial={false}>
+            {filteredLeads.map((lead, i) => {
               const daysSince = getDaysSince(lead.dataFollowUp);
               
               return (
@@ -205,9 +205,9 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                   </div>
                 </motion.div>
               );
-            })
-          )}
-        </AnimatePresence>
+            })}
+          </AnimatePresence>
+        )}
       </div>
 
       <FollowUpDialog
