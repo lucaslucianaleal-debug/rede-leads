@@ -18,13 +18,14 @@ interface AllLeadsViewProps {
   selectedLeads?: string[];
   onSelectionChange?: (leadIds: string[]) => void;
   onDeleteSelected?: () => void;
+  onClearDuplicates?: () => void;
 }
 
 type FilterCategory = {
   duplicados?: boolean;
 };
 
-export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLeads, onSelectionChange, onDeleteSelected }: AllLeadsViewProps) {
+export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates }: AllLeadsViewProps) {
   const [filters, setFilters] = useState<FilterCategory>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContactMonth, setSelectedContactMonth] = useState<string>("all");
@@ -324,14 +325,27 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
       {duplicatePhones.size > 0 && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <span className="font-semibold">{duplicatePhones.size} leads duplicados</span> detectados (mesmo telefone).{" "}
-            <button
-              onClick={() => toggleFilter("duplicados", true)}
-              className="underline hover:text-primary"
-            >
-              Clique aqui para visualizar
-            </button>
+          <AlertDescription className="flex items-center justify-between gap-4 flex-wrap">
+            <span>
+              <span className="font-semibold">{duplicatePhones.size} leads duplicados</span> detectados (mesmo telefone).{" "}
+              <button
+                onClick={() => toggleFilter("duplicados", true)}
+                className="underline hover:text-primary"
+              >
+                Clique aqui para visualizar
+              </button>
+            </span>
+            {onClearDuplicates && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClearDuplicates}
+                className="border-amber-500 text-amber-700 hover:bg-amber-50 shrink-0"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Apagar Duplicatas ({duplicatePhones.size})
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       )}

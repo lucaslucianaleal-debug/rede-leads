@@ -249,6 +249,7 @@ const CRMDashboard = () => {
               selectedLeads={selectedLeads}
               onSelectionChange={setSelectedLeads}
               onDeleteSelected={() => setShowDeleteDialog(true)}
+              onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
             />
           </TabsContent>
         </Tabs>
