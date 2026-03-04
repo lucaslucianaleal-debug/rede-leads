@@ -6,7 +6,9 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import express from "express";
 import cors from "cors";
 import qrcode from "qrcode-terminal";
-import { readFileSync } from "fs";
+import { readFileSync, mkdirSync, writeFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import "dotenv/config";
 
 // Firebase Admin
@@ -21,6 +23,12 @@ const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 const PORT = process.env.PORT || 3001;
+
+// Pasta para arquivos de midia (audios)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const MEDIA_DIR = join(__dirname, "media");
+mkdirSync(MEDIA_DIR, { recursive: true });
+app.use("/media", express.static(MEDIA_DIR));
 
 // Verifica se e um LID (ID interno do WA) em vez de telefone real
 function isLID(jid) {
@@ -183,10 +191,30 @@ client.on("disconnected", (reason) => {
 client.on("message", async (msg) => {
   if (msg.isGroupMsg) return;
   const telefone = await getRealPhone(msg);
-  const body = msg.body || "(midia)";
   const pushName = msg._data?.notifyName || null;
+
+  let body = msg.body || "(midia)";
+
+  // Detectar e salvar audio (ptt = mensagem de voz, audio = arquivo de audio)
+  if (msg.hasMedia && (msg.type === "ptt" || msg.type === "audio")) {
+    try {
+      const media = await msg.downloadMedia();
+      if (media?.data) {
+        const ext = media.mimetype?.includes("ogg") ? "ogg" : "mp3";
+        const sanitizedId = msg.id._serialized.replace(/[^a-zA-Z0-9_\-]/g, "_");
+        const filename = `${sanitizedId}.${ext}`;
+        writeFileSync(join(MEDIA_DIR, filename), Buffer.from(media.data, "base64"));
+        body = `[audio:${filename}]`;
+        console.log(`Audio salvo: ${filename}`);
+      }
+    } catch (e) {
+      console.error("Erro ao baixar audio:", e.message);
+      body = "(audio)";
+    }
+  }
+
   console.log(`RECV ${telefone}: ${body}`);
-  await syncLead(telefone, pushName, body);
+  await syncLead(telefone, pushName, typeof body === "string" && body.startsWith("[audio:") ? "(audio)" : body);
   await saveMessage({ telefone, body, fromMe: false, msgId: msg.id._serialized });
 });
 

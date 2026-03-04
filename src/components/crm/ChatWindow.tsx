@@ -6,11 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save } from "lucide-react";
 import { toast } from "sonner";
+
+const SERVICOS = ["Facetas", "Clínico Geral", "Prótese", "Protocolo"];
+const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Outro"];
 
 interface ChatWindowProps {
   conversation: Conversation | null;
@@ -88,9 +92,9 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
   const groupedMessages = groupByDate(messages);
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full overflow-hidden">
       {/* Coluna principal: header + msgs + input */}
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0">
       {/* Header da conversa */}
       <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -132,7 +136,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
       {/* Mensagens — scroll só aqui */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-3 bg-[#ece5dd] dark:bg-background/50"
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-3 bg-[#ece5dd] dark:bg-background/50"
       >
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
@@ -156,15 +160,14 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                     msg.fromMe ? "justify-end" : "justify-start"
                   )}
                 >
-                  <div
-                    className={cn(
+                    <div className={cn(
                       "max-w-[75%] px-3 py-2 rounded-2xl shadow-sm text-sm",
                       msg.fromMe
                         ? "bg-[#dcf8c6] dark:bg-primary text-foreground dark:text-primary-foreground rounded-br-sm"
                         : "bg-white dark:bg-card text-foreground rounded-bl-sm"
                     )}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                    >
+                      {renderMessageBody(msg.body)}
                     <div className={cn(
                       "flex items-center gap-1 mt-0.5",
                       msg.fromMe ? "justify-end" : "justify-start"
@@ -233,15 +236,35 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Serviço procurado</Label>
-                <Input value={leadForm.servicoProcurado || ""} onChange={(e) => setLeadForm((f) => ({ ...f, servicoProcurado: e.target.value }))} className="h-8 mt-1" placeholder="Ex: Odontologia" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Captador</Label>
-                <Input value={leadForm.captador || ""} onChange={(e) => setLeadForm((f) => ({ ...f, captador: e.target.value }))} className="h-8 mt-1" />
+                <Select
+                  value={leadForm.servicoProcurado || ""}
+                  onValueChange={(v) => setLeadForm((f) => ({ ...f, servicoProcurado: v }))}
+                >
+                  <SelectTrigger className="h-8 mt-1">
+                    <SelectValue placeholder="Selecionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SERVICOS.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Fonte do Lead</Label>
-                <Input value={leadForm.fonteLead || ""} onChange={(e) => setLeadForm((f) => ({ ...f, fonteLead: e.target.value }))} className="h-8 mt-1" placeholder="Ex: Instagram" />
+                <Select
+                  value={leadForm.fonteLead || ""}
+                  onValueChange={(v) => setLeadForm((f) => ({ ...f, fonteLead: v }))}
+                >
+                  <SelectTrigger className="h-8 mt-1">
+                    <SelectValue placeholder="Selecionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONTES.map((f) => (
+                      <SelectItem key={f} value={f}>{f}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Observação</Label>
@@ -270,6 +293,27 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Renderiza o corpo da mensagem — detecta audio
+function renderMessageBody(body: string) {
+  if (!body) return null;
+  // Formato: [audio:filename.ogg] ou [audio:http://...]
+  const audioMatch = body.match(/^\[audio:(.+)\]$/);
+  if (audioMatch) {
+    const src = audioMatch[1].startsWith("http")
+      ? audioMatch[1]
+      : `http://localhost:3001/media/${audioMatch[1]}`;
+    return (
+      <audio
+        controls
+        src={src}
+        className="max-w-[220px] h-10 rounded"
+        preload="metadata"
+      />
+    );
+  }
+  return <p className="whitespace-pre-wrap break-words">{body}</p>;
+}
 
 function groupByDate(messages: ChatMessage[]): Record<string, ChatMessage[]> {
   const result: Record<string, ChatMessage[]> = {};
