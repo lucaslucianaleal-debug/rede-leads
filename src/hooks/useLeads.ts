@@ -333,30 +333,13 @@ export function useLeads() {
           };
         }
         
-        // Calcular próxima data de follow-up
-        // Follow-Up 1-4: +1 dia, Follow-Up 5+: +2 dias
-        const nextFollowUpDate = new Date(today);
-        const daysToAdd = nextCount >= 5 ? 2 : 1;
-        nextFollowUpDate.setDate(today.getDate() + daysToAdd);
-        
-        // Garantir que é dia útil (segunda a sexta)
-        // Se sábado (6) -> +2 dias para segunda; Se domingo (0) -> +1 dia para segunda
-        const dayOfWeek = nextFollowUpDate.getDay();
-        if (dayOfWeek === 6) {
-          nextFollowUpDate.setDate(nextFollowUpDate.getDate() + 2);
-        } else if (dayOfWeek === 0) {
-          nextFollowUpDate.setDate(nextFollowUpDate.getDate() + 1);
-        }
-        
-        const nextFollowUpFormatted = format(nextFollowUpDate, "dd/MM/yyyy");
-        
         const nextStage = `Follow-Up ${nextCount}` as LeadStage;
         
         return {
           ...l,
           followUpCount: nextCount,
           etapaLead: nextStage,
-          dataFollowUp: nextFollowUpFormatted,
+          dataFollowUp: todayFormatted,
           observacao: newObservacao,
         };
       })
