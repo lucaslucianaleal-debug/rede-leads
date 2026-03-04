@@ -48,21 +48,9 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   };
 
   const handleWhatsAppClick = (lead: Lead) => {
-    // Follow-Up 1-2 (followUpCount 0-1): libre text
-    if (lead.followUpCount < 2) {
-      const whatsLink = generateFollowUpWhatsAppLink(
-        lead.telefone,
-        lead.nome,
-        lead.servicoProcurado,
-        lead.followUpCount + 1
-      );
-      window.open(whatsLink, "_blank");
-      return;
-    }
-
-    // Follow-Up 3+ (followUpCount >= 2): show suggested message dialog
     const template = getFollowUpMessage(lead.etapaLead);
     if (template) {
+      // Follow-Up 3+: show suggested message
       const formatted = formatFollowUpMessage(
         template,
         lead.nome,
@@ -70,6 +58,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
       );
       setSuggestedMessage(formatted);
     } else {
+      // Follow-Up 1-2: empty message, user types
       setSuggestedMessage("");
     }
     setWhatsappLead(lead);
