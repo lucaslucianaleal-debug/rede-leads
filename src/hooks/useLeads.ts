@@ -1,13 +1,19 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Lead, ClinicFilter, DashboardStats, LeadStage } from "@/types/crm";
 import { mockLeads } from "@/data/mockLeads";
 import { format } from "date-fns";
 import Papa from "papaparse";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
 const STORAGE_KEY = "rede_leads_data";
+const FIREBASE_DOC = doc(db, "crm_data", "shared");
 
 export function useLeads() {
-  // Carregar dados do localStorage na inicialização
+  const isFromFirebase = useRef(false);
+  const isMounted = useRef(true);
+
+  // Carregar dados do localStorage na inicialização (enquanto Firebase carrega)
   const [leads, setLeads] = useState<Lead[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -23,9 +29,46 @@ export function useLeads() {
     busca: "",
   });
 
-  // Auto-salvar no localStorage quando leads mudarem
+  // Escutar mudanças em tempo real do Firebase (todos os usuários compartilham os mesmos dados)
   useEffect(() => {
+    isMounted.current = true;
+    const unsubscribe = onSnapshot(FIREBASE_DOC, (snapshot) => {
+      if (!isMounted.current) return;
+      if (snapshot.exists()) {
+        const data = snapshot.data().leads as Lead[];
+        if (data && Array.isArray(data)) {
+          isFromFirebase.current = true;
+          setLeads(data);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+      }
+    }, () => {
+      // Se Firebase falhar, mantém dados do localStorage silenciosamente
+    });
+    return () => {
+      isMounted.current = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // Salvar no Firebase + localStorage quando leads mudarem (com debounce)
+  useEffect(() => {
+    // Se a mudança veio do Firebase, não salva de volta (evita loop)
+    if (isFromFirebase.current) {
+      isFromFirebase.current = false;
+      return;
+    }
+    // Salva localmente imediatamente
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+    // Salva no Firebase com debounce de 1,5s
+    const timer = setTimeout(async () => {
+      try {
+        await setDoc(FIREBASE_DOC, { leads, lastUpdated: new Date().toISOString() }, { merge: true });
+      } catch {
+        // Falha silenciosa — dados ainda estão no localStorage
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
   }, [leads]);
 
   const filteredLeads = useMemo(() => {
