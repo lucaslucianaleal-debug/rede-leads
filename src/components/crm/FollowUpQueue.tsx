@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { Lead } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Send, Phone, User, ExternalLink, Check, Target } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
+import { FollowUpDialog } from "./FollowUpDialog";
 
 interface FollowUpQueueProps {
   leads: Lead[];
-  onSendFollowUp: (leadId: string) => void;
+  onSendFollowUp: (leadId: string, observacao?: string) => void;
   followUpsDoneToday?: number;
   followUpGoal?: number;
 }
@@ -25,7 +27,13 @@ const getDaysSince = (dateString: string): number => {
 };
 
 export function FollowUpQueue({ leads, onSendFollowUp, followUpsDoneToday = 0, followUpGoal = 20 }: FollowUpQueueProps) {
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
+  
+  const handleConfirmFollowUp = (leadId: string, observacao: string) => {
+    onSendFollowUp(leadId, observacao);
+    setSelectedLead(null);
+  };
   
   return (
     <div className="glass-card rounded-xl p-5">
@@ -111,7 +119,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, followUpsDoneToday = 0, f
                     </a>
                     <Button 
                       size="sm" 
-                      onClick={() => onSendFollowUp(lead.id)}
+                      onClick={() => setSelectedLead(lead)}
                       className="bg-primary hover:bg-primary/90"
                     >
                       <Check className="h-3.5 w-3.5 mr-1" />
@@ -124,6 +132,13 @@ export function FollowUpQueue({ leads, onSendFollowUp, followUpsDoneToday = 0, f
           )}
         </AnimatePresence>
       </div>
+
+      <FollowUpDialog
+        lead={selectedLead}
+        open={!!selectedLead}
+        onClose={() => setSelectedLead(null)}
+        onConfirm={handleConfirmFollowUp}
+      />
     </div>
   );
 }

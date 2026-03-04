@@ -239,7 +239,10 @@ export function useLeads() {
       });
   }, [leads]);
 
-  const sendFollowUp = (leadId: string) => {
+  const sendFollowUp = (leadId: string, observacao: string = "") => {
+    const today = new Date();
+    const todayFormatted = format(today, "dd/MM/yyyy");
+    
     setLeads((prev) =>
       prev.map((l) => {
         if (l.id !== leadId) return l;
@@ -250,19 +253,31 @@ export function useLeads() {
           return {
             ...l,
             etapaLead: "Desistência",
-            dataFollowUp: format(new Date(), "dd/MM/yyyy"),
+            dataFollowUp: todayFormatted,
             observacao: l.observacao 
               ? `${l.observacao} | Ciclo de follow-ups completo (12 tentativas)`
               : "Ciclo de follow-ups completo (12 tentativas)",
           };
         }
         
+        // Calcular próxima data de follow-up
+        // Follow-Up 1-4: +1 dia, Follow-Up 5+: +2 dias
+        const nextFollowUpDate = new Date(today);
+        const daysToAdd = nextCount >= 5 ? 2 : 1;
+        nextFollowUpDate.setDate(today.getDate() + daysToAdd);
+        const nextFollowUpFormatted = format(nextFollowUpDate, "dd/MM/yyyy");
+        
         const nextStage = `Follow-Up ${nextCount}` as LeadStage;
+        const newObservacao = observacao 
+          ? (l.observacao ? `${l.observacao} | [${todayFormatted}] ${observacao}` : `[${todayFormatted}] ${observacao}`)
+          : l.observacao;
+        
         return {
           ...l,
           followUpCount: nextCount,
           etapaLead: nextStage,
-          dataFollowUp: format(new Date(), "dd/MM/yyyy"),
+          dataFollowUp: nextFollowUpFormatted,
+          observacao: newObservacao,
         };
       })
     );
