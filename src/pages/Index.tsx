@@ -123,7 +123,7 @@ const CRMDashboard = () => {
             </div>
             <div>
               <h1 className="text-xl font-heading font-bold text-foreground">Rede Leads</h1>
-              <p className="text-xs text-muted-foreground">Central de Conversão de Leads • WhatsApp: (17) 99104-0452</p>
+              <p className="text-xs text-muted-foreground">Central de Conversão de Leads • WhatsApp: (17) 99115-4763</p>
             </div>
           </div>
           <div className="flex gap-2 items-center">

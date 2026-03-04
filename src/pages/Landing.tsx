@@ -155,7 +155,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="px-8 py-4 text-center">
         <p className="text-slate-600 text-xs">
-          © 2026 Rede Leads · Central de Conversão de Leads · WhatsApp: (17) 99104-0452
+          © 2026 Rede Leads · Central de Conversão de Leads · WhatsApp: (17) 99115-4763
         </p>
       </footer>
     </div>
