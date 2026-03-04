@@ -3,12 +3,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil, Phone, ExternalLink, Check } from "lucide-react";
+import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil, Phone, ExternalLink, Check, CalendarCheck } from "lucide-react";
 import { useState } from "react";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
+import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 
 interface LeadTableProps {
   leads: Lead[];
@@ -41,6 +42,11 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
   const handleWhatsAppClick = (lead: Lead) => {
     const template = getFollowUpMessage(lead.etapaLead);
     setSuggestedMessage(template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : "");
+    setWhatsappLead(lead);
+  };
+
+  const handleConfirmationClick = (lead: Lead) => {
+    setSuggestedMessage(generateAppointmentConfirmationText(lead.dataAgendamento || ""));
     setWhatsappLead(lead);
   };
   
@@ -298,6 +304,12 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                           <ExternalLink className="h-3 w-3 mr-1" />
                           WhatsApp
                         </Button>
+                        {lead.dataAgendamento && (
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-primary border-primary/30 hover:bg-primary/10" onClick={() => handleConfirmationClick(lead)}>
+                            <CalendarCheck className="h-3 w-3 mr-1" />
+                            Confirmação
+                          </Button>
+                        )}
                         {onSendFollowUp && (
                           <Button size="sm" className="h-7 px-2 text-xs bg-primary hover:bg-primary/90" onClick={() => setFollowUpLead(lead)}>
                             <Check className="h-3 w-3 mr-1" />

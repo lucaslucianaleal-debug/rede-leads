@@ -2,9 +2,9 @@ import { useState, useMemo } from "react";
 import { Lead } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Phone, User, ExternalLink, Check, Target, Search, X } from "lucide-react";
+import { Send, Phone, User, ExternalLink, Check, Target, Search, X, CalendarCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
+import { generateFollowUpWhatsAppLink, generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
@@ -62,17 +62,16 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const handleWhatsAppClick = (lead: Lead) => {
     const template = getFollowUpMessage(lead.etapaLead);
     if (template) {
-      // Follow-Up 3+: show suggested message
-      const formatted = formatFollowUpMessage(
-        template,
-        lead.nome,
-        lead.servicoProcurado
-      );
+      const formatted = formatFollowUpMessage(template, lead.nome, lead.servicoProcurado);
       setSuggestedMessage(formatted);
     } else {
-      // Follow-Up 1-2: empty message, user types
       setSuggestedMessage("");
     }
+    setWhatsappLead(lead);
+  };
+
+  const handleConfirmationClick = (lead: Lead) => {
+    setSuggestedMessage(generateAppointmentConfirmationText(lead.dataAgendamento || ""));
     setWhatsappLead(lead);
   };
   
@@ -185,6 +184,17 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                       <ExternalLink className="h-3.5 w-3.5 mr-1" />
                       WhatsApp
                     </Button>
+                    {lead.dataAgendamento && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleConfirmationClick(lead)}
+                        className="text-primary border-primary/30 hover:bg-primary/10"
+                      >
+                        <CalendarCheck className="h-3.5 w-3.5 mr-1" />
+                        Confirmação
+                      </Button>
+                    )}
                     <Button 
                       size="sm" 
                       onClick={() => setSelectedLead(lead)}
