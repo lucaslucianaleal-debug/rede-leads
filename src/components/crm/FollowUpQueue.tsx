@@ -119,13 +119,8 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1 shrink-0">
-                    <a href={`tel:${lead.telefone.replace(/\D/g, '')}`}>
-                      <Button size="sm" variant="outline" className="text-primary border-primary/30 hover:bg-primary/10">
-                        <Phone className="h-3.5 w-3.5 mr-1" />
-                        Ligar
-                      </Button>
-                    </a>
                     <Button size="sm" variant="outline" onClick={() => setCallLead(lead)}>
+                      <Phone className="h-3.5 w-3.5 mr-1" />
                       Registrar Ligação
                     </Button>
                     <a href={whatsLink} target="_blank" rel="noopener noreferrer">
