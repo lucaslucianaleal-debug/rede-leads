@@ -297,6 +297,8 @@ const CRMDashboard = () => {
               onSelectionChange={setSelectedLeads}
               onDeleteSelected={() => setShowDeleteDialog(true)}
               onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
+              onSendFollowUp={handleFollowUp}
+              onRegisterCall={handleRegisterCall}
             />
           </TabsContent>
         </Tabs>

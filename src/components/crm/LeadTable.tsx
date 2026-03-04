@@ -3,8 +3,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil } from "lucide-react";
+import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil, Phone, ExternalLink, Check } from "lucide-react";
 import { useState } from "react";
+import { FollowUpDialog } from "./FollowUpDialog";
+import { CallLogDialog } from "./CallLogDialog";
+import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
+import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 
 interface LeadTableProps {
   leads: Lead[];
@@ -12,6 +16,8 @@ interface LeadTableProps {
   selectedLeads?: string[];
   onSelectionChange?: (leadIds: string[]) => void;
   onEditLead?: (lead: Lead) => void;
+  onSendFollowUp?: (leadId: string, observacao?: string) => void;
+  onRegisterCall?: (leadId: string, outcome: string, obs: string) => void;
 }
 
 const statusColor: Record<LeadStatus | "", string> = {
@@ -24,9 +30,19 @@ const statusColor: Record<LeadStatus | "", string> = {
 type SortField = 'nome' | 'telefone' | 'servicoProcurado' | 'fonteLead' | 'etapaLead' | 'status' | 'respostaLead' | 'comparecimento' | 'dataFollowUp' | 'dataAgendamento';
 type SortDirection = 'asc' | 'desc' | null;
 
-export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelectionChange, onEditLead }: LeadTableProps) {
+export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelectionChange, onEditLead, onSendFollowUp, onRegisterCall }: LeadTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [followUpLead, setFollowUpLead] = useState<Lead | null>(null);
+  const [callLead, setCallLead] = useState<Lead | null>(null);
+  const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
+  const [suggestedMessage, setSuggestedMessage] = useState("");
+
+  const handleWhatsAppClick = (lead: Lead) => {
+    const template = getFollowUpMessage(lead.etapaLead);
+    setSuggestedMessage(template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : "");
+    setWhatsappLead(lead);
+  };
   
   const allSelected = leads.length > 0 && selectedLeads.length === leads.length;
   const someSelected = selectedLeads.length > 0 && selectedLeads.length < leads.length;
@@ -116,6 +132,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
   };
 
   return (
+    <>
     <div className="glass-card rounded-xl overflow-x-auto">
       <Table>
           <TableHeader>
@@ -181,6 +198,9 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                 </button>
               </TableHead>
               <TableHead className="font-heading font-semibold">Observação</TableHead>
+              {(onSendFollowUp || onRegisterCall) && (
+                <TableHead className="font-heading font-semibold">Ações</TableHead>
+              )}
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
@@ -265,6 +285,28 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                   <TableCell className="text-xs">{lead.dataFollowUp || "—"}</TableCell>
                   <TableCell className="text-xs">{lead.dataAgendamento || "—"}</TableCell>
                   <TableCell className="text-xs max-w-[200px] truncate" title={lead.observacao}>{lead.observacao || "—"}</TableCell>
+                  {(onSendFollowUp || onRegisterCall) && (
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {onRegisterCall && (
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setCallLead(lead)}>
+                            <Phone className="h-3 w-3 mr-1" />
+                            Ligar
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success/10" onClick={() => handleWhatsAppClick(lead)}>
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          WhatsApp
+                        </Button>
+                        {onSendFollowUp && (
+                          <Button size="sm" className="h-7 px-2 text-xs bg-primary hover:bg-primary/90" onClick={() => setFollowUpLead(lead)}>
+                            <Check className="h-3 w-3 mr-1" />
+                            Feito
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
                   {onEditLead && (
                     <TableCell>
                       <Button
@@ -285,5 +327,41 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
           </TableBody>
         </Table>
     </div>
+
+      {onSendFollowUp && (
+        <FollowUpDialog
+          lead={followUpLead}
+          open={!!followUpLead}
+          onClose={() => setFollowUpLead(null)}
+          onConfirm={(leadId, observacao) => {
+            onSendFollowUp(leadId, observacao);
+            setFollowUpLead(null);
+          }}
+        />
+      )}
+
+      {onRegisterCall && (
+        <CallLogDialog
+          lead={callLead}
+          open={!!callLead}
+          onClose={() => setCallLead(null)}
+          onConfirm={(leadId, outcome, obs) => {
+            onRegisterCall(leadId, outcome, obs);
+            setCallLead(null);
+          }}
+        />
+      )}
+
+      <WhatsAppMessageDialog
+        lead={whatsappLead}
+        open={!!whatsappLead}
+        onClose={() => setWhatsappLead(null)}
+        onDone={() => {
+          if (whatsappLead && onSendFollowUp) onSendFollowUp(whatsappLead.id, "");
+          setWhatsappLead(null);
+        }}
+        suggestedMessage={suggestedMessage}
+      />
+    </>
   );
 }
