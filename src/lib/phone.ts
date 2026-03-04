@@ -22,10 +22,10 @@ export function formatPhoneNumber(phone: string): string {
   
   // Format based on length
   if (cleaned.length === 11) {
-    // (XX) 9XXXX-XXXX
-    return `(${cleaned.slice(0, 2)}) 9${cleaned.slice(3, 8)}-${cleaned.slice(8)}`;
+    // (XX) XXXXX-XXXX (5 dígitos + 4 dígitos)
+    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
   } else if (cleaned.length === 10) {
-    // (XX) XXXX-XXXX
+    // (XX) XXXX-XXXX (4 dígitos + 4 dígitos)
     return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
   }
   
