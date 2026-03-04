@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Lead } from "@/types/crm";
 import { Button } from "@/components/ui/button";
-import { PhoneCall, User, Phone, Check, X } from "lucide-react";
+import { PhoneCall, User, Phone, X, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CallLogDialog } from "./CallLogDialog";
 import { formatPhoneNumber } from "@/lib/phone";
@@ -12,15 +12,29 @@ interface CallReturnQueueProps {
   onClearReturn: (leadId: string) => void;
 }
 
+function isOverdue(dataRetornoLigacao: string): boolean {
+  const parts = dataRetornoLigacao.split(" ");
+  const [day, month, year] = parts[0].split("/");
+  const [hour, minute] = (parts[1] || "00:00").split(":");
+  const returnDt = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+  return returnDt <= new Date();
+}
+
 export function CallReturnQueue({ leads, onRegisterCall, onClearReturn }: CallReturnQueueProps) {
   const [callLead, setCallLead] = useState<Lead | null>(null);
+  const overdueCount = leads.filter((l) => isOverdue(l.dataRetornoLigacao)).length;
 
   return (
     <div className="glass-card rounded-xl p-5">
       <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2">
         <PhoneCall className="h-5 w-5 text-warning" />
         Retornos de Ligação
-        <span className="ml-auto text-sm font-body text-muted-foreground">{leads.length} pendentes</span>
+        {overdueCount > 0 && (
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-destructive/15 text-destructive font-medium">
+            {overdueCount} vencido{overdueCount > 1 ? "s" : ""}
+          </span>
+        )}
+        <span className="ml-auto text-sm font-body text-muted-foreground">{leads.length} agendado{leads.length !== 1 ? "s" : ""}</span>
       </h3>
 
       <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -28,14 +42,20 @@ export function CallReturnQueue({ leads, onRegisterCall, onClearReturn }: CallRe
           {leads.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">Nenhum retorno pendente 🎉</p>
           ) : (
-            leads.map((lead, i) => (
+            leads.map((lead, i) => {
+              const overdue = isOverdue(lead.dataRetornoLigacao);
+              return (
               <motion.div
                 key={lead.id}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ delay: i * 0.03 }}
-                className="flex items-center gap-3 p-3 rounded-lg bg-warning/5 border border-warning/20 hover:bg-warning/10 transition-colors"
+                className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                  overdue
+                    ? "bg-destructive/5 border-destructive/25 hover:bg-destructive/10"
+                    : "bg-warning/5 border-warning/20 hover:bg-warning/10"
+                }`}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -53,16 +73,20 @@ export function CallReturnQueue({ leads, onRegisterCall, onClearReturn }: CallRe
                       {formatPhoneNumber(lead.telefone)}
                     </span>
                   </div>
-                  <div className="mt-1">
-                    <span className="text-xs font-medium text-warning">
-                      🕐 Retornar às {lead.dataRetornoLigacao?.split(" ")[1]} — {lead.dataRetornoLigacao?.split(" ")[0]}
+                  <div className="mt-1 flex items-center gap-1">
+                    <Clock className={`h-3 w-3 shrink-0 ${overdue ? "text-destructive" : "text-warning"}`} />
+                    <span className={`text-xs font-medium ${overdue ? "text-destructive" : "text-warning"}`}>
+                      {overdue ? "Vencido — " : "Retornar às "}
+                      {lead.dataRetornoLigacao?.split(" ")[1]}
+                      {" — "}
+                      {lead.dataRetornoLigacao?.split(" ")[0]}
                     </span>
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Button
                     size="icon"
-                    className="h-8 w-8 bg-warning hover:bg-warning/90 text-warning-foreground"
+                    className={`h-8 w-8 ${overdue ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" : "bg-warning hover:bg-warning/90 text-warning-foreground"}`}
                     title="Registrar ligação de retorno"
                     onClick={() => setCallLead(lead)}
                   >
@@ -79,7 +103,8 @@ export function CallReturnQueue({ leads, onRegisterCall, onClearReturn }: CallRe
                   </Button>
                 </div>
               </motion.div>
-            ))
+              );
+            })
           )}
         </AnimatePresence>
       </div>

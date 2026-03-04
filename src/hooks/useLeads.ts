@@ -245,19 +245,10 @@ export function useLeads() {
       });
   }, [leads]);
 
-  // Leads com retorno de ligação agendado para hoje ou vencido
+  // Leads com retorno de ligação agendado (futuros e vencidos)
   const callReturnQueue = useMemo(() => {
-    const now = new Date();
-    now.setSeconds(0, 0);
     return leads
-      .filter((l) => {
-        if (!l.dataRetornoLigacao) return false;
-        const parts = l.dataRetornoLigacao.split(" ");
-        const [day, month, year] = parts[0].split("/");
-        const [hour, minute] = (parts[1] || "00:00").split(":");
-        const returnDt = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
-        return returnDt <= now;
-      })
+      .filter((l) => !!l.dataRetornoLigacao)
       .sort((a, b) => {
         const toMs = (s: string) => {
           const parts = s.split(" ");
