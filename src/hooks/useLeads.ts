@@ -44,6 +44,21 @@ const normalizeFonteLead = (fonte: string): string => {
   if (normalized.includes("indicação") || normalized.includes("indicaçao")) {
     return "Indicação";
   }
+
+  // Se o valor corresponde a uma etapa do lead (coluna trocada na importação), ignora
+  const etapasConhecidas = [
+    "novo", "em contato", "follow-up", "avaliação agendada",
+    "desistência", "desistencia", "finalizado",
+  ];
+  if (etapasConhecidas.some((e) => normalized.startsWith(e))) {
+    return "Outro";
+  }
+
+  // Valores de status/resposta/comparecimento que não são fontes válidas
+  const naoSaoFontes = ["quente", "morno", "frio", "respondeu", "não respondeu", "compareceu", "não compareceu"];
+  if (naoSaoFontes.includes(normalized)) {
+    return "Outro";
+  }
   
   // Se não reconhecer, retorna como está (preserva valor original)
   return fonte;
