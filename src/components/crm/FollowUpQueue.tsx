@@ -186,6 +186,10 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         lead={whatsappLead}
         open={!!whatsappLead}
         onClose={() => setWhatsappLead(null)}
+        onDone={() => {
+          if (whatsappLead) onSendFollowUp(whatsappLead.id, "");
+          setWhatsappLead(null);
+        }}
         suggestedMessage={suggestedMessage}
       />
     </div>

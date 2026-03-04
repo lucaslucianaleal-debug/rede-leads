@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
 
@@ -16,6 +17,7 @@ interface WhatsAppMessageDialogProps {
   lead: Lead | null;
   open: boolean;
   onClose: () => void;
+  onDone?: () => void;
   suggestedMessage?: string;
 }
 
@@ -23,6 +25,7 @@ export function WhatsAppMessageDialog({
   lead,
   open,
   onClose,
+  onDone,
   suggestedMessage,
 }: WhatsAppMessageDialogProps) {
   const [message, setMessage] = useState("");
@@ -51,6 +54,10 @@ export function WhatsAppMessageDialog({
       message
     );
     window.open(whatsAppLink, "_blank");
+  };
+
+  const handleDone = () => {
+    onDone?.();
     onClose();
   };
 
@@ -92,6 +99,10 @@ export function WhatsAppMessageDialog({
           </Button>
           <Button onClick={handleSend} className="bg-success hover:bg-success/90">
             Enviar
+          </Button>
+          <Button onClick={handleDone} className="bg-primary hover:bg-primary/90">
+            <Check className="h-4 w-4 mr-1" />
+            Feito
           </Button>
         </DialogFooter>
       </DialogContent>
