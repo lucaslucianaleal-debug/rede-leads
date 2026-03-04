@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 210 25% 97%;
+    --foreground: 215 30% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 30% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 30% 12%;
+
+    --primary: 210 75% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 180 30% 94%;
+    --secondary-foreground: 180 40% 25%;
+
+    --muted: 210 20% 93%;
+    --muted-foreground: 215 15% 50%;
+
+    --accent: 165 50% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 20% 88%;
+    --input: 210 20% 88%;
+    --ring: 210 75% 42%;
+
+    --radius: 0.75rem;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --success: 155 55% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --info: 210 75% 55%;
+    --info-foreground: 0 0% 100%;
+
+    --sidebar-background: 215 30% 12%;
+    --sidebar-foreground: 210 20% 85%;
+    --sidebar-primary: 210 75% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 25% 18%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 215 25% 20%;
+    --sidebar-ring: 210 75% 55%;
+
+    --font-heading: 'Space Grotesk', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+  }
+
+  .dark {
+    --background: 215 30% 8%;
+    --foreground: 210 20% 93%;
+    --card: 215 28% 12%;
+    --card-foreground: 210 20% 93%;
+    --popover: 215 28% 12%;
+    --popover-foreground: 210 20% 93%;
+    --primary: 210 75% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 25% 18%;
+    --secondary-foreground: 210 20% 85%;
+    --muted: 215 25% 18%;
+    --muted-foreground: 210 15% 55%;
+    --accent: 165 50% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 215 25% 20%;
+    --input: 215 25% 20%;
+    --ring: 210 75% 55%;
+    --sidebar-background: 215 35% 6%;
+    --sidebar-foreground: 210 20% 85%;
+    --sidebar-primary: 210 75% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 30% 12%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 215 30% 12%;
+    --sidebar-ring: 210 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm;
+  }
+  
+  .stat-card {
+    @apply glass-card rounded-xl p-5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+  }
+
+  .badge-stage {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
