@@ -326,7 +326,7 @@ const CRMDashboard = () => {
           </TabsContent>
 
           <TabsContent value="chat">
-            <ChatView />
+            <ChatView leads={leads} onUpdateLead={(id, updates) => updateLead(id, updates)} />
           </TabsContent>
         </Tabs>
         )}

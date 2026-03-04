@@ -1,37 +1,61 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatMessage, Conversation } from "@/hooks/useConversations";
+import { Lead } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, MessageCircle, CheckCheck, Wifi, WifiOff } from "lucide-react";
+import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save } from "lucide-react";
+import { toast } from "sonner";
 
 interface ChatWindowProps {
   conversation: Conversation | null;
   messages: ChatMessage[];
   onSend: (message: string) => Promise<boolean>;
-  onOpen: () => void; // chamado quando a janela é aberta (marcar como lido)
+  onOpen: () => void;
   serverConnected: boolean | null;
+  currentLead: Lead | null;
+  onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
 }
 
-export function ChatWindow({ conversation, messages, onSend, onOpen, serverConnected }: ChatWindowProps) {
+export function ChatWindow({ conversation, messages, onSend, onOpen, serverConnected, currentLead, onUpdateLead }: ChatWindowProps) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [showLeadPanel, setShowLeadPanel] = useState(false);
+  const [leadForm, setLeadForm] = useState<Partial<Lead>>({});
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Rolar para o fim quando novas msgs chegam
+  // Scroll apenas dentro do container de mensagens
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   // Marcar como lido ao abrir
   useEffect(() => {
-    if (conversation) {
-      onOpen();
-    }
+    if (conversation) onOpen();
   }, [conversation?.telefone]);
+
+  // Pré-preencher formulário quando o lead muda
+  useEffect(() => {
+    if (currentLead) {
+      setLeadForm({ ...currentLead });
+    } else if (conversation) {
+      // Lead novo ainda não cadastrado — pré-preenche com dados da conversa
+      setLeadForm({
+        nome: conversation.leadNome,
+        telefone: formatPhone(conversation.telefone),
+        servicoProcurado: "",
+        captador: "",
+        fonteLead: "",
+        observacao: "",
+      });
+    }
+  }, [currentLead, conversation?.telefone]);
 
   const handleSend = async () => {
     const msg = text.trim();
@@ -40,6 +64,13 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
     setSending(true);
     await onSend(msg);
     setSending(false);
+  };
+
+  const handleSaveLead = () => {
+    if (!currentLead || !onUpdateLead) return;
+    onUpdateLead(currentLead.id, leadForm);
+    toast.success("Lead atualizado!");
+    setShowLeadPanel(false);
   };
 
   if (!conversation) {
@@ -57,9 +88,11 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
   const groupedMessages = groupByDate(messages);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full">
+      {/* Coluna principal: header + msgs + input */}
+      <div className="flex flex-col flex-1 min-w-0">
       {/* Header da conversa */}
-      <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
             {conversation.leadNome.charAt(0).toUpperCase()}
@@ -69,25 +102,38 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
             <p className="text-xs text-muted-foreground">{formatPhone(conversation.telefone)}</p>
           </div>
         </div>
-        {/* Status do servidor */}
-        <div className={cn(
-          "flex items-center gap-1.5 text-xs px-2 py-1 rounded-full",
-          serverConnected === true ? "bg-green-100 text-green-700" :
-          serverConnected === false ? "bg-red-100 text-red-600" :
-          "bg-muted text-muted-foreground"
-        )}>
-          {serverConnected === true ? (
-            <><Wifi className="h-3 w-3" /> Conectado</>
-          ) : serverConnected === false ? (
-            <><WifiOff className="h-3 w-3" /> Servidor offline</>
-          ) : (
-            <span>Verificando...</span>
-          )}
+        <div className="flex items-center gap-2">
+          {/* Botão editar lead */}
+          <button
+            onClick={() => setShowLeadPanel((v) => !v)}
+            title="Editar lead"
+            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
+          >
+            <UserPen className="h-4 w-4" />
+          </button>
+          {/* Status do servidor */}
+          <div className={cn(
+            "flex items-center gap-1.5 text-xs px-2 py-1 rounded-full",
+            serverConnected === true ? "bg-green-100 text-green-700" :
+            serverConnected === false ? "bg-red-100 text-red-600" :
+            "bg-muted text-muted-foreground"
+          )}>
+            {serverConnected === true ? (
+              <><Wifi className="h-3 w-3" /> Conectado</>
+            ) : serverConnected === false ? (
+              <><WifiOff className="h-3 w-3" /> Offline</>
+            ) : (
+              <span>Verificando...</span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Mensagens */}
-      <ScrollArea className="flex-1 px-4 py-3 bg-[#ece5dd] dark:bg-background/50">
+      {/* Mensagens — scroll só aqui */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-3 bg-[#ece5dd] dark:bg-background/50"
+      >
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
             Nenhuma mensagem ainda
@@ -138,11 +184,10 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
             </div>
           ))
         )}
-        <div ref={bottomRef} />
-      </ScrollArea>
+      </div>
 
       {/* Input de envio */}
-      <div className="p-3 border-t border-border bg-card flex items-center gap-2">
+      <div className="p-3 border-t border-border bg-card flex items-center gap-2 shrink-0">
         <Input
           placeholder={serverConnected === false ? "Servidor offline..." : "Digite uma mensagem..."}
           value={text}
@@ -165,6 +210,61 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
           <Send className="h-4 w-4" />
         </Button>
       </div>
+      </div>{/* fim coluna principal */}
+
+      {/* Painel lateral: editar lead */}
+      {showLeadPanel && (
+        <div className="w-72 border-l border-border bg-card flex flex-col shrink-0">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <p className="font-semibold text-sm">Dados do Lead</p>
+            <button onClick={() => setShowLeadPanel(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground">Nome</Label>
+                <Input value={leadForm.nome || ""} onChange={(e) => setLeadForm((f) => ({ ...f, nome: e.target.value }))} className="h-8 mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Telefone</Label>
+                <Input value={leadForm.telefone || ""} onChange={(e) => setLeadForm((f) => ({ ...f, telefone: e.target.value }))} className="h-8 mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Serviço procurado</Label>
+                <Input value={leadForm.servicoProcurado || ""} onChange={(e) => setLeadForm((f) => ({ ...f, servicoProcurado: e.target.value }))} className="h-8 mt-1" placeholder="Ex: Odontologia" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Captador</Label>
+                <Input value={leadForm.captador || ""} onChange={(e) => setLeadForm((f) => ({ ...f, captador: e.target.value }))} className="h-8 mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Fonte do Lead</Label>
+                <Input value={leadForm.fonteLead || ""} onChange={(e) => setLeadForm((f) => ({ ...f, fonteLead: e.target.value }))} className="h-8 mt-1" placeholder="Ex: Instagram" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Observação</Label>
+                <Textarea
+                  value={leadForm.observacao || ""}
+                  onChange={(e) => setLeadForm((f) => ({ ...f, observacao: e.target.value }))}
+                  className="mt-1 text-sm min-h-[80px] resize-none"
+                />
+              </div>
+            </div>
+          </ScrollArea>
+          {currentLead && onUpdateLead && (
+            <div className="p-3 border-t border-border">
+              <Button className="w-full h-8" onClick={handleSaveLead}>
+                <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar
+              </Button>
+            </div>
+          )}
+          {!currentLead && (
+            <p className="text-xs text-muted-foreground text-center p-3">Lead ainda nao cadastrado no CRM</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

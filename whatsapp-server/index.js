@@ -1,277 +1,235 @@
-import makeWASocket, {
-  useMultiFileAuthState,
-  DisconnectReason,
-  getContentType,
-} from "@whiskeysockets/baileys";
+import pkg from "whatsapp-web.js";
+const { Client, LocalAuth } = pkg;
+
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import express from "express";
 import cors from "cors";
 import qrcode from "qrcode-terminal";
 import { readFileSync } from "fs";
-import { createRequire } from "module";
 import "dotenv/config";
-import pino from "pino";
 
-// ─── Firebase Admin ────────────────────────────────────────────────────────────
+// Firebase Admin
 const serviceAccount = JSON.parse(
   readFileSync(new URL("./serviceAccountKey.json", import.meta.url))
 );
-
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
-// ─── Express API (para o CRM enviar mensagens) ─────────────────────────────────
+// Express API
 const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
-
 const PORT = process.env.PORT || 3001;
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-/** Remove @s.whatsapp.net e deixa só dígitos */
-function cleanPhone(jid) {
-  return jid.replace("@s.whatsapp.net", "").replace("@g.us", "").replace(/\D/g, "");
+// Verifica se e um LID (ID interno do WA) em vez de telefone real
+function isLID(jid) {
+  const digits = (jid || "").replace("@c.us", "").replace(/\D/g, "");
+  return digits.length > 13;
 }
 
-/** Converte telefone do lead (ex: "(17) 99115-4763") para JID do WhatsApp */
-function phoneToJid(phone) {
-  const digits = phone.replace(/\D/g, "");
-  // Garante que começa com 55 (Brasil)
+// Extrai numero real com fallback para getContact()
+async function getRealPhone(msg) {
+  try {
+    const rawFrom = msg.from || "";
+    const digits = rawFrom.replace("@c.us", "").replace(/\D/g, "");
+    if (!isLID(rawFrom)) {
+      return digits.startsWith("55") ? digits : `55${digits}`;
+    }
+    // E um LID - busca numero real via getContact()
+    const contact = await msg.getContact();
+    const number = contact.number || "";
+    if (number && number.length >= 10) {
+      return number.startsWith("55") ? number : `55${number}`;
+    }
+    return digits;
+  } catch (e) {
+    const digits = (msg.from || "").replace("@c.us", "").replace(/\D/g, "");
+    return digits;
+  }
+}
+
+// Formata para padrao brasileiro: (17) 99762-5696
+function formatBRPhone(digits) {
+  const d = digits.replace(/\D/g, "");
+  const local = d.startsWith("55") ? d.slice(2) : d;
+  if (local.length === 11) return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+  if (local.length === 10) return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+  return d;
+}
+
+function phoneToWAId(telefone) {
+  const digits = telefone.replace(/\D/g, "");
   const withCountry = digits.startsWith("55") ? digits : `55${digits}`;
-  return `${withCountry}@s.whatsapp.net`;
+  return `${withCountry}@c.us`;
 }
 
-// ─── Salvar mensagem no Firestore ──────────────────────────────────────────────
-async function saveMessage({ telefone, body, fromMe, msgId, nome = null }) {
+// Salvar mensagem evitando duplicatas
+async function saveMessage({ telefone, body, fromMe, msgId }) {
   const convRef = db.collection("conversations").doc(telefone);
   const msgRef = convRef.collection("messages").doc(msgId);
-
-  // Salvar mensagem
-  await msgRef.set({
-    id: msgId,
-    body,
-    fromMe,
-    timestamp: Timestamp.now(),
-    read: fromMe, // msgs enviadas consideradas lidas; recebidas não
-  });
-
-  // Atualizar conversa (último msg + contagem não lidas)
+  const existing = await msgRef.get();
+  if (existing.exists) return;
+  await msgRef.set({ id: msgId, body, fromMe, timestamp: Timestamp.now(), read: fromMe });
   const convSnap = await convRef.get();
   const currentUnread = convSnap.exists ? (convSnap.data().unreadCount || 0) : 0;
-
   await convRef.set(
-    {
-      telefone,
-      lastMessage: body,
-      lastMessageAt: Timestamp.now(),
-      unreadCount: fromMe ? 0 : currentUnread + 1,
-      ...(nome && !convSnap.exists ? { leadNome: nome } : {}),
-    },
+    { telefone, lastMessage: body, lastMessageAt: Timestamp.now(), unreadCount: fromMe ? 0 : currentUnread + 1 },
     { merge: true }
   );
 }
 
-// ─── Buscar lead pelo telefone no CRM ─────────────────────────────────────────
-async function findLeadByPhone(telefone) {
-  try {
-    const crmRef = db.collection("crm_data").doc("shared");
-    const doc = await crmRef.get();
-    if (!doc.exists) return null;
-
-    const leads = doc.data()?.leads || [];
-    const match = leads.find((l) => {
-      const digits = l.telefone?.replace(/\D/g, "") || "";
-      return telefone.endsWith(digits) || digits.endsWith(telefone.slice(-8));
-    });
-    return match || null;
-  } catch (e) {
-    return null;
-  }
-}
-
-// ─── Criar lead automaticamente se não existir ────────────────────────────────
-async function createLeadIfNew(telefone, nome) {
+// Sincronizar lead: cria se novo, NAO sobrescreve se ja existe
+async function syncLead(telefone, pushName, firstMessage) {
   try {
     const crmRef = db.collection("crm_data").doc("shared");
     const doc = await crmRef.get();
     const leads = doc.exists ? doc.data()?.leads || [] : [];
+    const telDigits = telefone.replace(/\D/g, "");
 
-    const exists = leads.find((l) => {
-      const digits = l.telefone?.replace(/\D/g, "") || "";
-      return telefone.endsWith(digits) || digits.endsWith(telefone.slice(-8));
+    // Compara ultimos 8 digitos para tolerar prefixo de pais
+    const existing = leads.find((l) => {
+      const d = l.telefone?.replace(/\D/g, "") || "";
+      return d.length >= 8 && telDigits.slice(-8) === d.slice(-8);
     });
 
-    if (!exists) {
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, "0");
-      const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
-
-      const newLead = {
-        id: `lead_${Date.now()}`,
-        dataCriacao: dateStr,
-        dataContato: dateStr,
-        nome: nome || `WhatsApp ${telefone.slice(-4)}`,
-        telefone: telefone,
-        servicoProcurado: "",
-        captador: "WhatsApp",
-        fonteLead: "WhatsApp",
-        etapaLead: "Novo",
-        status: "",
-        respostaLead: "RESPONDEU",
-        comparecimento: "",
-        dataFollowUp: "",
-        dataAgendamento: "",
-        dataRetornoLigacao: "",
-        observacao: "Lead captado via WhatsApp",
-        followUpCount: 0,
-        lembretes: { h24: false, today: false },
-      };
-
-      await crmRef.update({ leads: [...leads, newLead] });
-      console.log(`✅ Novo lead criado: ${newLead.nome} (${telefone})`);
-      return newLead;
+    if (existing) {
+      // Ja existe - usa nome do CRM na conversa
+      console.log(`Lead ja existe: ${existing.nome} (${telefone})`);
+      await db.collection("conversations").doc(telefone).set(
+        { leadNome: existing.nome, telefone },
+        { merge: true }
+      );
+      return;
     }
 
-    return exists;
+    // Lead novo - fonte e captador em branco, primeira msg na observacao
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+    const nome = pushName || `WhatsApp ${telefone.slice(-4)}`;
+    const telefoneFormatado = formatBRPhone(telefone);
+
+    const newLead = {
+      id: `lead_${Date.now()}`,
+      dataCriacao: dateStr,
+      dataContato: dateStr,
+      nome,
+      telefone: telefoneFormatado,
+      servicoProcurado: "",
+      captador: "",
+      fonteLead: "",
+      etapaLead: "Novo",
+      status: "",
+      respostaLead: "RESPONDEU",
+      comparecimento: "",
+      dataFollowUp: "",
+      dataAgendamento: "",
+      dataRetornoLigacao: "",
+      observacao: firstMessage ? `Primeira mensagem: "${firstMessage}"` : "",
+      followUpCount: 0,
+      lembretes: { h24: false, today: false },
+    };
+
+    await crmRef.update({ leads: [...leads, newLead] });
+    console.log(`Novo lead criado: ${nome} (${telefoneFormatado})`);
+    await db.collection("conversations").doc(telefone).set(
+      { leadNome: nome, telefone },
+      { merge: true }
+    );
   } catch (e) {
-    console.error("Erro ao criar lead:", e);
-    return null;
+    console.error("Erro ao sincronizar lead:", e);
   }
 }
 
-// ─── Baileys connection ────────────────────────────────────────────────────────
-let sock = null;
+const client = new Client({
+  authStrategy: new LocalAuth({ dataPath: "./auth_info" }),
+  puppeteer: {
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--no-first-run",
+      "--no-zygote",
+      "--disable-gpu",
+    ],
+  },
+});
 
-async function connectWhatsApp() {
-  const { state, saveCreds } = await useMultiFileAuthState("./auth_info");
+client.on("qr", (qr) => {
+  console.log("\nEscaneie o QR Code abaixo com o WhatsApp:\n");
+  qrcode.generate(qr, { small: true });
+  console.log("\n(WhatsApp -> Aparelhos conectados -> Conectar aparelho)\n");
+});
 
-  sock = makeWASocket({
-    auth: state,
-    logger: pino({ level: "silent" }),
-    printQRInTerminal: false,
-  });
+client.on("ready", () => {
+  console.log("WhatsApp conectado! Escutando mensagens...");
+});
 
-  sock.ev.on("creds.update", saveCreds);
+client.on("authenticated", () => {
+  console.log("Autenticado! Sessao salva.");
+});
 
-  sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
-    if (qr) {
-      console.log("\n📱 Escaneie o QR Code abaixo com o WhatsApp:\n");
-      qrcode.generate(qr, { small: true });
-    }
+client.on("auth_failure", (msg) => {
+  console.error("Falha de autenticacao:", msg);
+});
 
-    if (connection === "close") {
-      const shouldReconnect =
-        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log("Conexão encerrada. Reconectando:", shouldReconnect);
-      if (shouldReconnect) connectWhatsApp();
-    }
+client.on("disconnected", (reason) => {
+  console.log("Desconectado:", reason);
+  setTimeout(() => client.initialize(), 5000);
+});
 
-    if (connection === "open") {
-      console.log("✅ WhatsApp conectado com sucesso!");
-    }
-  });
+client.on("message", async (msg) => {
+  if (msg.isGroupMsg) return;
+  const telefone = await getRealPhone(msg);
+  const body = msg.body || "(midia)";
+  const pushName = msg._data?.notifyName || null;
+  console.log(`RECV ${telefone}: ${body}`);
+  await syncLead(telefone, pushName, body);
+  await saveMessage({ telefone, body, fromMe: false, msgId: msg.id._serialized });
+});
 
-  // ─── Escutar mensagens recebidas ──────────────────────────────────────────
-  sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify") return;
+client.on("message_create", async (msg) => {
+  if (!msg.fromMe || msg.isGroupMsg) return;
+  const rawTo = (msg.to || "").replace("@c.us", "").replace(/\D/g, "");
+  const telefone = rawTo.startsWith("55") ? rawTo : `55${rawTo}`;
+  const body = msg.body || "(midia)";
+  console.log(`SENT ${telefone}: ${body}`);
+  await saveMessage({ telefone, body, fromMe: true, msgId: msg.id._serialized });
+});
 
-    for (const msg of messages) {
-      if (!msg.message) continue;
-      if (msg.key.remoteJid?.endsWith("@g.us")) continue; // ignorar grupos
-
-      const fromMe = msg.key.fromMe || false;
-      const jid = msg.key.remoteJid;
-      const telefone = cleanPhone(jid);
-      const msgId = msg.key.id;
-
-      const contentType = getContentType(msg.message);
-      let body = "";
-
-      if (contentType === "conversation") {
-        body = msg.message.conversation;
-      } else if (contentType === "extendedTextMessage") {
-        body = msg.message.extendedTextMessage?.text || "";
-      } else if (contentType === "imageMessage") {
-        body = "📷 Imagem";
-      } else if (contentType === "audioMessage") {
-        body = "🎵 Áudio";
-      } else if (contentType === "videoMessage") {
-        body = "🎬 Vídeo";
-      } else if (contentType === "documentMessage") {
-        body = "📄 Documento";
-      } else if (contentType === "stickerMessage") {
-        body = "🩷 Sticker";
-      } else {
-        body = `(${contentType})`;
-      }
-
-      if (!body && !fromMe) return;
-
-      console.log(`${fromMe ? "📤" : "📨"} ${telefone}: ${body}`);
-
-      // Buscar/criar lead
-      const pushName = msg.pushName || null;
-      const lead = await findLeadByPhone(telefone);
-      const leadNome = lead?.nome || pushName || `WhatsApp ${telefone.slice(-4)}`;
-
-      if (!fromMe) {
-        await createLeadIfNew(telefone, pushName || leadNome);
-      }
-
-      // Salvar mensagem
-      await saveMessage({ telefone, body, fromMe, msgId, nome: leadNome });
-    }
-  });
-}
-
-// ─── Endpoint: enviar mensagem do CRM ─────────────────────────────────────────
+// API: enviar mensagem
 app.post("/send-message", async (req, res) => {
   const { telefone, message } = req.body;
-  if (!telefone || !message) {
-    return res.status(400).json({ error: "telefone e message são obrigatórios" });
-  }
-
-  if (!sock) {
-    return res.status(503).json({ error: "WhatsApp não conectado" });
-  }
-
+  if (!telefone || !message) return res.status(400).json({ error: "telefone e message sao obrigatorios" });
   try {
-    const jid = phoneToJid(telefone);
-    await sock.sendMessage(jid, { text: message });
-
-    // Salvar no Firestore
-    const msgId = `out_${Date.now()}`;
-    await saveMessage({ telefone: telefone.replace(/\D/g, ""), body: message, fromMe: true, msgId });
-
+    const waId = phoneToWAId(telefone);
+    await client.sendMessage(waId, message);
     res.json({ success: true });
   } catch (e) {
-    console.error("Erro ao enviar mensagem:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-// ─── Endpoint: status da conexão ──────────────────────────────────────────────
+// API: status
 app.get("/status", (req, res) => {
-  res.json({ connected: !!sock?.user });
+  const info = client.info;
+  res.json({ connected: !!info, number: info?.wid?.user || null });
 });
 
-// ─── Endpoint: marcar conversa como lida ──────────────────────────────────────
+// API: marcar como lido
 app.post("/mark-read", async (req, res) => {
   const { telefone } = req.body;
-  if (!telefone) return res.status(400).json({ error: "telefone obrigatório" });
-
+  if (!telefone) return res.status(400).json({ error: "telefone obrigatorio" });
   try {
     const cleanTel = telefone.replace(/\D/g, "");
     await db.collection("conversations").doc(cleanTel).update({ unreadCount: 0 });
-
-    // Marcar todas as mensagens como lidas
     const msgsRef = db.collection("conversations").doc(cleanTel).collection("messages");
     const unread = await msgsRef.where("read", "==", false).get();
     const batch = db.batch();
     unread.forEach((d) => batch.update(d.ref, { read: true }));
     await batch.commit();
-
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -279,10 +237,8 @@ app.post("/mark-read", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 Servidor CRM WhatsApp rodando na porta ${PORT}`);
-  console.log(`   POST /send-message  → envia mensagem`);
-  console.log(`   GET  /status        → status da conexão`);
-  console.log(`   POST /mark-read     → marca como lido\n`);
+  console.log(`\nServidor CRM WhatsApp na porta ${PORT}\n`);
 });
 
-connectWhatsApp();
+console.log("Iniciando WhatsApp... aguarde o QR Code...\n");
+client.initialize();

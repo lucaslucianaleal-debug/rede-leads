@@ -2,11 +2,16 @@ import { useState, useEffect } from "react";
 import { useConversations } from "@/hooks/useConversations";
 import { ConversationList } from "@/components/crm/ConversationList";
 import { ChatWindow } from "@/components/crm/ChatWindow";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
+import { Lead } from "@/types/crm";
 
-export function ChatView() {
+interface ChatViewProps {
+  leads: Lead[];
+  onUpdateLead: (id: string, updates: Partial<Lead>) => void;
+}
+
+export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
   const {
     conversations,
     serverConnected,
@@ -19,6 +24,15 @@ export function ChatView() {
   const messages = useMessages(selectedPhone);
 
   const selectedConversation = conversations.find((c) => c.telefone === selectedPhone) || null;
+
+  // Encontrar lead correspondente pelo telefone (ultimos 8 digitos)
+  const currentLead = selectedPhone
+    ? leads.find((l) => {
+        const ld = l.telefone?.replace(/\D/g, "") || "";
+        const sd = selectedPhone.replace(/\D/g, "");
+        return ld.length >= 8 && sd.slice(-8) === ld.slice(-8);
+      }) || null
+    : null;
 
   // Pedir permissão de notificação ao abrir a aba
   useEffect(() => {
@@ -81,6 +95,8 @@ export function ChatView() {
             onSend={handleSend}
             onOpen={handleOpen}
             serverConnected={serverConnected}
+            currentLead={currentLead}
+            onUpdateLead={onUpdateLead}
           />
         </div>
       </div>
