@@ -9,8 +9,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle, Clock, User, Stethoscope, CalendarCheck, Phone, Share2, ChevronRight } from "lucide-react";
-import { format } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CheckCircle2, XCircle, Clock, User, Stethoscope, CalendarCheck, Phone, Share2, ChevronRight, ChevronLeft, CalendarDays } from "lucide-react";
+import { format, addDays, subDays, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
 
@@ -20,21 +22,22 @@ interface AgendaDoDiaProps {
 }
 
 export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
-  const today = format(new Date(), "dd/MM/yyyy");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const dateStr = format(selectedDate, "dd/MM/yyyy");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const leadsHoje = useMemo(() => {
     return leads.filter((lead) => {
       if (!lead.dataAgendamento) return false;
-      // dataAgendamento pode ser "DD/MM/YYYY" ou "DD/MM/YYYY HH:MM"
-      return lead.dataAgendamento.startsWith(today);
+      return lead.dataAgendamento.startsWith(dateStr);
     }).sort((a, b) => {
       // Ordena por horário se disponível
       const timeA = a.dataAgendamento.split(" ")[1] || "00:00";
       const timeB = b.dataAgendamento.split(" ")[1] || "00:00";
       return timeA.localeCompare(timeB);
     });
-  }, [leads, today]);
+  }, [leads, dateStr]);
 
   const compareceram = leadsHoje.filter((l) => l.comparecimento === "COMPARECEU").length;
   const naoCompareceram = leadsHoje.filter((l) => l.comparecimento === "NÃO COMPARECEU").length;
@@ -44,11 +47,36 @@ export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
     <div className="space-y-6">
       {/* Header do dia */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-heading font-bold text-foreground">Agenda do Dia</h2>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-          </p>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedDate(d => subDays(d, 1))}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-8 px-3 gap-2 font-normal">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                <span className="font-semibold">
+                  {isToday(selectedDate) ? "Hoje — " : ""}{format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(d) => { if (d) { setSelectedDate(d); setCalendarOpen(false); } }}
+                locale={ptBR}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSelectedDate(d => addDays(d, 1))}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          {!isToday(selectedDate) && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setSelectedDate(new Date())}>
+              Hoje
+            </Button>
+          )}
         </div>
 
         {/* Resumo */}
@@ -79,7 +107,7 @@ export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <CalendarCheck className="h-12 w-12 text-muted-foreground mb-4 opacity-40" />
-            <p className="text-lg font-medium text-muted-foreground">Nenhum paciente agendado para hoje</p>
+            <p className="text-lg font-medium text-muted-foreground">Nenhum paciente agendado para {isToday(selectedDate) ? "hoje" : dateStr}</p>
             <p className="text-sm text-muted-foreground mt-1">Os agendamentos do dia aparecerão aqui</p>
           </CardContent>
         </Card>
