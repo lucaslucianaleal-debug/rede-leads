@@ -34,6 +34,7 @@ export type LeadSource =
 
 export interface Lead {
   id: string;
+  dataCriacao: string;
   dataContato: string;
   nome: string;
   telefone: string;

@@ -54,6 +54,15 @@ const normalizeLead = (lead: Lead): Lead => ({
   fonteLead: normalizeFonteLead(lead.fonteLead),
 });
 
+// Garantir que todo lead tem dataCriacao (fallback para dataContato ou hoje)
+const ensureDateCriacao = (lead: Lead): Lead => {
+  if (lead.dataCriacao) return lead;
+  return {
+    ...lead,
+    dataCriacao: lead.dataContato || format(new Date(), "dd/MM/yyyy"),
+  };
+};
+
 export function useLeads() {
   const isFromFirebase = useRef(false);
   const isMounted = useRef(true);
@@ -63,10 +72,10 @@ export function useLeads() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       const data = saved ? JSON.parse(saved) : mockLeads;
-      // Normalizar fontes ao carregar
-      return data.map(normalizeLead);
+      // Normalizar fontes e garantir dataCriacao ao carregar
+      return data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
     } catch {
-      return mockLeads.map(normalizeLead);
+      return mockLeads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
     }
   });
   const [filters, setFilters] = useState<ClinicFilter>({
@@ -84,8 +93,8 @@ export function useLeads() {
       if (snapshot.exists()) {
         let data = snapshot.data().leads as Lead[];
         if (data && Array.isArray(data)) {
-          // Normalizar fontes antigas para novos padrões
-          data = data.map(normalizeLead);
+          // Normalizar fontes antigas para novos padrões e garantir dataCriacao
+          data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
           isFromFirebase.current = true;
           setLeads(data);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -109,10 +118,10 @@ export function useLeads() {
     }
     // Salva localmente imediatamente
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
-    // Salva no Firebase com debounce de 1,5s, normalizando fontes
+    // Salva no Firebase com debounce de 1,5s, normalizando fontes e garantindo dataCriacao
     const timer = setTimeout(async () => {
       try {
-        const normalizedLeads = leads.map(normalizeLead);
+        const normalizedLeads = leads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
         await setDoc(FIREBASE_DOC, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
       } catch {
         // Falha silenciosa — dados ainda estão no localStorage
@@ -512,6 +521,7 @@ export function useLeads() {
 
   const exportCSV = () => {
     const data = leads.map((l) => ({
+      "DATA DE CRIAÇÃO": l.dataCriacao,
       "DATA DO CONTATO": l.dataContato,
       "NOME DO LEAD": l.nome,
       "TELEFONE": l.telefone,
@@ -581,26 +591,28 @@ export function useLeads() {
               const values = Object.values(row) as string[];
               return {
                 id: `imported-${Date.now()}-${i}`,
-                dataContato: values[0] || "",
-                nome: values[1] || "",
-                telefone: values[2] || "",
-                servicoProcurado: values[3] || "",
-                captador: values[4] || "",
-                fonteLead: values[5] || "Outro",
-                etapaLead: (values[6] || "Novo") as LeadStage,
-                status: (values[7] || "") as any,
-                respostaLead: (values[8] || "") as any,
-                comparecimento: (values[9] || "") as any,
-                dataFollowUp: values[10] || "",
-                dataAgendamento: values[11] || "",
-                observacao: values[12] || "",
-                followUpCount: parseInt(values[6]?.match(/\d+/)?.[0] || "0", 10),
+                dataCriacao: values[0] || format(new Date(), "dd/MM/yyyy"),
+                dataContato: values[1] || "",
+                nome: values[2] || "",
+                telefone: values[3] || "",
+                servicoProcurado: values[4] || "",
+                captador: values[5] || "",
+                fonteLead: values[6] || "Outro",
+                etapaLead: (values[7] || "Novo") as LeadStage,
+                status: (values[8] || "") as any,
+                respostaLead: (values[9] || "") as any,
+                comparecimento: (values[10] || "") as any,
+                dataFollowUp: values[11] || "",
+                dataAgendamento: values[12] || "",
+                observacao: values[13] || "",
+                followUpCount: parseInt(values[7]?.match(/\d+/)?.[0] || "0", 10),
                 lembretes: { h24: false, h12: false, h3: false, h1: false },
               };
             } else {
               // Map by column name
               return {
                 id: `imported-${Date.now()}-${i}`,
+                dataCriacao: row["DATA DE CRIAÇÃO"] || row["Data de Criação"] || format(new Date(), "dd/MM/yyyy"),
                 dataContato: row["DATA DO CONTATO"] || row["Data do Contato"] || "",
                 nome: row["NOME DO LEAD"] || row["Nome do Lead"] || row["nome"] || "",
                 telefone: row["TELEFONE"] || row["Telefone"] || "",
@@ -620,8 +632,8 @@ export function useLeads() {
             }
           });
         
-        // Normalizar fontes dos leads importados
-        const normalized = imported.map(normalizeLead);
+        // Normalizar fontes dos leads importados e garantir dataCriacao
+        const normalized = imported.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
         setLeads((prev) => [...prev, ...normalized]);
       },
       error: (error) => {

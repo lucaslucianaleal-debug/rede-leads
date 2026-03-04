@@ -55,6 +55,9 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Lead — {lead.nome}</DialogTitle>
+          <div className="text-xs text-muted-foreground mt-1">
+            Lead criado em <strong>{form.dataCriacao}</strong>
+          </div>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-4 py-2">
