@@ -11,23 +11,42 @@ const FIREBASE_DOC = doc(db, "crm_data", "shared");
 
 // Normalizar fontes antigas para as novas (unificar variações de maiúscula e agrupar online)
 const normalizeFonteLead = (fonte: string): string => {
-  const normalized = fonte?.trim().toLowerCase() || "outro";
+  if (!fonte) return "Outro";
+  const normalized = fonte.trim().toLowerCase();
   
-  // Mapear variações antigas para novas padrões
+  // Mapeamento exato
   const fonteMaps: Record<string, string> = {
     "instagram": "Online",
     "facebook": "Online",
     "whatsapp": "Online",
-    "cupom indicação": "Cupom Indicação",
-    "cupom indicaçao": "Cupom Indicação", // erro de acentuação
     "google": "Google",
     "sorteio radio": "Sorteio Radio",
+    "sorteio rádio": "Sorteio Radio",
     "site": "Site",
     "indicação": "Indicação",
-    "outro": "Outro",
+    "cupom indicação": "Cupom Indicação",
+    "cupom indicaçao": "Cupom Indicação",
+    "online": "Online",
   };
   
-  return fonteMaps[normalized] || "Outro";
+  // Se encontra no mapa, retorna
+  if (fonteMaps[normalized]) {
+    return fonteMaps[normalized];
+  }
+  
+  // Busca parcial (se contém a palavra)
+  if (normalized.includes("instagram") || normalized.includes("facebook") || normalized.includes("whatsapp")) {
+    return "Online";
+  }
+  if (normalized.includes("google")) return "Google";
+  if (normalized.includes("site")) return "Site";
+  if (normalized.includes("sorteio") || normalized.includes("radio")) return "Sorteio Radio";
+  if (normalized.includes("indicação") || normalized.includes("indicaçao")) {
+    return normalized.includes("cupom") ? "Cupom Indicação" : "Indicação";
+  }
+  
+  // Se não reconhecer, retorna como está (preserva valor original)
+  return fonte;
 };
 
 const normalizeLead = (lead: Lead): Lead => ({

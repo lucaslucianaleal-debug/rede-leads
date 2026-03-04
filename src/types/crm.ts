@@ -30,7 +30,7 @@ export type LeadSource =
   | "Sorteio Radio"
   | "Site"
   | "Indicação"
-  | "Outro";
+  | string;
 
 export interface Lead {
   id: string;
