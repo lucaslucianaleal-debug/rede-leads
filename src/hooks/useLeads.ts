@@ -594,12 +594,21 @@ export function useLeads() {
   };
 
   const importCSV = (file: File) => {
+    // Try parsing once with auto-detect; if duplicate headers appear, retry with explicit ";"
+    const doParse = (delimiter: string) => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      delimiter: "", // auto-detect comma or semicolon
+      delimiter,
       complete: (results) => {
         if (!results.data.length) return;
+        // If duplicate header renaming happened (keys end with _1, _2), retry with the other delimiter
+        const keys = Object.keys(results.data[0] as any);
+        const hasDuplicateRename = keys.some(k => /_\d+$/.test(k));
+        if (hasDuplicateRename && delimiter === "") {
+          doParse(";");
+          return;
+        }
 
         // Build a smart column resolver: finds the best matching key for each field
         const allKeys = Object.keys(results.data[0] as any).map(k =>
@@ -687,6 +696,8 @@ export function useLeads() {
         console.error("CSV Parse Error:", error);
       },
     });
+  };
+  doParse("");
   };
 
   const deleteLeads = (leadIds: string[]) => {
