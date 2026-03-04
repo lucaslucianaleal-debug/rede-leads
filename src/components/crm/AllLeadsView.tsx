@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LeadTable } from "./LeadTable";
 import { EditLeadDialog } from "./EditLeadDialog";
 import { useState, useMemo } from "react";
-import { Search, AlertTriangle, Users, CalendarCheck, Clock, UserCheck, Trash2 } from "lucide-react";
+import { Search, AlertTriangle, Users, CalendarCheck, Clock, UserCheck, Trash2, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
 
@@ -27,8 +27,7 @@ type FilterCategory = {
 export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLeads, onSelectionChange, onDeleteSelected }: AllLeadsViewProps) {
   const [filters, setFilters] = useState<FilterCategory>({});
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedContactMonth, setSelectedContactMonth] = useState<string>("all");
-  const [selectedAppointmentMonth, setSelectedAppointmentMonth] = useState<string>("all");
+  const [selectedEntryMonth, setSelectedEntryMonth] = useState<string>("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
 
@@ -59,32 +58,15 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
     return fonte;
   };
 
-  // Generate available months from dataContato
-  const availableContactMonths = useMemo(() => {
+  // Meses disponíveis baseados em dataCriacao (com fallback para dataContato)
+  const availableEntryMonths = useMemo(() => {
     const months = new Set<string>();
     leads.forEach((lead) => {
-      if (lead.dataContato) {
-        const [, month, year] = lead.dataContato.split("/");
-        if (month && year) {
-          months.add(`${month}/${year}`);
-        }
-      }
-    });
-    return Array.from(months).sort((a, b) => {
-      const [monthA, yearA] = a.split("/");
-      const [monthB, yearB] = b.split("/");
-      return yearB.localeCompare(yearA) || monthB.localeCompare(monthA);
-    });
-  }, [leads]);
-
-  // Generate available months from dataAgendamento
-  const availableAppointmentMonths = useMemo(() => {
-    const months = new Set<string>();
-    leads.forEach((lead) => {
-      if (lead.dataAgendamento) {
-        const parts = lead.dataAgendamento.split("/");
+      const date = lead.dataCriacao || lead.dataContato;
+      if (date) {
+        const parts = date.split("/");
         const month = parts[1];
-        const year = parts[2]?.split(" ")[0]; // strip time if present
+        const year = parts[2]?.split(" ")[0];
         if (month && year) {
           months.add(`${month}/${year}`);
         }
@@ -106,29 +88,25 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
     return Array.from(sources).sort();
   }, [leads]);
 
-  // First filter by contact month, appointment month, and source
+  // Filtra pelo mês de ENTRADA do lead (coorte) + fonte
+  // Stats refletem o destino de todos os leads que ENTRARAM naquele mês,
+  // independentemente de quando foram agendados/compareceram
   const leadsFilteredByMonthSource = useMemo(() => {
     let result = leads;
 
-    // Filter by contact month
-    if (selectedContactMonth !== "all") {
+    // Filtro por mês de entrada (dataCriacao com fallback para dataContato)
+    if (selectedEntryMonth !== "all") {
       result = result.filter((lead) => {
-        if (!lead.dataContato) return false;
-        const [, month, year] = lead.dataContato.split("/");
-        return `${month}/${year}` === selectedContactMonth;
+        const date = lead.dataCriacao || lead.dataContato;
+        if (!date) return false;
+        const parts = date.split("/");
+        const month = parts[1];
+        const year = parts[2]?.split(" ")[0];
+        return `${month}/${year}` === selectedEntryMonth;
       });
     }
 
-    // Filter by appointment month
-    if (selectedAppointmentMonth !== "all") {
-      result = result.filter((lead) => {
-        if (!lead.dataAgendamento) return false;
-        const [, month, year] = lead.dataAgendamento.split("/");
-        return `${month}/${year}` === selectedAppointmentMonth;
-      });
-    }
-
-    // Filter by source
+    // Filtro por fonte
     if (selectedSource !== "all") {
       result = result.filter((lead) => {
         return getSourceGroup(lead.fonteLead) === selectedSource;
@@ -136,7 +114,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
     }
 
     return result;
-  }, [leads, selectedContactMonth, selectedAppointmentMonth, selectedSource]);
+  }, [leads, selectedEntryMonth, selectedSource]);
 
   // Calculate stats based on month/source filters
   const stats = useMemo(() => {
@@ -186,12 +164,11 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
   const clearFilters = () => {
     setFilters({});
     setSearchTerm("");
-    setSelectedContactMonth("all");
-    setSelectedAppointmentMonth("all");
+    setSelectedEntryMonth("all");
     setSelectedSource("all");
   };
 
-  const hasActiveFilters = searchTerm !== "" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all";
+  const hasActiveFilters = searchTerm !== "" || selectedEntryMonth !== "all" || selectedSource !== "all";
 
   const colorMap: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
@@ -221,31 +198,14 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
           {/* Month and Source Filters */}
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Mês de Contato:</span>
-              <Select value={selectedContactMonth} onValueChange={setSelectedContactMonth}>
+              <span className="text-sm font-medium text-muted-foreground">Mês de Entrada:</span>
+              <Select value={selectedEntryMonth} onValueChange={setSelectedEntryMonth}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {availableContactMonths.map((month) => (
-                    <SelectItem key={month} value={month}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Mês de Agendamento:</span>
-              <Select value={selectedAppointmentMonth} onValueChange={setSelectedAppointmentMonth}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {availableAppointmentMonths.map((month) => (
+                  {availableEntryMonths.map((month) => (
                     <SelectItem key={month} value={month}>
                       {month}
                     </SelectItem>
@@ -275,6 +235,16 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
               ))}
             </div>
           </div>
+
+          {/* Coorte label */}
+          {selectedEntryMonth !== "all" && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 rounded-md px-3 py-2">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                Visão de <strong>coorte {selectedEntryMonth}</strong>: estatísticas referentes apenas aos leads que <strong>entraram</strong> neste mês, independente de quando foram agendados ou compareceram.
+              </span>
+            </div>
+          )}
 
           {/* Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
