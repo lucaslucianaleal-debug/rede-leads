@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 
 interface AgendaDoDiaProps {
   leads: Lead[];
-  onMarkAttendance: (id: string, value: "COMPARECEU" | "NÃO COMPARECEU") => void;
+  onMarkAttendance: (id: string, value: "COMPARECEU" | "NÃO COMPARECEU" | "") => void;
 }
 
 export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
@@ -115,11 +115,11 @@ export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
                       <span className="truncate">{lead.servicoProcurado || "Não informado"}</span>
                     </div>
 
-                    {/* Botões sempre visíveis, selecionado fica destacado */}
+                    {/* Botões sempre visíveis, clicar no ativo desfaz a seleção */}
                     <div className="grid grid-cols-2 gap-2">
                       <Button
                         size="sm"
-                        onClick={() => onMarkAttendance(lead.id, "COMPARECEU")}
+                        onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "COMPARECEU" ? "" : "COMPARECEU")}
                         className={`h-10 text-xs font-semibold transition-all ${
                           lead.comparecimento === "COMPARECEU"
                             ? "bg-green-600 hover:bg-green-700 text-white ring-2 ring-green-400"
@@ -132,7 +132,7 @@ export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
                       </Button>
                       <Button
                         size="sm"
-                        onClick={() => onMarkAttendance(lead.id, "NÃO COMPARECEU")}
+                        onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "NÃO COMPARECEU" ? "" : "NÃO COMPARECEU")}
                         className={`h-10 text-xs font-semibold transition-all ${
                           lead.comparecimento === "NÃO COMPARECEU"
                             ? "bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-400"
