@@ -20,7 +20,18 @@ const getNextFollowUpDate = (lead: Lead): string => {
   // Se está em Follow-Up 1-4, próximo = +1 dia; se 5+, +2 dias
   const daysToAdd = lead.followUpCount >= 5 ? 2 : 1;
   const lastFollowUpDate = parse(lead.dataFollowUp, "dd/MM/yyyy", new Date());
-  const nextDate = addDays(lastFollowUpDate, daysToAdd);
+  let nextDate = addDays(lastFollowUpDate, daysToAdd);
+  
+  // Se tem agendamento, o próximo follow-up deve ser após a data de agendamento
+  if (lead.dataAgendamento) {
+    const agendamentoDate = parse(lead.dataAgendamento.split(" ")[0], "dd/MM/yyyy", new Date());
+    if (nextDate <= agendamentoDate) {
+      // Próximo follow-up seria antes/na data do agendamento
+      // Então mostrar a data do agendamento como referência
+      return format(agendamentoDate, "dd/MM/yyyy");
+    }
+  }
+  
   return format(nextDate, "dd/MM/yyyy");
 };
 
