@@ -1,0 +1,20 @@
+{
+  "name": "whatsapp-server",
+  "version": "1.0.0",
+  "description": "Baileys WhatsApp server for CRM integration",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.5",
+    "firebase-admin": "^12.0.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "qrcode-terminal": "^0.12.0",
+    "dotenv": "^16.4.5",
+    "pino": "^9.0.0"
+  }
+}

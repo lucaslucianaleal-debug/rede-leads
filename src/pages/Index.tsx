@@ -1,6 +1,7 @@
 import { useLeads } from "@/hooks/useLeads";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useConversations } from "@/hooks/useConversations";
 import { StatsCards } from "@/components/crm/StatsCards";
 import { FollowUpQueue } from "@/components/crm/FollowUpQueue";
 import { CallReturnQueue } from "@/components/crm/CallReturnQueue";
@@ -10,6 +11,7 @@ import { ReminderQueue } from "@/components/crm/ReminderQueue";
 import { CalendarView } from "@/components/crm/CalendarView";
 import { AllLeadsView } from "@/components/crm/AllLeadsView";
 import { AgendaDoDia } from "@/components/crm/AgendaDoDia";
+import { ChatView } from "@/components/crm/ChatView";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -24,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
 import { format } from "date-fns";
@@ -58,6 +60,8 @@ const CRMDashboard = () => {
     clearDuplicates,
     allLeads,
   } = useLeads();
+
+  const { totalUnread } = useConversations();
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -244,7 +248,7 @@ const CRMDashboard = () => {
           />
         ) : (
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full sm:max-w-[750px] grid-cols-4">
+          <TabsList className="grid w-full sm:max-w-[900px] grid-cols-5">
             <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
               <LayoutDashboard className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -260,6 +264,15 @@ const CRMDashboard = () => {
             <TabsTrigger value="all-leads" className="flex items-center gap-1.5">
               <Database className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Todos os Leads</span>
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="flex items-center gap-1.5 relative">
+              <MessageCircle className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Chat</span>
+              {totalUnread > 0 && (
+                <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                  {totalUnread > 9 ? "9+" : totalUnread}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -310,6 +323,10 @@ const CRMDashboard = () => {
               onSendFollowUp={handleFollowUp}
               onRegisterCall={handleRegisterCall}
             />
+          </TabsContent>
+
+          <TabsContent value="chat">
+            <ChatView />
           </TabsContent>
         </Tabs>
         )}
