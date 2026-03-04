@@ -45,7 +45,9 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const fromSelect = (v: string) => v === NONE ? "" : v;
 
   const handleSave = () => {
-    onSave(lead.id, form);
+    // Nunca alterar followUpCount via edição manual — só o "Feito" pode avançar o follow-up
+    const { followUpCount, ...safeUpdates } = form as Lead;
+    onSave(lead.id, safeUpdates);
     toast.success("Lead atualizado!");
     onClose();
   };
