@@ -1,13 +1,10 @@
 import { WHATSAPP_CLINIC_NUMBER } from "@/types/crm";
 
-type ReminderType = "24h" | "12h" | "3h" | "1h";
-
 export function generateWhatsAppLink(
   leadPhone: string,
   leadName: string,
   servicoProcurado: string,
-  dataAgendamento: string,
-  reminderType: ReminderType
+  dataAgendamento: string
 ): string {
   const message = `⏰ Lembrete da sua avaliação | OdontoCompany Olimpia\n\nOlá! \nPassando só pra lembrar que sua avaliação está marcada para *HOJE*. 😊\n\n📅 Data e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui.\nTe esperamos! 💚`;
 

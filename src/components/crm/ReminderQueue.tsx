@@ -6,14 +6,12 @@ import { generateWhatsAppLink } from "@/lib/whatsapp";
 
 interface ReminderQueueProps {
   leads: Lead[];
-  onMarkReminder: (leadId: string, type: "h24" | "h12" | "h3" | "h1") => void;
+  onMarkReminder: (leadId: string, type: "h24" | "today") => void;
 }
 
 const reminderTypes = [
-  { key: "h24" as const, label: "24h" },
-  { key: "h12" as const, label: "12h" },
-  { key: "h3" as const, label: "3h" },
-  { key: "h1" as const, label: "1h" },
+  { key: "h24" as const, label: "24h antes" },
+  { key: "today" as const, label: "Hoje" },
 ];
 
 export function ReminderQueue({ leads, onMarkReminder }: ReminderQueueProps) {

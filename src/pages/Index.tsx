@@ -85,7 +85,7 @@ const CRMDashboard = () => {
     registerCall(leadId, outcome, obs);
   };
 
-  const handleReminder = (id: string, type: "h24" | "h12" | "h3" | "h1") => {
+  const handleReminder = (id: string, type: "h24" | "today") => {
     markReminder(id, type);
     toast.success(`Lembrete ${type} registrado!`);
   };

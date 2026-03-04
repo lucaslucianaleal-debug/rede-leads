@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 interface CalendarViewProps {
   leads: Lead[];
-  onMarkReminder: (id: string, type: "h24" | "h12" | "h3" | "h1") => void;
+  onMarkReminder: (id: string, type: "h24" | "today") => void;
 }
 
 export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
@@ -57,32 +57,28 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
     }
   };
 
-  const handleSendReminder = (lead: Lead, type: "h24" | "h12" | "h3" | "h1") => {
+  const handleSendReminder = (lead: Lead, type: "h24" | "today") => {
     const reminderTypeMap = {
-      h24: "24h",
-      h12: "12h",
-      h3: "3h",
-      h1: "1h",
+      h24: "24h antes",
+      today: "Hoje",
     } as const;
     
     const whatsappLink = generateWhatsAppLink(
       lead.telefone,
       lead.nome,
       lead.servicoProcurado,
-      lead.dataAgendamento,
-      reminderTypeMap[type]
+      lead.dataAgendamento
     );
     
     window.open(whatsappLink, "_blank");
     onMarkReminder(lead.id, type);
-    toast.success(`Lembrete ${type} enviado para ${lead.nome}`);
+    toast.success(`Lembrete ${reminderTypeMap[type]} enviado para ${lead.nome}`);
   };
 
   const getReminderStatus = (lead: Lead) => {
-    const { h24, h12, h3, h1 } = lead.lembretes;
-    if (h1) return { label: "Todos enviados", color: "bg-green-500" };
-    if (h3) return { label: "3 enviados", color: "bg-yellow-500" };
-    if (h12) return { label: "2 enviados", color: "bg-orange-500" };
+    const { h24, today } = lead.lembretes;
+    if (h24 && today) return { label: "Todos enviados", color: "bg-green-500" };
+    if (today) return { label: "1 enviado", color: "bg-blue-500" };
     if (h24) return { label: "1 enviado", color: "bg-blue-500" };
     return { label: "Nenhum enviado", color: "bg-gray-500" };
   };
@@ -162,7 +158,7 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <Button
                           size="sm"
                           variant={lead.lembretes.h24 ? "default" : "outline"}
@@ -171,37 +167,17 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
                           className={lead.lembretes.h24 ? "bg-success" : ""}
                         >
                           <Clock className="h-3 w-3 mr-1" />
-                          24h
+                          24h antes
                         </Button>
                         <Button
                           size="sm"
-                          variant={lead.lembretes.h12 ? "default" : "outline"}
-                          onClick={() => handleSendReminder(lead, "h12")}
-                          disabled={lead.lembretes.h12}
-                          className={lead.lembretes.h12 ? "bg-success" : ""}
+                          variant={lead.lembretes.today ? "default" : "outline"}
+                          onClick={() => handleSendReminder(lead, "today")}
+                          disabled={lead.lembretes.today}
+                          className={lead.lembretes.today ? "bg-success" : ""}
                         >
                           <Clock className="h-3 w-3 mr-1" />
-                          12h
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={lead.lembretes.h3 ? "default" : "outline"}
-                          onClick={() => handleSendReminder(lead, "h3")}
-                          disabled={lead.lembretes.h3}
-                          className={lead.lembretes.h3 ? "bg-success" : ""}
-                        >
-                          <Clock className="h-3 w-3 mr-1" />
-                          3h
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={lead.lembretes.h1 ? "default" : "outline"}
-                          onClick={() => handleSendReminder(lead, "h1")}
-                          disabled={lead.lembretes.h1}
-                          className={lead.lembretes.h1 ? "bg-success" : ""}
-                        >
-                          <Clock className="h-3 w-3 mr-1" />
-                          1h
+                          Hoje
                         </Button>
                       </div>
                       

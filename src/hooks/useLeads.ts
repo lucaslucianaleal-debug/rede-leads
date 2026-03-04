@@ -170,7 +170,7 @@ export function useLeads() {
     
     const lembretesPendentes = leads.filter((l) => {
       if (!l.dataAgendamento) return false;
-      if (l.lembretes.h24 && l.lembretes.h12 && l.lembretes.h3 && l.lembretes.h1) return false;
+      if (l.lembretes.h24 && l.lembretes.today) return false;
       
       const [day, month, year] = l.dataAgendamento.split('/');
       const agendamentoDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
@@ -283,7 +283,7 @@ export function useLeads() {
     );
   };
 
-  const markReminder = (leadId: string, type: "h24" | "h12" | "h3" | "h1") => {
+  const markReminder = (leadId: string, type: "h24" | "today") => {
     setLeads((prev) =>
       prev.map((l) => {
         if (l.id !== leadId) return l;
@@ -566,9 +566,7 @@ export function useLeads() {
       "DATA DE AGENDAMENTO": l.dataAgendamento,
       "OBSERVAÇÃO": l.observacao,
       "LEMBRETE 24H": l.lembretes.h24 ? "SIM" : "NÃO",
-      "LEMBRETE 12H": l.lembretes.h12 ? "SIM" : "NÃO",
-      "LEMBRETE 3H": l.lembretes.h3 ? "SIM" : "NÃO",
-      "LEMBRETE 1H": l.lembretes.h1 ? "SIM" : "NÃO",
+      "LEMBRETE HOJE": l.lembretes.today ? "SIM" : "NÃO",
     }));
     const csv = Papa.unparse(data, { delimiter: ";" });
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
@@ -636,7 +634,7 @@ export function useLeads() {
                 dataAgendamento: values[12] || "",
                 observacao: values[13] || "",
                 followUpCount: parseInt(values[7]?.match(/\d+/)?.[0] || "0", 10),
-                lembretes: { h24: false, h12: false, h3: false, h1: false },
+                lembretes: { h24: false, today: false },
               };
             } else {
               // Map by column name
@@ -657,7 +655,7 @@ export function useLeads() {
                 dataAgendamento: row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || "",
                 observacao: row["OBSERVAÇÃO"] || row["Observação"] || "",
                 followUpCount: parseInt(row["ETAPA DO LEAD"]?.match(/\d+/)?.[0] || "0", 10),
-                lembretes: { h24: false, h12: false, h3: false, h1: false },
+                lembretes: { h24: false, today: false },
               };
             }
           });

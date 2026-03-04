@@ -1,6 +1,6 @@
 import { Lead } from "@/types/crm";
 
-const noReminders = { h24: false, h12: false, h3: false, h1: false };
+const noReminders = { h24: false, today: false };
 
 export const mockLeads: Lead[] = [
   { id: "1", dataContato: "15/01/2026", nome: "Gii", telefone: "+5517996843267", servicoProcurado: "Facetas", captador: "", fonteLead: "Instagram", etapaLead: "Follow-Up 3", status: "QUENTE", respostaLead: "RESPONDEU", comparecimento: "", dataFollowUp: "18/02/2026", dataAgendamento: "", observacao: "Enviado Voucher 200,00", followUpCount: 3, lembretes: { ...noReminders } },

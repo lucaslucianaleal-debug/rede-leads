@@ -54,9 +54,7 @@ export interface Lead {
 
 export interface ReminderStatus {
   h24: boolean;
-  h12: boolean;
-  h3: boolean;
-  h1: boolean;
+  today: boolean;
 }
 
 export interface ClinicFilter {
