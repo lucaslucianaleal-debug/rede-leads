@@ -65,7 +65,14 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
         <DialogHeader>
           <DialogTitle>Registrar Ligação</DialogTitle>
           <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
-            <div className="text-xs text-muted-foreground mb-1">{lead.nome}</div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-xs text-muted-foreground">{lead.nome}</div>
+              {lead.servicoProcurado && (
+                <div className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                  {lead.servicoProcurado}
+                </div>
+              )}
+            </div>
             <div className="text-2xl font-mono font-bold tracking-widest text-foreground">
               {formatPhoneNumber(lead.telefone)}
             </div>
