@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# WhatsApp server - arquivos sensíveis/locais
+whatsapp-server/serviceAccountKey.json
+whatsapp-server/auth_info/
+whatsapp-server/.wwebjs_cache/
+whatsapp-server/.wwebjs_auth/
+whatsapp-server/media/
+whatsapp-server/package-lock.json
