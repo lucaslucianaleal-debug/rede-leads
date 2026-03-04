@@ -25,10 +25,23 @@ export function generateWhatsAppLink(
 export function generateFollowUpWhatsAppLink(
   leadPhone: string,
   leadName: string,
-  servicoProcurado: string,
-  followUpNumber: number
+  servicoProcuradoOrMessage: string,
+  followUpNumberOrUndefined?: number | undefined
 ): string {
-  const message = `Olá ${leadName}! 😊\n\nTudo bem? Estamos entrando em contato sobre o seu interesse em *${servicoProcurado}*.\n\nGostaríamos de agendar uma avaliação gratuita para você. Temos horários disponíveis esta semana!\n\nPosso agendar para você? 📅\n\n_Ninety Assessoria de Marketing e Vendas_`;
+  // Support both old API (servicoProcurado, followUpNumber) and new API (customMessage as 3rd param)
+  const isFreeTextMessage = typeof followUpNumberOrUndefined === "undefined" || 
+    (typeof servicoProcuradoOrMessage === "string" && servicoProcuradoOrMessage.length > 50);
+  
+  let message: string;
+  
+  if (isFreeTextMessage) {
+    // New API: message is provided directly
+    message = servicoProcuradoOrMessage;
+  } else {
+    // Old API: generate default message
+    const servicoProcurado = servicoProcuradoOrMessage;
+    message = `Olá ${leadName}! 😊\n\nTudo bem? Estamos entrando em contato sobre o seu interesse em *${servicoProcurado}*.\n\nGostaríamos de agendar uma avaliação gratuita para você. Temos horários disponíveis esta semana!\n\nPosso agendar para você? 📅\n\n_Ninety Assessoria de Marketing e Vendas_`;
+  }
 
   const phone = leadPhone.replace(/[^0-9]/g, "");
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;

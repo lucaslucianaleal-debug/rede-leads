@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
+import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
+import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 
 interface FollowUpQueueProps {
   leads: Lead[];
@@ -31,6 +33,8 @@ const getDaysSince = (dateString: string): number => {
 export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20 }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
+  const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
+  const [suggestedMessage, setSuggestedMessage] = useState<string>("");
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
   
   const handleConfirmFollowUp = (leadId: string, observacao: string) => {
@@ -41,6 +45,34 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const handleConfirmCall = (leadId: string, outcome: string, obs: string) => {
     onRegisterCall?.(leadId, outcome, obs);
     setCallLead(null);
+  };
+
+  const handleWhatsAppClick = (lead: Lead) => {
+    // Follow-Up 1-2 (followUpCount 0-1): libre text
+    if (lead.followUpCount < 2) {
+      const whatsLink = generateFollowUpWhatsAppLink(
+        lead.telefone,
+        lead.nome,
+        lead.servicoProcurado,
+        lead.followUpCount + 1
+      );
+      window.open(whatsLink, "_blank");
+      return;
+    }
+
+    // Follow-Up 3+ (followUpCount >= 2): show suggested message dialog
+    const template = getFollowUpMessage(lead.etapaLead);
+    if (template) {
+      const formatted = formatFollowUpMessage(
+        template,
+        lead.nome,
+        lead.servicoProcurado
+      );
+      setSuggestedMessage(formatted);
+    } else {
+      setSuggestedMessage("");
+    }
+    setWhatsappLead(lead);
   };
   
   return (
@@ -78,7 +110,6 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
             <p className="text-sm text-muted-foreground py-4 text-center">Nenhum follow-up pendente 🎉</p>
           ) : (
             leads.map((lead, i) => {
-              const whatsLink = generateFollowUpWhatsAppLink(lead.telefone, lead.nome, lead.servicoProcurado, lead.followUpCount + 1);
               const daysSince = getDaysSince(lead.dataFollowUp);
               
               return (
@@ -123,12 +154,15 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                       <Phone className="h-3.5 w-3.5 mr-1" />
                       Registrar Ligação
                     </Button>
-                    <a href={whatsLink} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline" className="text-success border-success/30 hover:bg-success/10">
-                        <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                        WhatsApp
-                      </Button>
-                    </a>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleWhatsAppClick(lead)}
+                      className="text-success border-success/30 hover:bg-success/10"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                      WhatsApp
+                    </Button>
                     <Button 
                       size="sm" 
                       onClick={() => setSelectedLead(lead)}
@@ -157,6 +191,13 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         open={!!callLead}
         onClose={() => setCallLead(null)}
         onConfirm={handleConfirmCall}
+      />
+
+      <WhatsAppMessageDialog
+        lead={whatsappLead}
+        open={!!whatsappLead}
+        onClose={() => setWhatsappLead(null)}
+        suggestedMessage={suggestedMessage}
       />
     </div>
   );
