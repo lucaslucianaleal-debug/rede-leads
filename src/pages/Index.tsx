@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck } from "lucide-react";
 import { FunnelIcon } from "@/components/FunnelIcon";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -194,10 +194,14 @@ const CRMDashboard = () => {
           />
         ) : (
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full max-w-[600px] grid-cols-3">
+          <TabsList className="grid w-full max-w-[750px] grid-cols-4">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
               Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="agenda" className="flex items-center gap-2">
+              <CalendarCheck className="h-4 w-4" />
+              Agenda do Dia
             </TabsTrigger>
             <TabsTrigger value="calendar" className="flex items-center gap-2">
               <CalendarIcon className="h-4 w-4" />
@@ -224,6 +228,13 @@ const CRMDashboard = () => {
               />
               <ReminderQueue leads={reminderQueue} onMarkReminder={handleReminder} />
             </div>
+          </TabsContent>
+
+          <TabsContent value="agenda" className="mt-6">
+            <AgendaDoDia
+              leads={leads}
+              onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
+            />
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-6">
