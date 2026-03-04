@@ -46,7 +46,7 @@ export default function Landing() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-white">Rede Leads</h1>
-          <p className="text-xs text-blue-300">Assessoria de Marketing e Vendas</p>
+          <p className="text-xs text-blue-300">Central de Conversão de Leads</p>
         </div>
       </header>
 
@@ -155,7 +155,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="px-8 py-4 text-center">
         <p className="text-slate-600 text-xs">
-          © 2026 Rede Leads · Assessoria de Marketing e Vendas · WhatsApp: (17) 99104-0452
+          © 2026 Rede Leads · Central de Conversão de Leads · WhatsApp: (17) 99104-0452
         </p>
       </footer>
     </div>
