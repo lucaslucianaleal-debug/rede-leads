@@ -211,7 +211,7 @@ export function useLeads() {
     return leads
       .filter(
         (l) =>
-          l.etapaLead.startsWith("Follow-Up") &&
+          (l.etapaLead === "Em contato" || l.etapaLead.startsWith("Follow-Up")) &&
           l.etapaLead !== "Desistência" &&
           l.comparecimento !== "COMPARECEU"
       )
