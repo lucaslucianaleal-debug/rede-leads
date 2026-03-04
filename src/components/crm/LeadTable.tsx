@@ -3,11 +3,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil, Phone, ExternalLink, Check, CalendarCheck } from "lucide-react";
+import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil, Phone, ExternalLink, Check, CalendarCheck, Info } from "lucide-react";
 import { useState } from "react";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
+import { LeadDetailsDialog } from "./LeadDetailsDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 
@@ -38,6 +39,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
   const [suggestedMessage, setSuggestedMessage] = useState("");
+  const [detailsLead, setDetailsLead] = useState<Lead | null>(null);
 
   const handleWhatsAppClick = (lead: Lead) => {
     const template = getFollowUpMessage(lead.etapaLead);
@@ -321,7 +323,16 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                     </TableCell>
                   )}
                   {onEditLead && (
-                    <TableCell>
+                    <TableCell className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={() => setDetailsLead(lead)}
+                        title="Ver detalhes"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -374,6 +385,13 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
           setWhatsappLead(null);
         }}
         suggestedMessage={suggestedMessage}
+      />
+
+      <LeadDetailsDialog
+        lead={detailsLead}
+        open={!!detailsLead}
+        onClose={() => setDetailsLead(null)}
+        onEdit={onEditLead}
       />
     </>
   );
