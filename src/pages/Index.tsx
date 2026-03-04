@@ -8,6 +8,7 @@ import { AdminPanel } from "@/components/crm/AdminPanel";
 import { ReminderQueue } from "@/components/crm/ReminderQueue";
 import { CalendarView } from "@/components/crm/CalendarView";
 import { AllLeadsView } from "@/components/crm/AllLeadsView";
+import { AgendaDoDia } from "@/components/crm/AgendaDoDia";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,7 +33,7 @@ import { toast } from "sonner";
 
 const CRMDashboard = () => {
   const { user } = useAuth();
-  const { permissions } = useUserPermissions();
+  const { permissions, isReceptionist } = useUserPermissions();
   const {
     leads,
     stats,
@@ -133,57 +134,65 @@ const CRMDashboard = () => {
           </div>
           <div className="flex gap-2 items-center">
             <AuthComponent />
-            <input type="file" ref={fileRef} accept=".csv" onChange={handleImport} className="hidden" />
-            {permissions?.canImport && (
-              <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                <Download className="h-4 w-4 mr-1" />
-                Importar CSV
-              </Button>
-            )}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <CalendarIcon className="h-4 w-4 mr-1" />
-                  {format(reportDate, "dd/MM/yyyy")}
+            {!isReceptionist && (
+              <>
+                <input type="file" ref={fileRef} accept=".csv" onChange={handleImport} className="hidden" />
+                {permissions?.canImport && (
+                  <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                    <Download className="h-4 w-4 mr-1" />
+                    Importar CSV
+                  </Button>
+                )}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <CalendarIcon className="h-4 w-4 mr-1" />
+                      {format(reportDate, "dd/MM/yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={reportDate}
+                      onSelect={(date) => date && setReportDate(date)}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button variant="default" size="sm" onClick={() => exportDailyReport(reportDate)}>
+                  <FileText className="h-4 w-4 mr-1" />
+                  Relatório Diário
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={reportDate}
-                  onSelect={(date) => date && setReportDate(date)}
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
-            <Button variant="default" size="sm" onClick={() => exportDailyReport(reportDate)}>
-              <FileText className="h-4 w-4 mr-1" />
-              Relatório Diário
-            </Button>
-            <Button variant="default" size="sm" onClick={() => exportWeeklyReport(reportDate)}>
-              <FileSpreadsheet className="h-4 w-4 mr-1" />
-              Relatório Semanal
-            </Button>
-            {duplicatesInfo.has && permissions?.canDelete && (
-              <Button variant="outline" size="sm" onClick={() => setShowClearDuplicatesDialog(true)} className="border-amber-500 text-amber-700 hover:bg-amber-50">
-                <Copy className="h-4 w-4 mr-1" />
-                Limpar Duplicatas ({duplicatesInfo.count})
-              </Button>
+                <Button variant="default" size="sm" onClick={() => exportWeeklyReport(reportDate)}>
+                  <FileSpreadsheet className="h-4 w-4 mr-1" />
+                  Relatório Semanal
+                </Button>
+                {duplicatesInfo.has && permissions?.canDelete && (
+                  <Button variant="outline" size="sm" onClick={() => setShowClearDuplicatesDialog(true)} className="border-amber-500 text-amber-700 hover:bg-amber-50">
+                    <Copy className="h-4 w-4 mr-1" />
+                    Limpar Duplicatas ({duplicatesInfo.count})
+                  </Button>
+                )}
+                {permissions?.canDelete && (
+                  <Button variant="destructive" size="sm" onClick={() => setShowClearDialog(true)}>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Limpar Base
+                  </Button>
+                )}
+                {user && <AdminPanel />}
+              </>
             )}
-            {permissions?.canDelete && (
-              <Button variant="destructive" size="sm" onClick={() => setShowClearDialog(true)}>
-                <Trash2 className="h-4 w-4 mr-1" />
-                Limpar Base
-              </Button>
-            )}
-            {user && 
-              <AdminPanel />
-            }
           </div>
         </div>
       </header>
 
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {isReceptionist ? (
+          <AgendaDoDia
+            leads={leads}
+            onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
+          />
+        ) : (
         <Tabs defaultValue="dashboard" className="w-full">
           <TabsList className="grid w-full max-w-[600px] grid-cols-3">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
@@ -232,6 +241,7 @@ const CRMDashboard = () => {
             />
           </TabsContent>
         </Tabs>
+        )}
       </main>
 
       {/* Clear All Dialog */}

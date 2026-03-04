@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "editor" | "viewer";
+export type UserRole = "admin" | "editor" | "viewer" | "recepcao";
 
 export interface CRMUser {
   uid: string;
@@ -34,6 +34,13 @@ export const rolePermissions: Record<UserRole, UserPermissions> = {
   viewer: {
     canView: true,
     canEdit: false,
+    canImport: false,
+    canDelete: false,
+    canManageUsers: false,
+  },
+  recepcao: {
+    canView: true,
+    canEdit: true,
     canImport: false,
     canDelete: false,
     canManageUsers: false,

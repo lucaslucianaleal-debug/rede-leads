@@ -53,5 +53,5 @@ export function useUserPermissions() {
     loadPermissions();
   }, [user]);
 
-  return { role, permissions, loading, isAdmin: role === "admin" };
+  return { role, permissions, loading, isAdmin: role === "admin", isReceptionist: role === "recepcao" };
 }
