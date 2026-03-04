@@ -80,7 +80,6 @@ export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {leadsHoje.map((lead, index) => {
             const horario = lead.dataAgendamento.split(" ")[1];
-            const jaConfirmado = !!lead.comparecimento;
 
             return (
               <motion.div
@@ -116,47 +115,35 @@ export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
                       <span className="truncate">{lead.servicoProcurado || "Não informado"}</span>
                     </div>
 
-                    {/* Status já confirmado */}
-                    {jaConfirmado ? (
-                      <div className={`flex items-center justify-center gap-2 rounded-lg py-2.5 font-medium text-sm ${
-                        lead.comparecimento === "COMPARECEU"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}>
-                        {lead.comparecimento === "COMPARECEU" ? (
-                          <><CheckCircle2 className="h-4 w-4" /> Compareceu</>
-                        ) : (
-                          <><XCircle className="h-4 w-4" /> Não Compareceu</>
-                        )}
-                        <button
-                          className="ml-auto text-xs underline opacity-60 hover:opacity-100"
-                          onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "COMPARECEU" ? "NÃO COMPARECEU" : "COMPARECEU")}
-                        >
-                          desfazer
-                        </button>
-                      </div>
-                    ) : (
-                      /* Botões de ação */
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => onMarkAttendance(lead.id, "COMPARECEU")}
-                          className="bg-green-600 hover:bg-green-700 text-white h-10 text-xs font-semibold"
-                        >
-                          <CheckCircle2 className="h-4 w-4 mr-1" />
-                          Compareceu
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onMarkAttendance(lead.id, "NÃO COMPARECEU")}
-                          className="border-red-300 text-red-700 hover:bg-red-50 h-10 text-xs font-semibold"
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Não Veio
-                        </Button>
-                      </div>
-                    )}
+                    {/* Botões sempre visíveis, selecionado fica destacado */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => onMarkAttendance(lead.id, "COMPARECEU")}
+                        className={`h-10 text-xs font-semibold transition-all ${
+                          lead.comparecimento === "COMPARECEU"
+                            ? "bg-green-600 hover:bg-green-700 text-white ring-2 ring-green-400"
+                            : "bg-white border border-gray-300 text-gray-500 hover:bg-green-50 hover:border-green-400 hover:text-green-700"
+                        }`}
+                        variant="outline"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Compareceu
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => onMarkAttendance(lead.id, "NÃO COMPARECEU")}
+                        className={`h-10 text-xs font-semibold transition-all ${
+                          lead.comparecimento === "NÃO COMPARECEU"
+                            ? "bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-400"
+                            : "bg-white border border-gray-300 text-gray-500 hover:bg-red-50 hover:border-red-400 hover:text-red-700"
+                        }`}
+                        variant="outline"
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Não Veio
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
