@@ -219,6 +219,7 @@ const CRMDashboard = () => {
             <AllLeadsView 
               leads={leads} 
               onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
+              onUpdateLead={updateLead}
               selectedLeads={selectedLeads}
               onSelectionChange={setSelectedLeads}
               onDeleteSelected={() => setShowDeleteDialog(true)}

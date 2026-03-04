@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LeadTable } from "./LeadTable";
+import { EditLeadDialog } from "./EditLeadDialog";
 import { useState, useMemo } from "react";
 import { Search, AlertTriangle, Users, CalendarCheck, Clock, UserCheck, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,6 +14,7 @@ import { motion } from "framer-motion";
 interface AllLeadsViewProps {
   leads: Lead[];
   onMarkAttendance: (id: string, value: string) => void;
+  onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
   selectedLeads?: string[];
   onSelectionChange?: (leadIds: string[]) => void;
   onDeleteSelected?: () => void;
@@ -22,12 +24,13 @@ type FilterCategory = {
   duplicados?: boolean;
 };
 
-export function AllLeadsView({ leads, onMarkAttendance, selectedLeads, onSelectionChange, onDeleteSelected }: AllLeadsViewProps) {
+export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLeads, onSelectionChange, onDeleteSelected }: AllLeadsViewProps) {
   const [filters, setFilters] = useState<FilterCategory>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContactMonth, setSelectedContactMonth] = useState<string>("all");
   const [selectedAppointmentMonth, setSelectedAppointmentMonth] = useState<string>("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
 
   // Detect duplicates by phone number
   const duplicatePhones = useMemo(() => {
@@ -386,6 +389,18 @@ export function AllLeadsView({ leads, onMarkAttendance, selectedLeads, onSelecti
         onMarkAttendance={onMarkAttendance}
         selectedLeads={selectedLeads}
         onSelectionChange={onSelectionChange}
+        onEditLead={onUpdateLead ? (lead) => setEditingLead(lead) : undefined}
+      />
+
+      {/* Edit Dialog */}
+      <EditLeadDialog
+        lead={editingLead}
+        open={!!editingLead}
+        onClose={() => setEditingLead(null)}
+        onSave={(id, updates) => {
+          onUpdateLead?.(id, updates);
+          setEditingLead(null);
+        }}
       />
     </div>
   );

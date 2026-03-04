@@ -2,7 +2,8 @@ import { Lead, LeadStage, LeadStatus, LeadComparecimento } from "@/types/crm";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronsUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil } from "lucide-react";
 import { useState } from "react";
 
 interface LeadTableProps {
@@ -10,6 +11,7 @@ interface LeadTableProps {
   onMarkAttendance?: (id: string, value: LeadComparecimento) => void;
   selectedLeads?: string[];
   onSelectionChange?: (leadIds: string[]) => void;
+  onEditLead?: (lead: Lead) => void;
 }
 
 const statusColor: Record<LeadStatus | "", string> = {
@@ -22,7 +24,7 @@ const statusColor: Record<LeadStatus | "", string> = {
 type SortField = 'nome' | 'telefone' | 'servicoProcurado' | 'fonteLead' | 'etapaLead' | 'status' | 'respostaLead' | 'comparecimento' | 'dataFollowUp' | 'dataAgendamento';
 type SortDirection = 'asc' | 'desc' | null;
 
-export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelectionChange }: LeadTableProps) {
+export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelectionChange, onEditLead }: LeadTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   
@@ -180,6 +182,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                 </button>
               </TableHead>
               <TableHead className="font-heading font-semibold">Observação</TableHead>
+              <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -263,6 +266,19 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                   <TableCell className="text-xs">{lead.dataFollowUp || "—"}</TableCell>
                   <TableCell className="text-xs">{lead.dataAgendamento || "—"}</TableCell>
                   <TableCell className="text-xs max-w-[200px] truncate" title={lead.observacao}>{lead.observacao || "—"}</TableCell>
+                  {onEditLead && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={() => onEditLead(lead)}
+                        title="Editar lead"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
                 );
               })
