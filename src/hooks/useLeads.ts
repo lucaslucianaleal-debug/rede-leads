@@ -216,14 +216,26 @@ export function useLeads() {
           l.comparecimento !== "COMPARECEU"
       )
       .sort((a, b) => {
-        // Sort by follow-up date, oldest first
-        if (!a.dataFollowUp) return 1;
-        if (!b.dataFollowUp) return -1;
+        // Sem contato nenhum sobe ao topo
+        if (!a.dataFollowUp && !b.dataFollowUp) {
+          // Desempate: criado mais recente primeiro
+          if (!a.dataCriacao && !b.dataCriacao) return 0;
+          if (!a.dataCriacao) return 1;
+          if (!b.dataCriacao) return -1;
+          const [dayA, monthA, yearA] = a.dataCriacao.split('/');
+          const [dayB, monthB, yearB] = b.dataCriacao.split('/');
+          const dateA = new Date(parseInt(yearA), parseInt(monthA) - 1, parseInt(dayA));
+          const dateB = new Date(parseInt(yearB), parseInt(monthB) - 1, parseInt(dayB));
+          return dateB.getTime() - dateA.getTime();
+        }
+        if (!a.dataFollowUp) return -1; // sem contato vai pro topo
+        if (!b.dataFollowUp) return 1;
+        // Último contato mais recente primeiro
         const [dayA, monthA, yearA] = a.dataFollowUp.split('/');
         const [dayB, monthB, yearB] = b.dataFollowUp.split('/');
         const dateA = new Date(parseInt(yearA), parseInt(monthA) - 1, parseInt(dayA));
         const dateB = new Date(parseInt(yearB), parseInt(monthB) - 1, parseInt(dayB));
-        return dateA.getTime() - dateB.getTime();
+        return dateB.getTime() - dateA.getTime();
       });
   }, [leads]);
 
