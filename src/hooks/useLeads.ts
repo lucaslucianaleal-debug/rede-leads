@@ -209,40 +209,49 @@ export function useLeads() {
   }, [leads]);
 
   const followUpQueue = useMemo(() => {
-    return leads
-      .filter(
-        (l) =>
-          (
-            l.etapaLead === "Novo" ||
-            l.etapaLead === "Em contato" ||
-            l.etapaLead === "Avaliação agendada" ||
-            l.etapaLead.startsWith("Follow-Up")
-          ) &&
-          l.etapaLead !== "Desistência" &&
-          l.comparecimento !== "COMPARECEU"
-      )
+    const filtered = leads.filter(
+      (l) =>
+        (
+          l.etapaLead === "Novo" ||
+          l.etapaLead === "Em contato" ||
+          l.etapaLead === "Avaliação agendada" ||
+          l.etapaLead.startsWith("Follow-Up")
+        ) &&
+        l.etapaLead !== "Desistência" &&
+        l.comparecimento !== "COMPARECEU"
+    );
+
+    // Separar em leads novos vs. que não compareceram
+    const parseDateCriacao = (dateStr: string) => {
+      const [day, month, year] = dateStr.split('/');
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    };
+
+    const novos = filtered
+      .filter((l) => l.comparecimento !== "NÃO COMPARECEU")
       .sort((a, b) => {
-        // Sem contato nenhum sobe ao topo
-        if (!a.dataFollowUp && !b.dataFollowUp) {
-          // Desempate: criado mais recente primeiro
-          if (!a.dataCriacao && !b.dataCriacao) return 0;
-          if (!a.dataCriacao) return 1;
-          if (!b.dataCriacao) return -1;
-          const [dayA, monthA, yearA] = a.dataCriacao.split('/');
-          const [dayB, monthB, yearB] = b.dataCriacao.split('/');
-          const dateA = new Date(parseInt(yearA), parseInt(monthA) - 1, parseInt(dayA));
-          const dateB = new Date(parseInt(yearB), parseInt(monthB) - 1, parseInt(dayB));
-          return dateB.getTime() - dateA.getTime();
-        }
-        if (!a.dataFollowUp) return -1; // sem contato vai pro topo
-        if (!b.dataFollowUp) return 1;
-        // Último contato mais recente primeiro
-        const [dayA, monthA, yearA] = a.dataFollowUp.split('/');
-        const [dayB, monthB, yearB] = b.dataFollowUp.split('/');
-        const dateA = new Date(parseInt(yearA), parseInt(monthA) - 1, parseInt(dayA));
-        const dateB = new Date(parseInt(yearB), parseInt(monthB) - 1, parseInt(dayB));
-        return dateB.getTime() - dateA.getTime();
+        const dateA = parseDateCriacao(a.dataCriacao);
+        const dateB = parseDateCriacao(b.dataCriacao);
+        return dateB.getTime() - dateA.getTime(); // Mais recente primeiro
       });
+
+    const naoCompareceram = filtered
+      .filter((l) => l.comparecimento === "NÃO COMPARECEU")
+      .sort((a, b) => {
+        const dateA = parseDateCriacao(a.dataCriacao);
+        const dateB = parseDateCriacao(b.dataCriacao);
+        return dateA.getTime() - dateB.getTime(); // Mais antigo primeiro
+      });
+
+    // Intercalar: 1 novo, 1 que não compareceu, 1 novo, etc
+    const resultado: Lead[] = [];
+    let iNovo = 0,
+      iNaoCompareceram = 0;
+    while (iNovo < novos.length || iNaoCompareceram < naoCompareceram.length) {
+      if (iNovo < novos.length) resultado.push(novos[iNovo++]);
+      if (iNaoCompareceram < naoCompareceram.length) resultado.push(naoCompareceram[iNaoCompareceram++]);
+    }
+    return resultado;
   }, [leads]);
 
   // Leads com retorno de ligação agendado (futuros e vencidos)
