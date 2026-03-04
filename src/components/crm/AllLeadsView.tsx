@@ -30,6 +30,7 @@ type FilterCategory = {
 export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall }: AllLeadsViewProps) {
   const [filters, setFilters] = useState<FilterCategory>({});
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCreationDay, setSelectedCreationDay] = useState<string>("all");
   const [selectedContactMonth, setSelectedContactMonth] = useState<string>("all");
   const [selectedAppointmentMonth, setSelectedAppointmentMonth] = useState<string>("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");
@@ -101,6 +102,23 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
     });
   }, [leads]);
 
+  // Generate available days from dataCriacao
+  const availableCreationDays = useMemo(() => {
+    const days = new Set<string>();
+    leads.forEach((lead) => {
+      if (lead.dataCriacao) {
+        days.add(lead.dataCriacao);
+      }
+    });
+    return Array.from(days).sort((a, b) => {
+      const [dayA, monthA, yearA] = a.split("/");
+      const [dayB, monthB, yearB] = b.split("/");
+      const dateA = new Date(parseInt(yearA), parseInt(monthA) - 1, parseInt(dayA));
+      const dateB = new Date(parseInt(yearB), parseInt(monthB) - 1, parseInt(dayB));
+      return dateB.getTime() - dateA.getTime();
+    });
+  }, [leads]);
+
   // Get available sources
   const availableSources = useMemo(() => {
     const sources = new Set<string>();
@@ -110,9 +128,14 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
     return Array.from(sources).sort();
   }, [leads]);
 
-  // First filter by contact month, appointment month, and source
+  // First filter by creation day, contact month, appointment month, and source
   const leadsFilteredByMonthSource = useMemo(() => {
     let result = leads;
+
+    // Filter by creation day
+    if (selectedCreationDay !== "all") {
+      result = result.filter((lead) => lead.dataCriacao === selectedCreationDay);
+    }
 
     // Filter by contact month
     if (selectedContactMonth !== "all") {
@@ -140,7 +163,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
     }
 
     return result;
-  }, [leads, selectedContactMonth, selectedAppointmentMonth, selectedSource]);
+  }, [leads, selectedCreationDay, selectedContactMonth, selectedAppointmentMonth, selectedSource]);
 
   // Calculate stats based on month/source filters
   const stats = useMemo(() => {
@@ -190,12 +213,13 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
   const clearFilters = () => {
     setFilters({});
     setSearchTerm("");
+    setSelectedCreationDay("all");
     setSelectedContactMonth("all");
     setSelectedAppointmentMonth("all");
     setSelectedSource("all");
   };
 
-  const hasActiveFilters = searchTerm !== "" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all";
+  const hasActiveFilters = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all";
 
   const colorMap: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
@@ -235,6 +259,23 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
                   {availableContactMonths.map((month) => (
                     <SelectItem key={month} value={month}>
                       {month}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Dia Criação:</span>
+              <Select value={selectedCreationDay} onValueChange={setSelectedCreationDay}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {availableCreationDays.map((day) => (
+                    <SelectItem key={day} value={day}>
+                      {day}
                     </SelectItem>
                   ))}
                 </SelectContent>
