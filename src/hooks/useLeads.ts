@@ -599,80 +599,84 @@ export function useLeads() {
       skipEmptyLines: true,
       delimiter: "", // auto-detect comma or semicolon
       complete: (results) => {
-        // Detect if headers are invalid (common when exporting from some systems)
-        const firstRowKeys = results.data.length > 0 ? Object.keys(results.data[0]) : [];
-        const hasInvalidHeaders = 
-          firstRowKeys.some(k => k.startsWith('_') || k === '' || k.includes('REDE LEADS'));
+        if (!results.data.length) return;
 
-        const imported: Lead[] = results.data
+        // Build a smart column resolver: finds the best matching key for each field
+        const allKeys = Object.keys(results.data[0] as any).map(k =>
+          k.replace(/^\uFEFF/, "").trim() // strip BOM and whitespace from header names
+        );
+
+        const findKey = (...patterns: string[]): string | null => {
+          for (const pattern of patterns) {
+            const exact = allKeys.find(k => k.toUpperCase() === pattern.toUpperCase());
+            if (exact) return exact;
+          }
+          for (const pattern of patterns) {
+            const partial = allKeys.find(k => k.toUpperCase().includes(pattern.toUpperCase()));
+            if (partial) return partial;
+          }
+          return null;
+        };
+
+        // Map each field to the actual column key found in the file
+        const col = {
+          dataCriacao:    findKey("DATA DE CRIAÇÃO", "DATA CRIAÇÃO", "CRIAÇÃO", "DATA CRIACAO"),
+          dataContato:    findKey("DATA DO CONTATO", "DATA CONTATO", "CONTATO", "DATA"),
+          nome:           findKey("NOME DO LEAD", "NOME LEAD", "NOME", "NAME"),
+          telefone:       findKey("TELEFONE", "FONE", "CEL", "CELULAR", "PHONE"),
+          servico:        findKey("SERVIÇO PROCURADO", "SERVIÇO", "SERVICO", "SERVIÇO PROC", "SERVICO PROC"),
+          captador:       findKey("CAPTADOR", "CAPTAÇÃO", "CAPTOR"),
+          fonte:          findKey("FONTE DO LEAD", "FONTE LEAD", "FONTE", "SOURCE"),
+          etapa:          findKey("ETAPA DO LEAD", "ETAPA LEAD", "ETAPA", "STAGE"),
+          status:         findKey("STATUS"),
+          resposta:       findKey("RESPOSTA LEAD", "RESPOSTA"),
+          comparecimento: findKey("COMPARECIMENTO"),
+          dataFollowUp:   findKey("DATA DE FOLLOW UP", "DATA FOLLOW UP", "FOLLOW UP", "FOLLOWUP"),
+          dataAgendamento:findKey("DATA DE AGENDAMENTO", "DATA AGENDAMENTO", "AGENDAMENTO"),
+          observacao:     findKey("OBSERVAÇÃO", "OBSERVACAO", "OBS"),
+        };
+
+        // Helper: get value by resolved column key, with BOM-stripped raw row access
+        const get = (row: any, key: string | null): string => {
+          if (!key) return "";
+          // Try exact key
+          if (row[key] !== undefined) return String(row[key] || "").trim();
+          // Try BOM-stripped first key variant
+          const rawKeys = Object.keys(row);
+          const match = rawKeys.find(k => k.replace(/^\uFEFF/, "").trim().toUpperCase() === key.toUpperCase());
+          return match ? String(row[match] || "").trim() : "";
+        };
+
+        const imported: Lead[] = (results.data as any[])
           .filter((row: any) => {
-            let hasName, nome, telefone;
-            if (hasInvalidHeaders) {
-              // Map by position: second column is nome
-              const values = Object.values(row) as string[];
-              nome = values[1];
-              telefone = values[2];
-              hasName = nome;
-            } else {
-              nome = row["NOME DO LEAD"] || row["Nome do Lead"] || row["nome"];
-              telefone = row["TELEFONE"] || row["Telefone"] || row["telefone"];
-              hasName = nome;
-            }
-            
-            // Filtrar cabeçalhos que foram importados como dados
-            const headerKeywords = ["NOME DO LEAD", "Nome do Lead", "TELEFONE", "Telefone", "SERVIÇO PROCURADO", "DATA DO CONTATO"];
-            const isHeaderRow = headerKeywords.some(keyword => 
-              nome?.toUpperCase().includes(keyword.toUpperCase()) || 
-              telefone?.toUpperCase() === "TELEFONE"
-            );
-            
-            return hasName && !isHeaderRow;
+            const nome = get(row, col.nome);
+            const telefone = get(row, col.telefone);
+            if (!nome) return false;
+            // Filter out header rows accidentally parsed as data
+            if (nome.toUpperCase().includes("NOME") || telefone.toUpperCase() === "TELEFONE") return false;
+            return true;
           })
           .map((row: any, i: number) => {
-            if (hasInvalidHeaders) {
-              // Map by column position
-              const values = Object.values(row) as string[];
-              return {
-                id: `imported-${Date.now()}-${i}`,
-                dataCriacao: values[0] || format(new Date(), "dd/MM/yyyy"),
-                dataContato: values[1] || "",
-                nome: values[2] || "",
-                telefone: values[3] || "",
-                servicoProcurado: values[4] || "",
-                captador: values[5] || "",
-                fonteLead: values[6] || "Outro",
-                etapaLead: (values[7] || "Novo") as LeadStage,
-                status: (values[8] || "") as any,
-                respostaLead: (values[9] || "") as any,
-                comparecimento: (values[10] || "") as any,
-                dataFollowUp: values[11] || "",
-                dataAgendamento: values[12] || "",
-                observacao: values[13] || "",
-                followUpCount: parseInt(values[7]?.match(/\d+/)?.[0] || "0", 10),
-                lembretes: { h24: false, today: false },
-              };
-            } else {
-              // Map by column name
-              return {
-                id: `imported-${Date.now()}-${i}`,
-                dataCriacao: row["DATA DE CRIAÇÃO"] || row["Data de Criação"] || format(new Date(), "dd/MM/yyyy"),
-                dataContato: row["DATA DO CONTATO"] || row["Data do Contato"] || "",
-                nome: row["NOME DO LEAD"] || row["Nome do Lead"] || row["nome"] || "",
-                telefone: row["TELEFONE"] || row["Telefone"] || "",
-                servicoProcurado: row["SERVIÇO PROCURADO"] || row["Serviço Procurado"] || "",
-                captador: row["CAPTADOR"] || row["Captador"] || "",
-                fonteLead: row["FONTE DO LEAD"] || row["Fonte do Lead"] || "Outro",
-                etapaLead: (row["ETAPA DO LEAD"] || row["Etapa do Lead"] || "Novo") as LeadStage,
-                status: (row["STATUS"] || row["Status"] || "") as any,
-                respostaLead: (row["RESPOSTA LEAD"] || row["Resposta Lead"] || "") as any,
-                comparecimento: (row["COMPARECIMENTO"] || row["Comparecimento"] || "") as any,
-                dataFollowUp: row["DATA DE FOLLOW UP"] || row["Data de Follow Up"] || "",
-                dataAgendamento: row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || "",
-                observacao: row["OBSERVAÇÃO"] || row["Observação"] || "",
-                followUpCount: parseInt(row["ETAPA DO LEAD"]?.match(/\d+/)?.[0] || "0", 10),
-                lembretes: { h24: false, today: false },
-              };
-            }
+            const etapaRaw = get(row, col.etapa) || "Novo";
+            return {
+              id: `imported-${Date.now()}-${i}`,
+              dataCriacao: get(row, col.dataCriacao) || get(row, col.dataContato) || format(new Date(), "dd/MM/yyyy"),
+              dataContato: get(row, col.dataContato),
+              nome: get(row, col.nome),
+              telefone: get(row, col.telefone),
+              servicoProcurado: get(row, col.servico),
+              captador: get(row, col.captador),
+              fonteLead: get(row, col.fonte) || "Outro",
+              etapaLead: etapaRaw as LeadStage,
+              status: get(row, col.status) as any,
+              respostaLead: get(row, col.resposta) as any,
+              comparecimento: get(row, col.comparecimento) as any,
+              dataFollowUp: get(row, col.dataFollowUp),
+              dataAgendamento: get(row, col.dataAgendamento),
+              observacao: get(row, col.observacao),
+              followUpCount: parseInt(etapaRaw?.match(/\d+/)?.[0] || "0", 10),
+              lembretes: { h24: false, today: false },
+            };
           });
         
         // Normalizar fontes dos leads importados e garantir dataCriacao
