@@ -21,30 +21,35 @@ export function AuthComponent() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [open, setOpen] = useState(false);
 
-  const sanitizeUsername = (input: string) => {
-    // Se digitou email completo (ex: fulano@gmail.com), pega só a parte antes do @
-    const withoutDomain = input.split("@")[0];
-    // Remove caracteres especiais, mantém letras, números, _ e -
-    return withoutDomain.replace(/[^a-z0-9_\-]/g, "").toLowerCase();
+  // Se o input já é um email real (contém @ com domínio), usa direto.
+  // Caso contrário, trata como username e adiciona @redeleads.app
+  const resolveEmail = (input: string): string => {
+    const trimmed = input.trim().toLowerCase();
+    const atIndex = trimmed.indexOf("@");
+    if (atIndex > 0 && trimmed.indexOf(".", atIndex) > atIndex) {
+      // É um email real (ex: fulano@gmail.com)
+      return trimmed;
+    }
+    // É um username simples — remove caracteres inválidos e adiciona domínio
+    const clean = trimmed.replace(/[^a-z0-9_\-]/g, "");
+    return `${clean}@redeleads.app`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanUsername = sanitizeUsername(username);
-    if (!cleanUsername) {
-      toast.error("Nome de usuário inválido. Use apenas letras e números.");
+    const email = resolveEmail(username);
+    if (!email) {
+      toast.error("Usuário inválido.");
       return;
     }
+    const displayName = username.trim().split("@")[0];
     try {
-      // Converter username em email válido para Firebase Auth
-      const email = `${cleanUsername}@redeleads.app`;
-      
       if (isRegistering) {
         await register(email, password);
-        toast.success(`Usuário "${cleanUsername}" criado com sucesso!`);
+        toast.success(`Usuário "${displayName}" criado com sucesso!`);
       } else {
         await login(email, password);
-        toast.success(`Bem-vindo, ${cleanUsername}!`);
+        toast.success(`Bem-vindo, ${displayName}!`);
       }
       setUsername("");
       setPassword("");
@@ -86,11 +91,11 @@ export function AuthComponent() {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="username">Usuário</Label>
+            <Label htmlFor="username">Usuário ou E-mail</Label>
             <Input
               id="username"
               type="text"
-              placeholder="seu_usuario"
+              placeholder="usuario ou email@gmail.com"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
