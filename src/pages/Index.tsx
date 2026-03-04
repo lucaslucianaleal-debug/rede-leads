@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { StatsCards } from "@/components/crm/StatsCards";
 import { FollowUpQueue } from "@/components/crm/FollowUpQueue";
+import { CallReturnQueue } from "@/components/crm/CallReturnQueue";
 import { AuthComponent } from "@/components/crm/AuthComponent";
 import { AdminPanel } from "@/components/crm/AdminPanel";
 import { ReminderQueue } from "@/components/crm/ReminderQueue";
@@ -38,6 +39,7 @@ const CRMDashboard = () => {
   const {
     leads,
     stats,
+    callReturnQueue,
     followUpQueue,
     followUpsDoneToday,
     followUpGoal,
@@ -45,6 +47,7 @@ const CRMDashboard = () => {
     sendFollowUp,
     markReminder,
     updateLead,
+    clearCallReturn,
     registerCall,
     exportAppointments,
     exportDailyReport,
@@ -84,8 +87,8 @@ const CRMDashboard = () => {
     sendFollowUp(id, observacao || "");
   };
 
-  const handleRegisterCall = (leadId: string, outcome: string, obs: string) => {
-    registerCall(leadId, outcome, obs);
+  const handleRegisterCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
+    registerCall(leadId, outcome, obs, returnDate);
   };
 
   const handleReminder = (id: string, type: "h24" | "today") => {
@@ -275,6 +278,13 @@ const CRMDashboard = () => {
               />
               <ReminderQueue leads={reminderQueue} onMarkReminder={handleReminder} />
             </div>
+            {callReturnQueue.length > 0 && (
+              <CallReturnQueue
+                leads={callReturnQueue}
+                onRegisterCall={handleRegisterCall}
+                onClearReturn={clearCallReturn}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6">

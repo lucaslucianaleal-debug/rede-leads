@@ -13,7 +13,7 @@ import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessag
 interface FollowUpQueueProps {
   leads: Lead[];
   onSendFollowUp: (leadId: string, observacao?: string) => void;
-  onRegisterCall?: (leadId: string, outcome: string, obs: string) => void;
+  onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
   followUpsDoneToday?: number;
   followUpGoal?: number;
 }
@@ -54,8 +54,8 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
     setSelectedLead(null);
   };
 
-  const handleConfirmCall = (leadId: string, outcome: string, obs: string) => {
-    onRegisterCall?.(leadId, outcome, obs);
+  const handleConfirmCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
+    onRegisterCall?.(leadId, outcome, obs, returnDate);
     setCallLead(null);
   };
 

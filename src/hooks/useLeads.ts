@@ -67,6 +67,7 @@ const normalizeFonteLead = (fonte: string): string => {
 const normalizeLead = (lead: Lead): Lead => ({
   ...lead,
   fonteLead: normalizeFonteLead(lead.fonteLead),
+  dataRetornoLigacao: lead.dataRetornoLigacao ?? "",
 });
 
 // Garantir que todo lead tem dataCriacao (fallback para dataContato ou hoje)
@@ -244,6 +245,30 @@ export function useLeads() {
       });
   }, [leads]);
 
+  // Leads com retorno de ligação agendado para hoje ou vencido
+  const callReturnQueue = useMemo(() => {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    return leads
+      .filter((l) => {
+        if (!l.dataRetornoLigacao) return false;
+        const parts = l.dataRetornoLigacao.split(" ");
+        const [day, month, year] = parts[0].split("/");
+        const [hour, minute] = (parts[1] || "00:00").split(":");
+        const returnDt = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+        return returnDt <= now;
+      })
+      .sort((a, b) => {
+        const toMs = (s: string) => {
+          const parts = s.split(" ");
+          const [day, month, year] = parts[0].split("/");
+          const [hour, minute] = (parts[1] || "00:00").split(":");
+          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)).getTime();
+        };
+        return toMs(a.dataRetornoLigacao) - toMs(b.dataRetornoLigacao);
+      });
+  }, [leads]);
+
   const reminderQueue = useMemo(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -346,7 +371,11 @@ export function useLeads() {
     setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, ...updates } : l)));
   };
 
-  const registerCall = (leadId: string, outcome: string, obs: string) => {
+  const clearCallReturn = (leadId: string) => {
+    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, dataRetornoLigacao: "" } : l));
+  };
+
+  const registerCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
     const now = new Date();
     const timestamp = `${now.getDate().toString().padStart(2, "0")}/${(now.getMonth() + 1).toString().padStart(2, "0")}/${now.getFullYear()} ${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
     const nota = obs ? `📞 ${outcome} (${timestamp}) — ${obs}` : `📞 ${outcome} (${timestamp})`;
@@ -356,6 +385,7 @@ export function useLeads() {
         return {
           ...l,
           observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
+          dataRetornoLigacao: returnDate ?? l.dataRetornoLigacao ?? "",
         };
       })
     );
@@ -736,6 +766,7 @@ export function useLeads() {
                 comparecimento: get(row, col.comparecimento) as any,
                 dataFollowUp: get(row, col.dataFollowUp),
                 dataAgendamento: get(row, col.dataAgendamento),
+                dataRetornoLigacao: "",
                 observacao: get(row, col.observacao),
                 followUpCount: parseInt(etapaRaw?.match(/\d+/)?.[0] || "0", 10),
                 lembretes: { h24: false, today: false },
@@ -818,10 +849,12 @@ export function useLeads() {
     followUpQueue,
     followUpsDoneToday,
     followUpGoal: 20, // Meta diária
+    callReturnQueue,
     reminderQueue,
     sendFollowUp,
     markReminder,
     updateLead,
+    clearCallReturn,
     registerCall,
     exportCSV,
     importCSV,

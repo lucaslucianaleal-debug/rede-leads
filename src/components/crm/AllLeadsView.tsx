@@ -20,7 +20,7 @@ interface AllLeadsViewProps {
   onDeleteSelected?: () => void;
   onClearDuplicates?: () => void;
   onSendFollowUp?: (leadId: string, observacao?: string) => void;
-  onRegisterCall?: (leadId: string, outcome: string, obs: string) => void;
+  onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
 type FilterCategory = {

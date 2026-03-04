@@ -18,7 +18,7 @@ interface LeadTableProps {
   onSelectionChange?: (leadIds: string[]) => void;
   onEditLead?: (lead: Lead) => void;
   onSendFollowUp?: (leadId: string, observacao?: string) => void;
-  onRegisterCall?: (leadId: string, outcome: string, obs: string) => void;
+  onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
 const statusColor: Record<LeadStatus | "", string> = {
@@ -358,8 +358,8 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
           lead={callLead}
           open={!!callLead}
           onClose={() => setCallLead(null)}
-          onConfirm={(leadId, outcome, obs) => {
-            onRegisterCall(leadId, outcome, obs);
+          onConfirm={(leadId, outcome, obs, returnDate) => {
+            onRegisterCall(leadId, outcome, obs, returnDate);
             setCallLead(null);
           }}
         />

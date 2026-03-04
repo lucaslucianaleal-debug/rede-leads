@@ -46,6 +46,7 @@ export interface Lead {
   comparecimento: LeadComparecimento;
   dataFollowUp: string;
   dataAgendamento: string;
+  dataRetornoLigacao: string;
   observacao: string;
   followUpCount: number;
   lembretes: ReminderStatus;
