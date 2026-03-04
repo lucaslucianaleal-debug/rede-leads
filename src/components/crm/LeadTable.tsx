@@ -11,6 +11,18 @@ import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { LeadDetailsDialog } from "./LeadDetailsDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
+import { format, addDays, parse } from "date-fns";
+
+const getNextFollowUpDate = (lead: Lead): string => {
+  // Se não tem data de follow-up, não há próximo
+  if (!lead.dataFollowUp) return "—";
+  
+  // Se está em Follow-Up 1-4, próximo = +1 dia; se 5+, +2 dias
+  const daysToAdd = lead.followUpCount >= 5 ? 2 : 1;
+  const lastFollowUpDate = parse(lead.dataFollowUp, "dd/MM/yyyy", new Date());
+  const nextDate = addDays(lastFollowUpDate, daysToAdd);
+  return format(nextDate, "dd/MM/yyyy");
+};
 
 interface LeadTableProps {
   leads: Lead[];
@@ -200,6 +212,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                   Follow-up <SortIcon field="dataFollowUp" />
                 </button>
               </TableHead>
+              <TableHead className="font-heading font-semibold">Próximo Follow-up</TableHead>
               <TableHead className="font-heading font-semibold">
                 <button onClick={() => handleSort('dataAgendamento')} className="flex items-center hover:text-primary transition-colors">
                   Agendamento <SortIcon field="dataAgendamento" />
@@ -297,6 +310,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                     )}
                   </TableCell>
                   <TableCell className="text-xs">{lead.dataFollowUp || "—"}</TableCell>
+                  <TableCell className="text-xs font-medium text-primary">{getNextFollowUpDate(lead)}</TableCell>
                   <TableCell className="text-xs">{lead.dataAgendamento || "—"}</TableCell>
                   <TableCell className="text-xs max-w-[200px] truncate" title={lead.observacao}>{lead.observacao || "—"}</TableCell>
                   {(onSendFollowUp || onRegisterCall) && (
