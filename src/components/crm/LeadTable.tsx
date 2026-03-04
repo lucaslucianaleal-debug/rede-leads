@@ -38,9 +38,10 @@ const getNextFollowUpDate = (lead: Lead): string => {
   if (lead.dataAgendamento) {
     const agendamentoDate = parse(lead.dataAgendamento.split(" ")[0], "dd/MM/yyyy", new Date());
     if (nextDate <= agendamentoDate) {
-      // Próximo follow-up seria antes/na data do agendamento
-      // Então mostrar a data do agendamento como referência
-      return format(agendamentoDate, "dd/MM/yyyy");
+      // Próximo follow-up deve ser APÓS o agendamento (dia seguinte)
+      let followUpAfterAgendamento = addDays(agendamentoDate, 1);
+      followUpAfterAgendamento = getNextBusinessDay(followUpAfterAgendamento);
+      return format(followUpAfterAgendamento, "dd/MM/yyyy");
     }
   }
   
