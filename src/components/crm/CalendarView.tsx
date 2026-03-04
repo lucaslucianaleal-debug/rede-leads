@@ -36,7 +36,11 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
         }
       }
     });
-    return Array.from(dates).map((d) => new Date(d));
+    // Use noon (12:00) to avoid UTC offset shifting the date to the previous day
+    return Array.from(dates).map((d) => {
+      const [y, m, day] = d.split("-").map(Number);
+      return new Date(y, m - 1, day, 12, 0, 0);
+    });
   }, [leads]);
 
   // Get leads for selected date
@@ -50,7 +54,7 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
     setSelectedDate(date);
     if (date) {
       const dateStr = format(date, "dd/MM/yyyy");
-      const hasAppointments = leads.some((lead) => lead.dataAgendamento === dateStr);
+      const hasAppointments = leads.some((lead) => lead.dataAgendamento.startsWith(dateStr));
       if (hasAppointments) {
         setDialogOpen(true);
       }
