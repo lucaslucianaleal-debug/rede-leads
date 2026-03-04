@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil, Phone, ExternalLink, Check, CalendarCheck, Info } from "lucide-react";
+import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil, Phone, ExternalLink, Check, CalendarCheck } from "lucide-react";
 import { useState } from "react";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
@@ -240,7 +240,12 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                   )}
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      {lead.nome}
+                      <button 
+                        onClick={() => setDetailsLead(lead)}
+                        className="cursor-pointer hover:text-primary hover:underline transition-colors text-left"
+                      >
+                        {lead.nome}
+                      </button>
                       {isLeadDuplicate && (
                         <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 text-[10px] px-1.5 py-0">
                           ×{duplicateCount}
@@ -323,16 +328,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                     </TableCell>
                   )}
                   {onEditLead && (
-                    <TableCell className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-primary"
-                        onClick={() => setDetailsLead(lead)}
-                        title="Ver detalhes"
-                      >
-                        <Info className="h-3.5 w-3.5" />
-                      </Button>
+                    <TableCell>
                       <Button
                         variant="ghost"
                         size="icon"
