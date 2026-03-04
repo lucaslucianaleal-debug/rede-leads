@@ -14,6 +14,9 @@ import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { format, addDays, parse } from "date-fns";
 
 const getNextFollowUpDate = (lead: Lead): string => {
+  // Se compareceu, não precisa de follow-up
+  if (lead.comparecimento === "COMPARECEU") return "✓ Finalizado";
+  
   // Se não tem data de follow-up, não há próximo
   if (!lead.dataFollowUp) return "—";
   
@@ -321,7 +324,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                     )}
                   </TableCell>
                   <TableCell className="text-xs">{lead.dataFollowUp || "—"}</TableCell>
-                  <TableCell className="text-xs font-medium text-primary">{getNextFollowUpDate(lead)}</TableCell>
+                  <TableCell className={`text-xs font-medium ${lead.comparecimento === "COMPARECEU" ? "text-success" : "text-primary"}`}>{getNextFollowUpDate(lead)}</TableCell>
                   <TableCell className="text-xs">{lead.dataAgendamento || "—"}</TableCell>
                   <TableCell className="text-xs max-w-[200px] truncate" title={lead.observacao}>{lead.observacao || "—"}</TableCell>
                   {(onSendFollowUp || onRegisterCall) && (
