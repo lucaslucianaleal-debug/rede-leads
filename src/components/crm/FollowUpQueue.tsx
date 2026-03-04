@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Lead } from "@/types/crm";
 import { Button } from "@/components/ui/button";
-import { Send, Phone, User, ExternalLink, Check, Target } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Send, Phone, User, ExternalLink, Check, Target, Search, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
 import { FollowUpDialog } from "./FollowUpDialog";
@@ -35,7 +36,18 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
   const [suggestedMessage, setSuggestedMessage] = useState<string>("");
+  const [search, setSearch] = useState("");
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
+
+  const filteredLeads = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return leads;
+    return leads.filter(
+      (l) =>
+        l.nome.toLowerCase().includes(term) ||
+        l.telefone.replace(/\D/g, "").includes(term.replace(/\D/g, ""))
+    );
+  }, [leads, search]);
   
   const handleConfirmFollowUp = (leadId: string, observacao: string) => {
     onSendFollowUp(leadId, observacao);
@@ -71,6 +83,25 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         Fila de Follow-up
         <span className="ml-auto text-sm font-body text-muted-foreground">{leads.length} leads</span>
       </h3>
+
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nome ou telefone..."
+          className="pl-8 pr-8 h-8 text-sm"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
       
       {/* Daily Goal Progress */}
       <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/50">
@@ -95,10 +126,12 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
 
       <div className="space-y-2 max-h-[400px] overflow-y-auto">
         <AnimatePresence>
-          {leads.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">Nenhum follow-up pendente 🎉</p>
+          {filteredLeads.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              {search ? "Nenhum lead encontrado" : "Nenhum follow-up pendente 🎉"}
+            </p>
           ) : (
-            leads.map((lead, i) => {
+            filteredLeads.map((lead, i) => {
               const daysSince = getDaysSince(lead.dataFollowUp);
               
               return (
