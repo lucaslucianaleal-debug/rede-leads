@@ -116,9 +116,8 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
   };
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
-        <Table>
+    <div className="glass-card rounded-xl overflow-x-auto">
+      <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
               {onSelectionChange && (
@@ -285,7 +284,6 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
             )}
           </TableBody>
         </Table>
-      </div>
     </div>
   );
 }
