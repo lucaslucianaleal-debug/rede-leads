@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Upload, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useRef, useState, useMemo } from "react";
@@ -42,7 +42,6 @@ const CRMDashboard = () => {
     sendFollowUp,
     markReminder,
     updateLead,
-    exportCSV,
     exportAppointments,
     exportDailyReport,
     exportWeeklyReport,
@@ -132,14 +131,8 @@ const CRMDashboard = () => {
             <input type="file" ref={fileRef} accept=".csv" onChange={handleImport} className="hidden" />
             {permissions?.canImport && (
               <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                <Upload className="h-4 w-4 mr-1" />
-                Importar CSV
-              </Button>
-            )}
-            {permissions?.canView && (
-              <Button size="sm" onClick={exportCSV}>
                 <Download className="h-4 w-4 mr-1" />
-                Exportar CSV
+                Importar CSV
               </Button>
             )}
             <Popover>
