@@ -13,6 +13,12 @@ import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessag
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { format, addDays, parse } from "date-fns";
 
+const getNextBusinessDay = (date: Date): Date => {
+  const dayOfWeek = date.getDay();
+  const daysToSkip = dayOfWeek === 6 ? 2 : dayOfWeek === 0 ? 1 : 0; // Sábado (6) -> +2 dias, Domingo (0) -> +1 dia
+  return addDays(date, daysToSkip);
+};
+
 const getNextFollowUpDate = (lead: Lead): string => {
   // Se compareceu, não precisa de follow-up
   if (lead.comparecimento === "COMPARECEU") return "✓ Finalizado";
@@ -24,6 +30,9 @@ const getNextFollowUpDate = (lead: Lead): string => {
   const daysToAdd = lead.followUpCount >= 5 ? 2 : 1;
   const lastFollowUpDate = parse(lead.dataFollowUp, "dd/MM/yyyy", new Date());
   let nextDate = addDays(lastFollowUpDate, daysToAdd);
+  
+  // Garantir que é dia útil (segunda a sexta)
+  nextDate = getNextBusinessDay(nextDate);
   
   // Se tem agendamento, o próximo follow-up deve ser após a data de agendamento
   if (lead.dataAgendamento) {
