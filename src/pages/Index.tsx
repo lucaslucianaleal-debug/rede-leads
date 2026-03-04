@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet } from "lucide-react";
+import { FunnelIcon } from "@/components/FunnelIcon";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useRef, useState, useMemo } from "react";
@@ -123,7 +124,7 @@ const CRMDashboard = () => {
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-primary rounded-lg p-2">
-              <Activity className="h-5 w-5 text-primary-foreground" />
+              <FunnelIcon className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
               <h1 className="text-xl font-heading font-bold text-foreground">Rede Leads</h1>
