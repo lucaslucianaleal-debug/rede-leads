@@ -85,19 +85,19 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
 
       {/* Search */}
       <div className="relative mb-3">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por nome ou telefone..."
-          className="pl-8 pr-8 h-8 text-sm"
+          className="pl-9 pr-9"
         />
         {search && (
           <button
             onClick={() => setSearch("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -140,7 +140,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
                   transition={{ delay: i * 0.03 }}
-                  className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-lg bg-background/50 hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-background/50 hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -170,38 +170,37 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                       <span className="text-xs text-muted-foreground">• {lead.etapaLead}</span>
                     </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row flex-wrap gap-1 shrink-0 w-full sm:w-auto">
-                    <Button size="sm" variant="outline" onClick={() => setCallLead(lead)}>
-                      <Phone className="h-3.5 w-3.5 mr-1" />
-                      Registrar Ligação
+                  <div className="flex gap-1 shrink-0">
+                    <Button size="icon" variant="outline" className="h-8 w-8" title="Registrar Ligação" onClick={() => setCallLead(lead)}>
+                      <Phone className="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      size="sm"
+                      size="icon"
                       variant="outline"
+                      className="h-8 w-8 text-success border-success/30 hover:bg-success/10"
+                      title="WhatsApp"
                       onClick={() => handleWhatsAppClick(lead)}
-                      className="text-success border-success/30 hover:bg-success/10"
                     >
-                      <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                      WhatsApp
+                      <ExternalLink className="h-3.5 w-3.5" />
                     </Button>
                     {lead.dataAgendamento && (
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
+                        className="h-8 w-8 text-primary border-primary/30 hover:bg-primary/10"
+                        title="Enviar Confirmação de Agendamento"
                         onClick={() => handleConfirmationClick(lead)}
-                        className="text-primary border-primary/30 hover:bg-primary/10"
                       >
-                        <CalendarCheck className="h-3.5 w-3.5 mr-1" />
-                        Confirmação
+                        <CalendarCheck className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="icon"
+                      className="h-8 w-8 bg-primary hover:bg-primary/90"
+                      title="Feito"
                       onClick={() => setSelectedLead(lead)}
-                      className="bg-primary hover:bg-primary/90"
                     >
-                      <Check className="h-3.5 w-3.5 mr-1" />
-                      Feito
+                      <Check className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </motion.div>
