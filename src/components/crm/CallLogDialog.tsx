@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { formatPhoneNumber } from "@/lib/phone";
 
 interface CallLogDialogProps {
   lead: Lead | null;
@@ -48,7 +49,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
           <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
             <div className="text-xs text-muted-foreground mb-1">{lead.nome}</div>
             <div className="text-2xl font-mono font-bold tracking-widest text-foreground">
-              {lead.telefone}
+              {formatPhoneNumber(lead.telefone)}
             </div>
           </div>
         </DialogHeader>
