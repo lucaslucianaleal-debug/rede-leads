@@ -50,9 +50,9 @@ export function AllLeadsView({ leads, onMarkAttendance, selectedLeads, onSelecti
     return duplicates;
   }, [leads]);
 
-  // Group sources: Instagram + Facebook = Online
-  const normalizeSource = (fonte: string): string => {
-    if (fonte === "Instagram" || fonte === "Facebook") return "Online";
+  // All online sources grouped as "Online"
+  const getSourceGroup = (fonte: string): string => {
+    if (["Instagram", "Facebook", "WhatsApp"].includes(fonte)) return "Online";
     return fonte;
   };
 
@@ -96,12 +96,7 @@ export function AllLeadsView({ leads, onMarkAttendance, selectedLeads, onSelecti
   const availableSources = useMemo(() => {
     const sources = new Set<string>();
     leads.forEach((lead) => {
-      const fonte = lead.fonteLead;
-      if (fonte === "Instagram" || fonte === "Facebook") {
-        sources.add("Online");
-      } else {
-        sources.add(fonte);
-      }
+      sources.add(getSourceGroup(lead.fonteLead));
     });
     return Array.from(sources).sort();
   }, [leads]);
@@ -131,10 +126,7 @@ export function AllLeadsView({ leads, onMarkAttendance, selectedLeads, onSelecti
     // Filter by source
     if (selectedSource !== "all") {
       result = result.filter((lead) => {
-        if (selectedSource === "Online") {
-          return lead.fonteLead === "Instagram" || lead.fonteLead === "Facebook";
-        }
-        return lead.fonteLead === selectedSource;
+        return getSourceGroup(lead.fonteLead) === selectedSource;
       });
     }
 

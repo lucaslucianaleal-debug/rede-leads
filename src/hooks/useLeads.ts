@@ -9,6 +9,32 @@ import { doc, onSnapshot, setDoc } from "firebase/firestore";
 const STORAGE_KEY = "rede_leads_data";
 const FIREBASE_DOC = doc(db, "crm_data", "shared");
 
+// Normalizar fontes antigas para as novas (unificar variações de maiúscula e agrupar online)
+const normalizeFonteLead = (fonte: string): string => {
+  const normalized = fonte?.trim().toLowerCase() || "outro";
+  
+  // Mapear variações antigas para novas padrões
+  const fonteMaps: Record<string, string> = {
+    "instagram": "Online",
+    "facebook": "Online",
+    "whatsapp": "Online",
+    "cupom indicação": "Cupom Indicação",
+    "cupom indicaçao": "Cupom Indicação", // erro de acentuação
+    "google": "Google",
+    "sorteio radio": "Sorteio Radio",
+    "site": "Site",
+    "indicação": "Indicação",
+    "outro": "Outro",
+  };
+  
+  return fonteMaps[normalized] || "Outro";
+};
+
+const normalizeLead = (lead: Lead): Lead => ({
+  ...lead,
+  fonteLead: normalizeFonteLead(lead.fonteLead),
+});
+
 export function useLeads() {
   const isFromFirebase = useRef(false);
   const isMounted = useRef(true);
@@ -17,9 +43,11 @@ export function useLeads() {
   const [leads, setLeads] = useState<Lead[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : mockLeads;
+      const data = saved ? JSON.parse(saved) : mockLeads;
+      // Normalizar fontes ao carregar
+      return data.map(normalizeLead);
     } catch {
-      return mockLeads;
+      return mockLeads.map(normalizeLead);
     }
   });
   const [filters, setFilters] = useState<ClinicFilter>({
@@ -35,8 +63,10 @@ export function useLeads() {
     const unsubscribe = onSnapshot(FIREBASE_DOC, (snapshot) => {
       if (!isMounted.current) return;
       if (snapshot.exists()) {
-        const data = snapshot.data().leads as Lead[];
+        let data = snapshot.data().leads as Lead[];
         if (data && Array.isArray(data)) {
+          // Normalizar fontes antigas para novos padrões
+          data = data.map(normalizeLead);
           isFromFirebase.current = true;
           setLeads(data);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -60,10 +90,11 @@ export function useLeads() {
     }
     // Salva localmente imediatamente
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
-    // Salva no Firebase com debounce de 1,5s
+    // Salva no Firebase com debounce de 1,5s, normalizando fontes
     const timer = setTimeout(async () => {
       try {
-        await setDoc(FIREBASE_DOC, { leads, lastUpdated: new Date().toISOString() }, { merge: true });
+        const normalizedLeads = leads.map(normalizeLead);
+        await setDoc(FIREBASE_DOC, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
       } catch {
         // Falha silenciosa — dados ainda estão no localStorage
       }
@@ -570,7 +601,9 @@ export function useLeads() {
             }
           });
         
-        setLeads((prev) => [...prev, ...imported]);
+        // Normalizar fontes dos leads importados
+        const normalized = imported.map(normalizeLead);
+        setLeads((prev) => [...prev, ...normalized]);
       },
       error: (error) => {
         console.error("CSV Parse Error:", error);

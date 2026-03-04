@@ -24,11 +24,9 @@ export type LeadResposta = "RESPONDEU" | "NÃO RESPONDEU" | "";
 export type LeadComparecimento = "COMPARECEU" | "NÃO COMPARECEU" | "";
 
 export type LeadSource =
-  | "Instagram"
-  | "Facebook"
-  | "WhatsApp"
+  | "Online"
   | "Google"
-  | "Cupom indicação"
+  | "Cupom Indicação"
   | "Sorteio Radio"
   | "Site"
   | "Indicação"
