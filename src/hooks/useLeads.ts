@@ -594,7 +594,7 @@ export function useLeads() {
   };
 
   const importCSV = (file: File) => {
-    // Try parsing once with auto-detect; if duplicate headers appear, retry with explicit ";"
+    // Parse first with semicolon (export format). If duplicate headers appear, retry with comma.
     const doParse = (delimiter: string) => {
     Papa.parse(file, {
       header: true,
@@ -605,8 +605,8 @@ export function useLeads() {
         // If duplicate header renaming happened (keys end with _1, _2), retry with the other delimiter
         const keys = Object.keys(results.data[0] as any);
         const hasDuplicateRename = keys.some(k => /_\d+$/.test(k));
-        if (hasDuplicateRename && delimiter === "") {
-          doParse(";");
+        if (hasDuplicateRename && delimiter === ";") {
+          doParse(",");
           return;
         }
 
@@ -697,7 +697,7 @@ export function useLeads() {
       },
     });
   };
-  doParse("");
+  doParse(";");
   };
 
   const deleteLeads = (leadIds: string[]) => {
