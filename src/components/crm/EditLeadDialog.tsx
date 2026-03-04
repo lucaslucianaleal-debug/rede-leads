@@ -39,6 +39,11 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const set = (field: keyof Lead, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  const NONE = "__none__";
+
+  const selectValue = (v: string | undefined) => v || NONE;
+  const fromSelect = (v: string) => v === NONE ? "" : v;
+
   const handleSave = () => {
     onSave(lead.id, form);
     toast.success("Lead atualizado!");
@@ -80,7 +85,7 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           {/* Fonte */}
           <div className="space-y-1">
             <Label>Fonte</Label>
-            <Select value={form.fonteLead || ""} onValueChange={(v) => set("fonteLead", v)}>
+            <Select value={selectValue(form.fonteLead)} onValueChange={(v) => set("fonteLead", fromSelect(v))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {FONTES.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
@@ -91,7 +96,7 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           {/* Etapa */}
           <div className="space-y-1">
             <Label>Etapa</Label>
-            <Select value={form.etapaLead || ""} onValueChange={(v) => set("etapaLead", v as LeadStage)}>
+            <Select value={selectValue(form.etapaLead)} onValueChange={(v) => set("etapaLead", fromSelect(v) as LeadStage)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {ETAPAS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
@@ -102,13 +107,13 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           {/* Status */}
           <div className="space-y-1">
             <Label>Status</Label>
-            <Select value={form.status || ""} onValueChange={(v) => set("status", v as LeadStatus)}>
+            <Select value={selectValue(form.status)} onValueChange={(v) => set("status", fromSelect(v) as LeadStatus)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
                 <SelectItem value="QUENTE">QUENTE</SelectItem>
                 <SelectItem value="MORNO">MORNO</SelectItem>
                 <SelectItem value="FRIO">FRIO</SelectItem>
-                <SelectItem value="">—</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -116,12 +121,12 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           {/* Resposta */}
           <div className="space-y-1">
             <Label>Resposta</Label>
-            <Select value={form.respostaLead || ""} onValueChange={(v) => set("respostaLead", v as LeadResposta)}>
+            <Select value={selectValue(form.respostaLead)} onValueChange={(v) => set("respostaLead", fromSelect(v) as LeadResposta)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
                 <SelectItem value="RESPONDEU">RESPONDEU</SelectItem>
                 <SelectItem value="NÃO RESPONDEU">NÃO RESPONDEU</SelectItem>
-                <SelectItem value="">—</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -129,12 +134,12 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           {/* Comparecimento */}
           <div className="space-y-1">
             <Label>Comparecimento</Label>
-            <Select value={form.comparecimento || ""} onValueChange={(v) => set("comparecimento", v as LeadComparecimento)}>
+            <Select value={selectValue(form.comparecimento)} onValueChange={(v) => set("comparecimento", fromSelect(v) as LeadComparecimento)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value={NONE}>—</SelectItem>
                 <SelectItem value="COMPARECEU">COMPARECEU</SelectItem>
                 <SelectItem value="NÃO COMPARECEU">NÃO COMPARECEU</SelectItem>
-                <SelectItem value="">—</SelectItem>
               </SelectContent>
             </Select>
           </div>
