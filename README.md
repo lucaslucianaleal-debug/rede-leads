@@ -1,73 +1,46 @@
-# Welcome to your Lovable project
+# Rede Leads CRM
 
-## Project info
+Sistema de Gerenciamento de Leads (CRM) para gerenciamento de contatos, agendamentos e seguimento de leads em consultório odontológico.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Instalação
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Pré-requisitos: Node.js & npm
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Clone o repositório
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# Navegue até o diretório do projeto
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
+# Instale as dependências
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Inicie o servidor de desenvolvimento
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Tecnologias Utilizadas
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Este projeto foi construído com:
 
-**Use GitHub Codespaces**
+- **Vite** - Build tool e dev server
+- **TypeScript** - Type safety
+- **React 18** - UI framework
+- **shadcn/ui** - Component library
+- **Tailwind CSS** - Styling
+- **Firebase** - Authentication e Firestore database
+- **Recharts** - Data visualization
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Desenvolvimento
 
-## What technologies are used for this project?
+Para editar o código:
 
-This project is built with:
+1. Clone o repositório
+2. Instale as dependências com `npm i`
+3. Inicie o servidor dev com `npm run dev`
+4. Faça suas alterações e commit para o repositório
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Deploy
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+O projeto está configurado para auto-deploy via Vercel ao fazer push para a branch main.

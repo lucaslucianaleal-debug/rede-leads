@@ -63,7 +63,7 @@ export function AuthComponent() {
     const displayName = user.email?.split("@")[0] || user.email || "Usuário";
     return (
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">@{displayName}</span>
+        <span className="text-sm text-muted-foreground hidden sm:inline">@{displayName}</span>
         <Button variant="ghost" size="sm" onClick={logout}>
           <LogOut className="h-4 w-4 mr-1" />
           Sair
