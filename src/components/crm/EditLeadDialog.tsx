@@ -169,11 +169,11 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
 
           {/* Data Agendamento */}
           <div className="space-y-1">
-            <Label>Data de Agendamento (dd/mm/aaaa)</Label>
+            <Label>Data/Hora do Agendamento (dd/mm/aaaa hh:mm)</Label>
             <Input
               value={form.dataAgendamento || ""}
               onChange={(e) => set("dataAgendamento", e.target.value)}
-              placeholder="01/01/2026"
+              placeholder="01/01/2026 17:00"
             />
           </div>
 

@@ -26,7 +26,8 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
     leads.forEach((lead) => {
       if (lead.dataAgendamento) {
         try {
-          const parsedDate = parse(lead.dataAgendamento, "dd/MM/yyyy", new Date());
+          const datePart = lead.dataAgendamento.substring(0, 10);
+          const parsedDate = parse(datePart, "dd/MM/yyyy", new Date());
           if (isValid(parsedDate)) {
             dates.add(format(parsedDate, "yyyy-MM-dd"));
           }
@@ -42,7 +43,7 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
   const leadsForSelectedDate = useMemo(() => {
     if (!selectedDate) return [];
     const dateStr = format(selectedDate, "dd/MM/yyyy");
-    return leads.filter((lead) => lead.dataAgendamento === dateStr);
+    return leads.filter((lead) => lead.dataAgendamento.startsWith(dateStr));
   }, [leads, selectedDate]);
 
   const handleDateSelect = (date: Date | undefined) => {

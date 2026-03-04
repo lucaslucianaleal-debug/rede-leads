@@ -9,14 +9,7 @@ export function generateWhatsAppLink(
   dataAgendamento: string,
   reminderType: ReminderType
 ): string {
-  const timeLabel: Record<ReminderType, string> = {
-    "24h": "24 horas",
-    "12h": "12 horas",
-    "3h": "3 horas",
-    "1h": "1 hora",
-  };
-
-  const message = `Olá ${leadName}! 😊\n\nEste é um lembrete da sua consulta de *${servicoProcurado}* agendada para *${dataAgendamento}*.\n\n⏰ Faltam *${timeLabel[reminderType]}* para o seu atendimento.\n\nCaso precise reagendar, entre em contato conosco.\n\nAguardamos você! 🦷\n\n_Ninety Assessoria de Marketing e Vendas_`;
+  const message = `⏰ Lembrete da sua avaliação | OdontoCompany Olimpia\n\nOlá! \nPassando só pra lembrar que sua avaliação está marcada para *HOJE*. 😊\n\n📅 Data e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui.\nTe esperamos! 💚`;
 
   const phone = leadPhone.replace(/[^0-9]/g, "");
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;

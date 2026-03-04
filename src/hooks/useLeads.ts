@@ -319,7 +319,7 @@ export function useLeads() {
   // return leads whose `dataAgendamento` matches the given date (formatted as dd/MM/yyyy)
   const getAppointmentsFor = (date: Date = new Date()) => {
     const formatted = format(date, "dd/MM/yyyy");
-    return leads.filter((l) => l.dataAgendamento === formatted);
+    return leads.filter((l) => l.dataAgendamento.startsWith(formatted));
   };
 
   const exportAppointments = (date: Date = new Date()) => {

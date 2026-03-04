@@ -82,7 +82,9 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
     const months = new Set<string>();
     leads.forEach((lead) => {
       if (lead.dataAgendamento) {
-        const [, month, year] = lead.dataAgendamento.split("/");
+        const parts = lead.dataAgendamento.split("/");
+        const month = parts[1];
+        const year = parts[2]?.split(" ")[0]; // strip time if present
         if (month && year) {
           months.add(`${month}/${year}`);
         }
