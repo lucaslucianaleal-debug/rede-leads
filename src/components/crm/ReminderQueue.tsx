@@ -48,7 +48,7 @@ export function ReminderQueue({ leads, onMarkReminder }: ReminderQueueProps) {
                 <div className="flex gap-1.5 flex-wrap">
                   {reminderTypes.map((rt) => {
                     const sent = lead.lembretes[rt.key];
-                    const whatsLink = generateWhatsAppLink(lead.telefone, lead.nome, lead.servicoProcurado, lead.dataAgendamento, rt.label as any);
+                    const whatsLink = generateWhatsAppLink(lead.telefone, lead.nome, lead.servicoProcurado, lead.dataAgendamento, rt.key);
                     return (
                       <div key={rt.key} className="flex gap-0.5">
                         <a href={whatsLink} target="_blank" rel="noopener noreferrer">

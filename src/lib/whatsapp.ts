@@ -4,9 +4,11 @@ export function generateWhatsAppLink(
   leadPhone: string,
   leadName: string,
   servicoProcurado: string,
-  dataAgendamento: string
+  dataAgendamento: string,
+  reminderType: "h24" | "today"
 ): string {
-  const message = `⏰ Lembrete da sua avaliação | OdontoCompany Olimpia\n\nOlá! \nPassando só pra lembrar que sua avaliação está marcada para *HOJE*. 😊\n\n📅 Data e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui.\nTe esperamos! 💚`;
+  const timeLabel = reminderType === "h24" ? "amanhã" : "HOJE";
+  const message = `Olá!\nPassando só pra lembrar que sua avaliação está marcada para *${timeLabel}*.\n\nData e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui.\nTe esperamos!`;
 
   const phone = leadPhone.replace(/[^0-9]/g, "");
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;

@@ -67,7 +67,8 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
       lead.telefone,
       lead.nome,
       lead.servicoProcurado,
-      lead.dataAgendamento
+      lead.dataAgendamento,
+      type
     );
     
     window.open(whatsappLink, "_blank");
