@@ -377,6 +377,7 @@ export function useLeads() {
           ...l,
           observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
           dataRetornoLigacao: returnDate ?? l.dataRetornoLigacao ?? "",
+          respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
         };
       })
     );
