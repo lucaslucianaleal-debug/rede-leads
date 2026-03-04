@@ -76,4 +76,4 @@ export interface DashboardStats {
   lembretesPendentes: number;
 }
 
-export const WHATSAPP_CLINIC_NUMBER = "5517991040452";
+export const WHATSAPP_CLINIC_NUMBER = "5517991154763";

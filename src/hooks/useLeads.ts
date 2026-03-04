@@ -390,8 +390,8 @@ export function useLeads() {
 
     addInfoRow("REDE LEADS");
     ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 14 };
-    addInfoRow("Assessoria de Marketing e Vendas");
-    addInfoRow("WhatsApp: (17) 99104-0452");
+    addInfoRow("Central de Conversão de Leads");
+    addInfoRow("WhatsApp: (17) 99115-4763");
     ws.addRow([]);
     addInfoRow("RELATÓRIO DIÁRIO");
     ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 12 };
@@ -502,8 +502,8 @@ export function useLeads() {
 
     addInfoRow("REDE LEADS");
     ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 14 };
-    addInfoRow("Assessoria de Marketing e Vendas");
-    addInfoRow("WhatsApp: (17) 99104-0452");
+    addInfoRow("Central de Conversão de Leads");
+    addInfoRow("WhatsApp: (17) 99115-4763");
     ws.addRow([]);
     addInfoRow("RELATÓRIO SEMANAL");
     ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 12 };

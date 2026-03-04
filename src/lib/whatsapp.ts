@@ -32,7 +32,7 @@ export function generateFollowUpWhatsAppLink(
   } else {
     // Old API: generate default message
     const servicoProcurado = servicoProcuradoOrMessage;
-    message = `Olá ${leadName}! 😊\n\nTudo bem? Estamos entrando em contato sobre o seu interesse em *${servicoProcurado}*.\n\nGostaríamos de agendar uma avaliação gratuita para você. Temos horários disponíveis esta semana!\n\nPosso agendar para você? 📅\n\n_Ninety Assessoria de Marketing e Vendas_`;
+    message = `Olá ${leadName}! 😊\n\nTudo bem? Estamos entrando em contato sobre o seu interesse em *${servicoProcurado}*.\n\nGostaríamos de agendar uma avaliação gratuita para você. Temos horários disponíveis esta semana!\n\nPosso agendar para você? 📅\n\n_Central de Conversão de Leads_`;
   }
 
   const phone = leadPhone.replace(/[^0-9]/g, "");
