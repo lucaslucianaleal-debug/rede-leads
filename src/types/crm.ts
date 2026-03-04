@@ -26,7 +26,6 @@ export type LeadComparecimento = "COMPARECEU" | "NÃO COMPARECEU" | "";
 export type LeadSource =
   | "Online"
   | "Google"
-  | "Cupom Indicação"
   | "Sorteio Radio"
   | "Site"
   | "Indicação"

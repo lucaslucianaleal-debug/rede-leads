@@ -24,8 +24,8 @@ const normalizeFonteLead = (fonte: string): string => {
     "sorteio rádio": "Sorteio Radio",
     "site": "Site",
     "indicação": "Indicação",
-    "cupom indicação": "Cupom Indicação",
-    "cupom indicaçao": "Cupom Indicação",
+    "cupom indicação": "Indicação",
+    "cupom indicaçao": "Indicação",
     "online": "Online",
   };
   
@@ -42,7 +42,7 @@ const normalizeFonteLead = (fonte: string): string => {
   if (normalized.includes("site")) return "Site";
   if (normalized.includes("sorteio") || normalized.includes("radio")) return "Sorteio Radio";
   if (normalized.includes("indicação") || normalized.includes("indicaçao")) {
-    return normalized.includes("cupom") ? "Cupom Indicação" : "Indicação";
+    return "Indicação";
   }
   
   // Se não reconhecer, retorna como está (preserva valor original)
