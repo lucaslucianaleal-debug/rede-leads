@@ -47,7 +47,13 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
   const leadsForSelectedDate = useMemo(() => {
     if (!selectedDate) return [];
     const dateStr = format(selectedDate, "dd/MM/yyyy");
-    return leads.filter((lead) => lead.dataAgendamento.startsWith(dateStr));
+    return leads
+      .filter((lead) => lead.dataAgendamento.startsWith(dateStr))
+      .sort((a, b) => {
+        const timeA = a.dataAgendamento?.split(" ")[1] || "00:00";
+        const timeB = b.dataAgendamento?.split(" ")[1] || "00:00";
+        return timeA.localeCompare(timeB);
+      });
   }, [leads, selectedDate]);
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -142,6 +148,12 @@ export function CalendarView({ leads, onMarkReminder }: CalendarViewProps) {
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start mb-3">
                         <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Clock className="h-4 w-4 text-primary" />
+                            <span className="text-lg font-bold text-primary">
+                              {lead.dataAgendamento?.split(" ")[1] || "—"}
+                            </span>
+                          </div>
                           <h3 className="font-semibold text-lg">{lead.nome}</h3>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                             <Phone className="h-3 w-3" />
