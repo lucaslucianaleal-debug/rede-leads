@@ -8,6 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { format, parse, isValid } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 
 interface EditLeadDialogProps {
@@ -29,9 +34,31 @@ const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Out
 
 export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogProps) {
   const [form, setForm] = useState<Partial<Lead>>({});
+  const [agendamentoTime, setAgendamentoTime] = useState("09:00");
+  const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
-    if (lead) setForm({ ...lead });
+    if (lead) {
+      setForm({ ...lead });
+      // Parse existing dataAgendamento
+      if (lead.dataAgendamento) {
+        const parts = lead.dataAgendamento.split(" ");
+        const datePart = parts[0];
+        const timePart = parts[1] || "09:00";
+        setAgendamentoTime(timePart);
+        try {
+          const parsed = parse(datePart, "dd/MM/yyyy", new Date());
+          if (isValid(parsed)) setAgendamentoDate(parsed);
+          else setAgendamentoDate(undefined);
+        } catch {
+          setAgendamentoDate(undefined);
+        }
+      } else {
+        setAgendamentoDate(undefined);
+        setAgendamentoTime("09:00");
+      }
+    }
   }, [lead]);
 
   if (!lead) return null;
@@ -47,7 +74,11 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const handleSave = () => {
     // Nunca alterar followUpCount via edição manual — só o "Feito" pode avançar o follow-up
     const { followUpCount, ...safeUpdates } = form as Lead;
-    onSave(lead.id, safeUpdates);
+    // Montar dataAgendamento a partir do seletor
+    const finalAgendamento = agendamentoDate
+      ? `${format(agendamentoDate, "dd/MM/yyyy")} ${agendamentoTime}`
+      : "";
+    onSave(lead.id, { ...safeUpdates, dataAgendamento: finalAgendamento });
     toast.success("Lead atualizado!");
     onClose();
   };
@@ -171,13 +202,51 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           </div>
 
           {/* Data Agendamento */}
-          <div className="space-y-1">
-            <Label>Data/Hora do Agendamento (dd/mm/aaaa hh:mm)</Label>
-            <Input
-              value={form.dataAgendamento || ""}
-              onChange={(e) => set("dataAgendamento", e.target.value)}
-              placeholder="01/01/2026 17:00"
-            />
+          <div className="space-y-1 col-span-2">
+            <Label>Data/Hora do Agendamento</Label>
+            <div className="flex gap-2">
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="flex-1 justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                    {agendamentoDate
+                      ? format(agendamentoDate, "dd/MM/yyyy", { locale: ptBR })
+                      : <span className="text-muted-foreground">Selecionar data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={agendamentoDate}
+                    onSelect={(date) => {
+                      setAgendamentoDate(date);
+                      setCalendarOpen(false);
+                    }}
+                    locale={ptBR}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Input
+                type="time"
+                value={agendamentoTime}
+                onChange={(e) => setAgendamentoTime(e.target.value)}
+                className="w-32"
+              />
+              {agendamentoDate && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => { setAgendamentoDate(undefined); setAgendamentoTime("09:00"); }}
+                  title="Limpar"
+                >
+                  ×
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Observação */}
