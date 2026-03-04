@@ -21,18 +21,30 @@ export function AuthComponent() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [open, setOpen] = useState(false);
 
+  const sanitizeUsername = (input: string) => {
+    // Se digitou email completo (ex: fulano@gmail.com), pega só a parte antes do @
+    const withoutDomain = input.split("@")[0];
+    // Remove caracteres especiais, mantém letras, números, _ e -
+    return withoutDomain.replace(/[^a-z0-9_\-]/g, "").toLowerCase();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanUsername = sanitizeUsername(username);
+    if (!cleanUsername) {
+      toast.error("Nome de usuário inválido. Use apenas letras e números.");
+      return;
+    }
     try {
       // Converter username em email válido para Firebase Auth
-      const email = `${username.toLowerCase()}@redeleads.app`;
+      const email = `${cleanUsername}@redeleads.app`;
       
       if (isRegistering) {
         await register(email, password);
-        toast.success(`Usuário "${username}" criado com sucesso!`);
+        toast.success(`Usuário "${cleanUsername}" criado com sucesso!`);
       } else {
         await login(email, password);
-        toast.success(`Bem-vindo, ${username}!`);
+        toast.success(`Bem-vindo, ${cleanUsername}!`);
       }
       setUsername("");
       setPassword("");
@@ -80,7 +92,7 @@ export function AuthComponent() {
               type="text"
               placeholder="seu_usuario"
               value={username}
-              onChange={(e) => setUsername(e.target.value.toLowerCase())}
+              onChange={(e) => setUsername(e.target.value)}
               required
             />
           </div>
