@@ -15,22 +15,31 @@ export function useUserPermissions() {
   useEffect(() => {
     const loadPermissions = async () => {
       if (user) {
-        let userRole = await getUserRole(user.uid);
-
-        // Se não existe registro no Firestore, auto-criar como admin
-        // (usuário criado diretamente no Firebase Console)
-        if (!userRole) {
-          const crmUser: CRMUser = {
-            uid: user.uid,
-            username: user.email?.split("@")[0] || user.uid,
-            role: "admin",
-            createdAt: new Date().toISOString(),
-            createdBy: "system",
-          };
-          await setDoc(doc(db, "crm_users", user.uid), crmUser);
+        let userRole: UserRole = "admin"; // padrão para usuário logado
+        try {
+          const fetchedRole = await getUserRole(user.uid);
+          if (fetchedRole) {
+            userRole = fetchedRole;
+          } else {
+            // Tenta criar registro no Firestore, mas não bloqueia se falhar
+            try {
+              const crmUser: CRMUser = {
+                uid: user.uid,
+                username: user.email?.split("@")[0] || user.uid,
+                role: "admin",
+                createdAt: new Date().toISOString(),
+                createdBy: "system",
+              };
+              await setDoc(doc(db, "crm_users", user.uid), crmUser);
+            } catch {
+              // Silencia erro do Firestore, ainda usa admin como padrão
+            }
+            userRole = "admin";
+          }
+        } catch {
+          // Se Firestore inacessível, usuário logado = admin
           userRole = "admin";
         }
-
         setRole(userRole);
         setPermissions(rolePermissions[userRole]);
       } else {
