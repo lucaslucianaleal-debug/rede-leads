@@ -369,8 +369,12 @@ export function useLeads() {
         if (lead?.telefone) {
           const telefone = lead.telefone.replace(/\D/g, "");
           if (telefone) {
+            console.log(`Atualizando leadNome para ${updates.nome} na conversa ${telefone}`);
             const convRef = doc(db, "conversations", telefone);
-            updateDoc(convRef, { leadNome: updates.nome }).catch(() => {});
+            // Usa setDoc com merge para garantir que funciona mesmo se doc não existe
+            setDoc(convRef, { leadNome: updates.nome }, { merge: true })
+              .then(() => console.log(`leadNome atualizado com sucesso: ${updates.nome}`))
+              .catch((err) => console.error("Erro ao atualizar leadNome:", err));
           }
         }
       }
