@@ -335,6 +335,28 @@ async function syncLead(telefone, pushName, firstMessage) {
 
     console.log(`[syncLead] Novo lead: nome='${nome}', tel='${telefone}' (limpo)`);
 
+    // IMPORTANTE: antes de criar novo lead, tenta pegar conversa existente que tiver o mesmo telefone
+    let existingConversation = null;
+    try {
+      const allConvs = await db.collection("conversations").get();
+      const telDigits = telefone.replace(/\D/g, "");
+      for (const convDoc of allConvs.docs) {
+        const convData = convDoc.data();
+        // Busca por telefone no doc ID ou no campo telefone
+        const convDocDigits = convDoc.id.replace(/\D/g, "");
+        const convFieldDigits = convData?.telefone?.replace(/\D/g, "") || "";
+        
+        if ((convDocDigits.length >= 8 && telDigits.slice(-8) === convDocDigits.slice(-8)) ||
+            (convFieldDigits.length >= 8 && telDigits.slice(-8) === convFieldDigits.slice(-8))) {
+          existingConversation = convDoc.id;
+          console.log(`[syncLead] Conversa existente encontrada para novo lead: ${existingConversation}`);
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn("[syncLead] Erro ao procurar conversa existente:", err.message);
+    }
+
     const newLead = {
       id: `lead_${Date.now()}`,
       dataCriacao: dateStr,
@@ -358,8 +380,11 @@ async function syncLead(telefone, pushName, firstMessage) {
 
     await crmRef.update({ leads: [...leads, newLead] });
     console.log(`Novo lead criado: ${nome} (${telefone})`);
-    await db.collection("conversations").doc(telefone).set(
-      { leadNome: nome, telefone },
+    
+    // Usa conversa existente se houver, senão cria com o telefone
+    const conversationId = existingConversation || telefone;
+    await db.collection("conversations").doc(conversationId).set(
+      { leadNome: nome, telefone: conversationId },
       { merge: true }
     );
   } catch (e) {
