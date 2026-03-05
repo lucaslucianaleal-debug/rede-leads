@@ -264,33 +264,18 @@ async function syncLead(telefone, pushName, firstMessage) {
         nomeAtual = pushName;
       }
 
-      // PRIORIDADE: buscar conversa por NOME se foi passado um nome real (caso dos atalhos)
+      // Buscar conversa existente por TELEFONE (último padrão mais confiável)
       let conversationPhone = telefone;
       const allConvs = await db.collection("conversations").get();
       
-      // 1ª tentativa: buscar conversa por leadNome se foi passado nome real
-      const isRealName = pushName && !/^WhatsApp \d+$/i.test(pushName) && /[a-zA-ZÀ-ÿ]/.test(pushName);
-      if (isRealName) {
-        const nameKey = String(nomeAtual || "").trim().toLowerCase();
-        for (const convDoc of allConvs.docs) {
-          const convName = String(convDoc.data()?.leadNome || "").trim().toLowerCase();
-          if (convName && convName === nameKey) {
-            conversationPhone = convDoc.id;
-            console.log(`[syncLead] Conversa encontrada por NOME: ${conversationPhone} (nome: "${nomeAtual}")`);
-            break;
-          }
-        }
-      }
-
-      // 2ª tentativa (fallback): buscar por últimos 8 dígitos do telefone
-      if (conversationPhone === telefone) {
-        for (const convDoc of allConvs.docs) {
-          const convDigits = convDoc.id.replace(/\D/g, "");
-          if (convDigits.length >= 8 && telDigits.slice(-8) === convDigits.slice(-8)) {
-            conversationPhone = convDoc.id;
-            console.log(`[syncLead] Conversa encontrada por TELEFONE: ${conversationPhone} (match com ${telefone})`);
-            break;
-          }
+      // Tenta match por últimos 8-11 dígitos do telefone
+      const telDigits = telefone.replace(/\D/g, "");
+      for (const convDoc of allConvs.docs) {
+        const convDigits = convDoc.id.replace(/\D/g, "");
+        if (convDigits.length >= 8 && telDigits.slice(-8) === convDigits.slice(-8)) {
+          conversationPhone = convDoc.id;
+          console.log(`[syncLead] Conversa encontrada por TELEFONE: ${conversationPhone} (match com ${telefone})`);
+          break;
         }
       }
 
