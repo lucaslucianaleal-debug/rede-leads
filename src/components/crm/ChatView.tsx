@@ -76,9 +76,12 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
             return ld.length >= 8 && digits.slice(-8) === ld.slice(-8);
           });
           
-          const convRef = doc(db, "conversations", digits);
+          // Normalizar telefone: adicionar código país se não tiver
+          const fullPhone = digits.length === 11 ? `55${digits}` : digits;
+          
+          const convRef = doc(db, "conversations", fullPhone);
           await setDoc(convRef, {
-            telefone: digits,
+            telefone: fullPhone,
             leadNome: lead?.nome || "Novo Contato",
             createdAt: Timestamp.now(),
             lastMessageAt: null,
@@ -86,10 +89,10 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
             lastMessage: ""
           }, { merge: true });
           
-          console.log(`[ChatView] Conversa criada para ${digits}`);
+          console.log(`[ChatView] Conversa criada para ${fullPhone}`);
           // Aguardar um pouco para o hook useConversations pegar a nova conversa
           await new Promise(resolve => setTimeout(resolve, 500));
-          setSelectedPhone(digits);
+          setSelectedPhone(fullPhone);
           if (openTarget.message) setPrefilledMessage(openTarget.message);
           onOpenTargetHandled?.();
         } catch (err) {
