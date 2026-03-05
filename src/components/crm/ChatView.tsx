@@ -3,9 +3,14 @@ import { useConversations } from "@/hooks/useConversations";
 import { ConversationList } from "@/components/crm/ConversationList";
 import { ChatWindow } from "@/components/crm/ChatWindow";
 import { WhatsAppQRModal } from "@/components/crm/WhatsAppQRModal";
+import { EditLeadDialog } from "@/components/crm/EditLeadDialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, QrCode } from "lucide-react";
 import { Lead } from "@/types/crm";
+import { db } from "@/lib/firebase";
+import { collection, doc, getDocs, writeBatch, deleteDoc } from "firebase/firestore";
+import { toast } from "sonner";
 
 interface ChatViewProps {
   leads: Lead[];
@@ -25,6 +30,9 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   // Permite fechar o modal manualmente; reabre automaticamente quando o QR girar
   const [qrDismissed, setQrDismissed] = useState(false);
+  const [editLeadPhone, setEditLeadPhone] = useState<string | null>(null);
+  const [deletePhone, setDeletePhone] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const messages = useMessages(selectedPhone);
 
   const selectedConversation = conversations.find((c) => c.telefone === selectedPhone) || null;
@@ -55,6 +63,42 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
   const handleSelect = (telefone: string) => {
     setSelectedPhone(telefone);
   };
+
+  const handleEditLead = (telefone: string) => {
+    setEditLeadPhone(telefone);
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!deletePhone) return;
+    setDeleting(true);
+    try {
+      const cleanTel = deletePhone.replace(/\D/g, "");
+      const convRef = doc(db, "conversations", cleanTel);
+      // Apaga todas as mensagens primeiro
+      const msgsSnap = await getDocs(collection(db, "conversations", cleanTel, "messages"));
+      const batch = writeBatch(db);
+      msgsSnap.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      // Apaga o doc da conversa
+      await deleteDoc(convRef);
+      if (selectedPhone === deletePhone) setSelectedPhone(null);
+      toast.success("Conversa apagada.");
+    } catch (e) {
+      toast.error("Erro ao apagar conversa.");
+    } finally {
+      setDeleting(false);
+      setDeletePhone(null);
+    }
+  };
+
+  // Lead alvo para editar (match por telefone)
+  const editLeadTarget = editLeadPhone
+    ? leads.find((l) => {
+        const ld = l.telefone?.replace(/\D/g, "") || "";
+        const sd = editLeadPhone.replace(/\D/g, "");
+        return ld.length >= 8 && sd.slice(-8) === ld.slice(-8);
+      }) || null
+    : null;
 
   const handleSend = async (message: string) => {
     if (!selectedPhone) return false;
@@ -112,6 +156,8 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
             conversations={conversations}
             selectedPhone={selectedPhone}
             onSelect={handleSelect}
+            onEditLead={handleEditLead}
+            onDeleteConversation={(tel) => setDeletePhone(tel)}
           />
 
           {/* Janela de chat */}
@@ -132,6 +178,41 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
         qrCode={qrCode && !qrDismissed ? qrCode : null}
         onClose={() => setQrDismissed(true)}
       />
+
+      {/* Dialog Editar Lead */}
+      {editLeadTarget && (
+        <EditLeadDialog
+          lead={editLeadTarget}
+          open={!!editLeadPhone}
+          onClose={() => setEditLeadPhone(null)}
+          onSave={(id, updates) => {
+            onUpdateLead(id, updates);
+            setEditLeadPhone(null);
+          }}
+        />
+      )}
+
+      {/* Confirmação apagar conversa */}
+      <AlertDialog open={!!deletePhone} onOpenChange={(open) => !open && setDeletePhone(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar conversa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todas as mensagens desta conversa serão apagadas permanentemente. O lead no CRM <strong>não</strong> será apagado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConversation}
+              disabled={deleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleting ? "Apagando..." : "Apagar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
