@@ -496,7 +496,7 @@ client.on("message", async (msg) => {
       }
     } catch (e) {
       console.error("Erro ao baixar audio:", e.message);
-      body = "(audio)";
+      body = "🎙️ Áudio";
     }
   }
 
