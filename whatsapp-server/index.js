@@ -154,10 +154,18 @@ async function syncLead(telefone, pushName, firstMessage) {
     });
 
     if (existing) {
-      // Ja existe - usa nome do CRM na conversa
-      console.log(`[syncLead] Lead ja existe: ${existing.nome} (telefone=${existing.telefone})`);
+      let nomeAtual = existing.nome;
+
+      // Se o nome foi gerado automaticamente ("WhatsApp XXXX") e agora temos o nome real, atualiza
+      if (pushName && /^WhatsApp \d+$/.test(existing.nome)) {
+        console.log(`[syncLead] Atualizando nome gerado "${existing.nome}" -> "${pushName}"`);
+        const updatedLeads = leads.map((l) => l.id === existing.id ? { ...l, nome: pushName } : l);
+        await crmRef.update({ leads: updatedLeads });
+        nomeAtual = pushName;
+      }
+
       await db.collection("conversations").doc(telefone).set(
-        { leadNome: existing.nome, telefone },
+        { leadNome: nomeAtual, telefone },
         { merge: true }
       );
       return;
@@ -263,7 +271,26 @@ client.on("message", async (msg) => {
     return;
   }
 
-  let body = msg.body || "(midia)";
+  let body = msg.body || "";
+
+  // Identificar tipo de midia com emoji descritivo
+  if (msg.hasMedia) {
+    if (msg.type === "ptt" || msg.type === "audio") {
+      // tratado abaixo separadamente
+    } else if (msg.type === "image") {
+      body = msg.body ? `\uD83D\uDCF7 ${msg.body}` : "\uD83D\uDCF7 Imagem";
+    } else if (msg.type === "video") {
+      body = msg.body ? `\uD83C\uDFA5 ${msg.body}` : "\uD83C\uDFA5 V\u00eddeo";
+    } else if (msg.type === "document") {
+      body = msg.body || msg._data?.filename || "\uD83D\uDCC4 Documento";
+    } else if (msg.type === "sticker") {
+      body = "\uD83C\uDFF7\uFE0F Sticker";
+    } else {
+      body = body || "(m\u00eddia)";
+    }
+  } else if (!body) {
+    body = "(sem conte\u00FAdo)";
+  }
 
   // Detectar e salvar audio (ptt = mensagem de voz, audio = arquivo de audio)
   if (msg.hasMedia && (msg.type === "ptt" || msg.type === "audio")) {
