@@ -503,7 +503,7 @@ client.on("message", async (msg) => {
   console.log(`RECV ${telefone} (desde ${msg.from}): ${body}`);
   
   // Usar o MESMO telefone em ambas as operações para evitar duplicação
-  await syncLead(telefone, pushName, typeof body === "string" && body.startsWith("[audio:") ? "(audio)" : body);
+  await syncLead(telefone, pushName, typeof body === "string" && body.startsWith("[audio:") ? "🎙️ Áudio" : body);
   await saveMessage({ telefone, body, fromMe: false, msgId: msg.id._serialized });
 });
 
