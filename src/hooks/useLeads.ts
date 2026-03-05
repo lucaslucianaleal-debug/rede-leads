@@ -4,7 +4,7 @@ import { mockLeads } from "@/data/mockLeads";
 import { format } from "date-fns";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 
 const STORAGE_KEY = "rede_leads_data";
 const FIREBASE_DOC = doc(db, "crm_data", "shared");
@@ -361,7 +361,21 @@ export function useLeads() {
   };
 
   const updateLead = (leadId: string, updates: Partial<Lead>) => {
-    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, ...updates } : l)));
+    setLeads((prev) => {
+      const updated = prev.map((l) => (l.id === leadId ? { ...l, ...updates } : l));
+      // Se o nome foi alterado, sincroniza o leadNome na conversa do Firestore
+      if (updates.nome !== undefined) {
+        const lead = prev.find((l) => l.id === leadId);
+        if (lead?.telefone) {
+          const telefone = lead.telefone.replace(/\D/g, "");
+          if (telefone) {
+            const convRef = doc(db, "conversations", telefone);
+            updateDoc(convRef, { leadNome: updates.nome }).catch(() => {});
+          }
+        }
+      }
+      return updated;
+    });
   };
 
   const clearCallReturn = (leadId: string) => {
