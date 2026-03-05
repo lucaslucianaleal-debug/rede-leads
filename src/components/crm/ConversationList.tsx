@@ -27,7 +27,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
   );
 
   return (
-    <div className="flex flex-col h-full w-[300px] border-r border-border">
+    <div className="flex flex-col h-full min-w-[260px] max-w-[320px] w-full border-r border-border shrink-0">
       {/* Header */}
       <div className="p-3 border-b border-border">
         <div className="relative">
@@ -56,14 +56,14 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
             <div
               key={conv.telefone}
               className={cn(
-                "flex items-center border-b border-border/40 hover:bg-accent/50 transition-colors",
+                "flex items-center border-b border-border/40 hover:bg-accent/50 transition-colors overflow-hidden",
                 selectedPhone === conv.telefone && "bg-accent"
               )}
             >
               {/* Área clicável ocupa todo espaço menos o botão */}
               <button
                 onClick={() => onSelect(conv.telefone)}
-                className="flex-1 min-w-0 text-left px-4 py-3 flex items-start gap-3"
+                className="flex-1 min-w-0 text-left px-3 py-3 flex items-start gap-3 overflow-hidden"
               >
                 {/* Avatar */}
                 <div className="relative shrink-0">
@@ -78,13 +78,13 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
                 </div>
 
                 {/* Texto */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 w-full">
-                    <span className={cn("text-sm font-medium truncate flex-1", conv.unreadCount > 0 && "font-semibold")}>
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <div className="flex items-center gap-1">
+                    <span className={cn("text-sm font-medium truncate block max-w-[140px]", conv.unreadCount > 0 && "font-semibold")}>
                       {conv.leadNome}
                     </span>
                     {conv.lastMessageAt && (
-                      <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap ml-1">
+                      <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap ml-auto">
                         {formatDistanceToNow(conv.lastMessageAt.toDate(), {
                           addSuffix: false,
                           locale: ptBR,
@@ -93,7 +93,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
                     )}
                   </div>
                   <p className={cn(
-                    "text-xs truncate mt-0.5",
+                    "text-xs truncate mt-0.5 max-w-full",
                     conv.unreadCount > 0 ? "text-foreground font-medium" : "text-muted-foreground"
                   )}>
                     {conv.lastMessage || "Sem mensagens"}
@@ -102,7 +102,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
               </button>
 
               {/* Menu ⋯ — inline, nunca cortado */}
-              <div className="shrink-0 pr-2">
+              <div className="shrink-0 pr-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
