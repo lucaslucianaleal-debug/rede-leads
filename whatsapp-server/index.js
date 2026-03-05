@@ -6,6 +6,7 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import express from "express";
 import cors from "cors";
 import qrcode from "qrcode-terminal";
+import QRCode from "qrcode";
 import { readFileSync, mkdirSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -23,6 +24,10 @@ const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 const PORT = process.env.PORT || 3001;
+
+// Estado do QR Code (para exibir no CRM)
+let currentQR = null;
+let isConnected = false;
 
 // Pasta para arquivos de midia (audios)
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -185,18 +190,27 @@ const client = new Client({
   },
 });
 
-client.on("qr", (qr) => {
-  console.log("\nEscaneie o QR Code abaixo com o WhatsApp:\n");
+client.on("qr", async (qr) => {
+  console.log("\nQR Code gerado — escaneie no CRM ou aqui abaixo:\n");
   qrcode.generate(qr, { small: true });
   console.log("\n(WhatsApp -> Aparelhos conectados -> Conectar aparelho)\n");
+  try {
+    currentQR = await QRCode.toDataURL(qr);
+    isConnected = false;
+  } catch (e) {
+    console.error("Erro ao gerar QR base64:", e.message);
+  }
 });
 
 client.on("ready", () => {
   console.log("WhatsApp conectado! Escutando mensagens...");
+  currentQR = null;
+  isConnected = true;
 });
 
 client.on("authenticated", () => {
   console.log("Autenticado! Sessao salva.");
+  currentQR = null;
 });
 
 client.on("auth_failure", (msg) => {
@@ -205,6 +219,7 @@ client.on("auth_failure", (msg) => {
 
 client.on("disconnected", (reason) => {
   console.log("Desconectado:", reason);
+  isConnected = false;
   setTimeout(() => client.initialize(), 5000);
 });
 
@@ -264,6 +279,11 @@ app.post("/send-message", async (req, res) => {
 app.get("/status", (req, res) => {
   const info = client.info;
   res.json({ connected: !!info, number: info?.wid?.user || null });
+});
+
+// API: QR Code para autenticacao no CRM
+app.get("/qr", (req, res) => {
+  res.json({ qr: currentQR, connected: isConnected });
 });
 
 // API: marcar como lido

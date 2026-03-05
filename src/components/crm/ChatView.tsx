@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useConversations } from "@/hooks/useConversations";
 import { ConversationList } from "@/components/crm/ConversationList";
 import { ChatWindow } from "@/components/crm/ChatWindow";
+import { WhatsAppQRModal } from "@/components/crm/WhatsAppQRModal";
 import { Button } from "@/components/ui/button";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, QrCode } from "lucide-react";
 import { Lead } from "@/types/crm";
 
 interface ChatViewProps {
@@ -15,6 +16,9 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
   const {
     conversations,
     serverConnected,
+    qrCode,
+    showQRModal,
+    setShowQRModal,
     sendMessage,
     markAsRead,
     useMessages,
@@ -78,6 +82,21 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
         </div>
       )}
 
+      {/* Botão para escanear QR quando disponiivel */}
+      {qrCode && (
+        <div className="mb-3 flex items-center justify-between bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5 text-sm">
+          <span>📱 WhatsApp aguardando autenticação. Escaneie o QR Code para conectar.</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-blue-300 text-blue-700 ml-3 shrink-0"
+            onClick={() => setShowQRModal(true)}
+          >
+            <QrCode className="h-3 w-3 mr-1" /> Ver QR Code
+          </Button>
+        </div>
+      )}
+
       {/* Layout chat */}
       <div className="border border-border rounded-xl overflow-hidden bg-card" style={{ height: "calc(100vh - 220px)", minHeight: 500 }}>
         <div className="grid h-full" style={{ gridTemplateColumns: "300px 1fr" }}>
@@ -100,6 +119,12 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
           />
         </div>
       </div>
+
+      {/* Modal QR Code WhatsApp */}
+      <WhatsAppQRModal
+        qrCode={showQRModal ? qrCode : null}
+        onClose={() => setShowQRModal(false)}
+      />
     </div>
   );
 }

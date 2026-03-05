@@ -32,6 +32,8 @@ const SERVER_URL = "http://localhost:3001";
 export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [serverConnected, setServerConnected] = useState<boolean | null>(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
   const prevUnreadMap = useRef<Record<string, number>>({});
 
   // ─── Escutar lista de conversas ──────────────────────────────────────────────
@@ -101,6 +103,28 @@ export function useConversations() {
     return () => clearInterval(interval);
   }, []);
 
+  // ─── Polling do QR Code ───────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchQR = async () => {
+      try {
+        const res = await fetch(`${SERVER_URL}/qr`, { signal: AbortSignal.timeout(2000) });
+        const data = await res.json();
+        if (data.qr) {
+          setQrCode(data.qr);
+          setShowQRModal(true);
+        } else {
+          setQrCode(null);
+        }
+      } catch {
+        // servidor offline — sem QR
+        setQrCode(null);
+      }
+    };
+    fetchQR();
+    const interval = setInterval(fetchQR, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   // ─── Buscar mensagens de uma conversa ─────────────────────────────────────
   const useMessages = (telefone: string | null) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -159,6 +183,9 @@ export function useConversations() {
     conversations,
     totalUnread,
     serverConnected,
+    qrCode,
+    showQRModal,
+    setShowQRModal,
     sendMessage,
     markAsRead,
     useMessages,
