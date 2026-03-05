@@ -19,7 +19,6 @@ interface ConversationListProps {
 
 export function ConversationList({ conversations, selectedPhone, onSelect, onEditLead, onDeleteConversation }: ConversationListProps) {
   const [search, setSearch] = useState("");
-  const [hoveredPhone, setHoveredPhone] = useState<string | null>(null);
 
   const filtered = conversations.filter(
     (c) =>
@@ -57,18 +56,14 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
             <div
               key={conv.telefone}
               className={cn(
-                "relative group border-b border-border/40",
+                "flex items-center border-b border-border/40 hover:bg-accent/50 transition-colors",
                 selectedPhone === conv.telefone && "bg-accent"
               )}
-              onMouseEnter={() => setHoveredPhone(conv.telefone)}
-              onMouseLeave={() => setHoveredPhone(null)}
             >
+              {/* Área clicável ocupa todo espaço menos o botão */}
               <button
                 onClick={() => onSelect(conv.telefone)}
-                className={cn(
-                  "w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-accent/50 transition-colors pr-10",
-                  selectedPhone === conv.telefone && "bg-accent"
-                )}
+                className="flex-1 min-w-0 text-left px-4 py-3 flex items-start gap-3"
               >
                 {/* Avatar */}
                 <div className="relative shrink-0">
@@ -106,14 +101,16 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
                 </div>
               </button>
 
-              {/* Menu ⋯ — sempre visível */}
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
+              {/* Menu ⋯ — inline, nunca cortado */}
+              <div className="shrink-0 pr-2">
                 <DropdownMenu>
-                  <DropdownMenuTrigger
-                    className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreVertical className="h-4 w-4" />
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-44">
                     <DropdownMenuItem onClick={() => onEditLead(conv.telefone)}>
