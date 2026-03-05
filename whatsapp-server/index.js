@@ -45,15 +45,35 @@ async function getRealPhone(msg) {
       return digits.startsWith("55") ? digits : `55${digits}`;
     }
     // E um LID - busca numero real via getContact()
-    const contact = await msg.getContact();
-    const number = contact.number || "";
-    if (number && number.length >= 10) {
-      return number.startsWith("55") ? number : `55${number}`;
+    try {
+      const contact = await msg.getContact();
+      // Tenta contact.number primeiro
+      if (contact?.number) {
+        const num = String(contact.number).replace(/\D/g, "");
+        if (num.length >= 10 && num.length <= 13) {
+          return num.startsWith("55") ? num : `55${num}`;
+        }
+      }
+      // Fallback: contact._data.id
+      if (contact?._data?.id) {
+        const id = String(contact._data.id).replace("@c.us", "").replace(/\D/g, "");
+        if (id.length >= 10 && id.length <= 13) {
+          return id.startsWith("55") ? id : `55${id}`;
+        }
+      }
+    } catch (contactErr) {
+      console.warn("Erro ao buscar contact:", contactErr.message);
     }
-    return digits;
+    // Último fallback: tenta usar LID se for válido (11-13 dígitos = phone)
+    if (digits.length >= 11 && digits.length <= 13) {
+      return digits.startsWith("55") ? digits : `55${digits}`;
+    }
+    // Se LID é inválido, retorna formato genérico
+    console.warn(`LID inválido (${digits.length} dígitos): ${digits}`);
+    return `55${digits.slice(-11)}`  // pega últimos 11 dígitos como fallback
   } catch (e) {
     const digits = (msg.from || "").replace("@c.us", "").replace(/\D/g, "");
-    return digits;
+    return digits.length >= 11 ? digits : `55${digits.slice(-11)}`;
   }
 }
 
@@ -134,7 +154,7 @@ async function syncLead(telefone, pushName, firstMessage) {
       dataFollowUp: "",
       dataAgendamento: "",
       dataRetornoLigacao: "",
-      observacao: firstMessage ? `Primeira mensagem: "${firstMessage}"` : "",
+      observacao: "",
       followUpCount: 0,
       lembretes: { h24: false, today: false },
     };

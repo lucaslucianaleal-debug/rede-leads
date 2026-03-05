@@ -13,8 +13,8 @@ import { ptBR } from "date-fns/locale";
 import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save } from "lucide-react";
 import { toast } from "sonner";
 
-const SERVICOS = ["Facetas", "Clínico Geral", "Prótese", "Protocolo"];
-const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Outro"];
+const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
+const FONTES = ["Indicação", "Online", "Sorteio Radio"];
 
 interface ChatWindowProps {
   conversation: Conversation | null;
@@ -265,6 +265,15 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Agendar para</Label>
+                <Input
+                  type="date"
+                  value={leadForm.dataAgendamento || ""}
+                  onChange={(e) => setLeadForm((f) => ({ ...f, dataAgendamento: e.target.value }))}
+                  className="h-8 mt-1"
+                />
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Observação</Label>
