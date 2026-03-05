@@ -476,7 +476,7 @@ client.on("message", async (msg) => {
     } else if (msg.type === "sticker") {
       body = "\uD83C\uDFF7\uFE0F Sticker";
     } else {
-      body = body || "(m\u00eddia)";
+      body = body || "📦 Arquivo";
     }
   } else if (!body) {
     body = "(sem conte\u00FAdo)";
