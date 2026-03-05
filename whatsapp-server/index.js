@@ -46,9 +46,15 @@ async function getRealPhone(msg) {
   try {
     const rawFrom = msg.from || "";
     const digits = rawFrom.replace("@c.us", "").replace(/\D/g, "");
+    
+    console.log(`[getRealPhone] rawFrom=${rawFrom}, digits=${digits}, isLID=${isLID(rawFrom)}`);
+    
     if (!isLID(rawFrom)) {
-      return digits.startsWith("55") ? digits : `55${digits}`;
+      const result = digits.startsWith("55") ? digits : `55${digits}`;
+      console.log(`[getRealPhone] NAO eh LID, retornando: ${result}`);
+      return result;
     }
+    
     // E um LID - busca numero real via getContact()
     try {
       const contact = await msg.getContact();
@@ -56,27 +62,42 @@ async function getRealPhone(msg) {
       if (contact?.number) {
         const num = String(contact.number).replace(/\D/g, "");
         if (num.length >= 10 && num.length <= 13) {
-          return num.startsWith("55") ? num : `55${num}`;
+          const result = num.startsWith("55") ? num : `55${num}`;
+          console.log(`[getRealPhone] Resolvido via contact.number: ${result}`);
+          return result;
         }
       }
       // Fallback: contact._data.id
       if (contact?._data?.id) {
         const id = String(contact._data.id).replace("@c.us", "").replace(/\D/g, "");
         if (id.length >= 10 && id.length <= 13) {
-          return id.startsWith("55") ? id : `55${id}`;
+          const result = id.startsWith("55") ? id : `55${id}`;
+          console.log(`[getRealPhone] Resolvido via contact._data.id: ${result}`);
+          return result;
         }
       }
     } catch (contactErr) {
-      console.warn("Erro ao buscar contact:", contactErr.message);
+      console.warn("[getRealPhone] Erro ao buscar contact:", contactErr.message);
     }
-    // Último fallback: tenta usar LID se for válido (11-13 dígitos = phone)
+    
+    // Último fallback: tenta usar dígitos se tiver 11-13 (telefone brasileiro)
     if (digits.length >= 11 && digits.length <= 13) {
-      return digits.startsWith("55") ? digits : `55${digits}`;
+      const result = digits.startsWith("55") ? digits : `55${digits}`;
+      console.log(`[getRealPhone] Fallback com dígitos (${digits.length} chars): ${result}`);
+      return result;
     }
-    // Se LID é inválido, retorna formato genérico
-    console.warn(`LID inválido (${digits.length} dígitos): ${digits}`);
-    return `55${digits.slice(-11)}`  // pega últimos 11 dígitos como fallback
+    
+    // Se não conseguiu resolver e tem poucos dígitos, adiciona "55" na frente
+    if (digits.length > 0) {
+      const result = `55${digits.slice(-11)}`;
+      console.warn(`[getRealPhone] Fallback final com últimos 11 dígitos: ${result}`);
+      return result;
+    }
+    
+    console.error(`[getRealPhone] Nao conseguiu extrair numero: rawFrom=${rawFrom}`);
+    return "55";
   } catch (e) {
+    console.error("[getRealPhone] Exception:", e.message);
     const digits = (msg.from || "").replace("@c.us", "").replace(/\D/g, "");
     return digits.length >= 11 ? digits : `55${digits.slice(-11)}`;
   }
@@ -115,6 +136,12 @@ async function saveMessage({ telefone, body, fromMe, msgId }) {
 // Sincronizar lead: cria se novo, NAO sobrescreve se ja existe
 async function syncLead(telefone, pushName, firstMessage) {
   try {
+    // Validacao extra: rejeitar telefones invalidos
+    if (telefone.length < 12) {
+      console.error(`[syncLead] Rejeitando telefone invalido: "${telefone}"`);
+      return;
+    }
+
     const crmRef = db.collection("crm_data").doc("shared");
     const doc = await crmRef.get();
     const leads = doc.exists ? doc.data()?.leads || [] : [];
@@ -128,7 +155,7 @@ async function syncLead(telefone, pushName, firstMessage) {
 
     if (existing) {
       // Ja existe - usa nome do CRM na conversa
-      console.log(`Lead ja existe: ${existing.nome} (${telefone})`);
+      console.log(`[syncLead] Lead ja existe: ${existing.nome} (telefone=${existing.telefone})`);
       await db.collection("conversations").doc(telefone).set(
         { leadNome: existing.nome, telefone },
         { merge: true }
@@ -142,6 +169,8 @@ async function syncLead(telefone, pushName, firstMessage) {
     const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
     const nome = pushName || `WhatsApp ${telefone.slice(-4)}`;
     const telefoneFormatado = formatBRPhone(telefone);
+
+    console.log(`[syncLead] Novo lead: nome='${nome}', tel='${telefone}' -> formatado='${telefoneFormatado}'`);
 
     const newLead = {
       id: `lead_${Date.now()}`,
@@ -228,6 +257,12 @@ client.on("message", async (msg) => {
   const telefone = await getRealPhone(msg);
   const pushName = msg._data?.notifyName || null;
 
+  // Validar telefone: minimo "55" + 10 digitos = 12 chars
+  if (telefone.length < 12) {
+    console.warn(`[message] Telefone invalido (muito curto): "${telefone}" de ${msg.from}. Ignorando.`);
+    return;
+  }
+
   let body = msg.body || "(midia)";
 
   // Detectar e salvar audio (ptt = mensagem de voz, audio = arquivo de audio)
@@ -248,7 +283,7 @@ client.on("message", async (msg) => {
     }
   }
 
-  console.log(`RECV ${telefone}: ${body}`);
+  console.log(`RECV ${telefone} (desde ${msg.from}): ${body}`);
   await syncLead(telefone, pushName, typeof body === "string" && body.startsWith("[audio:") ? "(audio)" : body);
   await saveMessage({ telefone, body, fromMe: false, msgId: msg.id._serialized });
 });
