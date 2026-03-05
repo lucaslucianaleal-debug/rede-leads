@@ -39,7 +39,14 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
   const [isResizing, setIsResizing] = useState(false);
   const messages = useMessages(selectedPhone);
 
-  const selectedConversation = conversations.find((c) => c.telefone === selectedPhone) || null;
+  const selectedConversation = selectedPhone
+    ? conversations.find((c) => {
+        if (c.telefone === selectedPhone) return true;
+        const sd = selectedPhone.replace(/\D/g, "");
+        const cd = c.telefone.replace(/\D/g, "");
+        return sd.length >= 8 && cd.slice(-8) === sd.slice(-8);
+      }) || null
+    : null;
 
   // Encontrar lead correspondente pelo telefone (ultimos 8 digitos)
   const currentLead = selectedPhone
@@ -53,6 +60,7 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
   // Abrir conversa a partir de atalho (FollowUpQueue / AllLeadsView)
   useEffect(() => {
     if (!openTarget) return;
+    if (conversations.length === 0) return; // aguardar carregamento das conversas
     const digits = openTarget.phone.replace(/\D/g, "");
     const match = conversations.find((c) => {
       const cd = c.telefone.replace(/\D/g, "");
@@ -62,7 +70,7 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
     setSelectedPhone(targetPhone);
     if (openTarget.message) setPrefilledMessage(openTarget.message);
     onOpenTargetHandled?.();
-  }, [openTarget]);
+  }, [openTarget, conversations]);
 
   // Pedir permissão de notificação ao abrir a aba
   useEffect(() => {
