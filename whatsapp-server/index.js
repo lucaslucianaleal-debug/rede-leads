@@ -339,6 +339,40 @@ app.post("/mark-read", async (req, res) => {
   }
 });
 
+// API: limpar leads com telefone inválido (menos de 12 dígitos)
+app.get("/cleanup-invalid-leads", async (req, res) => {
+  try {
+    const crmRef = db.collection("crm_data").doc("shared");
+    const doc = await crmRef.get();
+    const leads = doc.exists ? doc.data()?.leads || [] : [];
+    
+    const invalid = leads.filter((l) => {
+      const digits = (l.telefone || "").replace(/\D/g, "");
+      return digits.length < 12;
+    });
+    
+    if (invalid.length === 0) {
+      return res.json({ message: "Nenhum lead inválido encontrado", cleaned: 0 });
+    }
+    
+    const cleaned = leads.filter((l) => {
+      const digits = (l.telefone || "").replace(/\D/g, "");
+      return digits.length >= 12;
+    });
+    
+    await crmRef.update({ leads: cleaned });
+    console.log(`[cleanup] Removidos ${invalid.length} leads com telefone inválido`);
+    
+    res.json({
+      message: `Removidos ${invalid.length} leads com telefone inválido`,
+      cleaned: invalid.length,
+      removedLeads: invalid.map((l) => ({ nome: l.nome, telefone: l.telefone })),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\nServidor CRM WhatsApp na porta ${PORT}\n`);
 });
