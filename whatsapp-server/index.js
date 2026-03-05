@@ -137,7 +137,7 @@ function phoneToWAId(telefone) {
 }
 
 // Salvar mensagem evitando duplicatas
-// Busca conversa existente pelos ultimos 8 digitos para evitar duplicatas
+// Busca conversa existente pelos ultimos 8-11 digitos para evitar duplicatas
 async function saveMessage({ telefone, body, fromMe, msgId }) {
   // Normaliza telefone (remove formatação)
   const normalizedPhone = telefone.replace(/\D/g, "");
@@ -145,28 +145,98 @@ async function saveMessage({ telefone, body, fromMe, msgId }) {
   // Resolve alias para manter sempre o mesmo documento de conversa
   const canonicalPhone = phoneAliasMap.get(normalizedPhone) || normalizedPhone;
 
-  // Busca conversa existente que bata com os ultimos 8 digitos
+  // Prepara para busca: ultimos 8 e 11 digitos
   let targetPhone = canonicalPhone;
   const last8 = normalizedPhone.slice(-8);
+  const last11 = normalizedPhone.slice(-11);
   
   // 1. Tenta procurar conversa com ID exato
   const directRef = db.collection("conversations").doc(canonicalPhone);
   const directSnap = await directRef.get();
   
   if (!directSnap.exists) {
-    // 2. Não existe com esse ID exato - busca por conversas existentes com match parcial (últimos 8 dígitos)
+    // 2. Não existe com esse ID exato - busca por conversas existentes com match
     const allConvs = await db.collection("conversations").get();
+    let found = false;
+    
     for (const doc of allConvs.docs) {
       const docDigits = doc.id.replace(/\D/g, "");
-      // Match se últimos 8 dígitos forem iguais E ter pelo menos 8 dígitos
-      if (docDigits.length >= 8 && docDigits.slice(-8) === last8) {
-        console.log(`[saveMessage] Encontrada conversa existente: ${doc.id} (match com ${normalizedPhone})`);
+      const docLast8 = docDigits.slice(-8);
+      const docLast11 = docDigits.slice(-11);
+      const convTelField = doc.data()?.telefone?.replace(/\D/g, "") || "";
+      const convTelLast8 = convTelField.slice(-8);
+      const convTelLast11 = convTelField.slice(-11);
+      
+      // Priority 1: Match nos últimos 11 dígitos (telefone sem país)
+      if (last11 && docLast11 && docLast11 === last11) {
+        console.log(`[saveMessage] Encontrada conversa por 11-digitos: ${doc.id} (input: ${normalizedPhone})`);
         targetPhone = doc.id;
-        // Registra mapeamento para futuro (se este ID limpasse diferente)
-        if (normalizedPhone !== targetPhone) {
-          phoneAliasMap.set(normalizedPhone, targetPhone);
-        }
+        phoneAliasMap.set(normalizedPhone, targetPhone);
+        found = true;
         break;
+      }
+      
+      // Priority 2: Match no campo telefone da conversa (ultimos 11)
+      if (last11 && convTelField && convTelLast11 === last11) {
+        console.log(`[saveMessage] Encontrada conversa por telefone field (11-dig): ${doc.id} (input: ${normalizedPhone})`);
+        targetPhone = doc.id;
+        phoneAliasMap.set(normalizedPhone, targetPhone);
+        found = true;
+        break;
+      }
+      
+      // Priority 3: Match nos últimos 8 dígitos
+      if (docDigits.length >= 8 && docLast8 === last8) {
+        console.log(`[saveMessage] Encontrada conversa por 8-digitos: ${doc.id} (input: ${normalizedPhone})`);
+        targetPhone = doc.id;
+        phoneAliasMap.set(normalizedPhone, targetPhone);
+        found = true;
+        break;
+      }
+      
+      // Priority 4: Match no campo telefone (ultimos 8)
+      if (convTelField.length >= 8 && convTelLast8 === last8) {
+        console.log(`[saveMessage] Encontrada conversa por telefone field (8-dig): ${doc.id} (input: ${normalizedPhone})`);
+        targetPhone = doc.id;
+        phoneAliasMap.set(normalizedPhone, targetPhone);
+        found = true;
+        break;
+      }
+    }
+    
+    if (found) {
+      console.log(`[saveMessage] MATCH encontrado: usando conversa ${targetPhone}`);
+    } else {
+      console.log(`[saveMessage] Nenhuma conversa existente encontrada - CRIANDO NOVA com ID ${targetPhone}`);
+
+      // 3. Fallback por leadNome: se houver lead com este telefone, tenta reaproveitar conversa já vinculada ao mesmo nome
+      try {
+        const crmRef = db.collection("crm_data").doc("shared");
+        const crmSnap = await crmRef.get();
+        const leads = crmSnap.exists ? (crmSnap.data()?.leads || []) : [];
+        const matchedLead = leads.find((lead) => {
+          const leadDigits = String(lead?.telefone || "").replace(/\D/g, "");
+          return (
+            (leadDigits.length >= 11 && last11 && leadDigits.slice(-11) === last11) ||
+            (leadDigits.length >= 8 && leadDigits.slice(-8) === last8)
+          );
+        });
+
+        if (matchedLead?.nome) {
+          const allConvsByName = await db.collection("conversations").get();
+          const byLeadName = allConvsByName.docs.find((doc) => {
+            const name = String(doc.data()?.leadNome || "").trim().toLowerCase();
+            return name && name === String(matchedLead.nome).trim().toLowerCase();
+          });
+
+          if (byLeadName) {
+            targetPhone = byLeadName.id;
+            phoneAliasMap.set(normalizedPhone, targetPhone);
+            console.log(`[saveMessage] Fallback por leadNome: usando conversa ${targetPhone} para ${matchedLead.nome}`);
+          }
+        }
+      } catch (err) {
+        console.warn("[saveMessage] Falha no fallback por leadNome:", err.message);
       }
     }
   }
@@ -175,7 +245,10 @@ async function saveMessage({ telefone, body, fromMe, msgId }) {
   const convRef = db.collection("conversations").doc(targetPhone);
   const msgRef = convRef.collection("messages").doc(msgId);
   const existing = await msgRef.get();
-  if (existing.exists) return; // Mensagem já foi salva
+  if (existing.exists) {
+    console.log(`[saveMessage] Mensagem ${msgId} já existe - ignorando duplicata`);
+    return; // Mensagem já foi salva
+  }
   
   await msgRef.set({ id: msgId, body, fromMe, timestamp: Timestamp.now(), read: fromMe });
   const convSnap = await convRef.get();
@@ -185,6 +258,8 @@ async function saveMessage({ telefone, body, fromMe, msgId }) {
     { telefone: targetPhone, lastMessage: body, lastMessageAt: Timestamp.now(), unreadCount: fromMe ? 0 : currentUnread + 1 },
     { merge: true }
   );
+  
+  console.log(`[saveMessage] Mensagem finalizada - conversa: ${targetPhone}, fromMe: ${fromMe}`);
 }
 
 // Sincronizar lead: cria se novo, NAO sobrescreve se ja existe
@@ -218,16 +293,33 @@ async function syncLead(telefone, pushName, firstMessage) {
         nomeAtual = pushName;
       }
 
-      // MAS converter para a mesma conversa já existente (por últimos 8 dígitos)
-      // Isso evita duplicação se getRealPhone retornar números levemente diferentes
+      // PRIORIDADE: buscar conversa por NOME se foi passado um nome real (caso dos atalhos)
       let conversationPhone = telefone;
       const allConvs = await db.collection("conversations").get();
-      for (const convDoc of allConvs.docs) {
-        const convDigits = convDoc.id.replace(/\D/g, "");
-        if (convDigits.length >= 8 && telDigits.slice(-8) === convDigits.slice(-8)) {
-          conversationPhone = convDoc.id;
-          console.log(`[syncLead] Encontrada conversa existente: ${conversationPhone} (match com ${telefone})`);
-          break;
+      
+      // 1ª tentativa: buscar conversa por leadNome se foi passado nome real
+      const isRealName = pushName && !/^WhatsApp \d+$/i.test(pushName) && /[a-zA-ZÀ-ÿ]/.test(pushName);
+      if (isRealName) {
+        const nameKey = String(nomeAtual || "").trim().toLowerCase();
+        for (const convDoc of allConvs.docs) {
+          const convName = String(convDoc.data()?.leadNome || "").trim().toLowerCase();
+          if (convName && convName === nameKey) {
+            conversationPhone = convDoc.id;
+            console.log(`[syncLead] Conversa encontrada por NOME: ${conversationPhone} (nome: "${nomeAtual}")`);
+            break;
+          }
+        }
+      }
+
+      // 2ª tentativa (fallback): buscar por últimos 8 dígitos do telefone
+      if (conversationPhone === telefone) {
+        for (const convDoc of allConvs.docs) {
+          const convDigits = convDoc.id.replace(/\D/g, "");
+          if (convDigits.length >= 8 && telDigits.slice(-8) === convDigits.slice(-8)) {
+            conversationPhone = convDoc.id;
+            console.log(`[syncLead] Conversa encontrada por TELEFONE: ${conversationPhone} (match com ${telefone})`);
+            break;
+          }
         }
       }
 
@@ -235,6 +327,22 @@ async function syncLead(telefone, pushName, firstMessage) {
         { leadNome: nomeAtual, telefone: conversationPhone },
         { merge: true }
       );
+
+      // Limpa leadNome duplicado em outras conversas (evita 2 chats com o mesmo nome)
+      try {
+        const allConvs2 = await db.collection("conversations").get();
+        const targetName = String(nomeAtual || "").trim().toLowerCase();
+        for (const convDoc of allConvs2.docs) {
+          if (convDoc.id === conversationPhone) continue;
+          const convName = String(convDoc.data()?.leadNome || "").trim().toLowerCase();
+          if (targetName && convName === targetName) {
+            await convDoc.ref.set({ leadNome: "" }, { merge: true });
+            console.log(`[syncLead] leadNome duplicado removido de ${convDoc.id}; mantido em ${conversationPhone}`);
+          }
+        }
+      } catch (cleanupErr) {
+        console.warn("[syncLead] Falha ao limpar leadNome duplicado:", cleanupErr.message);
+      }
       return;
     }
 
@@ -268,7 +376,7 @@ async function syncLead(telefone, pushName, firstMessage) {
     };
 
     await crmRef.update({ leads: [...leads, newLead] });
-    console.log(`Novo lead criado: ${nome} (${telefoneFormatado})`);
+    console.log(`Novo lead criado: ${nome} (${telefone})`);
     await db.collection("conversations").doc(telefone).set(
       { leadNome: nome, telefone },
       { merge: true }
@@ -431,20 +539,65 @@ app.post("/send-message", async (req, res) => {
   if (!telefone || !message) return res.status(400).json({ error: "telefone e message sao obrigatorios" });
   try {
     // Normaliza telefone (remove formatação, pode vir formatado do CRM: "(17) 99104-5246")
-    const normalizedPhone = telefone.replace(/\D/g, "");
+    const digits = telefone.replace(/\D/g, "");
+    // Adiciona prefixo 55 (Brasil) se não tiver
+    const normalizedPhone = digits.startsWith("55") ? digits : `55${digits}`;
     
     if (normalizedPhone.length < 12) {
       return res.status(400).json({ error: "telefone invalido (menos de 12 digitos)" });
     }
     
+    // Busca o lead no CRM para obter o nome (será usado como referência primária nos atalhos)
+    let leadName = null;
+    try {
+      const crmRef = db.collection("crm_data").doc("shared");
+      const crmSnap = await crmRef.get();
+      const leads = crmSnap.exists ? (crmSnap.data()?.leads || []) : [];
+      const telDigits = normalizedPhone.replace(/\D/g, "");
+      const matchedLead = leads.find((l) => {
+        const leadDigits = String(l?.telefone || "").replace(/\D/g, "");
+        return (
+          (leadDigits.length >= 11 && telDigits.length >= 11 && leadDigits.slice(-11) === telDigits.slice(-11)) ||
+          (leadDigits.length >= 8 && telDigits.length >= 8 && leadDigits.slice(-8) === telDigits.slice(-8))
+        );
+      });
+      if (matchedLead) {
+        leadName = String(matchedLead.nome || "").trim();
+        console.log(`[send-message] Lead encontrado: "${leadName}" para telefone ${normalizedPhone}`);
+      }
+    } catch (leadErr) {
+      console.warn("[send-message] Falha ao buscar lead do CRM:", leadErr.message);
+    }
+
     const waId = phoneToWAId(normalizedPhone);
     const sentMsg = await client.sendMessage(waId, message);
 
-    // Salva mapeamento do msgId para garantir que message_create usa a mesma conversa
+    // Garante que futuras mensagens para este contato usem o mesmo ID de conversa
+    // Registra o msgId se disponível
     if (sentMsg?.id?._serialized) {
       sentMsgConversationMap.set(sentMsg.id._serialized, normalizedPhone);
       setTimeout(() => sentMsgConversationMap.delete(sentMsg.id._serialized), 10 * 60 * 1000);
     }
+    
+    // Força o alias: qualquer variação deste telefone -> normalizedPhone
+    // Isso garante que se getRealPhone retornar valor ligeiramente diferente,
+    // será mapeado para a mesma conversa
+    for (const key of phoneAliasMap.keys()) {
+      const keyDigits = key.replace(/\D/g, "");
+      const normalizedDigits = normalizedPhone.replace(/\D/g, "");
+      // Se últimos 8 dígitos batem, assumir que é o mesmo contato
+      if (keyDigits.length >= 8 && normalizedDigits.length >= 8 &&
+          keyDigits.slice(-8) === normalizedDigits.slice(-8)) {
+        phoneAliasMap.set(normalizedPhone, normalizedPhone);
+        break;
+      }
+    }
+    if (!phoneAliasMap.has(normalizedPhone)) {
+      phoneAliasMap.set(normalizedPhone, normalizedPhone);
+    }
+
+    // Garante sincronização do lead/conversa nos atalhos - PASSA O NOME para usar como referência primária
+    await syncLead(normalizedPhone, leadName || null, message);
 
     // Salva mensagem com telefone normalizado
     await saveMessage({

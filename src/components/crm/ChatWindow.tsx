@@ -12,7 +12,7 @@ import { AgendamentoDialog } from "@/components/crm/AgendamentoDialog";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone, Calendar } from "lucide-react";
+import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone, Calendar, Reply } from "lucide-react";
 import { toast } from "sonner";
 
 const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
@@ -45,6 +45,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
   const [leadForm, setLeadForm] = useState<Partial<Lead>>({});
   const [callLogOpen, setCallLogOpen] = useState(false);
   const [agendamentoDialogOpen, setAgendamentoDialogOpen] = useState(false);
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Scroll apenas dentro do container de mensagens
@@ -79,6 +80,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
     const msg = text.trim();
     if (!msg || !conversation) return;
     setText("");
+    setReplyingToId(null);
     setSending(true);
     await onSend(msg);
     setSending(false);
@@ -210,17 +212,24 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                 <div
                   key={msg.id}
                   className={cn(
-                    "flex mb-1.5",
+                    "flex mb-1.5 group",
                     msg.fromMe ? "justify-end" : "justify-start"
                   )}
                 >
                     <div className={cn(
-                      "max-w-[75%] px-3 py-2 rounded-2xl shadow-sm text-sm",
+                      "max-w-[75%] px-3 py-2 rounded-2xl shadow-sm text-sm relative",
                       msg.fromMe
                         ? "bg-[#dcf8c6] dark:bg-primary text-foreground dark:text-primary-foreground rounded-br-sm"
                         : "bg-white dark:bg-card text-foreground rounded-bl-sm"
                     )}
                     >
+                      {/* Renderiza contexto de resposta se existir */}
+                      {msg.replyTo && (
+                        <div className="mb-1.5 pb-1.5 border-b border-current/20 text-[11px] italic opacity-75">
+                          <div className="font-medium">Respondendo a:</div>
+                          <div className="max-h-12 overflow-hidden">{msg.replyTo.bodyPreview}</div>
+                        </div>
+                      )}
                       {renderMessageBody(msg.body)}
                     <div className={cn(
                       "flex items-center gap-1 mt-0.5",
@@ -235,6 +244,14 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                         <CheckCheck className={cn("h-3 w-3", msg.read ? "text-blue-500" : "text-muted-foreground")} />
                       )}
                     </div>
+                    {/* Botão de resposta ao fazer hover */}
+                    <button
+                      onClick={() => setReplyingToId(msg.id)}
+                      className="absolute -right-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent text-muted-foreground hover:text-primary"
+                      title="Responder"
+                    >
+                      <Reply className="h-3 w-3" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -242,6 +259,25 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
           ))
         )}
       </div>
+
+      {/* Contexto de resposta */}
+      {replyingToId && (
+        <div className="px-3 py-2 border-t border-b border-border bg-muted/30 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground font-medium">Respondendo a:</p>
+            <p className="text-sm truncate max-h-8 overflow-hidden">
+              {messages.find(m => m.id === replyingToId)?.body || "Mensagem não encontrada"}
+            </p>
+          </div>
+          <button
+            onClick={() => setReplyingToId(null)}
+            className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            title="Cancelar resposta"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Input de envio */}
       <div className="p-3 border-t border-border bg-card flex items-center gap-2 shrink-0">

@@ -27,7 +27,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
   );
 
   return (
-    <div className="flex flex-col h-full min-w-[260px] max-w-[320px] w-full border-r border-border shrink-0">
+    <div className="flex flex-col h-full w-full overflow-hidden border-r border-border">
       {/* Header */}
       <div className="p-3 border-b border-border">
         <div className="relative">
@@ -63,7 +63,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
               {/* Área clicável ocupa todo espaço menos o botão */}
               <button
                 onClick={() => onSelect(conv.telefone)}
-                className="flex-1 min-w-0 text-left px-3 py-3 flex items-start gap-3 overflow-hidden"
+                className="flex-1 min-w-0 overflow-hidden text-left px-3 py-3 flex items-start gap-3"
               >
                 {/* Avatar */}
                 <div className="relative shrink-0">
@@ -80,11 +80,11 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
                 {/* Texto */}
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-1">
-                    <span className={cn("text-sm font-medium truncate block max-w-[140px]", conv.unreadCount > 0 && "font-semibold")}>
+                    <span className={cn("text-sm font-medium truncate block flex-1 min-w-0", conv.unreadCount > 0 && "font-semibold")}>
                       {conv.leadNome}
                     </span>
                     {conv.lastMessageAt && (
-                      <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap ml-auto">
+                      <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap ml-1 max-w-[84px] truncate">
                         {formatDistanceToNow(conv.lastMessageAt.toDate(), {
                           addSuffix: false,
                           locale: ptBR,
@@ -102,11 +102,11 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
               </button>
 
               {/* Menu ⋯ — inline, nunca cortado */}
-              <div className="shrink-0 pr-1">
+              <div className="w-10 shrink-0 flex items-center justify-center">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      className="h-7 w-7 flex items-center justify-center rounded-md bg-background/70 hover:bg-muted text-foreground/80 hover:text-foreground transition-colors"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <MoreVertical className="h-4 w-4" />
