@@ -95,19 +95,26 @@ async function getRealPhone(msg, useToField = false) {
     
     // Fallbacks se não conseguiu resolver via contact
     if (!resolvedPhone) {
-      // Último fallback: tenta usar dígitos se tiver 11-13 (telefone brasileiro)
-      if (digits.length >= 11 && digits.length <= 13) {
+      // Valida que tem no mínimo 10 dígitos pra um número brasileiro válido
+      if (digits.length >= 10 && digits.length <= 13) {
         resolvedPhone = digits.startsWith("55") ? digits : `55${digits}`;
         console.log(`[getRealPhone] Fallback com dígitos (${digits.length} chars): ${resolvedPhone}`);
-      }
-      // Se não conseguiu resolver e tem poucos dígitos, adiciona "55" na frente
-      else if (digits.length > 0) {
-        resolvedPhone = `55${digits.slice(-11)}`;
-        console.warn(`[getRealPhone] Fallback final com últimos 11 dígitos: ${resolvedPhone}`);
       } else {
-        resolvedPhone = "55";
-        console.error(`[getRealPhone] Nao conseguiu extrair numero: rawFrom=${rawFrom}`);
+        // Número inválido - muitos poucos ou muitos dígitos
+        console.error(`[getRealPhone] Número inválido: ${digits.length} dígitos. rawFrom=${rawFrom}`);
+        resolvedPhone = null;
       }
+    }
+    
+    // Se nada funcionou, gera um placeholder único baseado no timestamp
+    if (!resolvedPhone) {
+      resolvedPhone = `55unknown${Date.now()}`;
+      console.error(`[getRealPhone] Não conseguiu resolver número, usando placeholder: ${resolvedPhone}`);
+    }
+    
+    // Valida o resultado final
+    if (!resolvedPhone || resolvedPhone.length < 12 || resolvedPhone.length > 14) {
+      console.error(`[getRealPhone] FALHA: número final inválido: ${resolvedPhone} (${resolvedPhone.length} chars)`);
     }
     
     // Salva no cache para consistência futura
@@ -143,13 +150,42 @@ async function saveMessage({ telefone, body, fromMe, msgId }) {
   const digits = telefone.replace(/\D/g, "");
   const normalizedPhone = digits.startsWith("55") ? digits : `55${digits}`;
   
+  // Verifica se o telefone recebido tem DDD inválido
+  // Se tiver, procura no CRM por um lead com os mesmos últimos 8 dígitos
+  let correctedPhone = normalizedPhone;
+  const ddd = normalizedPhone.substring(2, 4);
+  const dddNum = parseInt(ddd, 10);
+  
+  if (dddNum < 11 || dddNum > 99) {
+    console.log(`[saveMessage] DDD inválido (${ddd}) - procurando lead no CRM com últimos 8 dígitos...`);
+    try {
+      const crmRef = db.collection("crm_data").doc("shared");
+      const crmSnap = await crmRef.get();
+      const leads = crmSnap.exists ? (crmSnap.data()?.leads || []) : [];
+      const last8 = normalizedPhone.slice(-8);
+      
+      const matchedLead = leads.find((lead) => {
+        const leadDigits = String(lead?.telefone || "").replace(/\D/g, "");
+        return leadDigits.length >= 8 && leadDigits.slice(-8) === last8;
+      });
+      
+      if (matchedLead) {
+        correctedPhone = String(matchedLead.telefone).replace(/\D/g, "");
+        phoneAliasMap.set(normalizedPhone, correctedPhone);
+        console.log(`[saveMessage] Encontrado lead: ${matchedLead.nome} - usando telefone: ${correctedPhone}`);
+      }
+    } catch (err) {
+      console.warn("[saveMessage] Erro ao procurar lead:", err.message);
+    }
+  }
+  
   // Resolve alias para manter sempre o mesmo documento de conversa
-  const canonicalPhone = phoneAliasMap.get(normalizedPhone) || normalizedPhone;
+  const canonicalPhone = phoneAliasMap.get(correctedPhone) || correctedPhone;
 
   // Prepara para busca: ultimos 8 e 11 digitos
   let targetPhone = canonicalPhone;
-  const last8 = normalizedPhone.slice(-8);
-  const last11 = normalizedPhone.slice(-11);
+  const last8 = correctedPhone.slice(-8);
+  const last11 = correctedPhone.slice(-11);
   
   // 1. Tenta procurar conversa com ID exato
   const directRef = db.collection("conversations").doc(canonicalPhone);
@@ -248,10 +284,33 @@ async function syncLead(telefone, pushName, firstMessage) {
     const telDigits = telefone.replace(/\D/g, "");
 
     // Compara ultimos 8 digitos para tolerar prefixo de pais
-    const existing = leads.find((l) => {
+    let existing = leads.find((l) => {
       const d = l.telefone?.replace(/\D/g, "") || "";
       return d.length >= 8 && telDigits.slice(-8) === d.slice(-8);
     });
+
+    // SE NÃO ENCONTROU E O TELEFONE TEM DDD INVÁLIDO (06, 07, etc),
+    // PROCURA POR OUTROS LEADS COM ÚLTIMOS 8 DÍGITOS SIMILARES
+    if (!existing && (telDigits.length >= 4)) {
+      const ddd = telDigits.substring(2, 4);
+      const dddNum = parseInt(ddd, 10);
+      if (dddNum < 11 || dddNum > 99) {
+        console.log(`[syncLead] DDD inválido (${ddd}) detectado - procurando leads com últimos 8 dígitos similares...`);
+        // Tenta encontrar lead com mesmo telefone mas DDD diferente
+        const last8 = telDigits.slice(-8);
+        existing = leads.find((l) => {
+          const leadDigits = String(l.telefone || "").replace(/\D/g, "");
+          return leadDigits.length >= 8 && leadDigits.slice(-8) === last8;
+        });
+        if (existing) {
+          console.log(`[syncLead] Encontrado lead com últimos 8 dígitos: ${existing.nome} (tel: ${existing.telefone})`);
+          // Atualiza o alias para mapear o número recebido errado para o correto
+          const correctPhone = existing.telefone.replace(/\D/g, "");
+          phoneAliasMap.set(telDigits, correctPhone);
+          console.log(`[syncLead] Mapeado: ${telDigits} -> ${correctPhone}`);
+        }
+      }
+    }
 
     if (existing) {
       let nomeAtual = existing.nome;
@@ -283,21 +342,21 @@ async function syncLead(telefone, pushName, firstMessage) {
       
       // 2ª tentativa: buscar por TELEFONE (últimos 8 dígitos)
       if (!conversationPhone) {
-        const telDigits = telefone.replace(/\D/g, "");
+        const realTelDigits = (existing.telefone || "").replace(/\D/g, "");
         for (const convDoc of allConvs.docs) {
           const convDigits = convDoc.id.replace(/\D/g, "");
-          if (convDigits.length >= 8 && telDigits.slice(-8) === convDigits.slice(-8)) {
+          if (convDigits.length >= 8 && realTelDigits.length >= 8 && realTelDigits.slice(-8) === convDigits.slice(-8)) {
             conversationPhone = convDoc.id;
-            console.log(`[syncLead] Conversa encontrada por TELEFONE: ${conversationPhone} (match com ${telefone})`);
+            console.log(`[syncLead] Conversa encontrada por TELEFONE: ${conversationPhone} (match com ${existing.telefone})`);
             break;
           }
         }
       }
       
-      // 3ª tentativa: usar o telefone fornecido (nova conversa se não existir)
+      // 3ª tentativa: usar o telefone do lead (pode ser diferente do recebido)
       if (!conversationPhone) {
-        conversationPhone = telefone;
-        console.log(`[syncLead] Nenhuma conversa existente - criando com telefone: ${conversationPhone}`);
+        conversationPhone = existing.telefone.replace(/\D/g, "");
+        console.log(`[syncLead] Usando telefone do lead: ${conversationPhone}`);
       }
 
       const updateData = { telefone: conversationPhone };
@@ -446,9 +505,23 @@ client.on("message", async (msg) => {
   // Resolve telefone UMA VEZ e usa o mesmo em todas as operações
   const telefone = await getRealPhone(msg);
 
-  // Validar telefone: minimo "55" + 10 digitos = 12 chars
-  if (telefone.length < 12) {
-    console.warn(`[message] Telefone invalido (muito curto): "${telefone}" de ${msg.from}. Ignorando.`);
+  // Validar telefone: minimo "55" + DDD(2) + numero(8-9) = 12-14 chars
+  if (telefone.length < 12 || telefone.length > 14) {
+    console.warn(`[message] Telefone invalido (tamanho ${telefone.length}): "${telefone}" de ${msg.from}. Ignorando.`);
+    return;
+  }
+  
+  // Valida que começa com "55"
+  if (!telefone.startsWith("55")) {
+    console.warn(`[message] Telefone invalido (não começa com 55): "${telefone}" de ${msg.from}. Ignorando.`);
+    return;
+  }
+  
+  // Extrai e valida DDD (2 dígitos após "55", deve ser 11-99)
+  const ddd = telefone.substring(2, 4);
+  const dddNum = parseInt(ddd, 10);
+  if (dddNum < 11 || dddNum > 99) {
+    console.warn(`[message] DDD inválido (${ddd}): telefone "${telefone}" de ${msg.from}. Ignorando.`);
     return;
   }
 
