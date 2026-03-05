@@ -134,8 +134,17 @@ export function useConversations() {
 
       const finalList = Array.from(nameDedupMap.values());
 
+      // Filtrar conversas órfãs (ID inválido "55unknown...")
+      const validConversations = finalList.filter((conv) => {
+        if (conv.telefone.includes("unknown")) {
+          console.warn(`[useConversations] Filtrando conversa órfã: ${conv.telefone}`);
+          return false; // Não incluir na lista final
+        }
+        return true;
+      });
+
       // Ordenar por mensagem mais recente
-      finalList.sort((a, b) => {
+      validConversations.sort((a, b) => {
         const ta = a.lastMessageAt?.toMillis() || 0;
         const tb = b.lastMessageAt?.toMillis() || 0;
         return tb - ta;
@@ -149,7 +158,7 @@ export function useConversations() {
         return `raw:${conv.telefone}`;
       };
 
-      for (const conv of finalList) {
+      for (const conv of validConversations) {
         const key = getKey(conv);
         const prevUnread = prevUnreadMap.current[key] ?? conv.unreadCount;
         if (conv.unreadCount > prevUnread) {
@@ -168,7 +177,7 @@ export function useConversations() {
         prevUnreadMap.current[key] = conv.unreadCount;
       }
 
-      setConversations(finalList);
+      setConversations(validConversations);
     });
 
     return () => unsubscribe();

@@ -149,46 +149,87 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
     if (!deletePhone) return;
     setDeleting(true);
     try {
-      // Usa o ID exato da conversa (pode não ser só dígitos se foi criado com nome/ID estranho)
-      let targetConvId = deletePhone;
+      // Tenta deletar com o ID EXATO primeiro (pode ser "55unknown...", "55...", etc)
+      let success = false;
+      let convRef = doc(db, "conversations", deletePhone);
       
-      // Tenta encontrar a conversa por matching de dígitos (últimos 11 dígitos)
-      const digits = deletePhone.replace(/\D/g, "");
-      const last11 = digits.slice(-11);
-      
-      if (last11.length >= 11) {
-        // Verifica se há conversa com ID exato primeiro
-        try {
-          const directSnap = await getDocs(collection(db, "conversations", digits, "messages"));
-          console.log("Conversa encontrada com ID exato de dígitos");
-          targetConvId = digits;
-        } catch (e) {
-          // Senão, procura por matching de 11 dígitos em todas as conversas
-          const allConvs = await getDocs(collection(db, "conversations"));
-          for (const convDoc of allConvs.docs) {
+      // Tenta deletar com o ID exato
+      try {
+        // Apaga todas as mensagens com o ID exato
+        const msgsSnap = await getDocs(collection(db, "conversations", deletePhone, "messages"));
+        if (msgsSnap.docs.length > 0) {
+          const batch = writeBatch(db);
+          msgsSnap.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+          console.log(`Deletadas ${msgsSnap.docs.length} mensagens de ${deletePhone}`);
+        }
+        
+        // Apaga o documento da conversa
+        await deleteDoc(convRef);
+        success = true;
+        console.log(`Conversa deletada: ${deletePhone}`);
+      } catch (e) {
+        console.warn(`Falha ao deletar com ID exato ${deletePhone}:`, e.message);
+        
+        // Fallback: se falhou, procura conversas que contenham parte do ID
+        // Útil se o ID for "55unknown..." e a conversa tenha sido salva com ID diferente
+        const allConvs = await getDocs(collection(db, "conversations"));
+        
+        for (const convDoc of allConvs.docs) {
+          // Se o ID atual é "55unknown...", procura por conversas órfãs similares
+          if (deletePhone.includes("unknown")) {
+            // Extrai os números após "unknown"
+            const unknownMatch = deletePhone.match(/unknown(\d+)/);
+            if (unknownMatch && convDoc.id.includes(unknownMatch[1])) {
+              // Encontrou conversa órfã similar
+              const msgsSnap = await getDocs(
+                collection(db, "conversations", convDoc.id, "messages")
+              );
+              const batch = writeBatch(db);
+              msgsSnap.forEach((d) => batch.delete(d.ref));
+              await batch.commit();
+              
+              await deleteDoc(doc(db, "conversations", convDoc.id));
+              success = true;
+              console.log(`Conversa órfã deletada: ${convDoc.id}`);
+              break;
+            }
+          } else {
+            // Para IDs normais, tenta matching por 11 dígitos
+            const digits = deletePhone.replace(/\D/g, "");
+            const last11 = digits.slice(-11);
             const convDigits = convDoc.id.replace(/\D/g, "");
-            if (convDigits.length >= 11 && convDigits.slice(-11) === last11) {
-              targetConvId = convDoc.id;
-              console.log(`Conversa encontrada por 11-digitos matching: ${targetConvId}`);
+            
+            if (
+              last11.length >= 11 &&
+              convDigits.length >= 11 &&
+              convDigits.slice(-11) === last11
+            ) {
+              const msgsSnap = await getDocs(
+                collection(db, "conversations", convDoc.id, "messages")
+              );
+              const batch = writeBatch(db);
+              msgsSnap.forEach((d) => batch.delete(d.ref));
+              await batch.commit();
+              
+              await deleteDoc(doc(db, "conversations", convDoc.id));
+              success = true;
+              console.log(`Conversa deletada por matching: ${convDoc.id}`);
               break;
             }
           }
         }
       }
       
-      const convRef = doc(db, "conversations", targetConvId);
-      // Apaga todas as mensagens primeiro
-      const msgsSnap = await getDocs(collection(db, "conversations", targetConvId, "messages"));
-      const batch = writeBatch(db);
-      msgsSnap.forEach((d) => batch.delete(d.ref));
-      await batch.commit();
-      // Apaga o doc da conversa
-      await deleteDoc(convRef);
-      if (selectedPhone === deletePhone) setSelectedPhone(null);
-      toast.success("Conversa apagada.");
+      if (success) {
+        if (selectedPhone === deletePhone) setSelectedPhone(null);
+        toast.success("Conversa apagada.");
+      } else {
+        toast.error("Conversa não encontrada para ser deletada.");
+      }
     } catch (e) {
       console.error("Erro ao apagar conversa:", e.message);
-      toast.error("Erro ao apagar conversa.");
+      toast.error(`Erro ao apagar conversa: ${e.message}`);
     } finally {
       setDeleting(false);
       setDeletePhone(null);
