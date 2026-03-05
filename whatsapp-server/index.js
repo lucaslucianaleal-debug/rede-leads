@@ -326,7 +326,7 @@ async function syncLead(telefone, pushName, firstMessage) {
 
       const updateData = { telefone: conversationPhone };
       if (nomeAtual) {
-        updateData.leadNome = nomeAtual; // Só atualiza se tem nome real
+        updateData.leadNome = nomeAtual;
       }
       await db.collection("conversations").doc(conversationPhone).set(
         updateData,
