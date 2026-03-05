@@ -478,8 +478,6 @@ client.on("message", async (msg) => {
     } else {
       body = body || "📦 Arquivo";
     }
-  } else if (!body) {
-    body = "(sem conte\u00FAdo)";
   }
 
   // Detectar e salvar audio (ptt = mensagem de voz, audio = arquivo de audio)
@@ -498,6 +496,12 @@ client.on("message", async (msg) => {
       console.error("Erro ao baixar audio:", e.message);
       body = "🎙️ Áudio";
     }
+  }
+
+  // Não salvar mensagens vazias
+  if (!body || !body.trim()) {
+    console.log(`RECV ${telefone} (desde ${msg.from}): [ignorada - sem conteúdo]`);
+    return;
   }
 
   console.log(`RECV ${telefone} (desde ${msg.from}): ${body}`);
