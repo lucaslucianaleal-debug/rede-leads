@@ -56,6 +56,8 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
         servicoProcurado: "",
         captador: "",
         fonteLead: "",
+        dataRetornoLigacao: "",
+        dataAgendamento: "",
         observacao: "",
       });
     }
@@ -265,6 +267,15 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Ligação realizada em</Label>
+                <Input
+                  type="datetime-local"
+                  value={leadForm.dataRetornoLigacao || ""}
+                  onChange={(e) => setLeadForm((f) => ({ ...f, dataRetornoLigacao: e.target.value }))}
+                  className="h-8 mt-1"
+                />
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Agendar para</Label>
