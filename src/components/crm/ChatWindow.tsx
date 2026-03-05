@@ -218,16 +218,28 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                 >
                     <div className={cn(
                       "max-w-[75%] px-3 py-2 rounded-2xl shadow-sm text-sm relative",
+                      msg.replyTo && "border-l-4",
                       msg.fromMe
-                        ? "bg-[#dcf8c6] dark:bg-primary text-foreground dark:text-primary-foreground rounded-br-sm"
-                        : "bg-white dark:bg-card text-foreground rounded-bl-sm"
+                        ? cn(
+                            "bg-[#dcf8c6] dark:bg-primary text-foreground dark:text-primary-foreground rounded-br-sm",
+                            msg.replyTo && "border-l-[#a8d76b]"
+                          )
+                        : cn(
+                            "bg-white dark:bg-card text-foreground rounded-bl-sm",
+                            msg.replyTo && "border-l-primary"
+                          )
                     )}
                     >
                       {/* Renderiza contexto de resposta se existir */}
                       {msg.replyTo && (
-                        <div className="mb-1.5 pb-1.5 border-b border-current/20 text-[11px] italic opacity-75">
-                          <div className="font-medium">Respondendo a:</div>
-                          <div className="max-h-12 overflow-hidden">{msg.replyTo.bodyPreview}</div>
+                        <div className={cn(
+                          "mb-2 pb-2 rounded px-2 py-1.5 text-[11px] font-medium",
+                          msg.fromMe 
+                            ? "bg-[#c0e6a3]/40 border-l-2 border-[#a8d76b] pl-2"
+                            : "bg-muted/50 border-l-2 border-primary pl-2"
+                        )}>
+                          <div className="opacity-75 mb-0.5">↳ Respondendo a:</div>
+                          <div className="max-h-10 overflow-hidden line-clamp-2 opacity-85">{msg.replyTo.bodyPreview}</div>
                         </div>
                       )}
                       {renderMessageBody(msg.body)}
