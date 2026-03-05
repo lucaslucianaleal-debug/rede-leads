@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LeadTable } from "./LeadTable";
 import { EditLeadDialog } from "./EditLeadDialog";
+import { CreateLeadDialog } from "./CreateLeadDialog";
 import { useState, useMemo } from "react";
-import { Search, AlertTriangle, Users, CalendarCheck, Clock, UserCheck, Trash2 } from "lucide-react";
+import { Search, AlertTriangle, Users, CalendarCheck, Clock, UserCheck, Trash2, Plus } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
 
@@ -15,6 +16,7 @@ interface AllLeadsViewProps {
   leads: Lead[];
   onMarkAttendance: (id: string, value: string) => void;
   onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
+  onCreateLead?: (lead: Omit<Lead, 'id'>) => void;
   selectedLeads?: string[];
   onSelectionChange?: (leadIds: string[]) => void;
   onDeleteSelected?: () => void;
@@ -28,7 +30,7 @@ type FilterCategory = {
   duplicados?: boolean;
 };
 
-export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat }: AllLeadsViewProps) {
+export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat }: AllLeadsViewProps) {
   const [filters, setFilters] = useState<FilterCategory>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCreationDay, setSelectedCreationDay] = useState<string>("all");
@@ -36,6 +38,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
   const [selectedAppointmentMonth, setSelectedAppointmentMonth] = useState<string>("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Detect duplicates by phone number
   const duplicatePhones = useMemo(() => {
@@ -409,15 +412,23 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, telefone ou serviço..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+          {/* Search Bar + New Lead Button */}
+          <div className="flex gap-2 items-end">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, telefone ou serviço..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {onCreateLead && (
+              <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Novo Lead
+              </Button>
+            )}
           </div>
 
           {/* Clear Filters Button */}
@@ -464,6 +475,16 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
         onSave={(id, updates) => {
           onUpdateLead?.(id, updates);
           setEditingLead(null);
+        }}
+      />
+
+      {/* Create Lead Dialog */}
+      <CreateLeadDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onSave={(lead) => {
+          onCreateLead?.(lead);
+          setShowCreateDialog(false);
         }}
       />
     </div>

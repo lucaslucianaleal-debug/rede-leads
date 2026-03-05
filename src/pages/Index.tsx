@@ -2,6 +2,7 @@ import { useLeads } from "@/hooks/useLeads";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useConversations } from "@/hooks/useConversations";
+import { Lead } from "@/types/crm";
 import { StatsCards } from "@/components/crm/StatsCards";
 import { FollowUpQueue } from "@/components/crm/FollowUpQueue";
 import { CallReturnQueue } from "@/components/crm/CallReturnQueue";
@@ -49,6 +50,7 @@ const CRMDashboard = () => {
     sendFollowUp,
     markReminder,
     updateLead,
+    createLead,
     clearCallReturn,
     registerCall,
     exportAppointments,
@@ -100,6 +102,11 @@ const CRMDashboard = () => {
 
   const handleRegisterCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
     registerCall(leadId, outcome, obs, returnDate);
+  };
+
+  const handleCreateLead = (lead: Omit<Lead, 'id'>) => {
+    createLead(lead);
+    toast.success(`Lead "${lead.nome}" criado com sucesso!`);
   };
 
   const handleReminder = (id: string, type: "h24" | "today") => {
@@ -324,6 +331,7 @@ const CRMDashboard = () => {
               leads={leads} 
               onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
               onUpdateLead={updateLead}
+              onCreateLead={handleCreateLead}
               selectedLeads={selectedLeads}
               onSelectionChange={setSelectedLeads}
               onDeleteSelected={() => setShowDeleteDialog(true)}

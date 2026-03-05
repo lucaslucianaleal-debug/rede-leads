@@ -406,6 +406,12 @@ export function useLeads() {
     });
   };
 
+  const createLead = (leadData: Omit<Lead, 'id'>) => {
+    const newId = `lead_${Date.now()}`;
+    const newLead: Lead = { ...leadData, id: newId };
+    setLeads((prev) => [...prev, newLead]);
+  };
+
   const clearCallReturn = (leadId: string) => {
     setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, dataRetornoLigacao: "" } : l));
   };
@@ -890,6 +896,7 @@ export function useLeads() {
     sendFollowUp,
     markReminder,
     updateLead,
+    createLead,
     clearCallReturn,
     registerCall,
     exportCSV,
