@@ -26,10 +26,20 @@ interface ChatWindowProps {
   serverConnected: boolean | null;
   currentLead: Lead | null;
   onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
+  prefilledMessage?: string;
+  onPrefilledConsumed?: () => void;
 }
 
-export function ChatWindow({ conversation, messages, onSend, onOpen, serverConnected, currentLead, onUpdateLead }: ChatWindowProps) {
+export function ChatWindow({ conversation, messages, onSend, onOpen, serverConnected, currentLead, onUpdateLead, prefilledMessage, onPrefilledConsumed }: ChatWindowProps) {
   const [text, setText] = useState("");
+
+  // Pre-fill message when a shortcut sends a template
+  useEffect(() => {
+    if (prefilledMessage) {
+      setText(prefilledMessage);
+      onPrefilledConsumed?.();
+    }
+  }, [prefilledMessage]);
   const [sending, setSending] = useState(false);
   const [showLeadPanel, setShowLeadPanel] = useState(false);
   const [leadForm, setLeadForm] = useState<Partial<Lead>>({});

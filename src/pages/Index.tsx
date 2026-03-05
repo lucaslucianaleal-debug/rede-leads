@@ -69,6 +69,13 @@ const CRMDashboard = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showClearDuplicatesDialog, setShowClearDuplicatesDialog] = useState(false);
   const [reportDate, setReportDate] = useState<Date>(new Date());
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [chatTarget, setChatTarget] = useState<{ phone: string; message?: string } | null>(null);
+
+  const handleOpenChat = (phone: string, message?: string) => {
+    setChatTarget({ phone, message });
+    setActiveTab("chat");
+  };
 
   // Calcular quantidade de duplicatas
   const duplicatesInfo = useMemo(() => {
@@ -247,7 +254,7 @@ const CRMDashboard = () => {
             onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
           />
         ) : (
-        <Tabs defaultValue="dashboard" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full sm:max-w-[900px] grid-cols-5">
             <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
               <LayoutDashboard className="h-4 w-4 shrink-0" />
@@ -288,8 +295,7 @@ const CRMDashboard = () => {
                 onRegisterCall={handleRegisterCall}
                 followUpsDoneToday={followUpsDoneToday}
                 followUpGoal={followUpGoal}
-                onSendWhatsApp={sendMessage}
-                serverConnected={serverConnected}
+                onOpenChat={handleOpenChat}
               />
               <ReminderQueue leads={reminderQueue} onMarkReminder={handleReminder} />
             </div>
@@ -324,13 +330,17 @@ const CRMDashboard = () => {
               onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
               onSendFollowUp={handleFollowUp}
               onRegisterCall={handleRegisterCall}
-              onSendWhatsApp={sendMessage}
-              serverConnected={serverConnected}
+              onOpenChat={handleOpenChat}
             />
           </TabsContent>
 
           <TabsContent value="chat">
-            <ChatView leads={leads} onUpdateLead={(id, updates) => updateLead(id, updates)} />
+            <ChatView
+              leads={leads}
+              onUpdateLead={(id, updates) => updateLead(id, updates)}
+              openTarget={chatTarget}
+              onOpenTargetHandled={() => setChatTarget(null)}
+            />
           </TabsContent>
         </Tabs>
         )}

@@ -15,9 +15,11 @@ import { toast } from "sonner";
 interface ChatViewProps {
   leads: Lead[];
   onUpdateLead: (id: string, updates: Partial<Lead>) => void;
+  openTarget?: { phone: string; message?: string } | null;
+  onOpenTargetHandled?: () => void;
 }
 
-export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
+export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled }: ChatViewProps) {
   const {
     conversations,
     serverConnected,
@@ -28,11 +30,13 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
   } = useConversations();
 
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
-  // Permite fechar o modal manualmente; reabre automaticamente quando o QR girar
+  const [prefilledMessage, setPrefilledMessage] = useState<string>("");
   const [qrDismissed, setQrDismissed] = useState(false);
   const [editLeadPhone, setEditLeadPhone] = useState<string | null>(null);
   const [deletePhone, setDeletePhone] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [conversationListWidth, setConversationListWidth] = useState(300);
+  const [isResizing, setIsResizing] = useState(false);
   const messages = useMessages(selectedPhone);
 
   const selectedConversation = conversations.find((c) => c.telefone === selectedPhone) || null;
@@ -46,6 +50,20 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
       }) || null
     : null;
 
+  // Abrir conversa a partir de atalho (FollowUpQueue / AllLeadsView)
+  useEffect(() => {
+    if (!openTarget) return;
+    const digits = openTarget.phone.replace(/\D/g, "");
+    const match = conversations.find((c) => {
+      const cd = c.telefone.replace(/\D/g, "");
+      return cd.slice(-8) === digits.slice(-8);
+    });
+    const targetPhone = match?.telefone ?? digits;
+    setSelectedPhone(targetPhone);
+    if (openTarget.message) setPrefilledMessage(openTarget.message);
+    onOpenTargetHandled?.();
+  }, [openTarget]);
+
   // Pedir permissão de notificação ao abrir a aba
   useEffect(() => {
     if (Notification.permission === "default") {
@@ -53,12 +71,26 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
     }
   }, []);
 
-  // Reabre o modal automaticamente quando chegar um QR novo
   useEffect(() => {
     if (qrCode) {
       setQrDismissed(false);
     }
   }, [qrCode]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.max(260, Math.min(500, e.clientX));
+      setConversationListWidth(newWidth);
+    };
+    const handleMouseUp = () => setIsResizing(false);
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
 
   const handleSelect = (telefone: string) => {
     setSelectedPhone(telefone);
@@ -150,26 +182,34 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
 
       {/* Layout chat — ocupa espaço restante */}
       <div className="flex-1 min-h-0 border border-border rounded-xl overflow-hidden bg-card">
-        <div className="grid h-full" style={{ gridTemplateColumns: "300px 1fr" }}>
-          {/* Lista de conversas */}
-          <ConversationList
-            conversations={conversations}
-            selectedPhone={selectedPhone}
-            onSelect={handleSelect}
-            onEditLead={handleEditLead}
-            onDeleteConversation={(tel) => setDeletePhone(tel)}
+        <div className="flex h-full">
+          <div style={{ width: `${conversationListWidth}px` }} className="shrink-0 overflow-hidden">
+            <ConversationList
+              conversations={conversations}
+              selectedPhone={selectedPhone}
+              onSelect={handleSelect}
+              onEditLead={handleEditLead}
+              onDeleteConversation={(tel) => setDeletePhone(tel)}
+            />
+          </div>
+          <div
+            onMouseDown={() => setIsResizing(true)}
+            className="w-1 bg-border hover:bg-primary/50 cursor-col-resize transition-colors flex-shrink-0"
+            title="Arraste para redimensionar"
           />
-
-          {/* Janela de chat */}
-          <ChatWindow
-            conversation={selectedConversation}
-            messages={messages}
-            onSend={handleSend}
-            onOpen={handleOpen}
-            serverConnected={serverConnected}
-            currentLead={currentLead}
-            onUpdateLead={onUpdateLead}
-          />
+          <div className="flex-1 min-w-0">
+            <ChatWindow
+              conversation={selectedConversation}
+              messages={messages}
+              onSend={handleSend}
+              onOpen={handleOpen}
+              serverConnected={serverConnected}
+              currentLead={currentLead}
+              onUpdateLead={onUpdateLead}
+              prefilledMessage={prefilledMessage}
+              onPrefilledConsumed={() => setPrefilledMessage("")}
+            />
+          </div>
         </div>
       </div>
 

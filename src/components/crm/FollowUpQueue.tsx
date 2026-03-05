@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Phone, User, ExternalLink, Check, Target, Search, X, CalendarCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { generateFollowUpWhatsAppLink, generateAppointmentConfirmationText } from "@/lib/whatsapp";
+import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
-import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 
 interface FollowUpQueueProps {
@@ -16,8 +15,7 @@ interface FollowUpQueueProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
   followUpsDoneToday?: number;
   followUpGoal?: number;
-  onSendWhatsApp?: (telefone: string, message: string) => Promise<boolean>;
-  serverConnected?: boolean | null;
+  onOpenChat?: (phone: string, message?: string) => void;
 }
 
 // Helper function to calculate days since last follow-up
@@ -33,11 +31,9 @@ const getDaysSince = (dateString: string): number => {
   return diffDays;
 };
 
-export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onSendWhatsApp, serverConnected }: FollowUpQueueProps) {
+export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
-  const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
-  const [suggestedMessage, setSuggestedMessage] = useState<string>("");
   const [search, setSearch] = useState("");
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
 
@@ -63,18 +59,13 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
 
   const handleWhatsAppClick = (lead: Lead) => {
     const template = getFollowUpMessage(lead.etapaLead);
-    if (template) {
-      const formatted = formatFollowUpMessage(template, lead.nome, lead.servicoProcurado);
-      setSuggestedMessage(formatted);
-    } else {
-      setSuggestedMessage("");
-    }
-    setWhatsappLead(lead);
+    const message = template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : undefined;
+    onOpenChat?.(lead.telefone, message);
   };
 
   const handleConfirmationClick = (lead: Lead) => {
-    setSuggestedMessage(generateAppointmentConfirmationText(lead.dataAgendamento || ""));
-    setWhatsappLead(lead);
+    const message = generateAppointmentConfirmationText(lead.dataAgendamento || "");
+    onOpenChat?.(lead.telefone, message);
   };
   
   return (
@@ -224,19 +215,6 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         open={!!callLead}
         onClose={() => setCallLead(null)}
         onConfirm={handleConfirmCall}
-      />
-
-      <WhatsAppMessageDialog
-        lead={whatsappLead}
-        open={!!whatsappLead}
-        onClose={() => setWhatsappLead(null)}
-        onDone={() => {
-          if (whatsappLead) onSendFollowUp(whatsappLead.id, "");
-          setWhatsappLead(null);
-        }}
-        suggestedMessage={suggestedMessage}
-        onSend={onSendWhatsApp}
-        serverConnected={serverConnected}
       />
     </div>
   );

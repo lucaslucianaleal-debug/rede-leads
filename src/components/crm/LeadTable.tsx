@@ -7,7 +7,6 @@ import { ChevronsUpDown, ChevronUp, ChevronDown, Pencil, Phone, ExternalLink, Ch
 import { useState } from "react";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
-import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { LeadDetailsDialog } from "./LeadDetailsDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
@@ -56,8 +55,7 @@ interface LeadTableProps {
   onEditLead?: (lead: Lead) => void;
   onSendFollowUp?: (leadId: string, observacao?: string) => void;
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
-  onSendWhatsApp?: (telefone: string, message: string) => Promise<boolean>;
-  serverConnected?: boolean | null;
+  onOpenChat?: (phone: string, message?: string) => void;
 }
 
 const statusColor: Record<LeadStatus | "", string> = {
@@ -70,24 +68,22 @@ const statusColor: Record<LeadStatus | "", string> = {
 type SortField = 'nome' | 'telefone' | 'servicoProcurado' | 'fonteLead' | 'etapaLead' | 'status' | 'respostaLead' | 'comparecimento' | 'dataFollowUp' | 'dataAgendamento';
 type SortDirection = 'asc' | 'desc' | null;
 
-export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelectionChange, onEditLead, onSendFollowUp, onRegisterCall, onSendWhatsApp, serverConnected }: LeadTableProps) {
+export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelectionChange, onEditLead, onSendFollowUp, onRegisterCall, onOpenChat }: LeadTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [followUpLead, setFollowUpLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
-  const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
-  const [suggestedMessage, setSuggestedMessage] = useState("");
   const [detailsLead, setDetailsLead] = useState<Lead | null>(null);
 
   const handleWhatsAppClick = (lead: Lead) => {
     const template = getFollowUpMessage(lead.etapaLead);
-    setSuggestedMessage(template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : "");
-    setWhatsappLead(lead);
+    const message = template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : undefined;
+    onOpenChat?.(lead.telefone, message);
   };
 
   const handleConfirmationClick = (lead: Lead) => {
-    setSuggestedMessage(generateAppointmentConfirmationText(lead.dataAgendamento || ""));
-    setWhatsappLead(lead);
+    const message = generateAppointmentConfirmationText(lead.dataAgendamento || "");
+    onOpenChat?.(lead.telefone, message);
   };
   
   const allSelected = leads.length > 0 && selectedLeads.length === leads.length;
@@ -411,19 +407,6 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
           }}
         />
       )}
-
-      <WhatsAppMessageDialog
-        lead={whatsappLead}
-        open={!!whatsappLead}
-        onClose={() => setWhatsappLead(null)}
-        onDone={() => {
-          if (whatsappLead && onSendFollowUp) onSendFollowUp(whatsappLead.id, "");
-          setWhatsappLead(null);
-        }}
-        suggestedMessage={suggestedMessage}
-        onSend={onSendWhatsApp}
-        serverConnected={serverConnected}
-      />
 
       <LeadDetailsDialog
         lead={detailsLead}
