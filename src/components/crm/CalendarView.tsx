@@ -9,16 +9,17 @@ import { useState, useMemo } from "react";
 import { format, parse, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Clock, Phone, Calendar as CalendarIcon, Pencil, Check } from "lucide-react";
-import { generateWhatsAppLink } from "@/lib/whatsapp";
+import { generateReminderText } from "@/lib/whatsapp";
 import { toast } from "sonner";
 
 interface CalendarViewProps {
   leads: Lead[];
   onMarkReminder: (id: string, type: "h24" | "today") => void;
   onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
+  onOpenChat?: (phone: string, message?: string) => void;
 }
 
-export function CalendarView({ leads, onMarkReminder, onUpdateLead }: CalendarViewProps) {
+export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }: CalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTimeId, setEditingTimeId] = useState<string | null>(null);
@@ -81,22 +82,8 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead }: CalendarVi
   };
 
   const handleSendReminder = (lead: Lead, type: "h24" | "today") => {
-    const reminderTypeMap = {
-      h24: "24h antes",
-      today: "Hoje",
-    } as const;
-    
-    const whatsappLink = generateWhatsAppLink(
-      lead.telefone,
-      lead.nome,
-      lead.servicoProcurado,
-      lead.dataAgendamento,
-      type
-    );
-    
-    window.open(whatsappLink, "_blank");
-    onMarkReminder(lead.id, type);
-    toast.success(`Lembrete ${reminderTypeMap[type]} enviado para ${lead.nome}`);
+    const msg = generateReminderText(lead.dataAgendamento || "", type);
+    onOpenChat?.(lead.telefone, msg);
   };
 
   const getReminderStatus = (lead: Lead) => {

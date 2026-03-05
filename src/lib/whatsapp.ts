@@ -20,6 +20,11 @@ export function generateAppointmentConfirmationMessage(leadPhone: string, dataAg
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
+export function generateReminderText(dataAgendamento: string, type: "h24" | "today"): string {
+  const timeLabel = type === "h24" ? "amanhã" : "HOJE";
+  return `Olá!\nPassando só pra lembrar que sua avaliação está marcada para *${timeLabel}*.\n\nData e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui.\nTe esperamos!`;
+}
+
 export function generateAppointmentConfirmationText(dataAgendamento: string): string {
   return `Confirmação de Consulta na Odontocompany Olimpia💚\nSua consulta está agendada para\n📍 Endereço : R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079\n\nData e Horario: ${dataAgendamento}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
 }

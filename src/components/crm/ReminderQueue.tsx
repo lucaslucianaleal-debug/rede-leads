@@ -2,11 +2,12 @@ import { Lead } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Bell, Phone, User, ExternalLink, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { generateWhatsAppLink } from "@/lib/whatsapp";
+import { generateReminderText } from "@/lib/whatsapp";
 
 interface ReminderQueueProps {
   leads: Lead[];
   onMarkReminder: (leadId: string, type: "h24" | "today") => void;
+  onOpenChat?: (phone: string, message?: string) => void;
 }
 
 const reminderTypes = [
@@ -14,7 +15,7 @@ const reminderTypes = [
   { key: "today" as const, label: "Hoje" },
 ];
 
-export function ReminderQueue({ leads, onMarkReminder }: ReminderQueueProps) {
+export function ReminderQueue({ leads, onMarkReminder, onOpenChat }: ReminderQueueProps) {
   return (
     <div className="glass-card rounded-xl p-5">
       <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2">
@@ -48,24 +49,27 @@ export function ReminderQueue({ leads, onMarkReminder }: ReminderQueueProps) {
                 <div className="flex gap-1.5 flex-wrap">
                   {reminderTypes.map((rt) => {
                     const sent = lead.lembretes[rt.key];
-                    const whatsLink = generateWhatsAppLink(lead.telefone, lead.nome, lead.servicoProcurado, lead.dataAgendamento, rt.key);
                     return (
                       <div key={rt.key} className="flex gap-0.5">
-                        <a href={whatsLink} target="_blank" rel="noopener noreferrer">
-                          <Button
-                            size="sm"
-                            variant={sent ? "default" : "outline"}
-                            className={`text-xs h-7 ${sent ? "bg-success hover:bg-success/90 text-white" : ""}`}
-                            disabled={sent}
-                          >
-                            {sent ? (
-                              <Check className="h-3 w-3 mr-1" />
-                            ) : (
-                              <ExternalLink className="h-3 w-3 mr-1" />
-                            )}
-                            {rt.label}
-                          </Button>
-                        </a>
+                        <Button
+                          size="sm"
+                          variant={sent ? "default" : "outline"}
+                          className={`text-xs h-7 ${sent ? "bg-success hover:bg-success/90 text-white" : ""}`}
+                          disabled={sent}
+                          onClick={() => {
+                            if (!sent) {
+                              const msg = generateReminderText(lead.dataAgendamento || "", rt.key);
+                              onOpenChat?.(lead.telefone, msg);
+                            }
+                          }}
+                        >
+                          {sent ? (
+                            <Check className="h-3 w-3 mr-1" />
+                          ) : (
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                          )}
+                          {rt.label}
+                        </Button>
                         {!sent && (
                           <Button
                             size="sm"
