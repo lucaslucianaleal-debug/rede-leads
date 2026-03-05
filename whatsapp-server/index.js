@@ -42,12 +42,12 @@ function isLID(jid) {
 }
 
 // Extrai numero real com fallback para getContact()
-async function getRealPhone(msg) {
+async function getRealPhone(msg, useToField = false) {
   try {
-    const rawFrom = msg.from || "";
+    const rawFrom = useToField ? (msg.to || "") : (msg.from || "");
     const digits = rawFrom.replace("@c.us", "").replace(/\D/g, "");
     
-    console.log(`[getRealPhone] rawFrom=${rawFrom}, digits=${digits}, isLID=${isLID(rawFrom)}`);
+    console.log(`[getRealPhone] rawFrom=${rawFrom}, digits=${digits}, isLID=${isLID(rawFrom)}, useToField=${useToField}`);
     
     if (!isLID(rawFrom)) {
       const result = digits.startsWith("55") ? digits : `55${digits}`;
@@ -327,41 +327,8 @@ client.on("message", async (msg) => {
 client.on("message_create", async (msg) => {
   if (!msg.fromMe || msg.isGroupMsg) return;
 
-  // Resolver LID em msg.to (mesmo problema que msg.from nas mensagens recebidas)
-  const rawTo = msg.to || "";
-  const toDigits = rawTo.replace("@c.us", "").replace(/\D/g, "");
-  let telefone;
-
-  if (toDigits.length > 13) {
-    // É um LID - tenta resolver via getContact
-    console.log(`[message_create] LID detectado em msg.to: ${rawTo}, tentando resolver...`);
-    try {
-      const contact = await msg.getContact();
-      if (contact?.number) {
-        const num = String(contact.number).replace(/\D/g, "");
-        if (num.length >= 10) {
-          telefone = num.startsWith("55") ? num : `55${num}`;
-          console.log(`[message_create] Resolvido via contact.number: ${telefone}`);
-        }
-      }
-      if (!telefone && contact?._data?.id) {
-        const id = String(contact._data.id).replace("@c.us", "").replace(/\D/g, "");
-        if (id.length >= 10 && id.length <= 13) {
-          telefone = id.startsWith("55") ? id : `55${id}`;
-          console.log(`[message_create] Resolvido via contact._data.id: ${telefone}`);
-        }
-      }
-    } catch (e) {
-      console.warn("[message_create] Erro ao resolver LID:", e.message);
-    }
-    if (!telefone) {
-      telefone = `55${toDigits.slice(-11)}`;
-      console.warn(`[message_create] Fallback últimos 11 dígitos: ${telefone}`);
-    }
-  } else {
-    telefone = toDigits.startsWith("55") ? toDigits : `55${toDigits}`;
-  }
-
+  // Usa a mesma função getRealPhone para consistência (campo msg.to)
+  const telefone = await getRealPhone(msg, true);
   const body = msg.body || "(mídia)";
   console.log(`SENT ${telefone}: ${body}`);
   await saveMessage({ telefone, body, fromMe: true, msgId: msg.id._serialized });
