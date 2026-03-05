@@ -317,56 +317,71 @@ export function useLeads() {
     const today = new Date();
     const todayFormatted = format(today, "dd/MM/yyyy");
     
-    setLeads((prev) =>
-      prev.map((l) => {
-        if (l.id !== leadId) return l;
+    // Calcula o novo estado ANTES de atualizar, para salvar no Firebase imediatamente
+    const newLeads = leads.map((l) => {
+      if (l.id !== leadId) return l;
 
-        const newObservacao = observacao 
-          ? (l.observacao ? `${l.observacao} | [${todayFormatted}] ${observacao}` : `[${todayFormatted}] ${observacao}`)
-          : l.observacao;
+      const newObservacao = observacao 
+        ? (l.observacao ? `${l.observacao} | [${todayFormatted}] ${observacao}` : `[${todayFormatted}] ${observacao}`)
+        : l.observacao;
 
-        // Se lead tem agendamento, mover para Avaliação agendada
-        if (l.dataAgendamento) {
-          return {
-            ...l,
-            etapaLead: "Avaliação agendada" as LeadStage,
-            comparecimento: "AGUARDANDO DATA" as LeadComparecimento,
-            dataFollowUp: todayFormatted,
-            observacao: newObservacao,
-          };
-        }
-
-        const nextCount = l.followUpCount + 1;
-        
-        // After Follow-Up 12, mark as Desistência
-        if (nextCount > 12) {
-          return {
-            ...l,
-            etapaLead: "Desistência",
-            dataFollowUp: todayFormatted,
-            observacao: l.observacao 
-              ? `${l.observacao} | Ciclo de follow-ups completo (12 tentativas)`
-              : "Ciclo de follow-ups completo (12 tentativas)",
-          };
-        }
-        
-        const nextStage = `Follow-Up ${nextCount}` as LeadStage;
-        
-        // Calcular próximo follow-up: +1 dia para Follow-Up 1-4, +2 dias para 5+
-        const daysToAdd = nextCount < 5 ? 1 : 2;
-        let nextFollowUpDate = addDays(today, daysToAdd);
-        nextFollowUpDate = getNextBusinessDay(nextFollowUpDate);
-        const nextFollowUpFormatted = format(nextFollowUpDate, "dd/MM/yyyy");
-        
+      // Se lead tem agendamento, mover para Avaliação agendada
+      if (l.dataAgendamento) {
         return {
           ...l,
-          followUpCount: nextCount,
-          etapaLead: nextStage,
-          dataFollowUp: nextFollowUpFormatted,
+          etapaLead: "Avaliação agendada" as LeadStage,
+          comparecimento: "AGUARDANDO DATA" as LeadComparecimento,
+          dataFollowUp: todayFormatted,
           observacao: newObservacao,
         };
-      })
-    );
+      }
+
+      const nextCount = l.followUpCount + 1;
+      
+      // After Follow-Up 12, mark as Desistência
+      if (nextCount > 12) {
+        return {
+          ...l,
+          etapaLead: "Desistência",
+          dataFollowUp: todayFormatted,
+          observacao: l.observacao 
+            ? `${l.observacao} | Ciclo de follow-ups completo (12 tentativas)`
+            : "Ciclo de follow-ups completo (12 tentativas)",
+        };
+      }
+      
+      const nextStage = `Follow-Up ${nextCount}` as LeadStage;
+      
+      // Calcular próximo follow-up: +1 dia para Follow-Up 1-4, +2 dias para 5+
+      const daysToAdd = nextCount < 5 ? 1 : 2;
+      let nextFollowUpDate = addDays(today, daysToAdd);
+      nextFollowUpDate = getNextBusinessDay(nextFollowUpDate);
+      const nextFollowUpFormatted = format(nextFollowUpDate, "dd/MM/yyyy");
+      
+      return {
+        ...l,
+        followUpCount: nextCount,
+        etapaLead: nextStage,
+        dataFollowUp: nextFollowUpFormatted,
+        observacao: newObservacao,
+      };
+    });
+
+    // Atualiza estado local imediatamente
+    setLeads(newLeads);
+    
+    // Salva imediatamente no Firebase (sem debounce) para evitar race condition com listener
+    setTimeout(async () => {
+      try {
+        const normalizedLeads = newLeads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+        await setDoc(FIREBASE_DOC, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
+        console.log(`[sendFollowUp] Lead ${leadId} salvo no Firebase`);
+        // Mark que veio do nosso save, não do listener
+        isFromFirebase.current = false;
+      } catch (e) {
+        console.error("[sendFollowUp] Erro ao salvar no Firebase:", e);
+      }
+    }, 50); // Pequeno delay para permitir que setLeads seja processado
   };
 
   const markReminder = (leadId: string, type: "h24" | "today") => {
