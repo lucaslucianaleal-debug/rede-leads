@@ -139,8 +139,9 @@ function phoneToWAId(telefone) {
 // Salvar mensagem evitando duplicatas
 // Busca conversa existente pelos ultimos 8-11 digitos para evitar duplicatas
 async function saveMessage({ telefone, body, fromMe, msgId }) {
-  // Normaliza telefone (remove formatação)
-  const normalizedPhone = telefone.replace(/\D/g, "");
+  // Normaliza telefone (remove formatação, adiciona 55 se necessário) - MESMO PADRÃO DO /send-message
+  const digits = telefone.replace(/\D/g, "");
+  const normalizedPhone = digits.startsWith("55") ? digits : `55${digits}`;
   
   // Resolve alias para manter sempre o mesmo documento de conversa
   const canonicalPhone = phoneAliasMap.get(normalizedPhone) || normalizedPhone;
