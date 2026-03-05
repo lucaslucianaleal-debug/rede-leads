@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Lead } from "@/types/crm";
 import {
   Dialog,
@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/phone";
@@ -29,6 +29,30 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm }: Agendament
   const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(new Date());
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  // Pré-preencher se já tem agendamento
+  useEffect(() => {
+    if (lead?.dataAgendamento && open) {
+      const parts = lead.dataAgendamento.split(" ");
+      if (parts.length >= 2) {
+        const dateStr = parts[0]; // dd/MM/yyyy
+        const timeStr = parts[1]; // HH:mm
+        try {
+          const parsedDate = parse(dateStr, "dd/MM/yyyy", new Date());
+          setAgendamentoDate(parsedDate);
+          setAgendamentoTime(timeStr);
+        } catch (e) {
+          // Fallback se parsing falhar
+          setAgendamentoDate(new Date());
+          setAgendamentoTime("09:00");
+        }
+      }
+    } else {
+      // Reset quando modal abre sem agendamento
+      setAgendamentoDate(new Date());
+      setAgendamentoTime("09:00");
+    }
+  }, [lead?.dataAgendamento, open]);
 
   if (!lead) return null;
 

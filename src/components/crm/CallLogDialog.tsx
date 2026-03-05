@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Lead } from "@/types/crm";
 import {
   Dialog,
@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/phone";
@@ -41,6 +41,35 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   const [returnDate, setReturnDate] = useState<Date | undefined>(new Date());
   const [returnTime, setReturnTime] = useState("17:00");
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  // Pré-preencher se já tem retorno ligação agendado
+  useEffect(() => {
+    if (lead?.dataRetornoLigacao && open) {
+      const parts = lead.dataRetornoLigacao.split(" ");
+      if (parts.length >= 2) {
+        const dateStr = parts[0]; // dd/MM/yyyy
+        const timeStr = parts[1]; // HH:mm
+        try {
+          const parsedDate = parse(dateStr, "dd/MM/yyyy", new Date());
+          setReturnDate(parsedDate);
+          setReturnTime(timeStr);
+          setAgendarRetorno(true); // Habilitar switch de retorno
+        } catch (e) {
+          // Fallback se parsing falhar
+          setReturnDate(new Date());
+          setReturnTime("17:00");
+          setAgendarRetorno(false);
+        }
+      }
+    } else {
+      // Reset quando modal abre sem retorno agendado
+      setReturnDate(new Date());
+      setReturnTime("17:00");
+      setAgendarRetorno(false);
+    }
+    setOutcome("Caixa de mensagem");
+    setObs("");
+  }, [lead?.dataRetornoLigacao, open]);
 
   if (!lead) return null;
 

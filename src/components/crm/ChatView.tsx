@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink, QrCode } from "lucide-react";
 import { Lead } from "@/types/crm";
 import { db } from "@/lib/firebase";
-import { collection, doc, getDocs, writeBatch, deleteDoc } from "firebase/firestore";
+import { collection, doc, getDocs, writeBatch, deleteDoc, setDoc, Timestamp } from "firebase/firestore";
 import { toast } from "sonner";
 
 interface ChatViewProps {
@@ -66,11 +66,45 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
       const cd = c.telefone.replace(/\D/g, "");
       return cd.slice(-8) === digits.slice(-8);
     });
-    const targetPhone = match?.telefone ?? digits;
+    
+    // Se conversa não existe, criar no Firestore
+    if (!match) {
+      const createConversation = async () => {
+        try {
+          const lead = leads.find((l) => {
+            const ld = l.telefone?.replace(/\D/g, "") || "";
+            return ld.length >= 8 && digits.slice(-8) === ld.slice(-8);
+          });
+          
+          const convRef = doc(db, "conversations", digits);
+          await setDoc(convRef, {
+            telefone: digits,
+            leadNome: lead?.nome || "Novo Contato",
+            createdAt: Timestamp.now(),
+            lastMessageAt: null,
+            unreadCount: 0,
+            lastMessage: ""
+          }, { merge: true });
+          
+          console.log(`[ChatView] Conversa criada para ${digits}`);
+          // Aguardar um pouco para o hook useConversations pegar a nova conversa
+          await new Promise(resolve => setTimeout(resolve, 500));
+          setSelectedPhone(digits);
+          if (openTarget.message) setPrefilledMessage(openTarget.message);
+          onOpenTargetHandled?.();
+        } catch (err) {
+          console.error(`[ChatView] Erro ao criar conversa: ${err}`);
+        }
+      };
+      createConversation();
+      return;
+    }
+    
+    const targetPhone = match.telefone;
     setSelectedPhone(targetPhone);
     if (openTarget.message) setPrefilledMessage(openTarget.message);
     onOpenTargetHandled?.();
-  }, [openTarget, conversations]);
+  }, [openTarget, conversations, leads]);
 
   // Pedir permissão de notificação ao abrir a aba
   useEffect(() => {

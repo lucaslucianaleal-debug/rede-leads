@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Lead, ClinicFilter, DashboardStats, LeadStage, LeadComparecimento } from "@/types/crm";
 import { mockLeads } from "@/data/mockLeads";
-import { format } from "date-fns";
+import { format, addDays, parse } from "date-fns";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc, updateDoc, getDoc } from "firebase/firestore";
@@ -169,6 +169,13 @@ export function useLeads() {
     return leads.filter((l) => l.dataFollowUp === today).length;
   }, [leads]);
 
+  // Helper: pular fins de semana (sábado +2 dias, domingo +1 dia)
+  const getNextBusinessDay = (date: Date): Date => {
+    const dayOfWeek = date.getDay();
+    const daysToSkip = dayOfWeek === 6 ? 2 : dayOfWeek === 0 ? 1 : 0;
+    return addDays(date, daysToSkip);
+  };
+
   const stats = useMemo<DashboardStats>(() => {
     const quentes = leads.filter((l) => l.status === "QUENTE").length;
     const mornos = leads.filter((l) => l.status === "MORNO").length;
@@ -209,6 +216,14 @@ export function useLeads() {
   }, [leads]);
 
   const followUpQueue = useMemo(() => {
+    const today = format(new Date(), "dd/MM/yyyy");
+    
+    // Helper para comparar datas em formato dd/MM/yyyy
+    const parseDate = (dateStr: string) => {
+      const [day, month, year] = dateStr.split('/');
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    };
+
     const filtered = leads.filter(
       (l) =>
         (
@@ -218,7 +233,9 @@ export function useLeads() {
           l.etapaLead.startsWith("Follow-Up")
         ) &&
         l.etapaLead !== "Desistência" &&
-        l.comparecimento !== "COMPARECEU"
+        l.comparecimento !== "COMPARECEU" &&
+        // Filtro crítico: aparecer na fila apenas se dataFollowUp é hoje ou antes
+        l.dataFollowUp && parseDate(l.dataFollowUp) <= parseDate(today)
     );
 
     // Separar em leads novos vs. que não compareceram
@@ -335,11 +352,17 @@ export function useLeads() {
         
         const nextStage = `Follow-Up ${nextCount}` as LeadStage;
         
+        // Calcular próximo follow-up: +1 dia para Follow-Up 1-4, +2 dias para 5+
+        const daysToAdd = nextCount < 5 ? 1 : 2;
+        let nextFollowUpDate = addDays(today, daysToAdd);
+        nextFollowUpDate = getNextBusinessDay(nextFollowUpDate);
+        const nextFollowUpFormatted = format(nextFollowUpDate, "dd/MM/yyyy");
+        
         return {
           ...l,
           followUpCount: nextCount,
           etapaLead: nextStage,
-          dataFollowUp: todayFormatted,
+          dataFollowUp: nextFollowUpFormatted,
           observacao: newObservacao,
         };
       })
