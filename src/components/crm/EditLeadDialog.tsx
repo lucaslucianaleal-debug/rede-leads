@@ -181,26 +181,6 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
             </Select>
           </div>
 
-          {/* Data Contato */}
-          <div className="space-y-1">
-            <Label>Data do Contato (dd/mm/aaaa)</Label>
-            <Input
-              value={form.dataContato || ""}
-              onChange={(e) => set("dataContato", e.target.value)}
-              placeholder="01/01/2026"
-            />
-          </div>
-
-          {/* Data Follow-Up */}
-          <div className="space-y-1">
-            <Label>Data do Follow-Up (dd/mm/aaaa)</Label>
-            <Input
-              value={form.dataFollowUp || ""}
-              onChange={(e) => set("dataFollowUp", e.target.value)}
-              placeholder="01/01/2026"
-            />
-          </div>
-
           {/* Data Agendamento */}
           <div className="space-y-1 col-span-2">
             <Label>Data/Hora do Agendamento</Label>
