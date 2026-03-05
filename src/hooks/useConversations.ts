@@ -56,26 +56,6 @@ export function useConversations() {
           unreadCount: data.unreadCount || 0,
         };
         list.push(conv);
-
-        // Notificar quando chegar mensagem nova
-        const prevUnread = prevUnreadMap.current[conv.telefone] ?? conv.unreadCount;
-        if (conv.unreadCount > prevUnread) {
-          const diff = conv.unreadCount - prevUnread;
-          toast(`💬 ${conv.leadNome}`, {
-            description: conv.lastMessage,
-            duration: 6000,
-            action: { label: "Ver", onClick: () => {} },
-          });
-
-          // Notificação do navegador (se permitido)
-          if (Notification.permission === "granted") {
-            new Notification(`💬 ${conv.leadNome}`, {
-              body: conv.lastMessage,
-              icon: "/favicon.ico",
-            });
-          }
-        }
-        prevUnreadMap.current[conv.telefone] = conv.unreadCount;
       });
 
       // Deduplicar conversas por telefone (mesmo contato com IDs diferentes)
@@ -160,6 +140,33 @@ export function useConversations() {
         const tb = b.lastMessageAt?.toMillis() || 0;
         return tb - ta;
       });
+
+      // Notificar quando chegar mensagem nova — usar lista final (deduplicada)
+      const getKey = (conv: Conversation) => {
+        const digits = conv.telefone.replace(/\D/g, "");
+        if (digits.length >= 11) return `11:${digits.slice(-11)}`;
+        if (digits.length >= 8) return `8:${digits.slice(-8)}`;
+        return `raw:${conv.telefone}`;
+      };
+
+      for (const conv of finalList) {
+        const key = getKey(conv);
+        const prevUnread = prevUnreadMap.current[key] ?? conv.unreadCount;
+        if (conv.unreadCount > prevUnread) {
+          toast(`💬 ${conv.leadNome}`, {
+            description: conv.lastMessage,
+            duration: 6000,
+            action: { label: "Ver", onClick: () => {} },
+          });
+          if (Notification.permission === "granted") {
+            new Notification(`💬 ${conv.leadNome}`, {
+              body: conv.lastMessage,
+              icon: "/favicon.ico",
+            });
+          }
+        }
+        prevUnreadMap.current[key] = conv.unreadCount;
+      }
 
       setConversations(finalList);
     });

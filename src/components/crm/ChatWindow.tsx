@@ -113,6 +113,9 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
       dataAgendamento,
       etapaLead: "Avaliação agendada",
     });
+    // Pré-preencher a barra de conversa com a confirmação para o lead
+    const name = currentLead?.nome || "";
+    setText(`Olá ${name}, seu atendimento foi agendado para ${dataAgendamento}.`);
   };
 
   if (!conversation) {
