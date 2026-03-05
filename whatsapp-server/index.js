@@ -49,12 +49,13 @@ function isLID(jid) {
 }
 
 // Extrai numero real com fallback para getContact()
-async function getRealPhone(msg, useToField = false) {
+// isInbound=true: Ser mais cuidadoso para evitar pegar o número do usuário (msg.to)
+async function getRealPhone(msg, useToField = false, isInbound = false) {
   try {
     const rawFrom = useToField ? (msg.to || "") : (msg.from || "");
     const digits = rawFrom.replace("@c.us", "").replace(/\D/g, "");
     
-    console.log(`[getRealPhone] rawFrom=${rawFrom}, digits=${digits}, isLID=${isLID(rawFrom)}, useToField=${useToField}`);
+    console.log(`[getRealPhone] rawFrom=${rawFrom}, digits=${digits}, isLID=${isLID(rawFrom)}, useToField=${useToField}, isInbound=${isInbound}`);
     
     if (!isLID(rawFrom)) {
       const result = digits.startsWith("55") ? digits : `55${digits}`;
@@ -69,7 +70,7 @@ async function getRealPhone(msg, useToField = false) {
       return cached;
     }
     
-    // E um LID - busca numero real via getContact()
+    // E um LID - busca numero real via getContact() (MAS com validação se é inbound)
     let resolvedPhone = null;
     try {
       const contact = await msg.getContact();
@@ -93,12 +94,33 @@ async function getRealPhone(msg, useToField = false) {
       console.warn("[getRealPhone] Erro ao buscar contact:", contactErr.message);
     }
     
+    // Validação de segurança para mensagens inbound: NÃO usar número do destinatário (msg.to)
+    if (isInbound && resolvedPhone && msg.to) {
+      const toDigits = (msg.to || "").replace("@c.us", "").replace(/\D/g, "");
+      const toNormalized = toDigits.startsWith("55") ? toDigits : `55${toDigits}`;
+      
+      if (resolvedPhone === toNormalized) {
+        console.error(`[getRealPhone] ALERTA: getContact retornou o NÚMERO DO USUÁRIO (${resolvedPhone}), rejeitando!`);
+        resolvedPhone = null; // Rejeita porque pegou o número errado
+      }
+    }
+    
     // Fallbacks se não conseguiu resolver via contact
     if (!resolvedPhone) {
       // Valida que tem no mínimo 10 dígitos pra um número brasileiro válido
       if (digits.length >= 10 && digits.length <= 13) {
         resolvedPhone = digits.startsWith("55") ? digits : `55${digits}`;
         console.log(`[getRealPhone] Fallback com dígitos (${digits.length} chars): ${resolvedPhone}`);
+        
+        // Para inbound, validar que NÃO é o número do usuário
+        if (isInbound && msg.to) {
+          const toDigits = (msg.to || "").replace("@c.us", "").replace(/\D/g, "");
+          const toNormalized = toDigits.startsWith("55") ? toDigits : `55${toDigits}`;
+          if (resolvedPhone === toNormalized) {
+            console.error(`[getRealPhone] Fallback retornou NÚMERO DO USUÁRIO, rejeitando por segurança!`);
+            return null;
+          }
+        }
       } else {
         // Número inválido - muitos poucos ou muitos dígitos
         console.error(`[getRealPhone] Número inválido: ${digits.length} dígitos. rawFrom=${rawFrom}. REJEITANDO mensagem.`);
@@ -411,7 +433,8 @@ client.on("message", async (msg) => {
   if (msg.isGroupMsg) return;
   
   // Resolve telefone UMA VEZ e usa o mesmo em todas as operações
-  const telefone = await getRealPhone(msg);
+  // isInbound=true: NÃO tentar getContact() que pode retornar número errado
+  const telefone = await getRealPhone(msg, false, true);
   
   // Rejeita mensagens com telefone inválido/não resolvível
   if (!telefone) {
