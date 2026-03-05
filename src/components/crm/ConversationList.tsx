@@ -106,14 +106,11 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
                 </div>
               </button>
 
-              {/* Menu ⋯ */}
-              <div className={cn(
-                "absolute right-2 top-1/2 -translate-y-1/2 transition-opacity",
-                hoveredPhone === conv.telefone || selectedPhone === conv.telefone ? "opacity-100" : "opacity-0"
-              )}>
+              {/* Menu ⋯ — sempre visível */}
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10">
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                    className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <MoreVertical className="h-4 w-4" />
