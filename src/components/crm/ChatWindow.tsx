@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
 const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Outro"];
+const STATUSES = ["QUENTE", "MORNO", "FRIO"];
 
 interface ChatWindowProps {
   conversation: Conversation | null;
@@ -71,6 +72,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
         servicoProcurado: "",
         captador: "",
         fonteLead: "",
+        status: "",
         observacao: "",
       });
     }
@@ -347,6 +349,22 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                   </SelectTrigger>
                   <SelectContent>
                     {SERVICOS.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Status</Label>
+                <Select
+                  value={leadForm.status || ""}
+                  onValueChange={(v) => setLeadForm((f) => ({ ...f, status: v as any }))}
+                >
+                  <SelectTrigger className="h-8 mt-1">
+                    <SelectValue placeholder="Selecionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>
