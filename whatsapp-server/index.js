@@ -264,19 +264,40 @@ async function syncLead(telefone, pushName, firstMessage) {
         nomeAtual = pushName;
       }
 
-      // Buscar conversa existente por TELEFONE (último padrão mais confiável)
-      let conversationPhone = telefone;
+      // Buscar conversa existente: 1º por NOME (se já tem), 2º por TELEFONE, 3º criar nova
+      let conversationPhone = null;
       const allConvs = await db.collection("conversations").get();
       
-      // Tenta match por últimos 8-11 dígitos do telefone
-      const telDigits = telefone.replace(/\D/g, "");
-      for (const convDoc of allConvs.docs) {
-        const convDigits = convDoc.id.replace(/\D/g, "");
-        if (convDigits.length >= 8 && telDigits.slice(-8) === convDigits.slice(-8)) {
-          conversationPhone = convDoc.id;
-          console.log(`[syncLead] Conversa encontrada por TELEFONE: ${conversationPhone} (match com ${telefone})`);
-          break;
+      // 1ª tentativa: buscar por leadNome (conversa já existente para este contato)
+      const nameKey = String(nomeAtual || "").trim().toLowerCase();
+      if (nameKey && nameKey !== "whatsapp") {
+        for (const convDoc of allConvs.docs) {
+          const convName = String(convDoc.data()?.leadNome || "").trim().toLowerCase();
+          if (convName === nameKey) {
+            conversationPhone = convDoc.id;
+            console.log(`[syncLead] Conversa encontrada por NOME: ${conversationPhone} (nome: "${nomeAtual}")`);
+            break;
+          }
         }
+      }
+      
+      // 2ª tentativa: buscar por TELEFONE (últimos 8 dígitos)
+      if (!conversationPhone) {
+        const telDigits = telefone.replace(/\D/g, "");
+        for (const convDoc of allConvs.docs) {
+          const convDigits = convDoc.id.replace(/\D/g, "");
+          if (convDigits.length >= 8 && telDigits.slice(-8) === convDigits.slice(-8)) {
+            conversationPhone = convDoc.id;
+            console.log(`[syncLead] Conversa encontrada por TELEFONE: ${conversationPhone} (match com ${telefone})`);
+            break;
+          }
+        }
+      }
+      
+      // 3ª tentativa: usar o telefone fornecido (nova conversa se não existir)
+      if (!conversationPhone) {
+        conversationPhone = telefone;
+        console.log(`[syncLead] Nenhuma conversa existente - criando com telefone: ${conversationPhone}`);
       }
 
       const updateData = { telefone: conversationPhone };
