@@ -141,13 +141,15 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
     : null;
 
   const handleSend = async (message: string) => {
-    if (!selectedPhone) return false;
-    return sendMessage(selectedPhone, message);
+    if (!selectedConversation) return false;
+    // Usar o telefone da conversa (ID canônico no Firestore) para garantir envio correto
+    return sendMessage(selectedConversation.telefone, message);
   };
 
   const handleOpen = () => {
-    if (selectedPhone) {
-      markAsRead(selectedPhone);
+    if (selectedConversation) {
+      // Marcar conversa como lida usando seu ID no Firestore
+      markAsRead(selectedConversation.telefone);
     }
   };
 
