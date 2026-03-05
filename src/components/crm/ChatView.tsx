@@ -17,14 +17,14 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
     conversations,
     serverConnected,
     qrCode,
-    showQRModal,
-    setShowQRModal,
     sendMessage,
     markAsRead,
     useMessages,
   } = useConversations();
 
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
+  // Permite fechar o modal manualmente; reabre automaticamente quando o QR girar
+  const [qrDismissed, setQrDismissed] = useState(false);
   const messages = useMessages(selectedPhone);
 
   const selectedConversation = conversations.find((c) => c.telefone === selectedPhone) || null;
@@ -44,6 +44,13 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
       Notification.requestPermission();
     }
   }, []);
+
+  // Reabre o modal automaticamente quando chegar um QR novo
+  useEffect(() => {
+    if (qrCode) {
+      setQrDismissed(false);
+    }
+  }, [qrCode]);
 
   const handleSelect = (telefone: string) => {
     setSelectedPhone(telefone);
@@ -82,15 +89,15 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
         </div>
       )}
 
-      {/* Botão para escanear QR quando disponiivel */}
-      {qrCode && (
+      {/* Botão para reabrir QR se foi fechado manualmente */}
+      {qrCode && qrDismissed && (
         <div className="mb-3 flex items-center justify-between bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5 text-sm">
           <span>📱 WhatsApp aguardando autenticação. Escaneie o QR Code para conectar.</span>
           <Button
             variant="outline"
             size="sm"
             className="border-blue-300 text-blue-700 ml-3 shrink-0"
-            onClick={() => setShowQRModal(true)}
+            onClick={() => setQrDismissed(false)}
           >
             <QrCode className="h-3 w-3 mr-1" /> Ver QR Code
           </Button>
@@ -120,10 +127,10 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
         </div>
       </div>
 
-      {/* Modal QR Code WhatsApp */}
+      {/* Modal QR Code WhatsApp — abre automaticamente quando QR disponivel */}
       <WhatsAppQRModal
-        qrCode={showQRModal ? qrCode : null}
-        onClose={() => setShowQRModal(false)}
+        qrCode={qrCode && !qrDismissed ? qrCode : null}
+        onClose={() => setQrDismissed(true)}
       />
     </div>
   );

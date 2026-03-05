@@ -33,7 +33,6 @@ export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [serverConnected, setServerConnected] = useState<boolean | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
-  const [showQRModal, setShowQRModal] = useState(false);
   const prevUnreadMap = useRef<Record<string, number>>({});
 
   // ─── Escutar lista de conversas ──────────────────────────────────────────────
@@ -109,14 +108,8 @@ export function useConversations() {
       try {
         const res = await fetch(`${SERVER_URL}/qr`, { signal: AbortSignal.timeout(2000) });
         const data = await res.json();
-        if (data.qr) {
-          setQrCode(data.qr);
-          setShowQRModal(true);
-        } else {
-          setQrCode(null);
-        }
+        setQrCode(data.qr || null);
       } catch {
-        // servidor offline — sem QR
         setQrCode(null);
       }
     };
@@ -184,8 +177,6 @@ export function useConversations() {
     totalUnread,
     serverConnected,
     qrCode,
-    showQRModal,
-    setShowQRModal,
     sendMessage,
     markAsRead,
     useMessages,
