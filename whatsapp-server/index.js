@@ -209,36 +209,6 @@ async function saveMessage({ telefone, body, fromMe, msgId }) {
       console.log(`[saveMessage] MATCH encontrado: usando conversa ${targetPhone}`);
     } else {
       console.log(`[saveMessage] Nenhuma conversa existente encontrada - CRIANDO NOVA com ID ${targetPhone}`);
-
-      // 3. Fallback por leadNome: se houver lead com este telefone, tenta reaproveitar conversa já vinculada ao mesmo nome
-      try {
-        const crmRef = db.collection("crm_data").doc("shared");
-        const crmSnap = await crmRef.get();
-        const leads = crmSnap.exists ? (crmSnap.data()?.leads || []) : [];
-        const matchedLead = leads.find((lead) => {
-          const leadDigits = String(lead?.telefone || "").replace(/\D/g, "");
-          return (
-            (leadDigits.length >= 11 && last11 && leadDigits.slice(-11) === last11) ||
-            (leadDigits.length >= 8 && leadDigits.slice(-8) === last8)
-          );
-        });
-
-        if (matchedLead?.nome) {
-          const allConvsByName = await db.collection("conversations").get();
-          const byLeadName = allConvsByName.docs.find((doc) => {
-            const name = String(doc.data()?.leadNome || "").trim().toLowerCase();
-            return name && name === String(matchedLead.nome).trim().toLowerCase();
-          });
-
-          if (byLeadName) {
-            targetPhone = byLeadName.id;
-            phoneAliasMap.set(normalizedPhone, targetPhone);
-            console.log(`[saveMessage] Fallback por leadNome: usando conversa ${targetPhone} para ${matchedLead.nome}`);
-          }
-        }
-      } catch (err) {
-        console.warn("[saveMessage] Falha no fallback por leadNome:", err.message);
-      }
     }
   }
 
@@ -498,14 +468,7 @@ client.on("message", async (msg) => {
     }
   }
 
-  // Não salvar mensagens vazias (apenas texto vazio; media vazia ainda precisa sincronizar conversa)
-  const isOnlyText = !msg.hasMedia && (!body || !body.trim());
-  if (isOnlyText) {
-    console.log(`RECV ${telefone} (desde ${msg.from}): [ignorada - sem conteúdo]`);
-    return;
-  }
-
-  console.log(`RECV ${telefone} (desde ${msg.from}): ${body}`);
+  console.log(`RECV ${telefone} (desde ${msg.from}): ${body || "[sem conteúdo]"}`);
   
   // Usar o MESMO telefone em ambas as operações para evitar duplicação
   await syncLead(telefone, pushName, typeof body === "string" && body.startsWith("[audio:") ? "🎙️ Áudio" : body);
