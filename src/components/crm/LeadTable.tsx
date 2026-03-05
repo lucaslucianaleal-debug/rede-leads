@@ -56,6 +56,8 @@ interface LeadTableProps {
   onEditLead?: (lead: Lead) => void;
   onSendFollowUp?: (leadId: string, observacao?: string) => void;
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
+  onSendWhatsApp?: (telefone: string, message: string) => Promise<boolean>;
+  serverConnected?: boolean | null;
 }
 
 const statusColor: Record<LeadStatus | "", string> = {
@@ -68,7 +70,7 @@ const statusColor: Record<LeadStatus | "", string> = {
 type SortField = 'nome' | 'telefone' | 'servicoProcurado' | 'fonteLead' | 'etapaLead' | 'status' | 'respostaLead' | 'comparecimento' | 'dataFollowUp' | 'dataAgendamento';
 type SortDirection = 'asc' | 'desc' | null;
 
-export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelectionChange, onEditLead, onSendFollowUp, onRegisterCall }: LeadTableProps) {
+export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelectionChange, onEditLead, onSendFollowUp, onRegisterCall, onSendWhatsApp, serverConnected }: LeadTableProps) {
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [followUpLead, setFollowUpLead] = useState<Lead | null>(null);
@@ -419,6 +421,8 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
           setWhatsappLead(null);
         }}
         suggestedMessage={suggestedMessage}
+        onSend={onSendWhatsApp}
+        serverConnected={serverConnected}
       />
 
       <LeadDetailsDialog

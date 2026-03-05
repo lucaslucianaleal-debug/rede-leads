@@ -16,6 +16,8 @@ interface FollowUpQueueProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
   followUpsDoneToday?: number;
   followUpGoal?: number;
+  onSendWhatsApp?: (telefone: string, message: string) => Promise<boolean>;
+  serverConnected?: boolean | null;
 }
 
 // Helper function to calculate days since last follow-up
@@ -31,7 +33,7 @@ const getDaysSince = (dateString: string): number => {
   return diffDays;
 };
 
-export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20 }: FollowUpQueueProps) {
+export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onSendWhatsApp, serverConnected }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [whatsappLead, setWhatsappLead] = useState<Lead | null>(null);
@@ -233,6 +235,8 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
           setWhatsappLead(null);
         }}
         suggestedMessage={suggestedMessage}
+        onSend={onSendWhatsApp}
+        serverConnected={serverConnected}
       />
     </div>
   );

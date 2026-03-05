@@ -21,13 +21,15 @@ interface AllLeadsViewProps {
   onClearDuplicates?: () => void;
   onSendFollowUp?: (leadId: string, observacao?: string) => void;
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
+  onSendWhatsApp?: (telefone: string, message: string) => Promise<boolean>;
+  serverConnected?: boolean | null;
 }
 
 type FilterCategory = {
   duplicados?: boolean;
 };
 
-export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall }: AllLeadsViewProps) {
+export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onSendWhatsApp, serverConnected }: AllLeadsViewProps) {
   const [filters, setFilters] = useState<FilterCategory>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCreationDay, setSelectedCreationDay] = useState<string>("all");
@@ -452,6 +454,8 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, selectedLe
         onEditLead={onUpdateLead ? (lead) => setEditingLead(lead) : undefined}
         onSendFollowUp={onSendFollowUp}
         onRegisterCall={onRegisterCall}
+        onSendWhatsApp={onSendWhatsApp}
+        serverConnected={serverConnected}
       />
 
       {/* Edit Dialog */}

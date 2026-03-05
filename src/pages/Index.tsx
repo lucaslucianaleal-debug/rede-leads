@@ -61,7 +61,7 @@ const CRMDashboard = () => {
     allLeads,
   } = useLeads();
 
-  const { totalUnread } = useConversations();
+  const { totalUnread, sendMessage, serverConnected } = useConversations();
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -288,6 +288,8 @@ const CRMDashboard = () => {
                 onRegisterCall={handleRegisterCall}
                 followUpsDoneToday={followUpsDoneToday}
                 followUpGoal={followUpGoal}
+                onSendWhatsApp={sendMessage}
+                serverConnected={serverConnected}
               />
               <ReminderQueue leads={reminderQueue} onMarkReminder={handleReminder} />
             </div>
@@ -322,6 +324,8 @@ const CRMDashboard = () => {
               onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
               onSendFollowUp={handleFollowUp}
               onRegisterCall={handleRegisterCall}
+              onSendWhatsApp={sendMessage}
+              serverConnected={serverConnected}
             />
           </TabsContent>
 
