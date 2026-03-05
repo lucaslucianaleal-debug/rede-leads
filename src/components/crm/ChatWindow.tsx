@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save } from "lucide-react";
+import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone } from "lucide-react";
 import { toast } from "sonner";
 
 const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
@@ -31,6 +32,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
   const [sending, setSending] = useState(false);
   const [showLeadPanel, setShowLeadPanel] = useState(false);
   const [leadForm, setLeadForm] = useState<Partial<Lead>>({});
+  const [callLogOpen, setCallLogOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Scroll apenas dentro do container de mensagens
@@ -79,6 +81,18 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
     setShowLeadPanel(false);
   };
 
+  const handleConfirmCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
+    if (!onUpdateLead) return;
+    const now = new Date();
+    const callTime = format(now, "dd/MM/yyyy HH:mm", { locale: ptBR });
+    onUpdateLead(leadId, {
+      observacao: obs ? `${obs} (${outcome})` : outcome,
+      dataRetornoLigacao: returnDate || callTime,
+      respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
+      etapaLead: returnDate ? "Follow-Up 1" : currentLead?.etapaLead || "Em contato",
+    });
+  };
+
   if (!conversation) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
@@ -109,6 +123,16 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Botão ligação (CallLog) */}
+          {currentLead && (
+            <button
+              onClick={() => setCallLogOpen(true)}
+              title="Registrar ligação"
+              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Phone className="h-4 w-4" />
+            </button>
+          )}
           {/* Botão editar lead */}
           <button
             onClick={() => setShowLeadPanel((v) => !v)}
@@ -308,6 +332,14 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
           )}
         </div>
       )}
+
+      {/* CallLog Dialog */}
+      <CallLogDialog
+        lead={currentLead}
+        open={callLogOpen}
+        onClose={() => setCallLogOpen(false)}
+        onConfirm={handleConfirmCall}
+      />
     </div>
   );
 }
