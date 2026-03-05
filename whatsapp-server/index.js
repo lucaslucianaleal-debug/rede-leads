@@ -498,8 +498,9 @@ client.on("message", async (msg) => {
     }
   }
 
-  // Não salvar mensagens vazias
-  if (!body || !body.trim()) {
+  // Não salvar mensagens vazias (apenas texto vazio; media vazia ainda precisa sincronizar conversa)
+  const isOnlyText = !msg.hasMedia && (!body || !body.trim());
+  if (isOnlyText) {
     console.log(`RECV ${telefone} (desde ${msg.from}): [ignorada - sem conteúdo]`);
     return;
   }
