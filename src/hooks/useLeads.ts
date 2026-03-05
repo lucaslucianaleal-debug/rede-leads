@@ -367,15 +367,26 @@ export function useLeads() {
       if (updates.nome !== undefined) {
         const lead = prev.find((l) => l.id === leadId);
         if (lead?.telefone) {
-          const telefone = lead.telefone.replace(/\D/g, "");
-          if (telefone) {
-            console.log(`Atualizando leadNome para ${updates.nome} na conversa ${telefone}`);
-            const convRef = doc(db, "conversations", telefone);
-            // Usa setDoc com merge para garantir que funciona mesmo se doc não existe
-            setDoc(convRef, { leadNome: updates.nome }, { merge: true })
-              .then(() => console.log(`leadNome atualizado com sucesso: ${updates.nome}`))
-              .catch((err) => console.error("Erro ao atualizar leadNome:", err));
-          }
+          const cleanPhone = lead.telefone.replace(/\D/g, "");
+          console.log(`Atualizando leadNome para ${updates.nome} na conversa ${cleanPhone}`);
+          
+          // Tenta várias variações do telefone para encontrar a conversa
+          const phoneVariants = [
+            cleanPhone,                           // 17992633297
+            `55${cleanPhone}`,                   // 5517992633297  
+            cleanPhone.startsWith('55') ? cleanPhone.substring(2) : cleanPhone  // Remove 55 se existir
+          ];
+
+          // Tenta atualizar cada variação até uma funcionar
+          phoneVariants.forEach(async (phone, index) => {
+            try {
+              const convRef = doc(db, "conversations", phone);
+              await setDoc(convRef, { leadNome: updates.nome }, { merge: true });
+              console.log(`leadNome atualizado com sucesso na variação ${index + 1} (${phone}): ${updates.nome}`);
+            } catch (err) {
+              console.log(`Tentativa ${index + 1} (${phone}) falhou:`, err);
+            }
+          });
         }
       }
       return updated;
