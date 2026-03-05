@@ -96,7 +96,12 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
                     "text-xs truncate mt-0.5 max-w-full",
                     conv.unreadCount > 0 ? "text-foreground font-medium" : "text-muted-foreground"
                   )}>
-                    {conv.lastMessage || "Sem mensagens"}
+                    {(() => {
+                      const msg = conv.lastMessage || "Sem mensagens";
+                      const words = msg.trim().split(/\s+/);
+                      const preview = words.slice(0, 2).join(" ");
+                      return words.length > 2 ? `${preview}...` : preview;
+                    })()}
                   </p>
                 </div>
               </button>
