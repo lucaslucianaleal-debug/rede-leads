@@ -4,7 +4,7 @@ import { mockLeads } from "@/data/mockLeads";
 import { format } from "date-fns";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, updateDoc, getDoc } from "firebase/firestore";
 
 const STORAGE_KEY = "rede_leads_data";
 const FIREBASE_DOC = doc(db, "crm_data", "shared");
@@ -370,23 +370,36 @@ export function useLeads() {
           const cleanPhone = lead.telefone.replace(/\D/g, "");
           console.log(`Atualizando leadNome para ${updates.nome} na conversa ${cleanPhone}`);
           
-          // Tenta várias variações do telefone para encontrar a conversa
+          // Variações do telefone para buscar a conversa existente
           const phoneVariants = [
             cleanPhone,                           // 17992633297
             `55${cleanPhone}`,                   // 5517992633297  
             cleanPhone.startsWith('55') ? cleanPhone.substring(2) : cleanPhone  // Remove 55 se existir
           ];
 
-          // Tenta atualizar cada variação até uma funcionar
-          phoneVariants.forEach(async (phone, index) => {
-            try {
-              const convRef = doc(db, "conversations", phone);
-              await setDoc(convRef, { leadNome: updates.nome }, { merge: true });
-              console.log(`leadNome atualizado com sucesso na variação ${index + 1} (${phone}): ${updates.nome}`);
-            } catch (err) {
-              console.log(`Tentativa ${index + 1} (${phone}) falhou:`, err);
+          // Busca qual variação já existe no Firestore antes de atualizar
+          const findAndUpdateConversation = async () => {
+            for (const [index, phone] of phoneVariants.entries()) {
+              try {
+                const convRef = doc(db, "conversations", phone);
+                const convSnap = await getDoc(convRef);
+                
+                if (convSnap.exists()) {
+                  // Encontrou! Atualiza só esta conversa
+                  await updateDoc(convRef, { leadNome: updates.nome });
+                  console.log(`leadNome atualizado na conversa existente ${phone}: ${updates.nome}`);
+                  return; // Para aqui, não tenta outras variações
+                } else {
+                  console.log(`Tentativa ${index + 1} (${phone}): conversa não existe`);
+                }
+              } catch (err) {
+                console.log(`Erro na tentativa ${index + 1} (${phone}):`, err);
+              }
             }
-          });
+            console.log('Nenhuma conversa existente encontrada para atualizar');
+          };
+
+          findAndUpdateConversation();
         }
       }
       return updated;
