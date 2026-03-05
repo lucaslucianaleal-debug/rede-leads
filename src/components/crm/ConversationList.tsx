@@ -28,7 +28,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
   );
 
   return (
-    <div className="flex flex-col h-full border-r border-border">
+    <div className="flex flex-col h-full w-[300px] border-r border-border overflow-hidden">
       {/* Header */}
       <div className="p-3 border-b border-border">
         <div className="relative">
@@ -84,12 +84,12 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
 
                 {/* Texto */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={cn("text-sm font-medium truncate", conv.unreadCount > 0 && "font-semibold")}>
+                  <div className="flex items-center justify-between gap-2 w-full">
+                    <span className={cn("text-sm font-medium truncate flex-1", conv.unreadCount > 0 && "font-semibold")}>
                       {conv.leadNome}
                     </span>
                     {conv.lastMessageAt && (
-                      <span className="text-[11px] text-muted-foreground shrink-0">
+                      <span className="text-[11px] text-muted-foreground shrink-0 whitespace-nowrap ml-1">
                         {formatDistanceToNow(conv.lastMessageAt.toDate(), {
                           addSuffix: false,
                           locale: ptBR,
