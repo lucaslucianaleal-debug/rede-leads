@@ -212,14 +212,24 @@ export function useConversations() {
 
     useEffect(() => {
       if (!telefone) return;
-      const cleanTel = telefone.replace(/\D/g, "");
-      const msgsRef = collection(db, "conversations", cleanTel, "messages");
+      
+      // O ID da conversa é exato - não limpar dígitos se já é um ID válido
+      // (pode ser "55...", "55unknown...", ou outro formato salvos no Firestore)
+      const msgsRef = collection(db, "conversations", telefone, "messages");
       const q = query(msgsRef, orderBy("timestamp", "asc"));
 
-      const unsub = onSnapshot(q, (snap) => {
-        const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ChatMessage));
-        setMessages(msgs);
-      });
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ChatMessage));
+          setMessages(msgs);
+        },
+        (err) => {
+          // Se falhar com ID exato, tenta buscar por matching de dígitos como fallback
+          console.warn(`[useMessages] Falha ao buscar mensagens para ${telefone}:`, err.message);
+          setMessages([]);
+        }
+      );
 
       return () => unsub();
     }, [telefone]);

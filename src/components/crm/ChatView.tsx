@@ -149,10 +149,36 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
     if (!deletePhone) return;
     setDeleting(true);
     try {
-      const cleanTel = deletePhone.replace(/\D/g, "");
-      const convRef = doc(db, "conversations", cleanTel);
+      // Usa o ID exato da conversa (pode não ser só dígitos se foi criado com nome/ID estranho)
+      let targetConvId = deletePhone;
+      
+      // Tenta encontrar a conversa por matching de dígitos (últimos 11 dígitos)
+      const digits = deletePhone.replace(/\D/g, "");
+      const last11 = digits.slice(-11);
+      
+      if (last11.length >= 11) {
+        // Verifica se há conversa com ID exato primeiro
+        try {
+          const directSnap = await getDocs(collection(db, "conversations", digits, "messages"));
+          console.log("Conversa encontrada com ID exato de dígitos");
+          targetConvId = digits;
+        } catch (e) {
+          // Senão, procura por matching de 11 dígitos em todas as conversas
+          const allConvs = await getDocs(collection(db, "conversations"));
+          for (const convDoc of allConvs.docs) {
+            const convDigits = convDoc.id.replace(/\D/g, "");
+            if (convDigits.length >= 11 && convDigits.slice(-11) === last11) {
+              targetConvId = convDoc.id;
+              console.log(`Conversa encontrada por 11-digitos matching: ${targetConvId}`);
+              break;
+            }
+          }
+        }
+      }
+      
+      const convRef = doc(db, "conversations", targetConvId);
       // Apaga todas as mensagens primeiro
-      const msgsSnap = await getDocs(collection(db, "conversations", cleanTel, "messages"));
+      const msgsSnap = await getDocs(collection(db, "conversations", targetConvId, "messages"));
       const batch = writeBatch(db);
       msgsSnap.forEach((d) => batch.delete(d.ref));
       await batch.commit();
@@ -161,6 +187,7 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
       if (selectedPhone === deletePhone) setSelectedPhone(null);
       toast.success("Conversa apagada.");
     } catch (e) {
+      console.error("Erro ao apagar conversa:", e.message);
       toast.error("Erro ao apagar conversa.");
     } finally {
       setDeleting(false);

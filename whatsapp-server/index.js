@@ -101,30 +101,32 @@ async function getRealPhone(msg, useToField = false) {
         console.log(`[getRealPhone] Fallback com dígitos (${digits.length} chars): ${resolvedPhone}`);
       } else {
         // Número inválido - muitos poucos ou muitos dígitos
-        console.error(`[getRealPhone] Número inválido: ${digits.length} dígitos. rawFrom=${rawFrom}`);
-        resolvedPhone = null;
+        console.error(`[getRealPhone] Número inválido: ${digits.length} dígitos. rawFrom=${rawFrom}. REJEITANDO mensagem.`);
+        return null; // Retorna null para sinalizar erro, não cria placeholder
       }
-    }
-    
-    // Se nada funcionou, gera um placeholder único baseado no timestamp
-    if (!resolvedPhone) {
-      resolvedPhone = `55unknown${Date.now()}`;
-      console.error(`[getRealPhone] Não conseguiu resolver número, usando placeholder: ${resolvedPhone}`);
     }
     
     // Valida o resultado final
     if (!resolvedPhone || resolvedPhone.length < 12 || resolvedPhone.length > 14) {
-      console.error(`[getRealPhone] FALHA: número final inválido: ${resolvedPhone} (${resolvedPhone.length} chars)`);
+      console.error(`[getRealPhone] FALHA: número final inválido: ${resolvedPhone} (${resolvedPhone ? resolvedPhone.length : 0} chars). REJEITANDO.`);
+      return null; // Retorna null em vez de número inválido
     }
     
-    // Salva no cache para consistência futura
-    lidCache.set(rawFrom, resolvedPhone);
-    console.log(`[getRealPhone] Cache salvo: ${rawFrom} -> ${resolvedPhone}`);
+    // Salva no cache para consistência futura (se for válido)
+    if (resolvedPhone && resolvedPhone.length >= 12) {
+      lidCache.set(rawFrom, resolvedPhone);
+      console.log(`[getRealPhone] Cache salvo: ${rawFrom} -> ${resolvedPhone}`);
+    }
     return resolvedPhone;
   } catch (e) {
     console.error("[getRealPhone] Exception:", e.message);
+    // Tenta fallback muito conservador: só retorna se tiver exatamente 13 dígitos (formato "55" + DDD + número)
     const digits = (msg.from || "").replace("@c.us", "").replace(/\D/g, "");
-    return digits.length >= 11 ? digits : `55${digits.slice(-11)}`;
+    if (digits.length === 13 && digits.startsWith("55")) {
+      return digits;
+    }
+    console.error(`[getRealPhone] Exception fallback falhou (${digits.length} dígitos). Rejeitando.`);
+    return null;
   }
 }
 
@@ -410,6 +412,12 @@ client.on("message", async (msg) => {
   
   // Resolve telefone UMA VEZ e usa o mesmo em todas as operações
   const telefone = await getRealPhone(msg);
+  
+  // Rejeita mensagens com telefone inválido/não resolvível
+  if (!telefone) {
+    console.warn(`[message] Telefone não resolvido: ${msg.from}. Ignorando mensagem.`);
+    return;
+  }
 
   // Validar telefone: minimo "55" + DDD(2) + numero(8-9) = 12-14 chars
   if (telefone.length < 12 || telefone.length > 14) {
@@ -491,6 +499,13 @@ client.on("message_create", async (msg) => {
 
   // Usa a mesma função getRealPhone para consistência (campo msg.to)
   const resolvedPhone = await getRealPhone(msg, true);
+  
+  // Rejeita mensagens com telefone inválido
+  if (!resolvedPhone) {
+    console.warn(`[message_create] Telefone não resolvido (msg.to=${msg.to}). Ignorando.`);
+    return;
+  }
+  
   const msgId = msg.id?._serialized;
   
   // Verifica se há mapeamento forçado da API (quando enviamos via /send-message)
