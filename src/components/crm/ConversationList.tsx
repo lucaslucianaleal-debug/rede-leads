@@ -27,7 +27,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
   );
 
   return (
-    <div className="flex flex-col h-full w-[300px] border-r border-border overflow-hidden">
+    <div className="flex flex-col h-full w-[300px] border-r border-border">
       {/* Header */}
       <div className="p-3 border-b border-border">
         <div className="relative">
