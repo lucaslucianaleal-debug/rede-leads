@@ -112,10 +112,10 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
   };
 
   return (
-    <div className="mt-6">
+    <div className="mt-4 flex flex-col" style={{ height: "calc(100vh - 190px)", minHeight: 520 }}>
       {/* Banner se servidor offline */}
       {serverConnected === false && (
-        <div className="mb-3 flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-2.5 text-sm">
+        <div className="mb-2 flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-2.5 text-sm shrink-0">
           <span>
             ⚠️ Servidor WhatsApp offline. Para receber e enviar mensagens, inicie o servidor:
             <code className="ml-2 bg-amber-100 px-1.5 py-0.5 rounded text-xs">
@@ -135,7 +135,7 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
 
       {/* Botão para reabrir QR se foi fechado manualmente */}
       {qrCode && qrDismissed && (
-        <div className="mb-3 flex items-center justify-between bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5 text-sm">
+        <div className="mb-2 flex items-center justify-between bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5 text-sm shrink-0">
           <span>📱 WhatsApp aguardando autenticação. Escaneie o QR Code para conectar.</span>
           <Button
             variant="outline"
@@ -148,8 +148,8 @@ export function ChatView({ leads, onUpdateLead }: ChatViewProps) {
         </div>
       )}
 
-      {/* Layout chat */}
-      <div className="border border-border rounded-xl overflow-hidden bg-card" style={{ height: "calc(100vh - 220px)", minHeight: 500 }}>
+      {/* Layout chat — ocupa espaço restante */}
+      <div className="flex-1 min-h-0 border border-border rounded-xl overflow-hidden bg-card">
         <div className="grid h-full" style={{ gridTemplateColumns: "300px 1fr" }}>
           {/* Lista de conversas */}
           <ConversationList

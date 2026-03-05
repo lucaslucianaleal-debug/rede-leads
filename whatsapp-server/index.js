@@ -263,7 +263,16 @@ client.on("disconnected", (reason) => {
 client.on("message", async (msg) => {
   if (msg.isGroupMsg) return;
   const telefone = await getRealPhone(msg);
-  const pushName = msg._data?.notifyName || null;
+
+  // Tenta extrair nome real do WhatsApp por múltiplas fontes
+  let pushName = msg.notifyName || msg._data?.notifyName || msg._data?.pushName || null;
+  if (!pushName) {
+    try {
+      const contact = await msg.getContact();
+      pushName = contact?.pushname || contact?.name || null;
+      if (pushName) console.log(`[pushName] Resolvido via getContact: ${pushName}`);
+    } catch (_) {}
+  }
 
   // Validar telefone: minimo "55" + 10 digitos = 12 chars
   if (telefone.length < 12) {
