@@ -8,10 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
+import { AgendamentoDialog } from "@/components/crm/AgendamentoDialog";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone } from "lucide-react";
+import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone, Calendar } from "lucide-react";
 import { toast } from "sonner";
 
 const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
@@ -33,6 +34,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
   const [showLeadPanel, setShowLeadPanel] = useState(false);
   const [leadForm, setLeadForm] = useState<Partial<Lead>>({});
   const [callLogOpen, setCallLogOpen] = useState(false);
+  const [agendamentoDialogOpen, setAgendamentoDialogOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Scroll apenas dentro do container de mensagens
@@ -93,6 +95,14 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
     });
   };
 
+  const handleConfirmAgendamento = (leadId: string, dataAgendamento: string) => {
+    if (!onUpdateLead) return;
+    onUpdateLead(leadId, {
+      dataAgendamento,
+      etapaLead: "Avaliação agendada",
+    });
+  };
+
   if (!conversation) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
@@ -131,6 +141,16 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
               className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
             >
               <Phone className="h-4 w-4" />
+            </button>
+          )}
+          {/* Botão agendar */}
+          {currentLead && (
+            <button
+              onClick={() => setAgendamentoDialogOpen(true)}
+              title="Agendar atendimento"
+              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Calendar className="h-4 w-4" />
             </button>
           )}
           {/* Botão editar lead */}
@@ -339,6 +359,14 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
         open={callLogOpen}
         onClose={() => setCallLogOpen(false)}
         onConfirm={handleConfirmCall}
+      />
+
+      {/* Agendamento Dialog */}
+      <AgendamentoDialog
+        lead={currentLead}
+        open={agendamentoDialogOpen}
+        onClose={() => setAgendamentoDialogOpen(false)}
+        onConfirm={handleConfirmAgendamento}
       />
     </div>
   );
