@@ -486,6 +486,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
           onCreateLead?.(lead);
           setShowCreateDialog(false);
         }}
+        onOpenChat={onOpenChat}
       />
     </div>
   );

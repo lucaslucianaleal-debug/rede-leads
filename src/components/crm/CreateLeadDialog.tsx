@@ -15,6 +15,7 @@ interface CreateLeadDialogProps {
   open: boolean;
   onClose: () => void;
   onSave: (lead: Omit<Lead, 'id'>) => void;
+  onOpenChat?: (phone: string, message?: string) => void;
 }
 
 const ETAPAS: LeadStage[] = [
@@ -25,6 +26,8 @@ const ETAPAS: LeadStage[] = [
   "Avaliação agendada", "Desistência", "Finalizado",
 ];
 
+const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
+
 const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Outro"];
 
 const STATUSES: LeadStatus[] = ["QUENTE", "MORNO", "FRIO"];
@@ -33,7 +36,7 @@ const RESPOSTAS: LeadResposta[] = ["RESPONDEU", "NÃO RESPONDEU"];
 
 const COMPARECIMENTOS: LeadComparecimento[] = ["COMPARECEU", "NÃO COMPARECEU", "AGUARDANDO DATA"];
 
-export function CreateLeadDialog({ open, onClose, onSave }: CreateLeadDialogProps) {
+export function CreateLeadDialog({ open, onClose, onSave, onOpenChat }: CreateLeadDialogProps) {
   const [form, setForm] = useState<Omit<Lead, 'id'>>({
     dataCriacao: format(new Date(), "dd/MM/yyyy"),
     dataContato: format(new Date(), "dd/MM/yyyy"),
@@ -79,6 +82,11 @@ export function CreateLeadDialog({ open, onClose, onSave }: CreateLeadDialogProp
 
     onSave(form);
     toast.success(`Lead "${form.nome}" criado com sucesso!`);
+    
+    // Abrir chat com o novo lead (após criar)
+    if (onOpenChat) {
+      onOpenChat(form.telefone, `Olá ${form.nome}! 👋\n\nBem-vindo(a)! Estou aqui para ajudá-lo com tudo que precisar.`);
+    }
     
     // Reset form
     setForm({
@@ -175,11 +183,13 @@ export function CreateLeadDialog({ open, onClose, onSave }: CreateLeadDialogProp
           {/* Serviço Procurado */}
           <div className="space-y-1">
             <Label>Serviço Procurado</Label>
-            <Input
-              value={form.servicoProcurado || ""}
-              onChange={(e) => set("servicoProcurado", e.target.value)}
-              placeholder="Ex: Implante, Limpeza, etc"
-            />
+            <Select value={selectValue(form.servicoProcurado)} onValueChange={(v) => set("servicoProcurado", fromSelect(v))}>
+              <SelectTrigger><SelectValue placeholder="Selecione um serviço" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">—</SelectItem>
+                {SERVICOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Captador */}
@@ -264,7 +274,7 @@ export function CreateLeadDialog({ open, onClose, onSave }: CreateLeadDialogProp
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave}>Criar Lead</Button>
+          <Button onClick={handleSave}>Criar e Enviar Mensagem</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
