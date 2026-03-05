@@ -85,7 +85,7 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenChat }: CreateLe
     
     // Abrir chat com o novo lead (após criar)
     if (onOpenChat) {
-      onOpenChat(form.telefone, `Olá ${form.nome}! 👋\n\nBem-vindo(a)! Estou aqui para ajudá-lo com tudo que precisar.`);
+      onOpenChat(form.telefone, `⏳ Aguardando resposta`);
     }
     
     // Reset form
