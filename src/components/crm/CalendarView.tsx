@@ -1,14 +1,11 @@
-import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+﻿import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Lead } from "@/types/crm";
-import { useState, useMemo } from "react";
-import { format, parse, isValid } from "date-fns";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Clock, Phone, Calendar as CalendarIcon, Pencil, Check, Bot, CheckCircle, AlertCircle } from "lucide-react";
+import { Clock, Phone, Bot, CheckCircle, AlertCircle, Calendar as CalendarIcon, Wifi, WifiOff } from "lucide-react";
 import { generateReminderText } from "@/lib/whatsapp";
 import { toast } from "sonner";
 
@@ -19,345 +16,345 @@ interface CalendarViewProps {
   onOpenChat?: (phone: string, message?: string) => void;
 }
 
+type SlotKey = "24h" | "12h" | "3h" | "1h";
+type SlotStatus = "sent" | "scheduled" | "missed" | "failed";
+
+interface SendFailureEntry {
+  leadId: string;
+  slot: string;
+  attempts: number;
+  lastError: string;
+  firstFailedAt: string;
+  lastFailedAt: string;
+}
+
+interface SendFailures {
+  [key: string]: SendFailureEntry;
+}
+
+const SLOTS: SlotKey[] = ["24h", "12h", "3h", "1h"];
+
+const SLOT_OFFSETS_MS: Record<SlotKey, number> = {
+  "24h": 24 * 60 * 60 * 1000,
+  "12h": 12 * 60 * 60 * 1000,
+  "3h":  3  * 60 * 60 * 1000,
+  "1h":  1  * 60 * 60 * 1000,
+};
+
+function parseAppointmentDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  try {
+    const [datePart, timePart] = dateStr.split(" ");
+    const [day, month, year] = datePart.split("/").map(Number);
+    const [hour = 0, minute = 0] = (timePart || "00:00").split(":").map(Number);
+    const d = new Date(year, month - 1, day, hour, minute, 0, 0);
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
+
+function computeSlotTimes(appointmentDate: Date): Record<SlotKey, Date> {
+  return {
+    "24h": new Date(appointmentDate.getTime() - SLOT_OFFSETS_MS["24h"]),
+    "12h": new Date(appointmentDate.getTime() - SLOT_OFFSETS_MS["12h"]),
+    "3h":  new Date(appointmentDate.getTime() - SLOT_OFFSETS_MS["3h"]),
+    "1h":  new Date(appointmentDate.getTime() - SLOT_OFFSETS_MS["1h"]),
+  };
+}
+
 export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }: CalendarViewProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingTimeId, setEditingTimeId] = useState<string | null>(null);
-  const [editingTimeValue, setEditingTimeValue] = useState<string>("");
+  const [sendFailures, setSendFailures] = useState<SendFailures>({});
+  const [serverConnected, setServerConnected] = useState<boolean | null>(null);
 
-  const handleSaveTime = (lead: Lead) => {
-    if (!editingTimeValue || !onUpdateLead) return;
-    const datePart = lead.dataAgendamento.split(" ")[0];
-    const newDataAgendamento = `${datePart} ${editingTimeValue}`;
-    onUpdateLead(lead.id, { dataAgendamento: newDataAgendamento });
-    setEditingTimeId(null);
-    toast.success(`Horário de ${lead.nome} alterado para ${editingTimeValue}`);
-  };
-
-  // Get all dates with appointments
-  const appointmentDates = useMemo(() => {
-    const dates = new Set<string>();
-    leads.forEach((lead) => {
-      if (lead.dataAgendamento) {
-        try {
-          const datePart = lead.dataAgendamento.substring(0, 10);
-          const parsedDate = parse(datePart, "dd/MM/yyyy", new Date());
-          if (isValid(parsedDate)) {
-            dates.add(format(parsedDate, "yyyy-MM-dd"));
-          }
-        } catch {
-          // Skip invalid dates
-        }
-      }
-    });
-    // Use noon (12:00) to avoid UTC offset shifting the date to the previous day
-    return Array.from(dates).map((d) => {
-      const [y, m, day] = d.split("-").map(Number);
-      return new Date(y, m - 1, day, 12, 0, 0);
-    });
-  }, [leads]);
-
-  // Get leads for selected date
-  const leadsForSelectedDate = useMemo(() => {
-    if (!selectedDate) return [];
-    const dateStr = format(selectedDate, "dd/MM/yyyy");
-    return leads
-      .filter((lead) => lead.dataAgendamento.startsWith(dateStr))
-      .sort((a, b) => {
-        const timeA = a.dataAgendamento?.split(" ")[1] || "00:00";
-        const timeB = b.dataAgendamento?.split(" ")[1] || "00:00";
-        return timeA.localeCompare(timeB);
-      });
-  }, [leads, selectedDate]);
-
-  const handleDateSelect = (date: Date | undefined) => {
-    setSelectedDate(date);
-    if (date) {
-      const dateStr = format(date, "dd/MM/yyyy");
-      const hasAppointments = leads.some((lead) => lead.dataAgendamento.startsWith(dateStr));
-      if (hasAppointments) {
-        setDialogOpen(true);
-      }
-    }
-  };
-
-  const handleSendReminder = (lead: Lead, type: "h24" | "today") => {
-    const msg = generateReminderText(lead.dataAgendamento || "", type);
-    onOpenChat?.(lead.telefone, msg);
-  };
-
-  const getReminderStatus = (lead: Lead) => {
-    const { h24, today } = lead.lembretes;
-    if (h24 && today) return { label: "Todos enviados", color: "bg-green-500" };
-    if (today) return { label: "1 enviado", color: "bg-blue-500" };
-    if (h24) return { label: "1 enviado", color: "bg-blue-500" };
-    return { label: "Nenhum enviado", color: "bg-gray-500" };
-  };
-
-  // Helper function to format the robot-sent timestamp
-  const formatRobotSendTime = (isoTimestamp: string | null | undefined): string | null => {
-    if (!isoTimestamp) return null;
+  const fetchFailures = useCallback(async () => {
     try {
-      const date = new Date(isoTimestamp);
-      return format(date, "HH:mm", { locale: ptBR });
+      const res = await fetch("http://localhost:3001/api/send-failures");
+      if (res.ok) {
+        const data = await res.json();
+        setSendFailures(data ?? {});
+        setServerConnected(true);
+      } else {
+        setServerConnected(false);
+      }
     } catch {
-      return null;
+      setServerConnected(false);
     }
-  };
+  }, []);
 
-  // Check if reminder was sent automatically by robot for a specific slot
-  const getRobotReminderStatus = (lead: Lead, slot: "24h" | "today") => {
-    const sent = lead.lembretes?.sent;
-    if (!sent) return { isSent: false, timestamp: null, timeStr: null };
-    
-    const timestamp = sent[slot];
-    const timeStr = formatRobotSendTime(timestamp);
-    
-    return {
-      isSent: !!timestamp,
-      timestamp,
-      timeStr
+  useEffect(() => {
+    fetchFailures();
+    const interval = setInterval(fetchFailures, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchFailures]);
+
+  const now = new Date();
+  const todayStr   = format(now, "dd/MM/yyyy");
+  const tomorrowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const tomorrowStr  = format(tomorrowDate, "dd/MM/yyyy");
+
+  const todayLeads = useMemo(
+    () =>
+      leads
+        .filter((l) => l.dataAgendamento?.startsWith(todayStr))
+        .sort((a, b) =>
+          (a.dataAgendamento?.split(" ")[1] ?? "").localeCompare(b.dataAgendamento?.split(" ")[1] ?? "")
+        ),
+    [leads, todayStr]
+  );
+
+  const tomorrowLeads = useMemo(
+    () =>
+      leads
+        .filter((l) => l.dataAgendamento?.startsWith(tomorrowStr))
+        .sort((a, b) =>
+          (a.dataAgendamento?.split(" ")[1] ?? "").localeCompare(b.dataAgendamento?.split(" ")[1] ?? "")
+        ),
+    [leads, tomorrowStr]
+  );
+
+  // ---- slot logic ----
+
+  function getSlotStatus(lead: Lead, slot: SlotKey, slotTime: Date): SlotStatus {
+    const sentTs = lead.lembretes?.sent?.[slot];
+    if (sentTs) return "sent";
+
+    if (sendFailures[`${lead.id}:${slot}`]) return "failed";
+
+    if (slotTime > new Date()) return "scheduled";
+    return "missed";
+  }
+
+  function stampSlot(lead: Lead, slot: SlotKey) {
+    if (!onUpdateLead) return;
+    const nowIso = new Date().toISOString();
+    onUpdateLead(lead.id, {
+      lembretes: {
+        ...lead.lembretes,
+        sent: {
+          "24h": lead.lembretes?.sent?.["24h"] ?? null,
+          "12h": lead.lembretes?.sent?.["12h"] ?? null,
+          "3h":  lead.lembretes?.sent?.["3h"]  ?? null,
+          "1h":  lead.lembretes?.sent?.["1h"]  ?? null,
+          [slot]: nowIso,
+        },
+      },
+    });
+  }
+
+  function handleManualSend(lead: Lead, slot: SlotKey) {
+    const reminderType: "h24" | "today" = slot === "24h" ? "h24" : "today";
+    const msg = generateReminderText(lead.dataAgendamento ?? "", reminderType);
+    onOpenChat?.(lead.telefone, msg);
+    stampSlot(lead, slot);
+    toast.success(`Lembrete ${slot} enviado e marcado para ${lead.nome}`);
+  }
+
+  // ---- render slot pill ----
+
+  function renderSlot(lead: Lead, slot: SlotKey, slotTime: Date) {
+    const status = getSlotStatus(lead, slot, slotTime);
+    const sentTs = lead.lembretes?.sent?.[slot];
+
+    type Config = { label: string; icon?: React.ReactNode; cls: string; tooltip: string; clickable: boolean };
+
+    const configs: Record<SlotStatus, Config> = {
+      sent: {
+        label: sentTs ? format(new Date(sentTs), "HH:mm") : "Env.",
+        icon: <CheckCircle className="h-3 w-3" />,
+        cls: "bg-green-100 text-green-700 border-green-300 hover:bg-green-200",
+        tooltip: sentTs ? `Enviado às ${format(new Date(sentTs), "HH:mm")}` : "Enviado",
+        clickable: false,
+      },
+      scheduled: {
+        label: format(slotTime, "HH:mm"),
+        icon: <Clock className="h-3 w-3 animate-pulse" />,
+        cls: "bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200",
+        tooltip: `Agendado para ${format(slotTime, "HH:mm")} — Clique para enviar agora`,
+        clickable: true,
+      },
+      failed: {
+        label: "FALHA",
+        icon: <AlertCircle className="h-3 w-3" />,
+        cls: "bg-red-100 text-red-700 border-red-300 hover:bg-red-200",
+        tooltip: "Falha no envio automático — Clique para enviar manual",
+        clickable: true,
+      },
+      missed: {
+        label: slot,
+        cls: "bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200",
+        tooltip: "Janela passou — Clique para marcar manualmente",
+        clickable: true,
+      },
     };
-  };
 
-  // Check if there's manual conversation cooldown (prevents robot from sending)
-  const hasCooldownBlock = (lead: Lead): boolean => {
-    const sent = lead.lembretes?.sent;
-    if (!sent) return false;
-    
-    // If any slot is marked, assume there might be cooldown consideration
-    // In production, we'd check timestamps against conversation messages
-    return false; // Placeholder for now
-  };
+    const cfg = configs[status];
 
-  return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5" />
-            Calendário de Agendamentos
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleDateSelect}
-              locale={ptBR}
-              modifiers={{
-                hasAppointment: appointmentDates,
-              }}
-              modifiersClassNames={{
-                hasAppointment: "bg-primary/20 font-bold",
-              }}
-              className="rounded-md border"
-            />
+    return (
+      <div key={slot} className="flex flex-col items-center gap-0.5">
+        <span className="text-[10px] text-muted-foreground font-medium">{slot}</span>
+        <Button
+          size="sm"
+          variant="outline"
+          className={`h-8 min-w-[52px] px-2 text-xs font-medium border ${cfg.cls}`}
+          onClick={() => { if (cfg.clickable) handleManualSend(lead, slot); }}
+          disabled={!cfg.clickable}
+          title={cfg.tooltip}
+        >
+          {cfg.icon && <span className="mr-1">{cfg.icon}</span>}
+          {cfg.label}
+        </Button>
+      </div>
+    );
+  }
+
+  // ---- render lead card ----
+
+  function renderLeadCard(lead: Lead) {
+    const appointment = parseAppointmentDate(lead.dataAgendamento ?? "");
+    const slotTimes = appointment ? computeSlotTimes(appointment) : null;
+
+    const failedSlots = slotTimes ? SLOTS.filter((s) => sendFailures[`${lead.id}:${s}`]) : [];
+    const allSent = slotTimes ? SLOTS.every((s) => !!lead.lembretes?.sent?.[s]) : false;
+
+    const borderColor = failedSlots.length > 0 ? "border-l-red-500" : allSent ? "border-l-green-500" : "border-l-primary/30";
+
+    return (
+      <Card key={lead.id} className={`border-l-4 ${borderColor} transition-colors`}>
+        <CardContent className="p-4">
+          {/* Header: time + name + procedure */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className="text-lg font-bold text-primary tabular-nums">
+              {lead.dataAgendamento?.split(" ")[1] ?? "—"}
+            </span>
+            <span className="font-semibold text-sm flex-1 min-w-0 truncate">{lead.nome}</span>
+            <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary font-semibold text-xs">
+              {lead.servicoProcurado}
+            </Badge>
           </div>
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            <p>Dias marcados têm agendamentos • Clique para ver detalhes</p>
-            <p className="mt-2">
-              Total de agendamentos: <span className="font-bold">{appointmentDates.length}</span> dias
-            </p>
+
+          {/* Phone */}
+          <div className="flex items-center gap-1.5 mb-3 text-xs text-muted-foreground">
+            <Phone className="h-3 w-3 shrink-0" />
+            <span>{lead.telefone}</span>
           </div>
+
+          {/* Automation timeline */}
+          {slotTimes ? (
+            <div className="flex items-center gap-2">
+              <Bot className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <div className="flex gap-2 flex-wrap">
+                {SLOTS.map((slot) => renderSlot(lead, slot, slotTimes[slot]))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">Data inválida</p>
+          )}
+
+          {/* Failure banner */}
+          {failedSlots.length > 0 && (
+            <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded flex items-start gap-2 text-xs">
+              <AlertCircle className="h-3.5 w-3.5 text-red-600 mt-0.5 shrink-0" />
+              <span className="text-red-700">
+                <strong>⚠️ Falha na automação</strong>{" "}
+                ({failedSlots.join(", ")}) — Clique no botão vermelho para enviar manualmente.
+              </span>
+            </div>
+          )}
+
+          {/* Notes */}
+          {lead.observacao && (
+            <div className="mt-2 p-2 bg-muted rounded text-xs">
+              <span className="font-medium">Obs:</span> {lead.observacao}
+            </div>
+          )}
         </CardContent>
       </Card>
+    );
+  }
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Agendamentos de {selectedDate && format(selectedDate, "dd/MM/yyyy")}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {leadsForSelectedDate.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                Nenhum agendamento para esta data
-              </p>
-            ) : (
-              leadsForSelectedDate.map((lead) => {
-                const reminderStatus = getReminderStatus(lead);
-                return (
-                  <Card key={lead.id}>
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <Clock className="h-4 w-4 text-primary" />
-                            {editingTimeId === lead.id ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="time"
-                                  value={editingTimeValue}
-                                  onChange={(e) => setEditingTimeValue(e.target.value)}
-                                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveTime(lead); if (e.key === "Escape") setEditingTimeId(null); }}
-                                  className="h-7 w-28 text-sm font-bold text-primary"
-                                  autoFocus
-                                />
-                                <Button size="icon" className="h-6 w-6" onClick={() => handleSaveTime(lead)}>
-                                  <Check className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1">
-                                <span className="text-lg font-bold text-primary">
-                                  {lead.dataAgendamento?.split(" ")[1] || "—"}
-                                </span>
-                                {onUpdateLead && (
-                                  <button
-                                    className="text-muted-foreground hover:text-primary"
-                                    title="Alterar horário"
-                                    onClick={() => {
-                                      setEditingTimeId(lead.id);
-                                      setEditingTimeValue(lead.dataAgendamento?.split(" ")[1] || "");
-                                    }}
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <h3 className="font-semibold text-lg">{lead.nome}</h3>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                            <Phone className="h-3 w-3" />
-                            {lead.telefone}
-                          </div>
-                          <p className="text-sm mt-1">
-                            <span className="font-medium">Serviço:</span> {lead.servicoProcurado}
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-2 items-end">
-                          <Badge className={reminderStatus.color}>
-                            {reminderStatus.label}
-                          </Badge>
-                          {lead.comparecimento && (
-                            <Badge variant={lead.comparecimento === "COMPARECEU" ? "default" : "destructive"}>
-                              {lead.comparecimento}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* 24h Reminder Button */}
-                        {(() => {
-                          const robotStatus = getRobotReminderStatus(lead, "24h");
-                          return (
-                            <div className="space-y-1">
-                              <Button
-                                size="sm"
-                                variant={robotStatus.isSent ? "default" : "outline"}
-                                onClick={() => handleSendReminder(lead, "h24")}
-                                className={`w-full ${
-                                  robotStatus.isSent 
-                                    ? "bg-green-500 hover:bg-green-600 text-white" 
-                                    : ""
-                                }`}
-                              >
-                                {robotStatus.isSent ? (
-                                  <>
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    24h antes
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    24h antes
-                                  </>
-                                )}
-                              </Button>
-                              {robotStatus.isSent && robotStatus.timeStr && (
-                                <div className="flex items-center gap-1 text-xs text-emerald-600 mx-1">
-                                  <Bot className="h-3 w-3" />
-                                  <span>Enviado às {robotStatus.timeStr}</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
+  // ---- render day section ----
 
-                        {/* Today Reminder Button */}
-                        {(() => {
-                          const robotStatus = getRobotReminderStatus(lead, "today");
-                          return (
-                            <div className="space-y-1">
-                              <Button
-                                size="sm"
-                                variant={robotStatus.isSent ? "default" : "outline"}
-                                onClick={() => handleSendReminder(lead, "today")}
-                                className={`w-full ${
-                                  robotStatus.isSent 
-                                    ? "bg-blue-500 hover:bg-blue-600 text-white" 
-                                    : ""
-                                }`}
-                              >
-                                {robotStatus.isSent ? (
-                                  <>
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Hoje
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    Hoje
-                                  </>
-                                )}
-                              </Button>
-                              {robotStatus.isSent && robotStatus.timeStr && (
-                                <div className="flex items-center gap-1 text-xs text-blue-600 mx-1">
-                                  <Bot className="h-3 w-3" />
-                                  <span>Enviado às {robotStatus.timeStr}</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
+  function renderDaySection(label: string, dateLabel: string, dayLeads: Lead[]) {
+    return (
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <span className="font-semibold text-sm">{label}</span>
+          <span className="text-xs text-muted-foreground capitalize">{dateLabel}</span>
+          <Badge variant="secondary" className="ml-auto text-xs">
+            {dayLeads.length} agendamento{dayLeads.length !== 1 ? "s" : ""}
+          </Badge>
+        </div>
+        {dayLeads.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic pl-6 py-2">Nenhum agendamento</p>
+        ) : (
+          <div className="space-y-2">{dayLeads.map(renderLeadCard)}</div>
+        )}
+      </div>
+    );
+  }
 
-                      {/* Cooldown Warning */}
-                      {(() => {
-                        const robotStatus24h = getRobotReminderStatus(lead, "24h");
-                        const robotStatusToday = getRobotReminderStatus(lead, "today");
-                        const maybeCooldown = hasCooldownBlock(lead);
-                        
-                        return (
-                          (robotStatus24h.isSent || robotStatusToday.isSent) && (
-                            <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded flex items-start gap-2 text-xs">
-                              <CheckCircle className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-                              <span className="text-emerald-700">
-                                <strong>✓ Automação ativa:</strong> O robô enviou lembrete(s). Você pode clicar acima para reenviar manualmente se necessário.
-                              </span>
-                            </div>
-                          )
-                        );
-                      })()}
+  const total = todayLeads.length + tomorrowLeads.length;
 
-                      {/* Cooldown Safety Notice */}
-                      {hasCooldownBlock(lead) && (
-                        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded flex items-start gap-2 text-xs">
-                          <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-amber-700">
-                            <strong>⏸ Atendimento manual detectado:</strong> Lembrete automaticamente pausado por 1 hora para não interromper sua conversa.
-                          </span>
-                        </div>
-                      )}
-                      
-                      {lead.observacao && (
-                        <div className="mt-3 p-2 bg-muted rounded text-sm">
-                          <span className="font-medium">Obs:</span> {lead.observacao}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <CalendarIcon className="h-5 w-5" />
+          Lembretes de Agendamento — Próximas 48h
+          <div className="ml-auto flex items-center gap-3">
+            {serverConnected === true && (
+              <span className="flex items-center gap-1 text-xs text-green-600 font-normal">
+                <Wifi className="h-3.5 w-3.5" /> Robô online
+              </span>
             )}
+            {serverConnected === false && (
+              <span className="flex items-center gap-1 text-xs text-red-500 font-normal">
+                <WifiOff className="h-3.5 w-3.5" /> Robô offline
+              </span>
+            )}
+            <Badge variant="outline" className="text-xs font-normal">
+              {total} agendamento{total !== 1 ? "s" : ""}
+            </Badge>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        </CardTitle>
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-4 pt-1 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded bg-green-200 border border-green-300" />
+            Enviado (mostra horário)
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded bg-yellow-200 border border-yellow-300" />
+            Agendado para HH:mm
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded bg-gray-100 border border-gray-200" />
+            Aguardando / Janela passou
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded bg-red-200 border border-red-300" />
+            ⚠️ Falha — Enviar Manual
+          </span>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-6 pt-4">
+        {total === 0 ? (
+          <p className="text-center text-muted-foreground py-10">
+            Nenhum agendamento nas próximas 48 horas
+          </p>
+        ) : (
+          <>
+            {renderDaySection("📆 Hoje", format(now, "EEEE, dd/MM", { locale: ptBR }), todayLeads)}
+            <div className="border-t pt-4">
+              {renderDaySection("📅 Amanhã", format(tomorrowDate, "EEEE, dd/MM", { locale: ptBR }), tomorrowLeads)}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

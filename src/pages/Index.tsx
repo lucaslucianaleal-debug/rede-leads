@@ -9,7 +9,6 @@ import { CallReturnQueue } from "@/components/crm/CallReturnQueue";
 import { AuthComponent } from "@/components/crm/AuthComponent";
 import { AdminPanel } from "@/components/crm/AdminPanel";
 import { ReminderQueue } from "@/components/crm/ReminderQueue";
-import { NextSendsPanel } from "@/components/crm/NextSendsPanel";
 import { CalendarView } from "@/components/crm/CalendarView";
 import { AllLeadsView } from "@/components/crm/AllLeadsView";
 import { AgendaDoDia } from "@/components/crm/AgendaDoDia";
@@ -305,7 +304,6 @@ const CRMDashboard = () => {
                 followUpGoal={followUpGoal}
                 onOpenChat={handleOpenChat}
               />
-              <NextSendsPanel />
               <ReminderQueue leads={reminderQueue} onMarkReminder={handleReminder} onOpenChat={handleOpenChat} />
             </div>
             {callReturnQueue.length > 0 && (
