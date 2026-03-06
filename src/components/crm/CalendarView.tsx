@@ -5,7 +5,7 @@ import { Lead } from "@/types/crm";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Clock, Phone, Bot, CheckCircle, AlertCircle, Calendar as CalendarIcon, Wifi, WifiOff } from "lucide-react";
+import { Clock, Phone, Bot, CheckCircle, AlertCircle, Calendar as CalendarIcon, Wifi, WifiOff, Ban } from "lucide-react";
 import { generateReminderText } from "@/lib/whatsapp";
 import { toast } from "sonner";
 
@@ -17,7 +17,7 @@ interface CalendarViewProps {
 }
 
 type SlotKey = "24h" | "12h" | "3h" | "1h";
-type SlotStatus = "sent" | "scheduled" | "missed" | "failed";
+type SlotStatus = "sent" | "scheduled" | "missed" | "failed" | "disabled";
 
 interface SendFailureEntry {
   leadId: string;
@@ -116,6 +116,8 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   // ---- slot logic ----
 
   function getSlotStatus(lead: Lead, slot: SlotKey, slotTime: Date): SlotStatus {
+    if (lead.lembretes?.disabled) return "disabled";
+
     const sentTs = lead.lembretes?.sent?.[slot];
     if (sentTs) return "sent";
 
@@ -186,6 +188,13 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
         tooltip: "Janela passou — Clique para marcar manualmente",
         clickable: true,
       },
+      disabled: {
+        label: slot,
+        icon: <Ban className="h-3 w-3" />,
+        cls: "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed opacity-60",
+        tooltip: "Automação desativada para este lead",
+        clickable: false,
+      },
     };
 
     const cfg = configs[status];
@@ -217,7 +226,8 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
     const failedSlots = slotTimes ? SLOTS.filter((s) => sendFailures[`${lead.id}:${s}`]) : [];
     const allSent = slotTimes ? SLOTS.every((s) => !!lead.lembretes?.sent?.[s]) : false;
 
-    const borderColor = failedSlots.length > 0 ? "border-l-red-500" : allSent ? "border-l-green-500" : "border-l-blue-300";
+    const isDisabled = lead.lembretes?.disabled;
+    const borderColor = isDisabled ? "border-l-gray-300" : failedSlots.length > 0 ? "border-l-red-500" : allSent ? "border-l-green-500" : "border-l-blue-300";
 
     return (
       <Card key={lead.id} className={`border-l-4 ${borderColor} transition-colors hover:shadow-md`}>
@@ -229,9 +239,16 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
             </span>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-base leading-tight truncate">{lead.nome}</p>
-              <Badge variant="secondary" className="mt-1 bg-blue-50 text-blue-700 border border-blue-200 font-medium text-xs">
-                {lead.servicoProcurado}
-              </Badge>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <Badge variant="secondary" className="bg-blue-50 text-blue-700 border border-blue-200 font-medium text-xs">
+                  {lead.servicoProcurado}
+                </Badge>
+                {isDisabled && (
+                  <span className="flex items-center gap-1 text-[11px] text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">
+                    <Ban className="h-2.5 w-2.5" /> Automação Off
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

@@ -55,6 +55,7 @@ export interface Lead {
 export interface ReminderStatus {
   h24: boolean;
   today: boolean;
+  disabled?: boolean;
   sent?: {
     "24h": string | null;
     "12h": string | null;

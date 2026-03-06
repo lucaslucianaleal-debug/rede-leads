@@ -277,6 +277,12 @@ async function runReminder() {
     for (const lead of leads) {
       if (!lead.dataAgendamento) continue;
 
+      // Ignorar leads com automação desativada
+      if (lead.lembretes?.disabled === true) {
+        console.log(`[reminder-worker] 🚫 ${lead.nome}: automação desativada (lembretes.disabled = true), ignorando`);
+        continue;
+      }
+
       checked++;
       const appointmentDate = parseAppointment(lead.dataAgendamento);
       if (!appointmentDate) continue;

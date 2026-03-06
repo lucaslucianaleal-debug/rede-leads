@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone, Calendar, Reply } from "lucide-react";
+import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone, Calendar, Reply, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 
 const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
@@ -110,12 +110,32 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
 
   const handleConfirmAgendamento = (leadId: string, dataAgendamento: string) => {
     if (!onUpdateLead) return;
+    // Reagendar: reativar automação e limpar envios anteriores
     onUpdateLead(leadId, {
       dataAgendamento,
       etapaLead: "Avaliação agendada",
+      lembretes: {
+        h24: false,
+        today: false,
+        disabled: false,
+        sent: { "24h": null, "12h": null, "3h": null, "1h": null },
+      },
     });
+    toast.success("Agendamento atualizado! Automação reativada.");
     // Pré-preencher a barra de conversa com a confirmação completa para o lead
     setText(generateAppointmentConfirmationText(dataAgendamento));
+  };
+
+  const handleDisableAutomation = () => {
+    if (!currentLead || !onUpdateLead) return;
+    onUpdateLead(currentLead.id, {
+      etapaLead: "Desistência",
+      lembretes: {
+        ...(currentLead.lembretes || { h24: false, today: false }),
+        disabled: true,
+      },
+    });
+    toast.warning(`Automação interrompida para ${currentLead.nome}.`);
   };
 
   if (!conversation) {
@@ -162,11 +182,27 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
           {currentLead && (
             <button
               onClick={() => setAgendamentoDialogOpen(true)}
-              title="Agendar atendimento"
+              title="Agendar / Reagendar atendimento"
               className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
             >
               <Calendar className="h-4 w-4" />
             </button>
+          )}
+          {/* Botão interromper automação */}
+          {currentLead && !currentLead.lembretes?.disabled && (
+            <button
+              onClick={handleDisableAutomation}
+              title="Interromper automação de lembretes"
+              className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+            >
+              <UserMinus className="h-4 w-4" />
+            </button>
+          )}
+          {/* Indicação visual quando automação está desativada */}
+          {currentLead?.lembretes?.disabled && (
+            <span className="flex items-center gap-1 text-xs text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+              <UserMinus className="h-3 w-3" /> Automação OFF
+            </span>
           )}
           {/* Botão editar lead */}
           <button
