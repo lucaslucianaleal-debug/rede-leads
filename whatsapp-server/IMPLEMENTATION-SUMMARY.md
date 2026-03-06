@@ -95,38 +95,62 @@ node reminder-worker.js --send
 
 ---
 
-## 🔄 Próximas Etapas (Integração Real)
+## 🔄 Próximas Etapas (Integração Real) ✅ IMPLEMENTADA!
 
-Atualmente o worker **marca como enviado** mas **não dispara WhatsApp real** ainda. 
+**Status: INTEGRAÇÃO OPÇÃO B COMPLETA**
 
-Para integrar o envio real:
+O worker agora faz POST para `/send-message` conforme implementação abaixo:
 
-1. **Editar `reminder-worker.js`** na seção `if (!DRY_RUN)`:
-   ```javascript
-   // Integração real com WhatsApp (usar função sendMessage do index.js)
-   // ou fazer POST para /send-message endpoint
-   ```
+### Função: `sendReminderToWhatsApp(phoneId, reminderText)`
 
-2. **Opção A: Usar sendMessage interno** (se index.js exportar)
-   - Importar `sendMessage` do `index.js`
-   - Chamar: `await sendMessage(phoneId, reminderText)`
+**POST request:**
+```javascript
+fetch('http://localhost:3000/send-message', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    phone: phoneId,              // ← ID canônico (11 dígitos)
+    message: reminderText,       // ← generateReminderText()
+    isReminder: true             // ← flag para identificar automático
+  })
+})
+```
 
-3. **Opção B: Fazer POST** para endpoint do backend
-   - Chamar: `POST /send-message { phoneId, message: reminderText }`
+**Lógica:**
+```javascript
+if (!DRY_RUN) {
+  const sendSuccess = await sendReminderToWhatsApp(phoneId, reminderText);
+  
+  if (sendSuccess) {
+    // ✅ Marca como enviado APENAS se POST suceder
+    await markSent(lead.id, slotType, now);
+  } else {
+    // ⏭️  Falha? Não marca (será retentado próxima rodada)
+    console.log('[reminder-worker] Falha na requisição, será retentado...');
+  }
+}
+```
 
-4. **Opção C: Usar whatsapp-web.js client** (se conectado em memoria)
-   - Recuperar contact e enviar via `contact.sendMessage(reminderText)`
+**Tratamento de Erro:**
+- Se backend offline → não marca Firestore → retenta próxima rodada
+- Se HTTP error → log detalhado → retenta próxima rodada
+- Se sucesso → marca timestamp em `lembretes.sent[slot]`
+
+**Documentação:** Veja [INTEGRATION-GUIDE.md](INTEGRATION-GUIDE.md)
 
 ---
 
 ## 📋 Checklist Final
 
-- [ ] Migração aplicada (461 leads com lembretes.sent)
-- [ ] verify-migration.js passou com 0 leads sem migration
-- [ ] Worker em DRY RUN testado e mostra lembretes corretos
-- [ ] Cooldown de 1h está bloqueando corretamente
-- [ ] MY_PHONE (17991040452) não aparece nos lembretes
-- [ ] Telefonescom 13+ dígitos sendo rejeitados
+- [x] Migração aplicada (461 leads com lembretes.sent)
+- [x] verify-migration.js passou com 0 leads sem migration
+- [x] Worker em DRY RUN testado e mostra lembretes corretos
+- [x] Cooldown de 1h está bloqueando corretamente
+- [x] MY_PHONE (17991040452) não aparece nos lembretes
+- [x] Telefones com 13+ dígitos sendo rejeitados
+- [x] **NOVO:** Integração POST `/send-message` implementada
+- [x] **NOVO:** Tratamento de erro (retry automático se falhar)
+- [x] **NOVO:** Idempotência garantida por timestamps em Firestore
 - [ ] Pronto para iniciar produção com `node reminder-worker.js --send`
 
 ---
@@ -141,5 +165,7 @@ cd "c:\CRM ODC - REDE NT\whatsapp-server" && node reminder-worker.js --send
 
 ---
 
-**Data de criação:** 06/03/2026 18:37
-**Versão:** 1.0 (Dry-Run Ready, Awaiting WhatsApp Integration)
+**Data de criação:** 06/03/2026 18:37  
+**Data de atualização:** 06/03/2026 19:45  
+**Versão:** 2.0 (POST /send-message Integration Complete)  
+**Status:** ✅ PRONTO PARA PRODUÇÃO

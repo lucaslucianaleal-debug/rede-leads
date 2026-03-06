@@ -21,6 +21,7 @@ const db = admin.firestore();
 const MY_PHONE = '17991040452';
 const COOLDOWN_MINUTES = 60; // 1 hora
 const DRY_RUN = !process.argv.includes('--send');
+const BACKEND_URL = 'http://localhost:3000'; // URL do backend (porta do servidor Express)
 
 // Templates de lembrete (iguais ao whatsapp.ts)
 function generateReminderText(dataAgendamento, type) {
@@ -127,6 +128,35 @@ async function shouldSend(lead, slot, now) {
   return true;
 }
 
+// Enviar lembrete via POST para /send-message
+async function sendReminderToWhatsApp(phoneId, reminderText) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/send-message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phone: phoneId,
+        message: reminderText,
+        isReminder: true // flag para identificar que é um lembrete automático
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log(`[reminder-worker] ✅ Lembrete enviado com sucesso para ${phoneId}`);
+    return true;
+  } catch (error) {
+    console.error(`[reminder-worker] ❌ Erro ao enviar lembrete para ${phoneId}:`, error.message);
+    return false;
+  }
+}
+
 // Marcar como enviado
 async function markSent(leadId, slot, timestamp) {
   try {
@@ -208,15 +238,22 @@ async function runReminder() {
           console.log(`[reminder-worker] 🔮 DRY RUN: Enviaria lembrete ${slotType} para ${lead.nome} (${lead.telefone})`);
           console.log(`[reminder-worker]    Mensagem: "${reminderText.split('\n')[0]}..."`);
           console.log(`[reminder-worker]    Conversa ID: ${phoneId}`);
+          console.log(`[reminder-worker]    POST: ${BACKEND_URL}/send-message`);
           
           // Ainda marca como enviado no dry-run (para não repetir no próximo ciclo)
           await markSent(lead.id, slotType, now);
         } else {
-          console.log(`[reminder-worker] 📤 Enviando lembrete ${slotType} para ${lead.nome}...`);
+          console.log(`[reminder-worker] 📤 Enviando lembrete ${slotType} para ${lead.nome} (${phoneId})...`);
           
-          // AQUI: integração real com WhatsApp client ou API
-          // Por enquanto, apenas marca como enviado
-          await markSent(lead.id, slotType, now);
+          // Enviar via POST para /send-message
+          const sendSuccess = await sendReminderToWhatsApp(phoneId, reminderText);
+          
+          if (sendSuccess) {
+            // Só marcar como enviado se o POST foi bem-sucedido
+            await markSent(lead.id, slotType, now);
+          } else {
+            console.log(`[reminder-worker] ⏭️  ${lead.nome}: falha na requisição, não será marcado como enviado (será retentado na próxima rodada)`);
+          }
         }
       }
     }
