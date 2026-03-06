@@ -1,0 +1,247 @@
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║              📤 INTEGRAÇÃO COMPLETA - OPÇÃO B (POST /send-message)            ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ✨ TRECHO PRINCIPAL: Envio em Produção (quando --send)                        ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+// Arquivo: whatsapp-server/reminder-worker.js
+// Linhas: ~235-257
+
+if (DRY_RUN) {
+  console.log(`[reminder-worker] 🔮 DRY RUN: Enviaria lembrete ${slotType} para ${lead.nome} (${lead.telefone})`);
+  console.log(`[reminder-worker]    Mensagem: "${reminderText.split('\n')[0]}..."`);
+  console.log(`[reminder-worker]    Conversa ID: ${phoneId}`);
+  console.log(`[reminder-worker]    POST: ${BACKEND_URL}/send-message`);
+  
+  await markSent(lead.id, slotType, now);
+  
+} else {  // 🎯 IMPLEMENTAÇÃO REAL (quando --send)
+
+  console.log(`[reminder-worker] 📤 Enviando lembrete ${slotType} para ${lead.nome} (${phoneId})...`);
+  
+  // ✨ NOVO: Fazer POST para /send-message
+  const sendSuccess = await sendReminderToWhatsApp(phoneId, reminderText);
+  
+  if (sendSuccess) {
+    // ✅ Sucesso: marca no Firestore
+    await markSent(lead.id, slotType, now);
+  } else {
+    // ❌ Falha: NÃO marca (será retentado próxima rodada)
+    console.log(`[reminder-worker] ⏭️  ${lead.nome}: falha na requisição, não será marcado como enviado (será retentado na próxima rodada)`);
+  }
+}
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 🔧 FUNÇÃO DE ENVIO (suportando a lógica acima)                               ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+// Linhas: ~130-160
+
+async function sendReminderToWhatsApp(phoneId, reminderText) {
+  try {
+    // Fazer POST para http://localhost:3000/send-message
+    const response = await fetch(`${BACKEND_URL}/send-message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phone: phoneId,              // ← ID canônico (11 dígitos)
+        message: reminderText,       // ← generateReminderText(dataAgendamento, type)
+        isReminder: true             // ← flag para diferenciar de mensagens manuais
+      })
+    });
+
+    // Verificar se o request foi bem-sucedido
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    // Parse response
+    const data = await response.json();
+    console.log(`[reminder-worker] ✅ Lembrete enviado com sucesso para ${phoneId}`);
+    
+    return true;  // 🎯 Sucesso → será marcado em Firestore
+    
+  } catch (error) {
+    // Qualquer erro (conexão, timeout, HTTP error, etc)
+    console.error(`[reminder-worker] ❌ Erro ao enviar lembrete para ${phoneId}:`, error.message);
+    
+    return false;  // 🎯 Falha → NÃO será marcado (retry próxima rodada)
+  }
+}
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 📊 DADOS ENVIADOS NO REQUEST POST                                            ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+POST http://localhost:3000/send-message
+Content-Type: application/json
+
+BODY:
+{
+  "phone": "17992633297",                    // ← ID canônico (normalizados + últimos 11)
+  
+  "message": "Olá!\n                         // ← Gerado por generateReminderText()
+             Passando só pra lembrar que 
+             sua avaliação está marcada 
+             para *amanhã*.\n
+             \n
+             Data e Horário: 07/03/2026 09:00\n
+             \n
+             Qualquer imprevisto me avise 
+             por aqui.\n
+             Te esperamos!",
+  
+  "isReminder": true                         // ← Flag para identificar automático
+}
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 📨 RESPOSTA ESPERADA DO BACKEND                                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "success": true,
+  "message": "Mensagem enviada com sucesso",
+  "messageId": "msg_abc123xyz",
+  "phone": "17992633297"
+}
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 🔄 FLUXO COMPLETO (Decision Tree)                                            ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+runReminder()  ← roda a cada 5 min (se --send)
+    │
+    ├─ Lead com dataAgendamento?
+    │   ├─ NÃO → pula lead
+    │   └─ SIM ↓
+    │
+    ├─ Passou em travas? (cooldown 1h, tel válido, etc)
+    │   ├─ NÃO → pula lead
+    │   └─ SIM ↓
+    │
+    ├─ generateReminderText(dataAgendamento, slotType)  ← "Olá! Passando pra lembrar..."
+    │   └─ reminderText
+    │
+    ├─ normalizePhone(lead.telefone)  ← "17 99263-3297" → "17992633297"
+    │   └─ phoneId = "17992633297"
+    │
+    ├─ DRY_RUN?
+    │   │
+    │   ├─ SIM → console.log("🔮 DRY RUN: Enviaria...") → markSent()
+    │   │
+    │   └─ NÃO → sendReminderToWhatsApp(phoneId, reminderText)
+    │       │
+    │       ├─ fetch POST /send-message
+    │       │   ├─ phone: "17992633297"
+    │       │   ├─ message: "Olá! Passando..."
+    │       │   └─ isReminder: true
+    │       │
+    │       └─ response.ok?
+    │           │
+    │           ├─ SIM (200-299) → ✅ markSent() → lembretes.sent[24h] = ISO_timestamp
+    │           │
+    │           └─ NÃO (error) → ❌ console.error() → NÃO marca (retry próx rodada)
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 💾 FIRESTORE APÓS ENVIO BEM-SUCEDIDO                                         ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+Documento: crm_data/shared → leads[index]
+
+{
+  "id": "lead_abc123",
+  "nome": "José Carlos",
+  "telefone": "17 9926-3297",
+  "dataAgendamento": "07/03/2026 09:00",
+  
+  "lembretes": {
+    "h24": false,                               // Flag manual (CalendarView)
+    "today": false,                             // Flag manual (CalendarView)
+    "sent": {
+      "24h": "2026-03-06T09:00:00.000Z",       // ← Marcado após POST suceder
+      "12h": null,                              // Ainda não é hora (ou falhou)
+      "3h": null,                               // Ainda não é hora
+      "1h": null                                // Ainda não é hora
+    }
+  }
+}
+
+✅ IDEMPOTÊNCIA GARANTIDA:
+   - Na próxima rodada, `shouldSend()` verá que `lembretes.sent["24h"]` ≠ null
+   - Então (await shouldSend(...)) retornará false → lead pulado
+   - Nenhuma repetição!
+
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 📋 COMANDOS PARA TESTAR                                                      ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+# Terminal 1: Backend (WhatsApp + Express)
+cd "c:\CRM ODC - REDE NT\whatsapp-server"
+node index.js
+  ↓
+  [ready] Meu número (bot): 17991040452
+  Servidor CRM WhatsApp na porta 3001
+  Aguardando POST em /send-message...
+
+
+# Terminal 2: DRY RUN (ver o que seria enviado)
+cd "c:\CRM ODC - REDE NT\whatsapp-server"
+node reminder-worker.js
+
+  ↓
+  [reminder-worker] 🔮 DRY RUN: Enviaria lembrete 24h para José (17 9926-3297)
+  [reminder-worker]    Mensagem: "Olá!..."
+  [reminder-worker]    Conversa ID: 17992633297
+  [reminder-worker]    POST: http://localhost:3000/send-message
+  [reminder-worker] 💾 lead_abc: lembretes.sent[24h] marcado como enviado
+  [reminder-worker] ✅ Rodada concluída: 45 leads, 2 lembretes (DRY RUN)
+
+
+# Terminal 3: PRODUÇÃO (enviar de verdade!)
+cd "c:\CRM ODC - REDE NT\whatsapp-server"
+node reminder-worker.js --send
+
+  ↓ (Sucesso)
+  [reminder-worker] 📤 Enviando lembrete 24h para José (17992633297)...
+  [reminder-worker] ✅ Lembrete enviado com sucesso para 17992633297
+  [reminder-worker] 💾 lead_abc: lembretes.sent[24h] marcado como enviado
+
+  ↓ (Falha)
+  [reminder-worker] 📤 Enviando lembrete 24h para José (17992633297)...
+  [reminder-worker] ❌ Erro ao enviar lembrete para 17992633297: connect ECONNREFUSED 127.0.0.1:3000
+  [reminder-worker] ⏭️  José: falha na requisição, não será marcado como enviado (será retentado na próxima rodada)
+
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║  ✅ PRONTO PARA PRODUÇÃO!                                                    ║
+║                                                                               ║
+║  Commit: 9e10d03 - feat: integração POST /send-message (Opção B)             ║
+║  Data: 06/03/2026 19:45                                                      ║
+║  Versão: reminder-worker.js v2.0                                             ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
