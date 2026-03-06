@@ -35,6 +35,8 @@ const lidCache = new Map();
 const phoneAliasMap = new Map();
 // msgId enviado via API -> telefone canônico escolhido no CRM
 const sentMsgConversationMap = new Map();
+// Número do próprio bot (capturado no evento "ready") — usado para trava anti-auto-conversa
+let myOwnPhone = null;
 
 // Pasta para arquivos de midia (audios)
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,32 +51,42 @@ function isLID(jid) {
 }
 
 // Extrai numero real com fallback para getContact()
-// isInbound=true: Ser mais cuidadoso para evitar pegar o número do usuário (msg.to)
+// Normalize and resolve phone-based IDs. For LIDs, try multiple contact fields
+// and additional msg metadata before giving up. This version always uses
+// the full international form when possible and avoids returning the
+// user's own number (`msg.to`) as the resolved lead phone.
 async function getRealPhone(msg, useToField = false, isInbound = false) {
   try {
     const rawFrom = useToField ? (msg.to || "") : (msg.from || "");
     const digits = rawFrom.replace("@c.us", "").replace(/\D/g, "");
-    
+
     console.log(`[getRealPhone] rawFrom=${rawFrom}, digits=${digits}, isLID=${isLID(rawFrom)}, useToField=${useToField}, isInbound=${isInbound}`);
-    
+
+    // If rawFrom is a plain JID (not LID), return normalized international form
     if (!isLID(rawFrom)) {
       const result = digits.startsWith("55") ? digits : `55${digits}`;
+      // Trava anti-auto: se for mensagem de saída e msg.to resolveu para o próprio bot, sinaliza
+      if (useToField && myOwnPhone && digits.slice(-11) === myOwnPhone) {
+        console.warn(`[getRealPhone] msg.to resolveu para o PRÓPRIO número (${result}). Retornando null para forçar fallback.`);
+        return null;
+      }
       console.log(`[getRealPhone] NAO eh LID, retornando: ${result}`);
       return result;
     }
-    
-    // É um LID - verifica cache primeiro
+
+    // LID case: check cache first
     if (lidCache.has(rawFrom)) {
       const cached = lidCache.get(rawFrom);
       console.log(`[getRealPhone] Cache hit para LID ${rawFrom}: ${cached}`);
       return cached;
     }
-    
-    // E um LID - busca numero real via getContact() (MAS com validação se é inbound)
+
+    // Try to resolve via contact and additional msg metadata
     let resolvedPhone = null;
     try {
       const contact = await msg.getContact();
-      // Tenta contact.number primeiro
+
+      // Prefer explicit contact.number when available
       if (contact?.number) {
         const num = String(contact.number).replace(/\D/g, "");
         if (num.length >= 10 && num.length <= 13) {
@@ -82,7 +94,8 @@ async function getRealPhone(msg, useToField = false, isInbound = false) {
           console.log(`[getRealPhone] Resolvido via contact.number: ${resolvedPhone}`);
         }
       }
-      // Fallback: contact._data.id
+
+      // Next try contact._data.id (common place for WA id)
       if (!resolvedPhone && contact?._data?.id) {
         const id = String(contact._data.id).replace("@c.us", "").replace(/\D/g, "");
         if (id.length >= 10 && id.length <= 13) {
@@ -90,64 +103,66 @@ async function getRealPhone(msg, useToField = false, isInbound = false) {
           console.log(`[getRealPhone] Resolvido via contact._data.id: ${resolvedPhone}`);
         }
       }
-    } catch (contactErr) {
-      console.warn("[getRealPhone] Erro ao buscar contact:", contactErr.message);
-    }
-    
-    // Validação de segurança para mensagens inbound: NÃO usar número do destinatário (msg.to)
-    if (isInbound && resolvedPhone && msg.to) {
-      const toDigits = (msg.to || "").replace("@c.us", "").replace(/\D/g, "");
-      const toNormalized = toDigits.startsWith("55") ? toDigits : `55${toDigits}`;
-      
-      if (resolvedPhone === toNormalized) {
-        console.error(`[getRealPhone] ALERTA: getContact retornou o NÚMERO DO USUÁRIO (${resolvedPhone}), rejeitando!`);
-        resolvedPhone = null; // Rejeita porque pegou o número errado
+
+      // If resolution matches the logged-in user's JID (msg.to), try extra fields
+      if (resolvedPhone && isInbound && msg.to) {
+        const toDigits = (msg.to || "").replace("@c.us", "").replace(/\D/g, "");
+        const toNormalized = toDigits.startsWith("55") ? toDigits : `55${toDigits}`;
+        if (resolvedPhone === toNormalized) {
+          console.warn(`[getRealPhone] getContact retornou o NÚMERO DO USUÁRIO (${resolvedPhone}) — tentando outras fontes`);
+          resolvedPhone = null; // clear and try other metadata
+        }
       }
+
+      // Additional heuristics: try msg._data fields that sometimes carry origin id
+      if (!resolvedPhone) {
+        const candidates = [msg._data?.author, msg._data?.participant, msg._data?.id, msg._data?.senderJid];
+        for (const c of candidates) {
+          if (!c) continue;
+          const cd = String(c).replace("@c.us", "").replace(/\D/g, "");
+          if (cd.length >= 10 && cd.length <= 13) {
+            const candidate = cd.startsWith("55") ? cd : `55${cd}`;
+            // don't accept the user's own number
+            if (msg.to) {
+              const toDigits = (msg.to || "").replace("@c.us", "").replace(/\D/g, "");
+              const toNormalized = toDigits.startsWith("55") ? toDigits : `55${toDigits}`;
+              if (candidate === toNormalized) continue;
+            }
+            resolvedPhone = candidate;
+            console.log(`[getRealPhone] Resolvido via msg._data campo: ${resolvedPhone}`);
+            break;
+          }
+        }
+      }
+    } catch (contactErr) {
+      console.warn("[getRealPhone] Erro ao buscar contact:", contactErr?.message || contactErr);
     }
-    
-    // Fallbacks se não conseguiu resolver via contact
+
+    // Final fallback: try to extract digits from rawFrom (may be a jid-like string)
     if (!resolvedPhone) {
-      // Valida que tem no mínimo 10 dígitos pra um número brasileiro válido
       if (digits.length >= 10 && digits.length <= 13) {
-        resolvedPhone = digits.startsWith("55") ? digits : `55${digits}`;
-        console.log(`[getRealPhone] Fallback com dígitos (${digits.length} chars): ${resolvedPhone}`);
-        
-        // Para inbound, validar que NÃO é o número do usuário
+        const candidate = digits.startsWith("55") ? digits : `55${digits}`;
+        // ensure we don't return the user's own number
         if (isInbound && msg.to) {
           const toDigits = (msg.to || "").replace("@c.us", "").replace(/\D/g, "");
           const toNormalized = toDigits.startsWith("55") ? toDigits : `55${toDigits}`;
-          if (resolvedPhone === toNormalized) {
-            console.error(`[getRealPhone] Fallback retornou NÚMERO DO USUÁRIO, rejeitando por segurança!`);
+          if (candidate === toNormalized) {
+            console.error(`[getRealPhone] Fallback extraiu NÚMERO DO USUÁRIO (${candidate}) — não vou usar`);
             return null;
           }
         }
+        resolvedPhone = candidate;
+        console.log(`[getRealPhone] Fallback com dígitos (${digits.length} chars): ${resolvedPhone}`);
       } else {
-        // Número inválido - muitos poucos ou muitos dígitos
         console.error(`[getRealPhone] Número inválido: ${digits.length} dígitos. rawFrom=${rawFrom}. REJEITANDO mensagem.`);
-        return null; // Retorna null para sinalizar erro, não cria placeholder
+        return null;
       }
     }
-    
-    // Valida o resultado final
-    if (!resolvedPhone || resolvedPhone.length < 12 || resolvedPhone.length > 14) {
-      console.error(`[getRealPhone] FALHA: número final inválido: ${resolvedPhone} (${resolvedPhone ? resolvedPhone.length : 0} chars). REJEITANDO.`);
-      return null; // Retorna null em vez de número inválido
-    }
-    
-    // Salva no cache para consistência futura (se for válido)
-    if (resolvedPhone && resolvedPhone.length >= 12) {
-      lidCache.set(rawFrom, resolvedPhone);
-      console.log(`[getRealPhone] Cache salvo: ${rawFrom} -> ${resolvedPhone}`);
-    }
+    // store in cache for future
+    lidCache.set(rawFrom, resolvedPhone);
     return resolvedPhone;
   } catch (e) {
-    console.error("[getRealPhone] Exception:", e.message);
-    // Tenta fallback muito conservador: só retorna se tiver exatamente 13 dígitos (formato "55" + DDD + número)
-    const digits = (msg.from || "").replace("@c.us", "").replace(/\D/g, "");
-    if (digits.length === 13 && digits.startsWith("55")) {
-      return digits;
-    }
-    console.error(`[getRealPhone] Exception fallback falhou (${digits.length} dígitos). Rejeitando.`);
+    console.error("[getRealPhone] Erro inesperado:", e);
     return null;
   }
 }
@@ -168,43 +183,79 @@ function phoneToWAId(telefone) {
 }
 
 // Salvar mensagem na conversa correta
-// Se targetConversation for passado (vindo do syncLead), usa diretamente sem buscar
+// BUSCA PROFUNDA: verifica doc ID + campo telefone para evitar duplicatas
 async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }) {
   const digits = telefone.replace(/\D/g, "");
-  const normalizedPhone = digits.startsWith("55") ? digits : `55${digits}`;
-  
-  // Se syncLead já determinou a conversa correta, usar diretamente
-  let targetPhone = targetConversation || phoneAliasMap.get(normalizedPhone) || normalizedPhone;
-  
-  // Só faz busca se NÃO temos uma conversa definida
-  if (!targetConversation) {
-    const directRef = db.collection("conversations").doc(targetPhone);
-    const directSnap = await directRef.get();
-    
+
+  // ─── REGRA DE FERRO: ID canônico = SEMPRE últimos 11 dígitos (sem "55") ───
+  // "5517991164762" → "17991164762"
+  // "17991164762"   → "17991164762"  (sem alteração)
+  const aliasKey = digits.slice(-11);
+
+  let targetPhone = targetConversation
+    ? targetConversation.replace(/\D/g, "").slice(-11)   // normaliza imediatamente
+    : null;
+
+  // Mesmo quando targetConversation é fornecido, verifica se o doc EXISTE no Firestore.
+  // Se não existir, faz busca profunda para evitar criar duplicata.
+  if (targetPhone) {
+    const directSnap = await db.collection("conversations").doc(targetPhone).get();
     if (!directSnap.exists) {
-      // Busca conversa existente - usa últimos 11 dígitos (mais preciso que 8)
+      console.log(`[saveMessage] Doc "${targetPhone}" não existe. Buscando conversa equivalente para: ${aliasKey}`);
+      targetPhone = null; // força busca profunda abaixo
+    }
+  }
+
+  if (!targetPhone) {
+    // 1ª tentativa: alias map (pré-carregado no startup)
+    const mappedPhone = phoneAliasMap.get(aliasKey);
+    if (mappedPhone) {
+      targetPhone = mappedPhone;
+      console.log(`[saveMessage] Alias map: ${aliasKey} -> ${targetPhone}`);
+    } else {
+      // 2ª tentativa: busca profunda em todas as conversas
+      // Verifica TANTO o ID do documento QUANTO o campo 'telefone' dentro do doc
       const allConvs = await db.collection("conversations").get();
-      const last11 = normalizedPhone.slice(-11);
-      
-      for (const doc of allConvs.docs) {
-        const docDigits = doc.id.replace(/\D/g, "");
-        const docLast11 = docDigits.slice(-11);
-        
-        // Match APENAS por últimos 11 dígitos (DDD + número completo)
-        if (last11.length >= 11 && docLast11.length >= 11 && docLast11 === last11) {
-          console.log(`[saveMessage] Conversa encontrada por 11-digitos: ${doc.id}`);
-          targetPhone = doc.id;
-          phoneAliasMap.set(normalizedPhone, targetPhone);
+      for (const convDoc of allConvs.docs) {
+        const idLast11  = convDoc.id.replace(/\D/g, "").slice(-11);
+        const telLast11 = (convDoc.data().telefone || "").replace(/\D/g, "").slice(-11);
+        if (
+          (idLast11.length === 11  && idLast11  === aliasKey) ||
+          (telLast11.length === 11 && telLast11 === aliasKey)
+        ) {
+          targetPhone = convDoc.id;
+          phoneAliasMap.set(aliasKey, targetPhone); // cacheia para próximas vezes
+          console.log(`[saveMessage] Conversa encontrada por busca profunda: ${targetPhone}`);
           break;
+        }
+      }
+      
+      // 3ª tentativa: criar nova conversa (última opção)
+      if (!targetPhone) {
+        // Última verificação: busca por SUFIXO novamente (garantia extra)
+        const convSnaps2 = await db.collection("conversations").get();
+        for (const convDoc2 of convSnaps2.docs) {
+          const idLast112 = convDoc2.id.replace(/\D/g, "").slice(-11);
+          if (idLast112.length === 11 && idLast112 === aliasKey) {
+            targetPhone = convDoc2.id;
+            phoneAliasMap.set(aliasKey, targetPhone);
+            console.log(`[saveMessage] Conversa encontrada por sufixo (segunda verificação): ${targetPhone}`);
+            break;
+          }
+        }
+
+        if (!targetPhone) {
+          // Log claro para auditoria antes de criar
+          console.log(`[saveMessage] CRIANDO NOVA: Motivo - Nenhum match encontrado para os 11 dígitos finais de ${telefone}.`);
+          targetPhone = aliasKey;
         }
       }
     }
   }
 
-  // Registra alias para futuras mensagens
-  if (targetPhone !== normalizedPhone) {
-    phoneAliasMap.set(normalizedPhone, targetPhone);
-  }
+  // Registra alias para futuras mensagens usando last11 como chave
+  const targetAliasKey = (targetPhone || aliasKey).replace(/\D/g, "").slice(-11);
+  if (targetAliasKey) phoneAliasMap.set(targetAliasKey, targetPhone);
 
   const convRef = db.collection("conversations").doc(targetPhone);
   const msgRef = convRef.collection("messages").doc(msgId);
@@ -213,16 +264,18 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     console.log(`[saveMessage] Mensagem ${msgId} já existe - ignorando duplicata`);
     return;
   }
-  
+
   await msgRef.set({ id: msgId, body, fromMe, timestamp: Timestamp.now(), read: fromMe });
   const convSnap = await convRef.get();
   const currentUnread = convSnap.exists ? (convSnap.data().unreadCount || 0) : 0;
-  
+
+  // ─── REGRA DE FERRO: campo 'telefone' salvo no doc = SEMPRE 11 dígitos ───
+  const canonicalTelefone = targetPhone.replace(/\D/g, "").slice(-11);
   await convRef.set(
-    { telefone: targetPhone, lastMessage: body, lastMessageAt: Timestamp.now(), unreadCount: fromMe ? 0 : currentUnread + 1 },
+    { telefone: canonicalTelefone, lastMessage: body, lastMessageAt: Timestamp.now(), unreadCount: fromMe ? 0 : currentUnread + 1 },
     { merge: true }
   );
-  
+
   console.log(`[saveMessage] Mensagem salva na conversa: ${targetPhone}, fromMe: ${fromMe}`);
 }
 
@@ -235,26 +288,20 @@ async function syncLead(telefone, pushName, firstMessage) {
       return null;
     }
 
+    // NORMALIZAR PARA ÚLTIMOS 11 DÍGITOS (canonical ID)
+    const telDigits = telefone.replace(/\D/g, "");
+    const telLast11 = telDigits.slice(-11);  // ex: "17991045246"
+    console.log(`[syncLead] Normalizando ${telefone} -> ${telLast11}`);
+
     const crmRef = db.collection("crm_data").doc("shared");
     const doc = await crmRef.get();
     const leads = doc.exists ? doc.data()?.leads || [] : [];
-    const telDigits = telefone.replace(/\D/g, "");
-    const last11 = telDigits.slice(-11);
 
-    // Busca lead por últimos 11 dígitos (DDD + número) - mais preciso que 8
+    // Busca lead por últimos 11 dígitos (DDD + número)
     let existing = leads.find((l) => {
       const d = l.telefone?.replace(/\D/g, "") || "";
-      return d.length >= 11 && last11.length >= 11 && d.slice(-11) === last11;
+      return d.length >= 11 && telLast11.length === 11 && d.slice(-11) === telLast11;
     });
-    
-    // Fallback: busca por últimos 8 dígitos (para números com DDD diferente)
-    if (!existing) {
-      const last8 = telDigits.slice(-8);
-      existing = leads.find((l) => {
-        const d = l.telefone?.replace(/\D/g, "") || "";
-        return d.length >= 8 && d.slice(-8) === last8;
-      });
-    }
 
     if (existing) {
       let nomeAtual = existing.nome;
@@ -299,15 +346,16 @@ async function syncLead(telefone, pushName, firstMessage) {
         }
       }
       
-      // 3ª tentativa: criar conversa com telefone normalizado do LEAD (não o recebido)
+      // 3ª tentativa: criar conversa com ÚLTIMOS 11 DÍGITOS do telefone normalizado
       if (!conversationPhone) {
-        conversationPhone = leadPhoneNormalized;
-        console.log(`[syncLead] Criando conversa com telefone do lead: ${conversationPhone}`);
+        conversationPhone = telLast11;  // Usar a versão normalizada de 11 dígitos
+        console.log(`[syncLead] Criando conversa com telefone normalizado: ${conversationPhone}`);
       }
 
-      // Registra alias: telefone recebido -> conversa do lead
-      phoneAliasMap.set(telDigits, conversationPhone);
-      phoneAliasMap.set(telefone, conversationPhone);
+      // Registra alias: usar sempre os ÚLTIMOS 11 dígitos como chave
+      const aliasKey = telLast11;
+      phoneAliasMap.set(aliasKey, conversationPhone);
+
 
       const updateData = { telefone: conversationPhone };
       if (nomeAtual) {
@@ -340,16 +388,16 @@ async function syncLead(telefone, pushName, firstMessage) {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, "0");
     const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
-    const nome = pushName || `WhatsApp ${telefone.slice(-4)}`;
+    const nome = pushName || `WhatsApp ${telLast11.slice(-4)}`;
 
-    console.log(`[syncLead] Novo lead: nome='${nome}', tel='${telefone}'`);
+    console.log(`[syncLead] Novo lead: nome='${nome}', tel='${telLast11}'`);
 
     const newLead = {
       id: `lead_${Date.now()}`,
       dataCriacao: dateStr,
       dataContato: dateStr,
       nome,
-      telefone: telefone,
+      telefone: telefone,  // Guardar o formato original do telefone no CRM
       servicoProcurado: "",
       captador: "",
       fonteLead: "",
@@ -368,18 +416,106 @@ async function syncLead(telefone, pushName, firstMessage) {
     await crmRef.update({ leads: [...leads, newLead] });
     console.log(`Novo lead criado: ${nome} (${telefone})`);
     
-    // Cria conversa com o telefone recebido
-    await db.collection("conversations").doc(telefone).set(
-      { leadNome: nome, telefone },
+    // Cria conversa com ÚLTIMOS 11 DÍGITOS (canonical ID)
+    await db.collection("conversations").doc(telLast11).set(
+      { leadNome: nome, telefone: telLast11 },
       { merge: true }
     );
     
-    return telefone;
+    // Registra alias para futuras mensagens
+    phoneAliasMap.set(telLast11, telLast11);
+    
+    console.log(`[syncLead] Conversa criada com ID: ${telLast11}`);
+    
+    return telLast11;  // Retornar a conversa normalizada
   } catch (e) {
     console.error("Erro ao sincronizar lead:", e);
     return null;
   }
 }
+
+// Pré-carrega phoneAliasMap com TODAS as conversas existentes no Firestore.
+// Isso garante que números conhecidos sejam vinculados ao doc correto
+// desde o primeiro evento, sem precisar de mensagens prévias para popular o cache.
+async function preloadPhoneAliasMap() {
+  try {
+    const convSnaps = await db.collection("conversations").get();
+    let count = 0;
+    for (const docSnap of convSnaps.docs) {
+      const data = docSnap.data();
+      const docId = docSnap.id;
+
+      // Registra pelo ID do documento (last-11 → docId)
+      const idLast11 = docId.replace(/\D/g, "").slice(-11);
+      if (idLast11.length === 11) {
+        phoneAliasMap.set(idLast11, docId);
+        count++;
+      }
+
+      // Registra também pelo campo 'telefone' dentro do documento
+      // (pode ter formato diferente do ID, ex: "5527..." vs "270...")
+      if (data.telefone) {
+        const telLast11 = (data.telefone || "").replace(/\D/g, "").slice(-11);
+        if (telLast11.length === 11 && telLast11 !== idLast11) {
+          if (!phoneAliasMap.has(telLast11)) {
+            phoneAliasMap.set(telLast11, docId);
+            count++;
+          }
+        }
+      }
+    }
+    console.log(`[preload] phoneAliasMap: ${count} entradas de ${convSnaps.size} conversas`);
+  } catch (e) {
+    console.error("[preload] Erro ao pré-carregar alias map:", e.message);
+  }
+}
+
+// Também percorre os leads no CRM e garante mapeamento forçado
+// para evitar que conversas sejam criadas em formatos diferentes (ex: com 55 prefix)
+async function preloadPhoneAliasMapFromLeads() {
+  try {
+    const crmRef = db.collection("crm_data").doc("shared");
+    const doc = await crmRef.get();
+    const leads = doc.exists ? doc.data()?.leads || [] : [];
+    if (!leads || leads.length === 0) return;
+
+    const convSnaps = await db.collection("conversations").get();
+    for (const l of leads) {
+      const tel = String(l.telefone || "").replace(/\D/g, "");
+      if (!tel || tel.length < 8) continue;
+      const last11 = tel.slice(-11);
+      if (last11.length !== 11) continue;
+
+      // Se já tem no alias map, pula
+      if (phoneAliasMap.has(last11)) continue;
+
+      // Tenta encontrar um documento cuja ID termine com esses 11 dígitos
+      let found = null;
+      for (const convDoc of convSnaps.docs) {
+        const convIdLast11 = convDoc.id.replace(/\D/g, "").slice(-11);
+        if (convIdLast11.length === 11 && convIdLast11 === last11) {
+          found = convDoc.id;
+          break;
+        }
+      }
+
+      if (found) {
+        phoneAliasMap.set(last11, found);
+      } else {
+        // Não encontrou conversa correspondente — mapear para o próprio last11
+        // Isso força o uso do ID canônico (últimos 11 dígitos) quando for criado
+        phoneAliasMap.set(last11, last11);
+      }
+    }
+    console.log(`[preload] phoneAliasMap alimentado a partir dos leads: ${leads.length} leads varridos`);
+  } catch (e) {
+    console.error("[preload] Erro ao pré-carregar alias map a partir dos leads:", e.message);
+  }
+}
+
+// Executa imediatamente ao iniciar o servidor (antes do WhatsApp conectar)
+await preloadPhoneAliasMap();
+await preloadPhoneAliasMapFromLeads();
 
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: "./auth_info" }),
@@ -412,6 +548,19 @@ client.on("ready", () => {
   console.log("WhatsApp conectado! Escutando mensagens...");
   currentQR = null;
   isConnected = true;
+  // Captura o próprio número para trava anti-auto-conversa
+  try {
+    if (client.info?.wid?._serialized) {
+      const ownDigits = client.info.wid._serialized.replace("@c.us", "").replace(/\D/g, "");
+      myOwnPhone = ownDigits.slice(-11);
+      console.log(`[ready] Meu número (bot): ${myOwnPhone}`);
+    }
+  } catch (e) {
+    console.warn("[ready] Não foi possível capturar phone do bot:", e.message);
+  }
+  // Recarrega alias map com dados atuais do Firestore (cobertura de conversas criadas após o startup)
+  preloadPhoneAliasMap();
+  preloadPhoneAliasMapFromLeads();
 });
 
 client.on("authenticated", () => {
@@ -521,12 +670,26 @@ client.on("message_create", async (msg) => {
   if (!msg.fromMe || msg.isGroupMsg) return;
 
   // Usa a mesma função getRealPhone para consistência (campo msg.to)
-  const resolvedPhone = await getRealPhone(msg, true);
-  
-  // Rejeita mensagens com telefone inválido
-  if (!resolvedPhone) {
-    console.warn(`[message_create] Telefone não resolvido (msg.to=${msg.to}). Ignorando.`);
-    return;
+  let resolvedPhone = await getRealPhone(msg, true);
+
+  // Trava Anti-Auto-Conversa: getRealPhone retornou null OU resolveu para o próprio bot
+  const resolvedLast11 = resolvedPhone ? String(resolvedPhone).replace(/\D/g, "").slice(-11) : null;
+  if (!resolvedPhone || (myOwnPhone && resolvedLast11 === myOwnPhone)) {
+    if (resolvedPhone) {
+      console.warn(`[message_create] ⚠️ Trava Anti-Auto-Conversa: resolvedPhone (${resolvedPhone}) é o próprio bot. Buscando destinatário real...`);
+    }
+    // Tentativa 1: msg.to direto
+    const toRaw = (msg.to || "").replace("@c.us", "").replace(/\D/g, "");
+    // Tentativa 2: msg._data.id.remote (remoteJid)
+    const remoteRaw = (msg._data?.id?.remote || "").replace("@c.us", "").replace(/\D/g, "");
+    const fallback = [toRaw, remoteRaw].find(r => r && r.length >= 10 && (!myOwnPhone || r.slice(-11) !== myOwnPhone));
+    if (fallback) {
+      resolvedPhone = fallback.startsWith("55") ? fallback : `55${fallback}`;
+      console.warn(`[message_create] ⚠️ Destinatário real encontrado via fallback: ${resolvedPhone}`);
+    } else {
+      console.error(`[message_create] ❌ Não foi possível determinar o destinatário real (msg.to=${msg.to}). Ignorando.`);
+      return;
+    }
   }
   
   const msgId = msg.id?._serialized;
@@ -534,13 +697,30 @@ client.on("message_create", async (msg) => {
   // Verifica se há mapeamento forçado da API (quando enviamos via /send-message)
   const forcedConversationPhone = msgId ? sentMsgConversationMap.get(msgId) : null;
   
-  // Usa a conversa mapeada, se existir; senão usa alias; senão usa o resolvido
-  const telefone = forcedConversationPhone || phoneAliasMap.get(resolvedPhone) || resolvedPhone;
+  // Extrai últimos 11 dígitos do telefone resolvido (canonical key)
+  const resolvedDigits = String(resolvedPhone).replace(/\D/g, "");
+  const aliasKey = resolvedDigits.slice(-11);  // últimos 11 dígitos
+  
+  // Prioridade: mapeamento forçado > alias registrado > normalização dos últimos 11
+  let telefone;
+  if (forcedConversationPhone) {
+    // API enviou explicitamente para qual conversa usar
+    telefone = forcedConversationPhone;
+    console.log(`[message_create] Usando conversa forçada: ${telefone}`);
+  } else if (phoneAliasMap.has(aliasKey)) {
+    // Há alias registrado para este contato
+    telefone = phoneAliasMap.get(aliasKey);
+    console.log(`[message_create] Usando alias registrado: ${aliasKey} -> ${telefone}`);
+  } else {
+    // Normaliza para últimos 11 dígitos (eliminando prefixo "55" se presente)
+    telefone = aliasKey;
+    console.log(`[message_create] Normalizado para 11 dígitos (sem prefixo): ${telefone}`);
+  }
 
   // Se havia um mapeamento forçado diferente do resolvido, registra o alias
-  if (forcedConversationPhone && forcedConversationPhone !== resolvedPhone) {
-    phoneAliasMap.set(resolvedPhone, forcedConversationPhone);
-    console.log(`[message_create] Alias registrado: ${resolvedPhone} -> ${forcedConversationPhone} via msgId ${msgId}`);
+  if (forcedConversationPhone && forcedConversationPhone !== telefone) {
+    phoneAliasMap.set(aliasKey, forcedConversationPhone);
+    console.log(`[message_create] Alias registrado: ${aliasKey} -> ${forcedConversationPhone}`);
   }
 
   // Limpa o mapeamento temporário
@@ -549,9 +729,11 @@ client.on("message_create", async (msg) => {
   }
 
   const body = msg.body || "(mídia)";
+  // Log de identidade: mostra o fluxo completo da resolução
+  console.log(`[message_create] Enviado por: ME | Destinatário Original: ${msg.to} | Resolvido para: ${telefone}`);
   console.log(`SENT ${telefone}: ${body}`);
   
-  // Salva com telefone normalizado, passando targetConversation
+  // Salva com telefone normalizado (sempre últimos 11 dígitos)
   await saveMessage({ telefone, body, fromMe: true, msgId: msg.id._serialized, targetConversation: telefone });
 });
 
@@ -600,8 +782,9 @@ app.post("/send-message", async (req, res) => {
       setTimeout(() => sentMsgConversationMap.delete(sentMsg.id._serialized), 10 * 60 * 1000);
     }
     
-    // Registra alias para consistência
-    phoneAliasMap.set(normalizedPhone, targetConv);
+    // Registra alias para consistência (usar últimos 11 dígitos)
+    const aliasKey = normalizedPhone.replace(/\D/g, "").slice(-11);
+    phoneAliasMap.set(aliasKey, targetConv);
 
     // Salva mensagem usando conversa retornada pelo syncLead
     await saveMessage({

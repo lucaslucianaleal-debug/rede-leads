@@ -10,6 +10,7 @@ import { CallLogDialog } from "./CallLogDialog";
 import { LeadDetailsDialog } from "./LeadDetailsDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
+import { normalizePhoneTo11Digits } from "@/lib/phone";
 import { format, addDays, parse } from "date-fns";
 
 const getNextBusinessDay = (date: Date): Date => {
@@ -78,12 +79,14 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
   const handleWhatsAppClick = (lead: Lead) => {
     const template = getFollowUpMessage(lead.etapaLead);
     const message = template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : undefined;
-    onOpenChat?.(lead.telefone, message);
+    const normalizedPhone = normalizePhoneTo11Digits(lead.telefone);
+    onOpenChat?.(normalizedPhone, message);
   };
 
   const handleConfirmationClick = (lead: Lead) => {
     const message = generateAppointmentConfirmationText(lead.dataAgendamento || "");
-    onOpenChat?.(lead.telefone, message);
+    const normalizedPhone = normalizePhoneTo11Digits(lead.telefone);
+    onOpenChat?.(normalizedPhone, message);
   };
   
   const allSelected = leads.length > 0 && selectedLeads.length === leads.length;

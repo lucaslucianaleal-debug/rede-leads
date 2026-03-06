@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
+import { normalizePhoneTo11Digits } from "@/lib/phone";
 
 export interface ChatMessage {
   id: string;
@@ -134,31 +135,16 @@ export function useConversations() {
 
       const finalList = Array.from(nameDedupMap.values());
 
-      // Filtrar conversas órfãs (ID inválido "55unknown...")
-      const validConversations = finalList.filter((conv) => {
-        if (conv.telefone.includes("unknown")) {
-          console.warn(`[useConversations] Filtrando conversa órfã: ${conv.telefone}`);
-          return false; // Não incluir na lista final
-        }
-        return true;
-      });
-
-      // Ordenar por mensagem mais recente
-      validConversations.sort((a, b) => {
+      // Ordenar por mensagem mais recente (sem filtrar órfãs automaticamente)
+      // O sistema mantém conversas mesmo que temporariamente sem lead sincronizado
+      finalList.sort((a, b) => {
         const ta = a.lastMessageAt?.toMillis() || 0;
         const tb = b.lastMessageAt?.toMillis() || 0;
         return tb - ta;
       });
 
       // Notificar quando chegar mensagem nova — usar lista final (deduplicada)
-      const getKey = (conv: Conversation) => {
-        const digits = conv.telefone.replace(/\D/g, "");
-        if (digits.length >= 11) return `11:${digits.slice(-11)}`;
-        if (digits.length >= 8) return `8:${digits.slice(-8)}`;
-        return `raw:${conv.telefone}`;
-      };
-
-      for (const conv of validConversations) {
+      for (const conv of finalList) {
         const key = getKey(conv);
         const prevUnread = prevUnreadMap.current[key] ?? conv.unreadCount;
         if (conv.unreadCount > prevUnread) {
@@ -177,7 +163,7 @@ export function useConversations() {
         prevUnreadMap.current[key] = conv.unreadCount;
       }
 
-      setConversations(validConversations);
+      setConversations(finalList);
     });
 
     return () => unsubscribe();
@@ -222,20 +208,30 @@ export function useConversations() {
     useEffect(() => {
       if (!telefone) return;
       
-      // O ID da conversa é exato - não limpar dígitos se já é um ID válido
-      // (pode ser "55...", "55unknown...", ou outro formato salvos no Firestore)
-      const msgsRef = collection(db, "conversations", telefone, "messages");
+      // FORÇAR normalização para 11 dígitos - garante matching com ID do Firestore
+      // Se receber "5517991164762" (13 dig) ou "17991164762" (11 dig), ambos retornam "17991164762"
+      const normalizedTelefone = normalizePhoneTo11Digits(telefone);
+      console.log(`[useMessages] Buscando mensagens. Input: ${telefone} → Normalizado: ${normalizedTelefone}`);
+      
+      if (!normalizedTelefone) {
+        console.error(`[useMessages] Falha ao normalizar telefone: ${telefone}`);
+        setMessages([]);
+        return;
+      }
+      
+      const msgsRef = collection(db, "conversations", normalizedTelefone, "messages");
       const q = query(msgsRef, orderBy("timestamp", "asc"));
 
       const unsub = onSnapshot(
         q,
         (snap) => {
           const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ChatMessage));
+          console.log(`[useMessages] ${msgs.length} mensagens encontradas para ${normalizedTelefone}`);
           setMessages(msgs);
         },
         (err) => {
-          // Se falhar com ID exato, tenta buscar por matching de dígitos como fallback
-          console.warn(`[useMessages] Falha ao buscar mensagens para ${telefone}:`, err.message);
+          // Se falhar com ID normalizado, será erro real - logar e limpar
+          console.error(`[useMessages] Erro ao buscar mensagens para ${normalizedTelefone}:`, err.message);
           setMessages([]);
         }
       );
@@ -249,10 +245,17 @@ export function useConversations() {
   // ─── Enviar mensagem ──────────────────────────────────────────────────────
   const sendMessage = useCallback(async (telefone: string, message: string) => {
     try {
+      // Normalizar telefone para 11 dígitos (compatível com phoneAliasMap do backend)
+      const normalizedPhone = normalizePhoneTo11Digits(telefone);
+      if (!normalizedPhone) {
+        toast.error("Telefone inválido. Impossível enviar mensagem.");
+        return false;
+      }
+
       const res = await fetch(`${SERVER_URL}/send-message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telefone, message }),
+        body: JSON.stringify({ telefone: normalizedPhone, message }),
       });
 
       if (!res.ok) {
@@ -270,10 +273,14 @@ export function useConversations() {
   // ─── Marcar como lido ─────────────────────────────────────────────────────
   const markAsRead = useCallback(async (telefone: string) => {
     try {
+      // Normalizar telefone para 11 dígitos (compatível com backend)
+      const normalizedPhone = normalizePhoneTo11Digits(telefone);
+      if (!normalizedPhone) return; // silencioso se não conseguir normalizar
+
       await fetch(`${SERVER_URL}/mark-read`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telefone }),
+        body: JSON.stringify({ telefone: normalizedPhone }),
       });
     } catch {
       // silencioso

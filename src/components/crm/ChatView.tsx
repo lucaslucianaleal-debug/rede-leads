@@ -11,6 +11,7 @@ import { Lead } from "@/types/crm";
 import { db } from "@/lib/firebase";
 import { collection, doc, getDocs, writeBatch, deleteDoc, setDoc, Timestamp } from "firebase/firestore";
 import { toast } from "sonner";
+import { normalizePhoneTo11Digits } from "@/lib/phone";
 
 interface ChatViewProps {
   leads: Lead[];
@@ -37,10 +38,26 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
   const [deleting, setDeleting] = useState(false);
   const [conversationListWidth, setConversationListWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
+  
+  // Rastrear conversas criadas localmente (otimistic update antes do Firebase sincronizar)
+  const [localConversations, setLocalConversations] = useState<Record<string, import("@/hooks/useConversations").Conversation>>({});
+  
   const messages = useMessages(selectedPhone);
 
+  // Combinar conversas do Firebase + conversas locais criadas
+  const allConversations = [
+    ...conversations,
+    ...Object.values(localConversations).filter(
+      (local) => !conversations.some((fb) => {
+        const fbDigits = fb.telefone.replace(/\D/g, "");
+        const localDigits = local.telefone.replace(/\D/g, "");
+        return fbDigits.slice(-11) === localDigits.slice(-11);
+      })
+    ),
+  ];
+
   const selectedConversation = selectedPhone
-    ? conversations.find((c) => {
+    ? allConversations.find((c) => {
         if (c.telefone === selectedPhone) return true;
         const sd = selectedPhone.replace(/\D/g, "");
         const cd = c.telefone.replace(/\D/g, "");
@@ -60,54 +77,101 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
   // Abrir conversa a partir de atalho (FollowUpQueue / AllLeadsView)
   useEffect(() => {
     if (!openTarget) return;
-    if (conversations.length === 0) return; // aguardar carregamento das conversas
+    console.log(`[ChatView] openTarget recebido:`, openTarget);
+    
     const digits = openTarget.phone.replace(/\D/g, "");
-    const match = conversations.find((c) => {
+    console.log(`[ChatView] Dígitos extraídos: ${digits}`);
+    
+    // Procura conversa existente (FB + locais)
+    const match = allConversations.find((c) => {
       const cd = c.telefone.replace(/\D/g, "");
       return cd.slice(-8) === digits.slice(-8);
     });
     
-    // Se conversa não existe, criar no Firestore
-    if (!match) {
-      const createConversation = async () => {
-        try {
-          const lead = leads.find((l) => {
-            const ld = l.telefone?.replace(/\D/g, "") || "";
-            return ld.length >= 8 && digits.slice(-8) === ld.slice(-8);
-          });
-          
-          // Normalizar telefone: adicionar código país se não tiver
-          const fullPhone = digits.length === 11 ? `55${digits}` : digits;
-          
-          const convRef = doc(db, "conversations", fullPhone);
-          await setDoc(convRef, {
-            telefone: fullPhone,
-            leadNome: lead?.nome || "Novo Contato",
-            createdAt: Timestamp.now(),
-            lastMessageAt: null,
-            unreadCount: 0,
-            lastMessage: ""
-          }, { merge: true });
-          
-          console.log(`[ChatView] Conversa criada para ${fullPhone}`);
-          // Aguardar um pouco para o hook useConversations pegar a nova conversa
-          await new Promise(resolve => setTimeout(resolve, 500));
-          setSelectedPhone(fullPhone);
-          if (openTarget.message) setPrefilledMessage(openTarget.message);
-          onOpenTargetHandled?.();
-        } catch (err) {
-          console.error(`[ChatView] Erro ao criar conversa: ${err}`);
-        }
-      };
-      createConversation();
+    console.log(`[ChatView] Conversa match encontrada:`, match?.telefone || "NENHUMA");
+    
+    if (match) {
+      // Conversa já existe - abrir diretamente
+      console.log(`[ChatView] ✓ Conversa encontrada, abrindo: ${match.telefone}`);
+      setSelectedPhone(match.telefone);
+      if (openTarget.message) setPrefilledMessage(openTarget.message);
+      onOpenTargetHandled?.();
+      console.log(`[ChatView] ✓ openTargetHandled chamado - resetando estado`);
       return;
     }
     
-    const targetPhone = match.telefone;
-    setSelectedPhone(targetPhone);
-    if (openTarget.message) setPrefilledMessage(openTarget.message);
-    onOpenTargetHandled?.();
-  }, [openTarget, conversations, leads]);
+    // Conversa não existe - criar nova
+    const createConversation = async () => {
+      try {
+        const lead = leads.find((l) => {
+          const ld = l.telefone?.replace(/\D/g, "") || "";
+          return ld.length >= 8 && digits.slice(-8) === ld.slice(-8);
+        });
+        
+        console.log(`[ChatView] Lead encontrado para criar conversa:`, lead?.nome || "Nenhum");
+        
+        // Normalizar para 11 dígitos (padrão do backend: últimos 11 dígitos)
+        const normalized11 = normalizePhoneTo11Digits(openTarget.phone);
+        console.log(`[ChatView] Telefone normalizado para 11 dígitos: ${normalized11}`);
+        
+        if (!normalized11) {
+          console.error(`[ChatView] FALHA: normalização retornou vazio. Input: ${openTarget.phone}`);
+          toast.error("Telefone inválido. Não foi possível abrir conversa.");
+          onOpenTargetHandled?.();
+          return;
+        }
+        
+        // Adicionar conversa ao estado LOCAL imediatamente (otimistic update)
+        const newConversation = {
+          telefone: normalized11,
+          leadNome: lead?.nome || "Novo Contato",
+          lastMessage: "",
+          lastMessageAt: null,
+          unreadCount: 0,
+        };
+        setLocalConversations((prev) => ({
+          ...prev,
+          [normalized11]: newConversation,
+        }));
+        console.log(`[ChatView] ✓ Conversa adicionada ao estado LOCAL: ${normalized11}`);
+        
+        // Criar documento no Firebase (merge para not overwrite se já existe)
+        const convRef = doc(db, "conversations", normalized11);
+        await setDoc(convRef, {
+          telefone: normalized11,
+          leadNome: lead?.nome || "Novo Contato",
+          createdAt: Timestamp.now(),
+          lastMessageAt: null,
+          unreadCount: 0,
+          lastMessage: ""
+        }, { merge: true });
+        
+        console.log(`[ChatView] ✓ Conversa criada no Firebase com ID: ${normalized11}`);
+        
+        // Abrir a conversa IMEDIATAMENTE (sem esperar sincronização)
+        console.log(`[ChatView] ✓ Abrindo conversa criada...`);
+        setSelectedPhone(normalized11);
+        if (openTarget.message) setPrefilledMessage(openTarget.message);
+        onOpenTargetHandled?.();
+        console.log(`[ChatView] ✓ openTargetHandled chamado - resetando estado`);
+        
+        // A conversa permanece em localConversations até sincronizar com Firebase
+        // O filter evita duplicatas quando chegar no listener
+      } catch (err) {
+        console.error(`[ChatView] ✗ Erro ao criar conversa:`, err);
+        toast.error("Erro ao criar conversa: " + String(err));
+        // Remover do estado local em caso de erro
+        setLocalConversations((prev) => {
+          const updated = { ...prev };
+          delete updated[normalizePhoneTo11Digits(openTarget.phone)];
+          return updated;
+        });
+        onOpenTargetHandled?.();
+      }
+    };
+    
+    createConversation();
+  }, [openTarget, allConversations, leads]);
 
   // Pedir permissão de notificação ao abrir a aba
   useEffect(() => {
@@ -300,7 +364,7 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
         <div className="flex h-full">
           <div style={{ width: `${conversationListWidth}px` }} className="shrink-0 overflow-hidden">
             <ConversationList
-              conversations={conversations}
+              conversations={allConversations}
               selectedPhone={selectedPhone}
               onSelect={handleSelect}
               onEditLead={handleEditLead}

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Send, Phone, User, ExternalLink, Check, Target, Search, X, CalendarCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
+import { normalizePhoneTo11Digits } from "@/lib/phone";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
@@ -60,12 +61,14 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const handleWhatsAppClick = (lead: Lead) => {
     const template = getFollowUpMessage(lead.etapaLead);
     const message = template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : undefined;
-    onOpenChat?.(lead.telefone, message);
+    const normalizedPhone = normalizePhoneTo11Digits(lead.telefone);
+    onOpenChat?.(normalizedPhone, message);
   };
 
   const handleConfirmationClick = (lead: Lead) => {
     const message = generateAppointmentConfirmationText(lead.dataAgendamento || "");
-    onOpenChat?.(lead.telefone, message);
+    const normalizedPhone = normalizePhoneTo11Digits(lead.telefone);
+    onOpenChat?.(normalizedPhone, message);
   };
   
   return (

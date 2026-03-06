@@ -342,7 +342,7 @@ export function useLeads() {
       if (nextCount > 12) {
         return {
           ...l,
-          etapaLead: "Desistência",
+          etapaLead: "Desistência" as LeadStage,
           dataFollowUp: todayFormatted,
           observacao: l.observacao 
             ? `${l.observacao} | Ciclo de follow-ups completo (12 tentativas)`
