@@ -8,7 +8,7 @@ import { Lead } from "@/types/crm";
 import { useState, useMemo } from "react";
 import { format, parse, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Clock, Phone, Calendar as CalendarIcon, Pencil, Check } from "lucide-react";
+import { Clock, Phone, Calendar as CalendarIcon, Pencil, Check, Bot, CheckCircle, AlertCircle } from "lucide-react";
 import { generateReminderText } from "@/lib/whatsapp";
 import { toast } from "sonner";
 
@@ -92,6 +92,42 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
     if (today) return { label: "1 enviado", color: "bg-blue-500" };
     if (h24) return { label: "1 enviado", color: "bg-blue-500" };
     return { label: "Nenhum enviado", color: "bg-gray-500" };
+  };
+
+  // Helper function to format the robot-sent timestamp
+  const formatRobotSendTime = (isoTimestamp: string | null | undefined): string | null => {
+    if (!isoTimestamp) return null;
+    try {
+      const date = new Date(isoTimestamp);
+      return format(date, "HH:mm", { locale: ptBR });
+    } catch {
+      return null;
+    }
+  };
+
+  // Check if reminder was sent automatically by robot for a specific slot
+  const getRobotReminderStatus = (lead: Lead, slot: "24h" | "today") => {
+    const sent = lead.lembretes?.sent;
+    if (!sent) return { isSent: false, timestamp: null, timeStr: null };
+    
+    const timestamp = sent[slot];
+    const timeStr = formatRobotSendTime(timestamp);
+    
+    return {
+      isSent: !!timestamp,
+      timestamp,
+      timeStr
+    };
+  };
+
+  // Check if there's manual conversation cooldown (prevents robot from sending)
+  const hasCooldownBlock = (lead: Lead): boolean => {
+    const sent = lead.lembretes?.sent;
+    if (!sent) return false;
+    
+    // If any slot is marked, assume there might be cooldown consideration
+    // In production, we'd check timestamps against conversation messages
+    return false; // Placeholder for now
   };
 
   return (
@@ -206,27 +242,108 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          size="sm"
-                          variant={lead.lembretes.h24 ? "default" : "outline"}
-                          onClick={() => handleSendReminder(lead, "h24")}
-                          disabled={lead.lembretes.h24}
-                          className={lead.lembretes.h24 ? "bg-success" : ""}
-                        >
-                          <Clock className="h-3 w-3 mr-1" />
-                          24h antes
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={lead.lembretes.today ? "default" : "outline"}
-                          onClick={() => handleSendReminder(lead, "today")}
-                          disabled={lead.lembretes.today}
-                          className={lead.lembretes.today ? "bg-success" : ""}
-                        >
-                          <Clock className="h-3 w-3 mr-1" />
-                          Hoje
-                        </Button>
+                        {/* 24h Reminder Button */}
+                        {(() => {
+                          const robotStatus = getRobotReminderStatus(lead, "24h");
+                          return (
+                            <div className="space-y-1">
+                              <Button
+                                size="sm"
+                                variant={robotStatus.isSent ? "default" : "outline"}
+                                onClick={() => handleSendReminder(lead, "h24")}
+                                className={`w-full ${
+                                  robotStatus.isSent 
+                                    ? "bg-green-500 hover:bg-green-600 text-white" 
+                                    : ""
+                                }`}
+                              >
+                                {robotStatus.isSent ? (
+                                  <>
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    24h antes
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    24h antes
+                                  </>
+                                )}
+                              </Button>
+                              {robotStatus.isSent && robotStatus.timeStr && (
+                                <div className="flex items-center gap-1 text-xs text-emerald-600 mx-1">
+                                  <Bot className="h-3 w-3" />
+                                  <span>Enviado às {robotStatus.timeStr}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Today Reminder Button */}
+                        {(() => {
+                          const robotStatus = getRobotReminderStatus(lead, "today");
+                          return (
+                            <div className="space-y-1">
+                              <Button
+                                size="sm"
+                                variant={robotStatus.isSent ? "default" : "outline"}
+                                onClick={() => handleSendReminder(lead, "today")}
+                                className={`w-full ${
+                                  robotStatus.isSent 
+                                    ? "bg-blue-500 hover:bg-blue-600 text-white" 
+                                    : ""
+                                }`}
+                              >
+                                {robotStatus.isSent ? (
+                                  <>
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Hoje
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    Hoje
+                                  </>
+                                )}
+                              </Button>
+                              {robotStatus.isSent && robotStatus.timeStr && (
+                                <div className="flex items-center gap-1 text-xs text-blue-600 mx-1">
+                                  <Bot className="h-3 w-3" />
+                                  <span>Enviado às {robotStatus.timeStr}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
+
+                      {/* Cooldown Warning */}
+                      {(() => {
+                        const robotStatus24h = getRobotReminderStatus(lead, "24h");
+                        const robotStatusToday = getRobotReminderStatus(lead, "today");
+                        const maybeCooldown = hasCooldownBlock(lead);
+                        
+                        return (
+                          (robotStatus24h.isSent || robotStatusToday.isSent) && (
+                            <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded flex items-start gap-2 text-xs">
+                              <CheckCircle className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                              <span className="text-emerald-700">
+                                <strong>✓ Automação ativa:</strong> O robô enviou lembrete(s). Você pode clicar acima para reenviar manualmente se necessário.
+                              </span>
+                            </div>
+                          )
+                        );
+                      })()}
+
+                      {/* Cooldown Safety Notice */}
+                      {hasCooldownBlock(lead) && (
+                        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded flex items-start gap-2 text-xs">
+                          <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-amber-700">
+                            <strong>⏸ Atendimento manual detectado:</strong> Lembrete automaticamente pausado por 1 hora para não interromper sua conversa.
+                          </span>
+                        </div>
+                      )}
                       
                       {lead.observacao && (
                         <div className="mt-3 p-2 bg-muted rounded text-sm">

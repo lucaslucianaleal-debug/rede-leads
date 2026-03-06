@@ -169,6 +169,21 @@ async function getRealPhone(msg, useToField = false, isInbound = false) {
   }
 }
 
+// Limpa lastMessage para exibição na lista lateral (remove nomes técnicos de arquivos)
+function cleanLastMessage(body) {
+  if (!body || typeof body !== "string") return "";
+  if (body.startsWith("[audio:")) return "🎤 Áudio";
+  if (body.startsWith("[image:")) return "📷 Foto";
+  if (body.startsWith("[video:")) return "🎬 Vídeo";
+  if (body.startsWith("[document:")) return "📄 Documento";
+  if (body === "🎙️ Áudio") return "🎤 Áudio";
+  if (body === "📷 Imagem") return "📷 Foto";
+  if (body === "🎬 Vídeo") return "🎬 Vídeo";
+  if (body === "📄 Documento") return "📄 Documento";
+  if (body === "🎙️ Áudio" || body.includes(".ogg") || body.includes(".mp3")) return "🎤 Áudio";
+  return body;
+}
+
 // Formata para padrao brasileiro: (17) 99762-5696
 function formatBRPhone(digits) {
   const d = digits.replace(/\D/g, "");
@@ -321,8 +336,9 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
 
   // ─── REGRA DE FERRO: campo 'telefone' salvo no doc = SEMPRE 11 dígitos ───
   const canonicalTelefone = targetPhone.replace(/\D/g, "").slice(-11);
+  const cleanMessage = cleanLastMessage(body);
   await convRef.set(
-    { telefone: canonicalTelefone, lastMessage: body, lastMessageAt: Timestamp.now(), unreadCount: fromMe ? 0 : currentUnread + 1 },
+    { telefone: canonicalTelefone, lastMessage: cleanMessage, lastMessageAt: Timestamp.now(), unreadCount: fromMe ? 0 : currentUnread + 1 },
     { merge: true }
   );
 

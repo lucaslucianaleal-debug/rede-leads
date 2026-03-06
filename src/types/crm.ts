@@ -55,6 +55,12 @@ export interface Lead {
 export interface ReminderStatus {
   h24: boolean;
   today: boolean;
+  sent?: {
+    "24h": string | null;
+    "12h": string | null;
+    "3h": string | null;
+    "1h": string | null;
+  };
 }
 
 export interface ClinicFilter {

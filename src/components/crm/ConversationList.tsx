@@ -9,6 +9,18 @@ import { ptBR } from "date-fns/locale";
 import { Search, MessageCircle, MoreVertical, UserPen, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+// Função para limpar nomes técnicos de arquivos na prévia de mensagem
+function formatLastMessagePreview(msg: string): string {
+  if (!msg) return "";
+  if (msg.startsWith("[audio:")) return "🎤 Áudio";
+  if (msg.startsWith("[image:")) return "📷 Foto";
+  if (msg.startsWith("[video:")) return "🎬 Vídeo";
+  if (msg.startsWith("[document:")) return "📄 Documento";
+  if (msg === "🎙️ Áudio") return "🎤 Áudio";
+  if (msg === "📷 Imagem") return "📷 Foto";
+  return msg;
+}
+
 interface ConversationListProps {
   conversations: Conversation[];
   selectedPhone: string | null;
@@ -97,7 +109,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
                     conv.unreadCount > 0 ? "text-foreground font-medium" : "text-muted-foreground"
                   )}>
                     {(() => {
-                      const msg = conv.lastMessage || "Sem mensagens";
+                      const msg = formatLastMessagePreview(conv.lastMessage || "Sem mensagens");
                       const words = msg.trim().split(/\s+/);
                       const preview = words.slice(0, 2).join(" ");
                       return words.length > 2 ? `${preview}...` : preview;
