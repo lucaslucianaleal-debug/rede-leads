@@ -1,6 +1,7 @@
 import admin from 'firebase-admin';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,6 +23,8 @@ const MY_PHONE = '17991040452';
 const COOLDOWN_MINUTES = 60; // 1 hora
 const DRY_RUN = !process.argv.includes('--send');
 const BACKEND_URL = 'http://localhost:3000'; // URL do backend (porta do servidor Express)
+const NEXT_SENDS_FILE = resolve(__dirname, 'next-sends.json');
+const SEND_FAILURES_FILE = resolve(__dirname, 'send-failures.json');
 
 // Templates de lembrete (iguais ao whatsapp.ts)
 function generateReminderText(dataAgendamento, type) {
@@ -157,6 +160,61 @@ async function sendReminderToWhatsApp(phoneId, reminderText) {
   }
 }
 
+// Salvar próximos envios para exibição na UI
+function saveNextSends(nextSends) {
+  try {
+    fs.writeFileSync(NEXT_SENDS_FILE, JSON.stringify(nextSends, null, 2));
+    console.log(`[reminder-worker] 📝 Próximos envios salvos (${nextSends.length} agendados)`);
+  } catch (e) {
+    console.error(`[reminder-worker] ⚠️  Erro ao salvar próximos envios:`, e.message);
+  }
+}
+
+// Registrar tentativa falhada
+function recordFailedAttempt(leadId, slot, error) {
+  try {
+    let failures = {};
+    if (fs.existsSync(SEND_FAILURES_FILE)) {
+      failures = JSON.parse(fs.readFileSync(SEND_FAILURES_FILE, 'utf8'));
+    }
+
+    const key = `${leadId}:${slot}`;
+    if (!failures[key]) {
+      failures[key] = {
+        leadId,
+        slot,
+        attempts: 0,
+        lastError: null,
+        firstFailedAt: new Date().toISOString(),
+        lastFailedAt: null
+      };
+    }
+
+    failures[key].attempts += 1;
+    failures[key].lastError = error;
+    failures[key].lastFailedAt = new Date().toISOString();
+
+    fs.writeFileSync(SEND_FAILURES_FILE, JSON.stringify(failures, null, 2));
+  } catch (e) {
+    console.error(`[reminder-worker] ⚠️  Erro ao registrar falha:`, e.message);
+  }
+}
+
+// Limpar registro de falha quando sucesso
+function clearFailedAttempt(leadId, slot) {
+  try {
+    if (!fs.existsSync(SEND_FAILURES_FILE)) return;
+    
+    let failures = JSON.parse(fs.readFileSync(SEND_FAILURES_FILE, 'utf8'));
+    const key = `${leadId}:${slot}`;
+    delete failures[key];
+    
+    fs.writeFileSync(SEND_FAILURES_FILE, JSON.stringify(failures, null, 2));
+  } catch (e) {
+    console.error(`[reminder-worker] ⚠️  Erro ao limpar falha:`, e.message);
+  }
+}
+
 // Marcar como enviado
 async function markSent(leadId, slot, timestamp) {
   try {
@@ -212,6 +270,9 @@ async function runReminder() {
     const leads = data?.leads || [];
     let checked = 0;
     let eligible = 0;
+    
+    // Para calcular próximos envios
+    const nextSends = [];
 
     for (const lead of leads) {
       if (!lead.dataAgendamento) continue;
@@ -225,6 +286,23 @@ async function runReminder() {
 
       // Para cada slot, verificar se deve enviar
       for (const [slotType, slotTime] of Object.entries(slots)) {
+        // Calcular se foi enviado e se está agendado para o futuro
+        const isAlreadySent = lead.lembretes?.sent?.[slotType];
+        const isFutureSlot = now < slotTime;
+        
+        if (!isAlreadySent && isFutureSlot) {
+          // Adicionar à lista de próximos envios
+          nextSends.push({
+            leadId: lead.id,
+            leadName: lead.nome,
+            telefone: lead.telefone,
+            servicoProcurado: lead.servicoProcurado,
+            slot: slotType,
+            scheduledFor: slotTime.toISOString(),
+            appointmentDate: lead.dataAgendamento
+          });
+        }
+
         if (!(await shouldSend(lead, slotType, now))) continue;
 
         eligible++;
@@ -251,15 +329,20 @@ async function runReminder() {
           if (sendSuccess) {
             // Só marcar como enviado se o POST foi bem-sucedido
             await markSent(lead.id, slotType, now);
+            clearFailedAttempt(lead.id, slotType);
           } else {
             console.log(`[reminder-worker] ⏭️  ${lead.nome}: falha na requisição, não será marcado como enviado (será retentado na próxima rodada)`);
+            recordFailedAttempt(lead.id, slotType, 'POST failed');
           }
         }
       }
     }
 
+    // Salvar próximos envios
+    saveNextSends(nextSends);
+
     console.log(
-      `[reminder-worker] ✅ Rodada concluída: ${checked} leads com agendamento, ${eligible} lembretes ${DRY_RUN ? '(DRY RUN)' : 'enviados'}`
+      `[reminder-worker] ✅ Rodada concluída: ${checked} leads com agendamento, ${eligible} lembretes ${DRY_RUN ? '(DRY RUN)' : 'enviados'}, ${nextSends.length} agendados`
     );
   } catch (error) {
     console.error('[reminder-worker] ❌ Erro:', error.message);

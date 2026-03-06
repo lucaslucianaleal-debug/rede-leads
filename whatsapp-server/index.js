@@ -7,7 +7,7 @@ import express from "express";
 import cors from "cors";
 import qrcode from "qrcode-terminal";
 import QRCode from "qrcode";
-import { readFileSync, mkdirSync, writeFileSync } from "fs";
+import { readFileSync, mkdirSync, writeFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
@@ -989,6 +989,44 @@ app.get("/cleanup-invalid-leads", async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// API: próximos disparos agendados (para dashboard em tempo real)
+app.get("/api/next-sends", (req, res) => {
+  try {
+    const nextSendsFile = join(__dirname, "next-sends.json");
+    
+    if (!existsSync(nextSendsFile)) {
+      return res.json([]);
+    }
+    
+    const data = readFileSync(nextSendsFile, "utf8");
+    const nextSends = JSON.parse(data);
+    
+    res.json(nextSends || []);
+  } catch (e) {
+    console.error("[/api/next-sends]", e.message);
+    res.json([]);
+  }
+});
+
+// API: falhas de envio (para alertas de reconexão)
+app.get("/api/send-failures", (req, res) => {
+  try {
+    const failuresFile = join(__dirname, "send-failures.json");
+    
+    if (!existsSync(failuresFile)) {
+      return res.json({});
+    }
+    
+    const data = readFileSync(failuresFile, "utf8");
+    const failures = JSON.parse(data);
+    
+    res.json(failures || {});
+  } catch (e) {
+    console.error("[/api/send-failures]", e.message);
+    res.json({});
   }
 });
 
