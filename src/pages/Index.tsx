@@ -304,8 +304,8 @@ const CRMDashboard = () => {
                 followUpGoal={followUpGoal}
                 onOpenChat={handleOpenChat}
               />
-              <ReminderQueue leads={reminderQueue} onMarkReminder={handleReminder} onOpenChat={handleOpenChat} />
             </div>
+            <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} onOpenChat={handleOpenChat} />
             {callReturnQueue.length > 0 && (
               <CallReturnQueue
                 leads={callReturnQueue}
