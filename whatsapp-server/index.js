@@ -37,6 +37,8 @@ const phoneAliasMap = new Map();
 const sentMsgConversationMap = new Map();
 // Número do próprio bot (capturado no evento "ready") — usado para trava anti-auto-conversa
 let myOwnPhone = null;
+// Constante fixa de segurança: mesmo que myOwnPhone não esteja populado ainda, este número NUNCA vira conversa
+const MY_PHONE = '17991040452';
 
 // Pasta para arquivos de midia (audios)
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -185,12 +187,60 @@ function phoneToWAId(telefone) {
 // Salvar mensagem na conversa correta
 // BUSCA PROFUNDA: verifica doc ID + campo telefone para evitar duplicatas
 async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }) {
+  console.log(`[saveMessage] Mensagem recebida de ID: ${telefone}, tentando vincular ao lead...`);
+
   const digits = telefone.replace(/\D/g, "");
+  const phoneAfter55 = digits.startsWith("55") ? digits.slice(2) : digits;
+
+  // ─── BLOQUEIO DO PRÓPRIO NÚMERO ───────────────────────────────────────────
+  // Se o telefone normalizado (últimos 11 dígitos) for o próprio número da conta,
+  // não criamos uma conversa 'de mim para mim'. A mensagem deve ir para o destinatário.
+  const selfCheck = digits.slice(-11);
+  if (selfCheck === MY_PHONE || (myOwnPhone && selfCheck === myOwnPhone)) {
+    console.warn(`[saveMessage] BLOQUEADO (auto-conversa): "${telefone}" é o próprio número do bot (${MY_PHONE}). Mensagem descartada.`);
+    return;
+  }
+
+  // ─── BLOQUEIO DE IDs TÉCNICOS ─────────────────────────────────────────────
+  // Após remover o prefixo "55", o número precisa ter 10 ou 11 dígitos reais.
+  // IDs de sistema do WhatsApp (LIDs não resolvidos, etc.) geralmente falham aqui.
+  if (phoneAfter55.length < 10 || phoneAfter55.length > 11) {
+    console.warn(`[saveMessage] BLOQUEADO: "${telefone}" tem ${phoneAfter55.length} dígito(s) após prefixo 55 (esperado: 10-11). Mensagem descartada.`);
+    return;
+  }
 
   // ─── REGRA DE FERRO: ID canônico = SEMPRE últimos 11 dígitos (sem "55") ───
   // "5517991164762" → "17991164762"
   // "17991164762"   → "17991164762"  (sem alteração)
-  const aliasKey = digits.slice(-11);
+  let aliasKey = digits.slice(-11);
+
+  // ─── PRIORIDADE AO LEAD CADASTRADO ────────────────────────────────────────
+  // Antes de qualquer busca em conversations, verifica nos leads cadastrados
+  // se existe um número cujo sufixo (últimos 8 dígitos) bate com o número recebido.
+  // Isso resolve casos onde o WhatsApp entrega um DDD errado (ex: 95 ao invés de 17).
+  try {
+    const crmSnap = await db.collection("crm_data").doc("shared").get();
+    const leads = crmSnap.exists ? (crmSnap.data()?.leads || []) : [];
+    const suffix8 = aliasKey.slice(-8);
+    const receivedDDD = aliasKey.slice(0, 2);
+
+    for (const lead of leads) {
+      const leadDigits = (lead.telefone || "").replace(/\D/g, "");
+      const leadNorm = leadDigits.startsWith("55") ? leadDigits.slice(2) : leadDigits;
+      if (leadNorm.length < 10) continue;
+      const leadLast11 = leadNorm.slice(-11);
+      const leadDDD = leadLast11.slice(0, 2);
+      const leadSuffix8 = leadLast11.slice(-8);
+      // Mesmo sufixo de 8 dígitos, DDDs diferentes → WhatsApp entregou DDD errado
+      if (leadSuffix8 === suffix8 && leadDDD !== receivedDDD) {
+        console.log(`[saveMessage] ⚠ DDD incorreto detectado! Recebido: ${aliasKey} (DDD ${receivedDDD}) | Lead cadastrado: ${leadLast11} (DDD ${leadDDD}). Corrigindo para ${leadLast11}.`);
+        aliasKey = leadLast11;
+        break;
+      }
+    }
+  } catch (leadLookupErr) {
+    console.warn("[saveMessage] Erro ao buscar lead por sufixo:", leadLookupErr.message);
+  }
 
   let targetPhone = targetConversation
     ? targetConversation.replace(/\D/g, "").slice(-11)   // normaliza imediatamente
@@ -285,6 +335,13 @@ async function syncLead(telefone, pushName, firstMessage) {
   try {
     if (telefone.length < 12) {
       console.error(`[syncLead] Rejeitando telefone invalido: "${telefone}"`);
+      return null;
+    }
+
+    // TRAVA: nunca criar lead/conversa para o próprio número do bot
+    const telDigitsCheck = telefone.replace(/\D/g, "");
+    if (telDigitsCheck.slice(-11) === MY_PHONE || (myOwnPhone && telDigitsCheck.slice(-11) === myOwnPhone)) {
+      console.warn(`[syncLead] BLOQUEADO: tentativa de criar lead para o próprio número do bot (${telefone}). Ignorando.`);
       return null;
     }
 
@@ -579,7 +636,8 @@ client.on("disconnected", (reason) => {
 });
 
 client.on("message", async (msg) => {
-  if (msg.isGroupMsg) return;
+  // TRAVA: ignorar mensagens enviadas pelo próprio usuário (evita auto-conversa e duplicatas)
+  if (msg.fromMe || msg.isGroupMsg) return;
   
   // Resolve telefone UMA VEZ e usa o mesmo em todas as operações
   // isInbound=true: NÃO tentar getContact() que pode retornar número errado
@@ -728,7 +786,40 @@ client.on("message_create", async (msg) => {
     sentMsgConversationMap.delete(msgId);
   }
 
-  const body = msg.body || "(mídia)";
+  // Determinar body — para mídia (áudio, imagem, etc.) faz download igual ao handler de incoming
+  let body = msg.body || "";
+
+  if (msg.hasMedia) {
+    if (msg.type === "ptt" || msg.type === "audio") {
+      try {
+        const media = await msg.downloadMedia();
+        if (media?.data) {
+          const ext = media.mimetype?.includes("ogg") ? "ogg" : "mp3";
+          const sanitizedId = msg.id._serialized.replace(/[^a-zA-Z0-9_\-]/g, "_");
+          const filename = `${sanitizedId}.${ext}`;
+          writeFileSync(join(MEDIA_DIR, filename), Buffer.from(media.data, "base64"));
+          body = `[audio:${filename}]`;
+          console.log(`[message_create] Áudio enviado salvo: ${filename}`);
+        }
+      } catch (e) {
+        console.error("[message_create] Erro ao baixar áudio enviado:", e.message);
+        body = "🎙️ Áudio";
+      }
+    } else if (msg.type === "image") {
+      body = body ? `📷 ${body}` : "📷 Imagem";
+    } else if (msg.type === "video") {
+      body = body ? `🎥 ${body}` : "🎥 Vídeo";
+    } else if (msg.type === "document") {
+      body = body || msg._data?.filename || "📄 Documento";
+    } else if (msg.type === "sticker") {
+      body = "🏷️ Sticker";
+    } else {
+      body = body || "📦 Arquivo";
+    }
+  } else {
+    body = body || "(mídia)";
+  }
+
   // Log de identidade: mostra o fluxo completo da resolução
   console.log(`[message_create] Enviado por: ME | Destinatário Original: ${msg.to} | Resolvido para: ${telefone}`);
   console.log(`SENT ${telefone}: ${body}`);

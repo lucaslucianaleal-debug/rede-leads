@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { AgendamentoDialog } from "@/components/crm/AgendamentoDialog";
 import { cn } from "@/lib/utils";
+import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone, Calendar, Reply } from "lucide-react";
@@ -113,9 +114,8 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
       dataAgendamento,
       etapaLead: "Avaliação agendada",
     });
-    // Pré-preencher a barra de conversa com a confirmação para o lead
-    const name = currentLead?.nome || "";
-    setText(`Olá ${name}, seu atendimento foi agendado para ${dataAgendamento}.`);
+    // Pré-preencher a barra de conversa com a confirmação completa para o lead
+    setText(generateAppointmentConfirmationText(dataAgendamento));
   };
 
   if (!conversation) {
