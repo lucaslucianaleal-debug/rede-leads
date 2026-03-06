@@ -73,6 +73,7 @@ const CRMDashboard = () => {
   const [reportDate, setReportDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState("dashboard");
   const [chatTarget, setChatTarget] = useState<{ phone: string; message?: string } | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const handleOpenChat = (phone: string, message?: string) => {
     setChatTarget({ phone, message });
@@ -295,24 +296,26 @@ const CRMDashboard = () => {
               <StatsCards stats={stats} />
             </motion.div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <FollowUpQueue 
-                leads={followUpQueue} 
-                onSendFollowUp={handleFollowUp}
-                onRegisterCall={handleRegisterCall}
-                followUpsDoneToday={followUpsDoneToday}
-                followUpGoal={followUpGoal}
-                onOpenChat={handleOpenChat}
-              />
+            <div className="grid lg:grid-cols-2 gap-4 items-start">
+              <div className="space-y-4">
+                <FollowUpQueue 
+                  leads={followUpQueue} 
+                  onSendFollowUp={handleFollowUp}
+                  onRegisterCall={handleRegisterCall}
+                  followUpsDoneToday={followUpsDoneToday}
+                  followUpGoal={followUpGoal}
+                  onOpenChat={handleOpenChat}
+                />
+                {callReturnQueue.length > 0 && (
+                  <CallReturnQueue
+                    leads={callReturnQueue}
+                    onRegisterCall={handleRegisterCall}
+                    onClearReturn={clearCallReturn}
+                  />
+                )}
+              </div>
+              <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} onOpenChat={handleOpenChat} />
             </div>
-            <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} onOpenChat={handleOpenChat} />
-            {callReturnQueue.length > 0 && (
-              <CallReturnQueue
-                leads={callReturnQueue}
-                onRegisterCall={handleRegisterCall}
-                onClearReturn={clearCallReturn}
-              />
-            )}
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6">
@@ -323,7 +326,11 @@ const CRMDashboard = () => {
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-6">
-            <CalendarView leads={leads} onMarkReminder={markReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} onOpenChat={handleOpenChat} />
+            <Calendar
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              locale={ptBR}
+            />
           </TabsContent>
 
           <TabsContent value="all-leads" className="mt-6">

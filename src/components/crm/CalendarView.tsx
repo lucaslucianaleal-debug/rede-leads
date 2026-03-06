@@ -191,12 +191,12 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
     const cfg = configs[status];
 
     return (
-      <div key={slot} className="flex flex-col items-center gap-0.5">
-        <span className="text-[10px] text-muted-foreground font-medium">{slot}</span>
+      <div key={slot} className="flex flex-col items-center gap-1">
+        <span className="text-[10px] text-muted-foreground font-semibold tracking-wide">{slot}</span>
         <Button
           size="sm"
           variant="outline"
-          className={`h-8 min-w-[52px] px-2 text-xs font-medium border ${cfg.cls}`}
+          className={`h-9 min-w-[60px] px-2 text-xs font-medium border ${cfg.cls}`}
           onClick={() => { if (cfg.clickable) handleManualSend(lead, slot); }}
           disabled={!cfg.clickable}
           title={cfg.tooltip}
@@ -217,20 +217,22 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
     const failedSlots = slotTimes ? SLOTS.filter((s) => sendFailures[`${lead.id}:${s}`]) : [];
     const allSent = slotTimes ? SLOTS.every((s) => !!lead.lembretes?.sent?.[s]) : false;
 
-    const borderColor = failedSlots.length > 0 ? "border-l-red-500" : allSent ? "border-l-green-500" : "border-l-primary/30";
+    const borderColor = failedSlots.length > 0 ? "border-l-red-500" : allSent ? "border-l-green-500" : "border-l-blue-300";
 
     return (
-      <Card key={lead.id} className={`border-l-4 ${borderColor} transition-colors`}>
+      <Card key={lead.id} className={`border-l-4 ${borderColor} transition-colors hover:shadow-md`}>
         <CardContent className="p-4">
           {/* Header: time + name + procedure */}
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="text-lg font-bold text-primary tabular-nums">
+          <div className="flex items-start gap-3 mb-3">
+            <span className="text-2xl font-bold text-primary tabular-nums leading-none pt-0.5 shrink-0">
               {lead.dataAgendamento?.split(" ")[1] ?? "—"}
             </span>
-            <span className="font-semibold text-sm flex-1 min-w-0 truncate">{lead.nome}</span>
-            <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary font-semibold text-xs">
-              {lead.servicoProcurado}
-            </Badge>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-base leading-tight truncate">{lead.nome}</p>
+              <Badge variant="secondary" className="mt-1 bg-blue-50 text-blue-700 border border-blue-200 font-medium text-xs">
+                {lead.servicoProcurado}
+              </Badge>
+            </div>
           </div>
 
           {/* Phone */}
@@ -242,7 +244,7 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
           {/* Automation timeline */}
           {slotTimes ? (
             <div className="flex items-center gap-2">
-              <Bot className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="flex gap-2 flex-wrap">
                 {SLOTS.map((slot) => renderSlot(lead, slot, slotTimes[slot]))}
               </div>
@@ -253,19 +255,17 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
 
           {/* Failure banner */}
           {failedSlots.length > 0 && (
-            <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded flex items-start gap-2 text-xs">
-              <AlertCircle className="h-3.5 w-3.5 text-red-600 mt-0.5 shrink-0" />
-              <span className="text-red-700">
-                <strong>⚠️ Falha na automação</strong>{" "}
-                ({failedSlots.join(", ")}) — Clique no botão vermelho para enviar manualmente.
-              </span>
+            <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+              <strong>⚠️ Falha na automação</strong>{" "}
+              ({failedSlots.join(", ")}) — Clique no botão vermelho para enviar manual.
             </div>
           )}
 
           {/* Notes */}
           {lead.observacao && (
-            <div className="mt-2 p-2 bg-muted rounded text-xs">
-              <span className="font-medium">Obs:</span> {lead.observacao}
+            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
+              <span className="font-semibold text-amber-800">Obs:</span>{" "}
+              <span className="text-amber-900">{lead.observacao}</span>
             </div>
           )}
         </CardContent>
@@ -278,18 +278,18 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   function renderDaySection(label: string, dateLabel: string, dayLeads: Lead[]) {
     return (
       <div>
-        <div className="flex items-center gap-2 mb-3">
-          <CalendarIcon className="h-4 w-4 text-primary" />
-          <span className="font-semibold text-sm">{label}</span>
+        <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+          <CalendarIcon className="h-4 w-4 text-primary shrink-0" />
+          <span className="font-bold text-sm">{label}</span>
           <span className="text-xs text-muted-foreground capitalize">{dateLabel}</span>
-          <Badge variant="secondary" className="ml-auto text-xs">
+          <Badge className="ml-auto text-xs bg-primary/10 text-primary border border-primary/20 font-semibold">
             {dayLeads.length} agendamento{dayLeads.length !== 1 ? "s" : ""}
           </Badge>
         </div>
         {dayLeads.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic pl-6 py-2">Nenhum agendamento</p>
+          <p className="text-sm text-muted-foreground italic pl-6 py-4 text-center">Nenhum agendamento</p>
         ) : (
-          <div className="space-y-2">{dayLeads.map(renderLeadCard)}</div>
+          <div className="space-y-3">{dayLeads.map(renderLeadCard)}</div>
         )}
       </div>
     );
@@ -341,16 +341,16 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6 pt-4">
+      <CardContent className="space-y-5 pt-4 max-h-[70vh] overflow-y-auto pr-1">
         {total === 0 ? (
           <p className="text-center text-muted-foreground py-10">
             Nenhum agendamento nas próximas 48 horas
           </p>
         ) : (
           <>
-            {renderDaySection("📆 Hoje", format(now, "EEEE, dd/MM", { locale: ptBR }), todayLeads)}
-            <div className="border-t pt-4">
-              {renderDaySection("📅 Amanhã", format(tomorrowDate, "EEEE, dd/MM", { locale: ptBR }), tomorrowLeads)}
+            {renderDaySection("Hoje", format(now, "EEEE, dd/MM", { locale: ptBR }), todayLeads)}
+            <div className="pt-5">
+              {renderDaySection("Amanhã", format(tomorrowDate, "EEEE, dd/MM", { locale: ptBR }), tomorrowLeads)}
             </div>
           </>
         )}
