@@ -42,7 +42,13 @@ export function useCRMUsers() {
     setLoading(true);
     setError(null);
     try {
-      const email = `${username.toLowerCase()}@redeleads.app`;
+      // Se o input já é um email (contém @ e ponto), usa direto. Senão, adiciona domínio padrão
+      const trimmed = username.trim().toLowerCase();
+      const atIndex = trimmed.indexOf("@");
+      const email =
+        atIndex > 0 && trimmed.indexOf(".", atIndex) > atIndex
+          ? trimmed
+          : `${trimmed}@redeleads.app`;
       
       // Create Firebase Auth user
       const { user } = await createUserWithEmailAndPassword(auth, email, password);

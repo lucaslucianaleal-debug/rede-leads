@@ -124,10 +124,10 @@ export function AdminPanel() {
           <form onSubmit={handleCreateUser} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="new-username">Usuário</Label>
+                <Label htmlFor="new-username">Usuário / Email</Label>
                 <Input
                   id="new-username"
-                  placeholder="nome_usuario"
+                  placeholder="nome_usuario ou email@dominio.com"
                   value={username}
                   onChange={(e) => setUsername(e.target.value.toLowerCase())}
                   required
