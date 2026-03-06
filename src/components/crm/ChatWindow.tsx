@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { AgendamentoDialog } from "@/components/crm/AgendamentoDialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { format } from "date-fns";
@@ -47,6 +48,8 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
   const [leadForm, setLeadForm] = useState<Partial<Lead>>({});
   const [callLogOpen, setCallLogOpen] = useState(false);
   const [agendamentoDialogOpen, setAgendamentoDialogOpen] = useState(false);
+  const [desistenciaOpen, setDesistenciaOpen] = useState(false);
+  const [desistenciaObs, setDesistenciaObs] = useState("");
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -128,14 +131,18 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
 
   const handleDisableAutomation = () => {
     if (!currentLead || !onUpdateLead) return;
+    const obs = desistenciaObs.trim();
     onUpdateLead(currentLead.id, {
       etapaLead: "Desistência",
+      observacao: obs ? obs : currentLead.observacao,
       lembretes: {
         ...(currentLead.lembretes || { h24: false, today: false }),
         disabled: true,
       },
     });
-    toast.warning(`Automação interrompida para ${currentLead.nome}.`);
+    toast.warning(`${currentLead.nome} marcado como Desistência.`);
+    setDesistenciaOpen(false);
+    setDesistenciaObs("");
   };
 
   if (!conversation) {
@@ -188,14 +195,15 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
               <Calendar className="h-4 w-4" />
             </button>
           )}
-          {/* Botão interromper automação */}
+          {/* Botão Desistiu */}
           {currentLead && !currentLead.lembretes?.disabled && (
             <button
-              onClick={handleDisableAutomation}
-              title="Interromper automação de lembretes"
-              className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+              onClick={() => { setDesistenciaObs(""); setDesistenciaOpen(true); }}
+              title="Marcar como desistência"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium hover:bg-red-50 text-muted-foreground hover:text-red-600 border border-transparent hover:border-red-200 transition-colors"
             >
-              <UserMinus className="h-4 w-4" />
+              <UserMinus className="h-3.5 w-3.5" />
+              Desistiu
             </button>
           )}
           {/* Indicação visual quando automação está desativada */}
@@ -463,6 +471,38 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
         onClose={() => setAgendamentoDialogOpen(false)}
         onConfirm={handleConfirmAgendamento}
       />
+
+      {/* Desistência Dialog */}
+      <AlertDialog open={desistenciaOpen} onOpenChange={(open) => { if (!open) { setDesistenciaOpen(false); setDesistenciaObs(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Registrar Desistência</AlertDialogTitle>
+            <AlertDialogDescription>
+              Marcar <strong>{currentLead?.nome}</strong> como desistente irá pausar todos os lembretes automáticos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Label htmlFor="desistencia-obs" className="text-sm font-medium">Motivo / Observação</Label>
+            <Textarea
+              id="desistencia-obs"
+              placeholder="Ex: Lead disse que não tem interesse no momento..."
+              className="mt-1.5 resize-none"
+              rows={3}
+              value={desistenciaObs}
+              onChange={(e) => setDesistenciaObs(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDisableAutomation}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Confirmar Desistência
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
