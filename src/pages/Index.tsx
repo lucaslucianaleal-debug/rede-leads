@@ -73,7 +73,6 @@ const CRMDashboard = () => {
   const [reportDate, setReportDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState("dashboard");
   const [chatTarget, setChatTarget] = useState<{ phone: string; message?: string } | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const handleOpenChat = (phone: string, message?: string) => {
     setChatTarget({ phone, message });
@@ -272,10 +271,6 @@ const CRMDashboard = () => {
               <CalendarCheck className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Agenda do Dia</span>
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="flex items-center gap-1.5">
-              <CalendarIcon className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Calendário</span>
-            </TabsTrigger>
             <TabsTrigger value="all-leads" className="flex items-center gap-1.5">
               <Database className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Todos os Leads</span>
@@ -322,14 +317,6 @@ const CRMDashboard = () => {
             <AgendaDoDia
               leads={leads}
               onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
-            />
-          </TabsContent>
-
-          <TabsContent value="calendar" className="mt-6">
-            <Calendar
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              locale={ptBR}
             />
           </TabsContent>
 
