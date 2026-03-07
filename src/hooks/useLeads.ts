@@ -233,9 +233,10 @@ export function useLeads() {
   const followUpQueue = useMemo(() => {
     const today = format(new Date(), "dd/MM/yyyy");
     
-    // Helper para comparar datas em formato dd/MM/yyyy
+    // Helper para comparar datas em formato dd/MM/yyyy (ignora horário se presente)
     const parseDate = (dateStr: string) => {
-      const [day, month, year] = dateStr.split('/');
+      const datePart = dateStr.split(" ")[0]; // Extrai apenas dd/MM/yyyy
+      const [day, month, year] = datePart.split('/');
       return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     };
 
@@ -249,15 +250,19 @@ export function useLeads() {
         ) &&
         l.etapaLead !== "Desistência" &&
         l.comparecimento !== "COMPARECEU" &&
-        // Filtro crítico: aparecer na fila apenas se dataFollowUp é hoje ou antes
-        l.dataFollowUp && parseDate(l.dataFollowUp) <= parseDate(today) &&
-        // NOVO: Excluir si tiver agendamento com data >= hoje (não aparecer em Follow-up se já tem agendamento)
+        // Filtro: leads com dataFollowUp hoje/antes OU leads novos sem dataFollowUp (criados hoje/antes)
+        (
+          (l.dataFollowUp && parseDate(l.dataFollowUp) <= parseDate(today)) ||
+          (!l.dataFollowUp && l.dataCriacao && parseDate(l.dataCriacao) <= parseDate(today))
+        ) &&
+        // Excluir se tiver agendamento com data >= hoje
         !(l.dataAgendamento && l.dataAgendamento.trim() !== "" && parseDate(l.dataAgendamento) >= parseDate(today))
     );
 
     // Separar em leads novos vs. que não compareceram
     const parseDateCriacao = (dateStr: string) => {
-      const [day, month, year] = dateStr.split('/');
+      const datePart = dateStr.split(" ")[0]; // Extrai apenas dd/MM/yyyy
+      const [day, month, year] = datePart.split('/');
       return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     };
 

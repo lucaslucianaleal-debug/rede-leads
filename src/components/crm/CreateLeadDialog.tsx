@@ -49,7 +49,7 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenChat }: CreateLe
     status: "",
     respostaLead: "",
     comparecimento: "",
-    dataFollowUp: "",
+    dataFollowUp: format(new Date(), "dd/MM/yyyy"), // Default hoje para aparecer na fila de follow-up
     dataAgendamento: "",
     dataRetornoLigacao: "",
     observacao: "",
@@ -101,7 +101,7 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenChat }: CreateLe
       status: "",
       respostaLead: "",
       comparecimento: "",
-      dataFollowUp: "",
+      dataFollowUp: format(new Date(), "dd/MM/yyyy"),
       dataAgendamento: "",
       dataRetornoLigacao: "",
       observacao: "",
