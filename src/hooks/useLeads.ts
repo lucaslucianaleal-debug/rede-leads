@@ -552,14 +552,10 @@ export function useLeads() {
       const df = l.dataFollowUp || "";
       return df.startsWith(formatted);
     });
-    // Agendamentos feitos: follow-up foi hoje E a consulta agendada é na mesma data ou posterior
-    const appointmentsMade = followUpsDone.filter(l => {
-      if (!l.dataAgendamento) return false;
-      const [ad, am, ay] = l.dataAgendamento.split("/");
-      const [fd, fm, fy] = formatted.split("/");
-      const agendDate = new Date(parseInt(ay), parseInt(am) - 1, parseInt(ad));
-      const followDate = new Date(parseInt(fy), parseInt(fm) - 1, parseInt(fd));
-      return agendDate >= followDate;
+    // Agendamentos feitos: contar agendamentos CRIADOS na UI hoje (dataAgendamentoCriado)
+    const appointmentsMade = leads.filter(l => {
+      const dac = l.dataAgendamentoCriado || "";
+      return dac.startsWith(formatted);
     });
 
     // Deduplicar: cada lead aparece uma vez; prioridade = agendamento > followup > novo

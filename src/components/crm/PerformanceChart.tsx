@@ -43,24 +43,35 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
     const data = interval.map((day) => {
       const dayStr = format(day, "dd/MM/yyyy");
 
-      // Atendimentos: leads criados nesse dia + follow-ups feitos nesse dia
-      const leadsNovos = leads.filter((l) => {
-        const dc = l.dataCriacao || "";
+      // Seguir mesma lógica do relatório diário:
+      // - Novos leads = dataContato
+      // - Follow-ups realizados = dataFollowUp
+      // - Agendamentos feitos = subset de follow-ups com dataAgendamento e agendamento >= follow-up
+      const newLeads = leads.filter((l) => {
+        const dc = l.dataContato || "";
         return dc.startsWith(dayStr);
-      }).length;
-      const followUpsDone = leads.filter(
-        (l) => {
-          const done = l.lastFollowUpDone || "";
-          return done.startsWith(dayStr) && l.etapaLead.startsWith("Follow-Up");
-        }
-      ).length;
-      const atendimentos = leadsNovos + followUpsDone;
+      });
+
+      const followUpsDone = leads.filter((l) => {
+        const df = l.dataFollowUp || "";
+        return df.startsWith(dayStr);
+      });
 
       // Agendamentos: contar apenas agendamentos CRIADOS nesse dia (dataAgendamentoCriado)
-      const agendamentos = leads.filter((l) => {
+      const appointmentsMade = leads.filter((l) => {
         const dac = l.dataAgendamentoCriado || "";
         return dac.startsWith(dayStr);
-      }).length;
+      });
+
+      // Deduplicar com prioridade: agendamento > followup > novo
+      const seen = new Set<string>();
+      const allDetails: Lead[] = [] as any;
+      for (const l of [...appointmentsMade, ...followUpsDone, ...newLeads]) {
+        if (!seen.has(l.id)) { seen.add(l.id); allDetails.push(l); }
+      }
+
+      const atendimentos = allDetails.length;
+      const agendamentos = appointmentsMade.length;
 
       return {
         dia: format(day, days === 1 ? "'Hoje'" : days === 7 ? "EEE dd/MM" : "dd/MM", { locale: ptBR }),
@@ -83,27 +94,23 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
 
   // Métricas do dia de hoje para as barras de progresso
   const todayStr = format(new Date(), "dd/MM/yyyy");
-  const atendimentosHoje = leads.filter((l) => {
-    const dc = l.dataCriacao || "";
-    return dc.startsWith(todayStr);
-  }).length + leads.filter((l) => {
-    const done = l.lastFollowUpDone || "";
-    return done.startsWith(todayStr) && l.etapaLead.startsWith("Follow-Up");
-  }).length;
-  // Agendamentos criados/atualizados HOJE (contabilizar vitórias do dia mesmo que comparecido)
-  const agendamentosHoje = leads.filter((l) => {
-    const da = l.dataAgendamento || "";
-    return da.startsWith(todayStr);
-  }).length;
+  const newLeadsToday = leads.filter((l) => (l.dataContato || "").startsWith(todayStr));
+  const followUpsDoneToday = leads.filter((l) => (l.dataFollowUp || "").startsWith(todayStr));
+  const appointmentsMadeToday = leads.filter((l) => (l.dataAgendamentoCriado || "").startsWith(todayStr));
+  const seenToday = new Set<string>();
+  const allToday: Lead[] = [] as any;
+  for (const l of [...appointmentsMadeToday, ...followUpsDoneToday, ...newLeadsToday]) {
+    if (!seenToday.has(l.id)) { seenToday.add(l.id); allToday.push(l); }
+  }
+  const atendimentosHoje = allToday.length;
+  const agendamentosHoje = appointmentsMadeToday.length;
   const taxaHoje =
     atendimentosHoje > 0
       ? ((agendamentosHoje / atendimentosHoje) * 100).toFixed(1)
       : "0.0";
 
   // Contagem de follow-ups concluídos hoje (para sincronizar com FollowUpQueue)
-  const checksDoneToday = leads.filter(
-    (l) => (l.lastFollowUpDone || "") === todayStr && l.etapaLead.startsWith("Follow-Up")
-  ).length;
+  const checksDoneToday = followUpsDoneToday.length;
 
   return (
     <div className="glass-card rounded-xl p-5">
