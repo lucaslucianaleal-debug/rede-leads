@@ -145,11 +145,17 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   }
 
   function handleManualSend(lead: Lead, slot: SlotKey) {
-    const reminderType: "h24" | "today" = slot === "24h" ? "h24" : "today";
+    // Mapa correto: 24h/12h usam "h24" (amanhã), 3h/1h usam "today" (hoje)
+    const reminderType: "h24" | "today" = (slot === "24h" || slot === "12h") ? "h24" : "today";
     const msg = generateReminderText(lead.dataAgendamento ?? "", reminderType);
+    
+    // Abre chat com mensagem pré-preenchida
     onOpenChat?.(lead.telefone, msg);
+    
+    // Marca como enviado
     stampSlot(lead, slot);
-    toast.success(`Lembrete ${slot} enviado e marcado para ${lead.nome}`);
+    
+    toast.success(`✓ ${lead.nome} — Lembrete ${slot} marcado como enviado!`);
   }
 
   // ---- render slot pill ----
@@ -201,17 +207,19 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
 
     return (
       <div key={slot} className="flex flex-col items-center gap-1">
-        <span className="text-[10px] text-muted-foreground font-semibold tracking-wide">{slot}</span>
+        <span className="text-[10px] text-muted-foreground font-semibold tracking-wide uppercase">{slot}</span>
         <Button
           size="sm"
           variant="outline"
-          className={`h-9 min-w-[60px] px-2 text-xs font-medium border ${cfg.cls}`}
+          className={`h-9 min-w-[65px] px-2 text-xs font-medium border transition-all ${
+            !cfg.clickable ? 'cursor-not-allowed' : 'cursor-pointer'
+          } ${cfg.cls}`}
           onClick={() => { if (cfg.clickable) handleManualSend(lead, slot); }}
           disabled={!cfg.clickable}
           title={cfg.tooltip}
         >
-          {cfg.icon && <span className="mr-1">{cfg.icon}</span>}
-          {cfg.label}
+          {cfg.icon && <span className="mr-1 flex-shrink-0">{cfg.icon}</span>}
+          <span className="truncate">{cfg.label}</span>
         </Button>
       </div>
     );
@@ -262,13 +270,13 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
           {slotTimes ? (
             <div className="flex items-center gap-2">
               <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-1.5 flex-wrap">
                 {SLOTS.map((slot) => renderSlot(lead, slot, slotTimes[slot]))}
               </div>
             </div>
           ) : (
             <p className="text-xs text-muted-foreground italic">Data inválida</p>
-          )}
+          )}}
 
           {/* Failure banner */}
           {failedSlots.length > 0 && (
