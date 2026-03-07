@@ -169,6 +169,12 @@ export function useLeads() {
     return leads.filter((l) => l.dataFollowUp === today && l.etapaLead.startsWith("Follow-Up")).length;
   }, [leads]);
 
+  // Contar agendamentos criados/atualizados HOJE
+  const scheduledTodayCount = useMemo(() => {
+    const today = format(new Date(), "dd/MM/yyyy");
+    return leads.filter((l) => l.dataAgendamento === today).length;
+  }, [leads]);
+
   // Helper: pular fins de semana (sábado +2 dias, domingo +1 dia)
   const getNextBusinessDay = (date: Date): Date => {
     const dayOfWeek = date.getDay();
@@ -235,7 +241,9 @@ export function useLeads() {
         l.etapaLead !== "Desistência" &&
         l.comparecimento !== "COMPARECEU" &&
         // Filtro crítico: aparecer na fila apenas se dataFollowUp é hoje ou antes
-        l.dataFollowUp && parseDate(l.dataFollowUp) <= parseDate(today)
+        l.dataFollowUp && parseDate(l.dataFollowUp) <= parseDate(today) &&
+        // NOVO: Excluir si tiver agendamento com data >= hoje (não aparecer em Follow-up se já tem agendamento)
+        !(l.dataAgendamento && l.dataAgendamento.trim() !== "" && parseDate(l.dataAgendamento) >= parseDate(today))
     );
 
     // Separar em leads novos vs. que não compareceram
@@ -928,6 +936,7 @@ export function useLeads() {
     stats,
     followUpQueue,
     followUpsDoneToday,
+    scheduledTodayCount,
     followUpGoal: 20, // Meta diária
     callReturnQueue,
     reminderQueue,

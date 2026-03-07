@@ -20,17 +20,18 @@ interface PerformanceChartProps {
   leads: Lead[];
 }
 
-type PeriodKey = "7d" | "30d";
+type PeriodKey = "today" | "7d" | "30d";
 
 const META_ATENDIMENTOS = 40;
 const META_AGENDAMENTOS = 15;
 
 export function PerformanceChart({ leads }: PerformanceChartProps) {
-  const [period, setPeriod] = useState<PeriodKey>("7d");
+  const [period, setPeriod] = useState<PeriodKey>("today");
 
-  const days = period === "7d" ? 7 : 30;
+  const days = period === "today" ? 1 : period === "7d" ? 7 : 30;
 
   // Gera os dados por dia para o período selecionado
+  // Se for "hoje", mostra apenas barras de progresso; se for período, mostra gráfico
   const { chartData, totalAtendimentos, totalAgendamentos } = useMemo(() => {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
@@ -49,16 +50,12 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       ).length;
       const atendimentos = leadsNovos + followUpsDone;
 
-      // Agendamentos: leads criados OU follow-ups feitos nesse dia QUE têm agendamento futuro marcado
-      const agendamentos = leads.filter((l) => {
-        const criadoHoje = l.dataCriacao === dayStr;
-        const followupHoje = l.dataFollowUp === dayStr;
-        const temAgendamento = !!l.dataAgendamento && l.dataAgendamento.trim() !== "";
-        return (criadoHoje || followupHoje) && temAgendamento;
-      }).length;
+      // Agendamentos: leads com dataAgendamento === EXATAMENTE nesse dia
+      // (contabilizar apenas criados/atualizados nesse dia)
+      const agendamentos = leads.filter((l) => l.dataAgendamento === dayStr).length;
 
       return {
-        dia: format(day, days === 7 ? "EEE dd/MM" : "dd/MM", { locale: ptBR }),
+        dia: format(day, days === 1 ? "'Hoje'" : days === 7 ? "EEE dd/MM" : "dd/MM", { locale: ptBR }),
         Atendimentos: atendimentos,
         Agendamentos: agendamentos,
       };
@@ -83,12 +80,8 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
   ).length + leads.filter(
     (l) => l.dataFollowUp === todayStr && l.etapaLead.startsWith("Follow-Up")
   ).length;
-  const agendamentosHoje = leads.filter((l) => {
-    const criadoHoje = l.dataCriacao === todayStr;
-    const followupHoje = l.dataFollowUp === todayStr;
-    const temAg = !!l.dataAgendamento && l.dataAgendamento.trim() !== "";
-    return (criadoHoje || followupHoje) && temAg;
-  }).length;
+  // Agendamentos criados/atualizados HOJE (contabilizar vitórias do dia mesmo que comparecido)
+  const agendamentosHoje = leads.filter((l) => l.dataAgendamento === todayStr).length;
   const taxaHoje =
     atendimentosHoje > 0
       ? ((agendamentosHoje / atendimentosHoje) * 100).toFixed(1)
@@ -109,7 +102,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </h3>
         {/* Seletor de período */}
         <div className="flex gap-1 bg-muted rounded-lg p-1">
-          {(["7d", "30d"] as PeriodKey[]).map((p) => (
+          {(["today", "7d", "30d"] as PeriodKey[]).map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
@@ -119,7 +112,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {p === "7d" ? "7 dias" : "30 dias"}
+              {p === "today" ? "Hoje" : p === "7d" ? "7 dias" : "30 dias"}
             </button>
           ))}
         </div>
@@ -175,75 +168,85 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </div>
       </div>
 
-      {/* Gráfico */}
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis
-            dataKey="dia"
-            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-            tickLine={false}
-            axisLine={{ stroke: "hsl(var(--border))" }}
-          />
-          <YAxis
-            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "8px",
-              fontSize: "12px",
-            }}
-          />
-          <Legend
-            wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
-          />
+      {/* Gráfico - Mostrar apenas se não for "Hoje" */}
+      {period !== "today" && (
+        <>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis
+                dataKey="dia"
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={{ stroke: "hsl(var(--border))" }}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+              />
+              <Legend
+                wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
+              />
 
-          {/* Linhas de referência (metas diárias) */}
-          <ReferenceLine
-            y={META_ATENDIMENTOS}
-            stroke="hsl(var(--primary))"
-            strokeDasharray="4 4"
-            strokeOpacity={0.5}
-            label={{ value: `Meta ${META_ATENDIMENTOS}`, fontSize: 9, fill: "hsl(var(--primary))", position: "insideTopRight" }}
-          />
-          <ReferenceLine
-            y={META_AGENDAMENTOS}
-            stroke="hsl(var(--success))"
-            strokeDasharray="4 4"
-            strokeOpacity={0.5}
-            label={{ value: `Meta ${META_AGENDAMENTOS}`, fontSize: 9, fill: "hsl(var(--success))", position: "insideTopRight" }}
-          />
+              {/* Linhas de referência (metas diárias) */}
+              <ReferenceLine
+                y={META_ATENDIMENTOS}
+                stroke="hsl(var(--primary))"
+                strokeDasharray="4 4"
+                strokeOpacity={0.5}
+                label={{ value: `Meta ${META_ATENDIMENTOS}`, fontSize: 9, fill: "hsl(var(--primary))", position: "insideTopRight" }}
+              />
+              <ReferenceLine
+                y={META_AGENDAMENTOS}
+                stroke="hsl(var(--success))"
+                strokeDasharray="4 4"
+                strokeOpacity={0.5}
+                label={{ value: `Meta ${META_AGENDAMENTOS}`, fontSize: 9, fill: "hsl(var(--success))", position: "insideTopRight" }}
+              />
 
-          {/* Linha 1: Atendimentos */}
-          <Line
-            type="monotone"
-            dataKey="Atendimentos"
-            stroke="hsl(var(--primary))"
-            strokeWidth={2.5}
-            dot={{ r: 3, fill: "hsl(var(--primary))" }}
-            activeDot={{ r: 5 }}
-          />
+              {/* Linha 1: Atendimentos */}
+              <Line
+                type="monotone"
+                dataKey="Atendimentos"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2.5}
+                dot={{ r: 3, fill: "hsl(var(--primary))" }}
+                activeDot={{ r: 5 }}
+              />
 
-          {/* Linha 2: Agendamentos */}
-          <Line
-            type="monotone"
-            dataKey="Agendamentos"
-            stroke="hsl(var(--success))"
-            strokeWidth={2.5}
-            dot={{ r: 3, fill: "hsl(var(--success))" }}
-            activeDot={{ r: 5 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+              {/* Linha 2: Agendamentos */}
+              <Line
+                type="monotone"
+                dataKey="Agendamentos"
+                stroke="hsl(var(--success))"
+                strokeWidth={2.5}
+                dot={{ r: 3, fill: "hsl(var(--success))" }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
 
-      {/* Legenda de métricas */}
-      <p className="text-[10px] text-muted-foreground mt-2 text-center">
-        Atendimentos = Novos leads + Follow-ups do dia &nbsp;|&nbsp; Agendamentos = Leads com consulta agendada
-      </p>
+          {/* Legenda de métricas */}
+          <p className="text-[10px] text-muted-foreground mt-2 text-center">
+            Atendimentos = Novos leads + Follow-ups do dia &nbsp;|&nbsp; Agendamentos = Leads com consulta agendada
+          </p>
+        </>
+      )}
+
+      {period === "today" && (
+        <p className="text-[10px] text-muted-foreground text-center mt-2">
+          Progresso em tempo real das metas do dia
+        </p>
+      )}
     </div>
   );
 }
