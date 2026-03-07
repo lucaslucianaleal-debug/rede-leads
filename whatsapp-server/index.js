@@ -882,7 +882,27 @@ app.post("/send-message", async (req, res) => {
     const targetConv = syncedConversation || normalizedPhone;
 
     const waId = phoneToWAId(normalizedPhone);
-    const sentMsg = await client.sendMessage(waId, message);
+    
+    // Verifica se o número é válido e WhatsApp ativo (cria chat implicitamente)
+    let numberId;
+    try {
+      numberId = await client.getNumberId(normalizedPhone);
+      if (!numberId) {
+        return res.status(400).json({ error: `Número ${normalizedPhone} não é WhatsApp ativo ou não existe` });
+      }
+    } catch (numErr) {
+      console.warn(`[send-message] Não conseguiu validar número ${normalizedPhone}:`, numErr.message);
+      return res.status(400).json({ error: `Não foi possível validar número: ${numErr.message}` });
+    }
+    
+    // Agora tenta enviar
+    let sentMsg;
+    try {
+      sentMsg = await client.sendMessage(waId, message);
+    } catch (sendErr) {
+      console.error(`[send-message] Erro ao enviar para ${waId}:`, sendErr.message);
+      return res.status(500).json({ error: `Falha ao enviar: ${sendErr.message}` });
+    }
 
     // Mapeia msgId -> conversa CORRETA (para message_create usar a mesma)
     if (sentMsg?.id?._serialized) {
