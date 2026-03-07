@@ -352,22 +352,23 @@ async function runReminder() {
   }
 }
 
-// Iniciar worker
-console.log(`[reminder-worker] 🔐 === MODO REPORT-ONLY (100% SEGURO) ===`);
-console.log(`[reminder-worker] ⚠️  O worker NUNCA envia mensagens automaticamente`);
-console.log(`[reminder-worker] ☛️  Ele apenas atualiza a lista de lembretes na UI`);
-console.log(`[reminder-worker] 📋 Clique nos botões manuais da interface para enviar`);
-console.log(`[reminder-worker] 🚀 Iniciando worker em MODO REPORT-ONLY`);
-console.log(`[reminder-worker] Rodará a cada 5 minutos. Pressione Ctrl+C para parar.\n`);
+// ⚠️ REMINDER-WORKER DESATIVADO COMPLETAMENTE
+// 🔐 O sistema agora é 100% MANUAL
+// Todos os lembretes são enviados manualmente via UI
+// O worker não roda em background
 
-// Rodar imediatamente
-await runReminder();
+console.log(`
+╔════════════════════════════════════════════════╗
+║  🔒 SISTEMA DESATIVADO - MODO 100% MANUAL      ║
+║                                                ║
+║  ✓ Automação: DESLIGADA                        ║
+║  ✓ Worker: NÃO RODANDO                         ║
+║  ✓ Lembretes: APENAS MANUAIS (via UI)          ║
+║  ✓ Segurança: MÁXIMA                           ║
+║                                                ║
+║  Use a interface para enviar lembretes         ║
+╚════════════════════════════════════════════════╝
+`);
 
-// Rodar a cada 5 minutos
-setInterval(runReminder, 5 * 60 * 1000);
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\n[reminder-worker] ⛔ Encerrando...');
-  process.exit(0);
-});
+// Encerrá imediatamente
+process.exit(0);

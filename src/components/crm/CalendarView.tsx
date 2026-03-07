@@ -1,12 +1,10 @@
-﻿import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+﻿import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Lead } from "@/types/crm";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useMemo } from "react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Clock, Phone, Bot, CheckCircle, AlertCircle, Calendar as CalendarIcon, Wifi, WifiOff, Ban } from "lucide-react";
-import { generateReminderText } from "@/lib/whatsapp";
+import { Clock, Phone, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface CalendarViewProps {
@@ -16,372 +14,166 @@ interface CalendarViewProps {
   onOpenChat?: (phone: string, message?: string) => void;
 }
 
-type SlotKey = "24h" | "12h" | "3h" | "1h";
-type SlotStatus = "sent" | "scheduled" | "missed" | "failed" | "disabled";
-
-interface SendFailureEntry {
-  leadId: string;
-  slot: string;
-  attempts: number;
-  lastError: string;
-  firstFailedAt: string;
-  lastFailedAt: string;
-}
-
-interface SendFailures {
-  [key: string]: SendFailureEntry;
-}
-
-const SLOTS: SlotKey[] = ["24h", "1h"];
-
-const SLOT_OFFSETS_MS: Record<SlotKey, number> = {
-  "24h": 24 * 60 * 60 * 1000,
-  "12h": 12 * 60 * 60 * 1000,
-  "3h":  3  * 60 * 60 * 1000,
-  "1h":  1  * 60 * 60 * 1000,
-};
-
-function parseAppointmentDate(dateStr: string): Date | null {
-  if (!dateStr) return null;
-  try {
-    const [datePart, timePart] = dateStr.split(" ");
-    const [day, month, year] = datePart.split("/").map(Number);
-    const [hour = 0, minute = 0] = (timePart || "00:00").split(":").map(Number);
-    const d = new Date(year, month - 1, day, hour, minute, 0, 0);
-    return isNaN(d.getTime()) ? null : d;
-  } catch {
-    return null;
-  }
-}
-
-function computeSlotTimes(appointmentDate: Date): Record<SlotKey, Date> {
-  return {
-    "24h": new Date(appointmentDate.getTime() - SLOT_OFFSETS_MS["24h"]),
-    "12h": new Date(appointmentDate.getTime() - SLOT_OFFSETS_MS["12h"]),
-    "3h":  new Date(appointmentDate.getTime() - SLOT_OFFSETS_MS["3h"]),
-    "1h":  new Date(appointmentDate.getTime() - SLOT_OFFSETS_MS["1h"]),
-  };
-}
-
 export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }: CalendarViewProps) {
-  const [sendFailures, setSendFailures] = useState<SendFailures>({});
-  const [serverConnected, setServerConnected] = useState<boolean | null>(null);
-
-  const fetchFailures = useCallback(async () => {
-    try {
-      const res = await fetch("http://localhost:3001/api/send-failures");
-      if (res.ok) {
-        const data = await res.json();
-        setSendFailures(data ?? {});
-        setServerConnected(true);
-      } else {
-        setServerConnected(false);
-      }
-    } catch {
-      setServerConnected(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchFailures();
-    const interval = setInterval(fetchFailures, 60_000);
-    return () => clearInterval(interval);
-  }, [fetchFailures]);
-
   const now = new Date();
-  const todayStr   = format(now, "dd/MM/yyyy");
+  const todayStr = format(now, "dd/MM/yyyy");
   const tomorrowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const tomorrowStr  = format(tomorrowDate, "dd/MM/yyyy");
+  const tomorrowStr = format(tomorrowDate, "dd/MM/yyyy");
 
-  const todayLeads = useMemo(
+  // Filtrar apenas leads de hoje e amanhã
+  const relevantLeads = useMemo(
     () =>
-      leads
-        .filter((l) => l.dataAgendamento?.startsWith(todayStr))
-        .sort((a, b) =>
-          (a.dataAgendamento?.split(" ")[1] ?? "").localeCompare(b.dataAgendamento?.split(" ")[1] ?? "")
-        ),
-    [leads, todayStr]
+      leads.filter(
+        (l) =>
+          l.dataAgendamento?.startsWith(todayStr) ||
+          l.dataAgendamento?.startsWith(tomorrowStr)
+      ),
+    [leads, todayStr, tomorrowStr]
   );
 
-  const tomorrowLeads = useMemo(
-    () =>
-      leads
-        .filter((l) => l.dataAgendamento?.startsWith(tomorrowStr))
-        .sort((a, b) =>
-          (a.dataAgendamento?.split(" ")[1] ?? "").localeCompare(b.dataAgendamento?.split(" ")[1] ?? "")
-        ),
-    [leads, tomorrowStr]
-  );
+  // Separar por dia
+  const todayLeads = relevantLeads.filter((l) => l.dataAgendamento?.startsWith(todayStr));
+  const tomorrowLeads = relevantLeads.filter((l) => l.dataAgendamento?.startsWith(tomorrowStr));
 
-  // ---- slot logic ----
+  // Textos fixos dos lembretes
+  const getReminder24h = (lead: Lead): string => {
+    const data = lead.dataAgendamento?.split(" ")[0] || "amanhã";
+    const hora = lead.dataAgendamento?.split(" ")[1] || "09:00";
+    return `⏰ Lembrete: Sua ${lead.procedimento?.toLowerCase() || 'consulta'} na OdontoCompany Olimpia é amanhã, ${data} às ${hora}. Confirmado? 💚`;
+  };
 
-  function getSlotStatus(lead: Lead, slot: SlotKey, slotTime: Date): SlotStatus {
-    if (lead.lembretes?.disabled) return "disabled";
+  const getReminder1h = (lead: Lead): string => {
+    const hora = lead.dataAgendamento?.split(" ")[1] || "09:00";
+    return `⏰ Falta 1 hora! Já estamos te esperando para sua ${lead.procedimento?.toLowerCase() || 'consulta'} das ${hora}. Até logo! 💚`;
+  };
 
-    const sentTs = lead.lembretes?.sent?.[slot];
-    if (sentTs) return "sent";
-
-    if (sendFailures[`${lead.id}:${slot}`]) return "failed";
-
-    if (slotTime > new Date()) return "scheduled";
-    return "missed";
-  }
-
-  function stampSlot(lead: Lead, slot: SlotKey) {
-    if (!onUpdateLead) return;
-    const nowIso = new Date().toISOString();
-    onUpdateLead(lead.id, {
-      lembretes: {
-        ...lead.lembretes,
-        sent: {
-          "24h": lead.lembretes?.sent?.["24h"] ?? null,
-          "12h": lead.lembretes?.sent?.["12h"] ?? null,
-          "3h":  lead.lembretes?.sent?.["3h"]  ?? null,
-          "1h":  lead.lembretes?.sent?.["1h"]  ?? null,
-          [slot]: nowIso,
-        },
-      },
-    });
-  }
-
-  function handleManualSend(lead: Lead, slot: SlotKey) {
-    // Mapa correto: 24h/12h usam "h24" (amanhã), 3h/1h usam "today" (hoje)
-    const reminderType: "h24" | "today" = (slot === "24h" || slot === "12h") ? "h24" : "today";
-    const msg = generateReminderText(lead.dataAgendamento ?? "", reminderType);
-    
-    // Abre chat com mensagem pré-preenchida
+  const handleSend24h = (lead: Lead) => {
+    const msg = getReminder24h(lead);
     onOpenChat?.(lead.telefone, msg);
-    
-    // Marca como enviado
-    stampSlot(lead, slot);
-    
-    toast.success(`✓ ${lead.nome} — Lembrete ${slot} marcado como enviado!`);
-  }
+    onMarkReminder(lead.id, "h24");
+    toast.success(`✓ ${lead.nome} — Lembrete 24h enviado!`);
+  };
 
-  // ---- render slot pill ----
+  const handleSend1h = (lead: Lead) => {
+    const msg = getReminder1h(lead);
+    onOpenChat?.(lead.telefone, msg);
+    onMarkReminder(lead.id, "today");
+    toast.success(`✓ ${lead.nome} — Lembrete 1h enviado!`);
+  };
 
-  function renderSlot(lead: Lead, slot: SlotKey, slotTime: Date) {
-    const status = getSlotStatus(lead, slot, slotTime);
-    const sentTs = lead.lembretes?.sent?.[slot];
+  const handleMarkAbsent = (lead: Lead) => {
+    onUpdateLead?.(lead.id, { lembretes: { ...lead.lembretes, disabled: true } });
+    toast.info(`✗ ${lead.nome} — Marcado como desistência`);
+  };
 
-    type Config = { label: string; icon?: React.ReactNode; cls: string; tooltip: string; clickable: boolean };
-
-    const configs: Record<SlotStatus, Config> = {
-      sent: {
-        label: sentTs ? format(new Date(sentTs), "HH:mm") : "Env.",
-        icon: <CheckCircle className="h-3 w-3" />,
-        cls: "bg-green-100 text-green-700 border-green-300 hover:bg-green-200",
-        tooltip: sentTs ? `Enviado às ${format(new Date(sentTs), "HH:mm")}` : "Enviado",
-        clickable: false,
-      },
-      scheduled: {
-        label: format(slotTime, "HH:mm"),
-        icon: <Clock className="h-3 w-3 animate-pulse" />,
-        cls: "bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200",
-        tooltip: `Agendado para ${format(slotTime, "HH:mm")} — Clique para enviar agora`,
-        clickable: true,
-      },
-      failed: {
-        label: "FALHA",
-        icon: <AlertCircle className="h-3 w-3" />,
-        cls: "bg-red-100 text-red-700 border-red-300 hover:bg-red-200",
-        tooltip: "Falha no envio automático — Clique para enviar manual",
-        clickable: true,
-      },
-      missed: {
-        label: slot,
-        cls: "bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200",
-        tooltip: "Janela passou — Clique para marcar manualmente",
-        clickable: true,
-      },
-      disabled: {
-        label: slot,
-        icon: <Ban className="h-3 w-3" />,
-        cls: "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed opacity-60",
-        tooltip: "Automação desativada para este lead",
-        clickable: false,
-      },
-    };
-
-    const cfg = configs[status];
+  const renderLeadCard = (lead: Lead, isToday: boolean) => {
+    const [hora, minuto] = (lead.dataAgendamento?.split(" ")[1] || "09:00").split(":");
+    const dayLabel = isToday ? "HOJE" : "AMANHÃ";
+    const colorBg = isToday ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200";
 
     return (
-      <div key={slot} className="flex flex-col items-center gap-1">
-        <span className="text-[10px] text-muted-foreground font-semibold tracking-wide uppercase">
-          {slot === "24h" ? "24h" : "Hoje"}
-        </span>
-        <Button
-          size="sm"
-          variant="outline"
-          className={`h-9 min-w-[65px] px-2 text-xs font-medium border transition-all ${
-            !cfg.clickable ? 'cursor-not-allowed' : 'cursor-pointer'
-          } ${cfg.cls}`}
-          onClick={() => { if (cfg.clickable) handleManualSend(lead, slot); }}
-          disabled={!cfg.clickable}
-          title={cfg.tooltip}
-        >
-          {cfg.icon && <span className="mr-1 flex-shrink-0">{cfg.icon}</span>}
-          <span className="truncate">{cfg.label}</span>
-        </Button>
-      </div>
-    );
-  }
-
-  // ---- render lead card ----
-
-  function renderLeadCard(lead: Lead) {
-    const appointment = parseAppointmentDate(lead.dataAgendamento ?? "");
-    const slotTimes = appointment ? computeSlotTimes(appointment) : null;
-
-    const failedSlots = slotTimes ? SLOTS.filter((s) => sendFailures[`${lead.id}:${s}`]) : [];
-    const allSent = slotTimes ? SLOTS.every((s) => !!lead.lembretes?.sent?.[s]) : false;
-
-    const isDisabled = lead.lembretes?.disabled;
-    const borderColor = isDisabled ? "border-l-gray-300" : failedSlots.length > 0 ? "border-l-red-500" : allSent ? "border-l-green-500" : "border-l-blue-300";
-
-    return (
-      <Card key={lead.id} className={`border-l-4 ${borderColor} transition-colors hover:shadow-md`}>
+      <Card
+        key={lead.id}
+        className={`relative overflow-hidden transition-all hover:shadow-lg ${colorBg}`}
+      >
         <CardContent className="p-4">
-          {/* Header: time + name + procedure */}
-          <div className="flex items-start gap-3 mb-3">
-            <span className="text-2xl font-bold text-primary tabular-nums leading-none pt-0.5 shrink-0">
-              {lead.dataAgendamento?.split(" ")[1] ?? "—"}
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-base leading-tight truncate">{lead.nome}</p>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <Badge variant="secondary" className="bg-blue-50 text-blue-700 border border-blue-200 font-medium text-xs">
-                  {lead.servicoProcurado}
+          {/* Header com nome, hora e X */}
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-gray-900">{lead.nome}</h3>
+              <p className="text-sm text-gray-600">{lead.procedimento || "Consulta"}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <Clock className="h-4 w-4 text-gray-500" />
+                <span className="text-sm font-semibold text-gray-700">
+                  {hora}:{minuto}
+                </span>
+                <Badge
+                  variant="outline"
+                  className={isToday ? "bg-red-100 text-red-800 border-red-300" : "bg-blue-100 text-blue-800 border-blue-300"}
+                >
+                  {dayLabel}
                 </Badge>
-                {isDisabled && (
-                  <span className="flex items-center gap-1 text-[11px] text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">
-                    <Ban className="h-2.5 w-2.5" /> Automação Off
-                  </span>
-                )}
               </div>
             </div>
+
+            {/* Botão X (desistência) */}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 hover:bg-red-200 hover:text-red-700 text-gray-500"
+              onClick={() => handleMarkAbsent(lead)}
+              title="Marcar como desistência"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
 
-          {/* Phone */}
-          <div className="flex items-center gap-1.5 mb-3 text-xs text-muted-foreground">
-            <Phone className="h-3 w-3 shrink-0" />
+          {/* Telefone */}
+          <div className="flex items-center gap-2 mb-4 text-sm text-gray-600">
+            <Phone className="h-4 w-4" />
             <span>{lead.telefone}</span>
           </div>
 
-          {/* Automation timeline */}
-          {slotTimes ? (
-            <div className="flex items-center gap-2">
-              <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
-              <div className="flex gap-1.5 flex-wrap">
-                {SLOTS.map((slot) => renderSlot(lead, slot, slotTimes[slot]))}
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground italic">Data inválida</p>
-          )}}
-
-          {/* Failure banner */}
-          {failedSlots.length > 0 && (
-            <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-              <strong>⚠️ Falha na automação</strong>{" "}
-              ({failedSlots.join(", ")}) — Clique no botão vermelho para enviar manual.
-            </div>
-          )}
-
-          {/* Notes */}
-          {lead.observacao && (
-            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
-              <span className="font-semibold text-amber-800">Obs:</span>{" "}
-              <span className="text-amber-900">{lead.observacao}</span>
-            </div>
-          )}
+          {/* 2 Botões grandes */}
+          <div className="flex gap-2">
+            <Button
+              onClick={() => handleSend24h(lead)}
+              className="flex-1 h-10 bg-green-100 hover:bg-green-200 text-green-800 font-semibold border border-green-300"
+              variant="outline"
+            >
+              <span>📱 Enviar 24h</span>
+            </Button>
+            <Button
+              onClick={() => handleSend1h(lead)}
+              className="flex-1 h-10 bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold border border-blue-300"
+              variant="outline"
+            >
+              <span>📱 Enviar 1h</span>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
-  }
-
-  // ---- render day section ----
-
-  function renderDaySection(label: string, dateLabel: string, dayLeads: Lead[]) {
-    return (
-      <div>
-        <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-          <CalendarIcon className="h-4 w-4 text-primary shrink-0" />
-          <span className="font-bold text-sm">{label}</span>
-          <span className="text-xs text-muted-foreground capitalize">{dateLabel}</span>
-          <Badge className="ml-auto text-xs bg-primary/10 text-primary border border-primary/20 font-semibold">
-            {dayLeads.length} agendamento{dayLeads.length !== 1 ? "s" : ""}
-          </Badge>
-        </div>
-        {dayLeads.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic pl-6 py-4 text-center">Nenhum agendamento</p>
-        ) : (
-          <div className="space-y-3">{dayLeads.map(renderLeadCard)}</div>
-        )}
-      </div>
-    );
-  }
-
-  const total = todayLeads.length + tomorrowLeads.length;
+  };
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <CalendarIcon className="h-5 w-5" />
-          Lembretes de Agendamento — Próximas 48h
-          <div className="ml-auto flex items-center gap-3">
-            {serverConnected === true && (
-              <span className="flex items-center gap-1 text-xs text-green-600 font-normal">
-                <Wifi className="h-3.5 w-3.5" /> Robô online
-              </span>
-            )}
-            {serverConnected === false && (
-              <span className="flex items-center gap-1 text-xs text-red-500 font-normal">
-                <WifiOff className="h-3.5 w-3.5" /> Robô offline
-              </span>
-            )}
-            <Badge variant="outline" className="text-xs font-normal">
-              {total} agendamento{total !== 1 ? "s" : ""}
-            </Badge>
+    <div className="space-y-6 p-4 max-w-3xl mx-auto">
+      {/* Título */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">🎯 Controle de Presença</h1>
+        <p className="text-sm text-gray-600 mt-1">Clique nos botões para enviar lembretes via WhatsApp</p>
+      </div>
+
+      {/* HOJE */}
+      {todayLeads.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xl font-semibold text-red-700 flex items-center gap-2">
+            📅 Hoje ({todayLeads.length} agendamentos)
+          </h2>
+          <div className="space-y-3">
+            {todayLeads.map((lead) => renderLeadCard(lead, true))}
           </div>
-        </CardTitle>
-
-        {/* Legend */}
-        <div className="flex flex-wrap gap-4 pt-1 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded bg-green-200 border border-green-300" />
-            Enviado (mostra horário)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded bg-yellow-200 border border-yellow-300" />
-            Agendado para HH:mm
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded bg-gray-100 border border-gray-200" />
-            Aguardando / Janela passou
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded bg-red-200 border border-red-300" />
-            ⚠️ Falha — Enviar Manual
-          </span>
         </div>
-      </CardHeader>
+      )}
 
-      <CardContent className="space-y-5 pt-4 max-h-[70vh] overflow-y-auto pr-1">
-        {total === 0 ? (
-          <p className="text-center text-muted-foreground py-10">
-            Nenhum agendamento nas próximas 48 horas
-          </p>
-        ) : (
-          <>
-            {renderDaySection("Hoje", format(now, "EEEE, dd/MM", { locale: ptBR }), todayLeads)}
-            <div className="pt-5">
-              {renderDaySection("Amanhã", format(tomorrowDate, "EEEE, dd/MM", { locale: ptBR }), tomorrowLeads)}
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+      {/* AMANHÃ */}
+      {tomorrowLeads.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xl font-semibold text-blue-700 flex items-center gap-2">
+            📅 Amanhã ({tomorrowLeads.length} agendamentos)
+          </h2>
+          <div className="space-y-3">
+            {tomorrowLeads.map((lead) => renderLeadCard(lead, false))}
+          </div>
+        </div>
+      )}
+
+      {/* Vazio */}
+      {relevantLeads.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-500">📭 Nenhum agendamento para hoje ou amanhã</p>
+        </div>
+      )}
+    </div>
   );
 }
