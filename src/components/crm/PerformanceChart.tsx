@@ -52,7 +52,10 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
 
       // Agendamentos: leads com dataAgendamento === EXATAMENTE nesse dia
       // (contabilizar apenas criados/atualizados nesse dia)
-      const agendamentos = leads.filter((l) => l.dataAgendamento === dayStr).length;
+      const agendamentos = leads.filter((l) => {
+        const da = l.dataAgendamento || "";
+        return da.startsWith(dayStr);
+      }).length;
 
       return {
         dia: format(day, days === 1 ? "'Hoje'" : days === 7 ? "EEE dd/MM" : "dd/MM", { locale: ptBR }),
@@ -81,7 +84,10 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
     (l) => l.dataFollowUp === todayStr && l.etapaLead.startsWith("Follow-Up")
   ).length;
   // Agendamentos criados/atualizados HOJE (contabilizar vitórias do dia mesmo que comparecido)
-  const agendamentosHoje = leads.filter((l) => l.dataAgendamento === todayStr).length;
+  const agendamentosHoje = leads.filter((l) => {
+    const da = l.dataAgendamento || "";
+    return da.startsWith(todayStr);
+  }).length;
   const taxaHoje =
     atendimentosHoje > 0
       ? ((agendamentosHoje / atendimentosHoje) * 100).toFixed(1)

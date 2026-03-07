@@ -172,7 +172,10 @@ export function useLeads() {
   // Contar agendamentos criados/atualizados HOJE
   const scheduledTodayCount = useMemo(() => {
     const today = format(new Date(), "dd/MM/yyyy");
-    return leads.filter((l) => l.dataAgendamento === today).length;
+    return leads.filter((l) => {
+      const da = l.dataAgendamento || "";
+      return da.startsWith(today);
+    }).length;
   }, [leads]);
 
   // Helper: pular fins de semana (sábado +2 dias, domingo +1 dia)
@@ -188,7 +191,10 @@ export function useLeads() {
     const frios = leads.filter((l) => l.status === "FRIO").length;
     const agendados = leads.filter((l) => l.dataAgendamento && l.dataAgendamento !== "").length;
     const todayFormatted = format(new Date(), "dd/MM/yyyy");
-    const agendadosHoje = leads.filter((l) => l.dataAgendamento === todayFormatted).length;
+    const agendadosHoje = leads.filter((l) => {
+      const da = l.dataAgendamento || "";
+      return da.startsWith(todayFormatted);
+    }).length;
     const followUpsPendentes = leads.filter((l) => l.etapaLead.startsWith("Follow-Up") && l.respostaLead !== "RESPONDEU").length;
     const compareceram = leads.filter((l) => l.comparecimento === "COMPARECEU").length;
     
