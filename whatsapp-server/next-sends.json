@@ -1,0 +1,110 @@
+[
+  {
+    "leadId": "imported-1772622348161-214",
+    "leadName": "Sergio",
+    "telefone": "+5517991274711",
+    "servicoProcurado": "Implante",
+    "slot": "3h",
+    "scheduledFor": "2026-03-07T09:00:00.000Z",
+    "appointmentDate": "07/03/2026 09:00"
+  },
+  {
+    "leadId": "imported-1772622348161-214",
+    "leadName": "Sergio",
+    "telefone": "+5517991274711",
+    "servicoProcurado": "Implante",
+    "slot": "1h",
+    "scheduledFor": "2026-03-07T11:00:00.000Z",
+    "appointmentDate": "07/03/2026 09:00"
+  },
+  {
+    "leadId": "imported-1772622348161-215",
+    "leadName": "Lizandra",
+    "telefone": "+5517981510079",
+    "servicoProcurado": "Prótese",
+    "slot": "24h",
+    "scheduledFor": "2026-03-09T19:00:00.000Z",
+    "appointmentDate": "10/03/2026 16:00"
+  },
+  {
+    "leadId": "imported-1772622348161-215",
+    "leadName": "Lizandra",
+    "telefone": "+5517981510079",
+    "servicoProcurado": "Prótese",
+    "slot": "12h",
+    "scheduledFor": "2026-03-10T07:00:00.000Z",
+    "appointmentDate": "10/03/2026 16:00"
+  },
+  {
+    "leadId": "imported-1772622348161-215",
+    "leadName": "Lizandra",
+    "telefone": "+5517981510079",
+    "servicoProcurado": "Prótese",
+    "slot": "3h",
+    "scheduledFor": "2026-03-10T16:00:00.000Z",
+    "appointmentDate": "10/03/2026 16:00"
+  },
+  {
+    "leadId": "imported-1772622348161-215",
+    "leadName": "Lizandra",
+    "telefone": "+5517981510079",
+    "servicoProcurado": "Prótese",
+    "slot": "1h",
+    "scheduledFor": "2026-03-10T18:00:00.000Z",
+    "appointmentDate": "10/03/2026 16:00"
+  },
+  {
+    "leadId": "lead_1772716476783",
+    "leadName": "José Carlos - Indicação Paula (Marido)",
+    "telefone": "17996834461",
+    "servicoProcurado": "Clareamento",
+    "slot": "3h",
+    "scheduledFor": "2026-03-07T10:30:00.000Z",
+    "appointmentDate": "07/03/2026 10:30"
+  },
+  {
+    "leadId": "lead_1772716476783",
+    "leadName": "José Carlos - Indicação Paula (Marido)",
+    "telefone": "17996834461",
+    "servicoProcurado": "Clareamento",
+    "slot": "1h",
+    "scheduledFor": "2026-03-07T12:30:00.000Z",
+    "appointmentDate": "07/03/2026 10:30"
+  },
+  {
+    "leadId": "lead_1772743780877",
+    "leadName": "Taissa🦋",
+    "telefone": "5517997688099",
+    "servicoProcurado": "Clínico geral",
+    "slot": "3h",
+    "scheduledFor": "2026-03-07T09:30:00.000Z",
+    "appointmentDate": "07/03/2026 09:30"
+  },
+  {
+    "leadId": "lead_1772743780877",
+    "leadName": "Taissa🦋",
+    "telefone": "5517997688099",
+    "servicoProcurado": "Clínico geral",
+    "slot": "1h",
+    "scheduledFor": "2026-03-07T11:30:00.000Z",
+    "appointmentDate": "07/03/2026 09:30"
+  },
+  {
+    "leadId": "lead_1772748645982",
+    "leadName": "Tiago Daniel da Cruz",
+    "telefone": "5517920048092",
+    "servicoProcurado": "Prótese",
+    "slot": "3h",
+    "scheduledFor": "2026-03-07T10:00:00.000Z",
+    "appointmentDate": "07/03/2026 10:00"
+  },
+  {
+    "leadId": "lead_1772748645982",
+    "leadName": "Tiago Daniel da Cruz",
+    "telefone": "5517920048092",
+    "servicoProcurado": "Prótese",
+    "slot": "1h",
+    "scheduledFor": "2026-03-07T12:00:00.000Z",
+    "appointmentDate": "07/03/2026 10:00"
+  }
+]

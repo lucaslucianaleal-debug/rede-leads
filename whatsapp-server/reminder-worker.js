@@ -18,11 +18,11 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// Constantes de segurança
+// MODO DE SEGURANÇA: REPORT-ONLY (sem envios automáticos)
+// O worker NUNCA envia mensagens, apenas atualiza a lista de lembretes na UI
 const MY_PHONE = '17991040452';
+const REPORT_ONLY_MODE = true; // ⚠️ SEMPRE true - sem envios automáticos
 const COOLDOWN_MINUTES = 60; // 1 hora
-const DRY_RUN = !process.argv.includes('--send');
-const ALLOW_SEND = process.env.ALLOW_SEND === 'true' && process.argv.includes('--send');
 const BACKEND_URL = 'http://localhost:3001'; // URL do backend (porta do servidor Express/WhatsApp)
 const NEXT_SENDS_FILE = resolve(__dirname, 'next-sends.json');
 const SEND_FAILURES_FILE = resolve(__dirname, 'send-failures.json');
@@ -333,28 +333,11 @@ async function runReminder() {
         const normalized = normalizePhone(lead.telefone);
         const phoneId = normalized.length >= 11 ? normalized.slice(-11) : normalized;
 
-        if (DRY_RUN || !ALLOW_SEND) {
-          console.log(`[reminder-worker] 🔮 DRY RUN (SEGURO): Enviaria lembrete ${slotType} para ${lead.nome} (${lead.telefone})`);
-          console.log(`[reminder-worker]    Mensagem: "${reminderText.split('\n')[0]}..."`);
-          console.log(`[reminder-worker]    Conversa ID: ${phoneId}`);
-          console.log(`[reminder-worker]    POST: ${BACKEND_URL}/send-message`);
-          console.log(`[reminder-worker]    ⚠️  NÃO SERÁ ENVIADO (use --send + ALLOW_SEND=true para ativar)`);
-          // NÃO marca como enviado em dry-run
-        } else {
-          console.log(`[reminder-worker] 📤 Enviando lembrete ${slotType} para ${lead.nome} (${phoneId})...`);
-          
-          // Enviar via POST para /send-message
-          const sendSuccess = await sendReminderToWhatsApp(phoneId, reminderText);
-          
-          if (sendSuccess) {
-            // Só marcar como enviado se o POST foi bem-sucedido
-            await markSent(lead.id, slotType, now);
-            clearFailedAttempt(lead.id, slotType);
-          } else {
-            console.log(`[reminder-worker] ⏭️  ${lead.nome}: falha na requisição, não será marcado como enviado (será retentado na próxima rodada)`);
-            recordFailedAttempt(lead.id, slotType, 'POST failed');
-          }
-        }
+        // REPORT-ONLY: Apenas registra que o lembrete está pronto, nÃO envia
+        console.log(`[reminder-worker] 📄 REPORT: Lembrete ${slotType} pronto para ENVIO MANUAL para ${lead.nome} (${phoneId})`);
+        console.log(`[reminder-worker]    Mensagem: "${reminderText.split('\n')[0]}..."`);
+        console.log(`[reminder-worker]    Clique no botão na UI para enviar manualmente`);
+        // NÃO marca, NÃO envia, apenas lista
       }
     }
 
@@ -370,11 +353,11 @@ async function runReminder() {
 }
 
 // Iniciar worker
-if (!ALLOW_SEND) {
-  console.log(`[reminder-worker] 🔐 MODO SEGURO: NÃO ENVIARÁ MENSAGENS`);
-  console.log(`[reminder-worker] Para enviar, use: ALLOW_SEND=true node reminder-worker.js --send`);
-}
-console.log(`[reminder-worker] 🚀 Iniciando worker (DRY RUN: ${DRY_RUN}, ALLOW_SEND: ${ALLOW_SEND})`);
+console.log(`[reminder-worker] 🔐 === MODO REPORT-ONLY (100% SEGURO) ===`);
+console.log(`[reminder-worker] ⚠️  O worker NUNCA envia mensagens automaticamente`);
+console.log(`[reminder-worker] ☛️  Ele apenas atualiza a lista de lembretes na UI`);
+console.log(`[reminder-worker] 📋 Clique nos botões manuais da interface para enviar`);
+console.log(`[reminder-worker] 🚀 Iniciando worker em MODO REPORT-ONLY`);
 console.log(`[reminder-worker] Rodará a cada 5 minutos. Pressione Ctrl+C para parar.\n`);
 
 // Rodar imediatamente

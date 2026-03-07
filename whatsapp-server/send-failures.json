@@ -1,0 +1,5018 @@
+{
+  "imported-1772622343800-76:24h": {
+    "leadId": "imported-1772622343800-76",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:32.324Z",
+    "lastFailedAt": "2026-03-07T02:10:38.126Z"
+  },
+  "imported-1772622343800-76:12h": {
+    "leadId": "imported-1772622343800-76",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:32.383Z",
+    "lastFailedAt": "2026-03-07T02:10:38.198Z"
+  },
+  "imported-1772622343800-76:3h": {
+    "leadId": "imported-1772622343800-76",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:32.485Z",
+    "lastFailedAt": "2026-03-07T02:10:38.242Z"
+  },
+  "imported-1772622343800-76:1h": {
+    "leadId": "imported-1772622343800-76",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:32.591Z",
+    "lastFailedAt": "2026-03-07T02:10:38.294Z"
+  },
+  "imported-1772622343800-104:24h": {
+    "leadId": "imported-1772622343800-104",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:32.694Z",
+    "lastFailedAt": "2026-03-07T02:10:39.985Z"
+  },
+  "imported-1772622343800-104:12h": {
+    "leadId": "imported-1772622343800-104",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:32.796Z",
+    "lastFailedAt": "2026-03-07T02:10:40.022Z"
+  },
+  "imported-1772622343800-104:3h": {
+    "leadId": "imported-1772622343800-104",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:32.894Z",
+    "lastFailedAt": "2026-03-07T02:10:40.113Z"
+  },
+  "imported-1772622343800-104:1h": {
+    "leadId": "imported-1772622343800-104",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.001Z",
+    "lastFailedAt": "2026-03-07T02:10:40.215Z"
+  },
+  "imported-1772622343800-138:24h": {
+    "leadId": "imported-1772622343800-138",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.104Z",
+    "lastFailedAt": "2026-03-07T02:10:41.944Z"
+  },
+  "imported-1772622343800-138:12h": {
+    "leadId": "imported-1772622343800-138",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.206Z",
+    "lastFailedAt": "2026-03-07T02:10:42.026Z"
+  },
+  "imported-1772622343800-138:3h": {
+    "leadId": "imported-1772622343800-138",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.308Z",
+    "lastFailedAt": "2026-03-07T02:10:42.060Z"
+  },
+  "imported-1772622343800-138:1h": {
+    "leadId": "imported-1772622343800-138",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.406Z",
+    "lastFailedAt": "2026-03-07T02:10:42.124Z"
+  },
+  "imported-1772622343801-181:24h": {
+    "leadId": "imported-1772622343801-181",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.513Z",
+    "lastFailedAt": "2026-03-07T02:10:46.864Z"
+  },
+  "imported-1772622343801-181:12h": {
+    "leadId": "imported-1772622343801-181",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.598Z",
+    "lastFailedAt": "2026-03-07T02:10:46.893Z"
+  },
+  "imported-1772622343801-181:3h": {
+    "leadId": "imported-1772622343801-181",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.715Z",
+    "lastFailedAt": "2026-03-07T02:10:46.927Z"
+  },
+  "imported-1772622343801-181:1h": {
+    "leadId": "imported-1772622343801-181",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.809Z",
+    "lastFailedAt": "2026-03-07T02:10:46.957Z"
+  },
+  "imported-1772622348160-16:24h": {
+    "leadId": "imported-1772622348160-16",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:33.924Z",
+    "lastFailedAt": "2026-03-07T02:10:51.992Z"
+  },
+  "imported-1772622348160-16:12h": {
+    "leadId": "imported-1772622348160-16",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.025Z",
+    "lastFailedAt": "2026-03-07T02:10:52.095Z"
+  },
+  "imported-1772622348160-16:3h": {
+    "leadId": "imported-1772622348160-16",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.124Z",
+    "lastFailedAt": "2026-03-07T02:10:52.168Z"
+  },
+  "imported-1772622348160-16:1h": {
+    "leadId": "imported-1772622348160-16",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.210Z",
+    "lastFailedAt": "2026-03-07T02:10:52.299Z"
+  },
+  "imported-1772622348160-84:24h": {
+    "leadId": "imported-1772622348160-84",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.327Z",
+    "lastFailedAt": "2026-03-07T02:10:57.666Z"
+  },
+  "imported-1772622348160-84:12h": {
+    "leadId": "imported-1772622348160-84",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.388Z",
+    "lastFailedAt": "2026-03-07T02:10:57.711Z"
+  },
+  "imported-1772622348160-84:3h": {
+    "leadId": "imported-1772622348160-84",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.536Z",
+    "lastFailedAt": "2026-03-07T02:10:57.746Z"
+  },
+  "imported-1772622348160-84:1h": {
+    "leadId": "imported-1772622348160-84",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.635Z",
+    "lastFailedAt": "2026-03-07T02:10:57.786Z"
+  },
+  "imported-1772622348160-85:24h": {
+    "leadId": "imported-1772622348160-85",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.689Z",
+    "lastFailedAt": "2026-03-07T02:10:57.828Z"
+  },
+  "imported-1772622348160-85:12h": {
+    "leadId": "imported-1772622348160-85",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.840Z",
+    "lastFailedAt": "2026-03-07T02:10:57.881Z"
+  },
+  "imported-1772622348160-85:3h": {
+    "leadId": "imported-1772622348160-85",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.946Z",
+    "lastFailedAt": "2026-03-07T02:10:57.930Z"
+  },
+  "imported-1772622348160-85:1h": {
+    "leadId": "imported-1772622348160-85",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:34.991Z",
+    "lastFailedAt": "2026-03-07T02:10:58.015Z"
+  },
+  "imported-1772622348160-95:24h": {
+    "leadId": "imported-1772622348160-95",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.048Z",
+    "lastFailedAt": "2026-03-07T02:10:59.530Z"
+  },
+  "imported-1772622348160-95:12h": {
+    "leadId": "imported-1772622348160-95",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.111Z",
+    "lastFailedAt": "2026-03-07T02:10:59.565Z"
+  },
+  "imported-1772622348160-95:3h": {
+    "leadId": "imported-1772622348160-95",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.151Z",
+    "lastFailedAt": "2026-03-07T02:10:59.596Z"
+  },
+  "imported-1772622348160-95:1h": {
+    "leadId": "imported-1772622348160-95",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.253Z",
+    "lastFailedAt": "2026-03-07T02:10:59.627Z"
+  },
+  "imported-1772622348160-156:24h": {
+    "leadId": "imported-1772622348160-156",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.453Z",
+    "lastFailedAt": "2026-03-07T02:11:04.989Z"
+  },
+  "imported-1772622348160-156:12h": {
+    "leadId": "imported-1772622348160-156",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.561Z",
+    "lastFailedAt": "2026-03-07T02:11:05.022Z"
+  },
+  "imported-1772622348160-156:3h": {
+    "leadId": "imported-1772622348160-156",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.635Z",
+    "lastFailedAt": "2026-03-07T02:11:05.054Z"
+  },
+  "imported-1772622348160-156:1h": {
+    "leadId": "imported-1772622348160-156",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.669Z",
+    "lastFailedAt": "2026-03-07T02:11:05.086Z"
+  },
+  "imported-1772622353669-10:24h": {
+    "leadId": "imported-1772622353669-10",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.737Z",
+    "lastFailedAt": "2026-03-07T02:11:10.322Z"
+  },
+  "imported-1772622353669-10:12h": {
+    "leadId": "imported-1772622353669-10",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.868Z",
+    "lastFailedAt": "2026-03-07T02:11:10.421Z"
+  },
+  "imported-1772622353669-10:3h": {
+    "leadId": "imported-1772622353669-10",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:35.970Z",
+    "lastFailedAt": "2026-03-07T02:11:10.487Z"
+  },
+  "imported-1772622353669-10:1h": {
+    "leadId": "imported-1772622353669-10",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:36.068Z",
+    "lastFailedAt": "2026-03-07T02:11:10.527Z"
+  },
+  "lead_1772716476783:24h": {
+    "leadId": "lead_1772716476783",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:36.103Z",
+    "lastFailedAt": "2026-03-07T02:11:10.936Z"
+  },
+  "lead_1772716476783:12h": {
+    "leadId": "lead_1772716476783",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:36.166Z",
+    "lastFailedAt": "2026-03-07T02:11:11.039Z"
+  },
+  "lead_1772716476783:3h": {
+    "leadId": "lead_1772716476783",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:36.203Z",
+    "lastFailedAt": "2026-03-07T02:11:11.142Z"
+  },
+  "lead_1772716476783:1h": {
+    "leadId": "lead_1772716476783",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:36.250Z",
+    "lastFailedAt": "2026-03-07T02:11:11.235Z"
+  },
+  "lead_1772733826103:24h": {
+    "leadId": "lead_1772733826103",
+    "slot": "24h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:36.375Z",
+    "lastFailedAt": "2026-03-07T02:11:11.755Z"
+  },
+  "lead_1772733826103:12h": {
+    "leadId": "lead_1772733826103",
+    "slot": "12h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:36.482Z",
+    "lastFailedAt": "2026-03-07T02:11:11.858Z"
+  },
+  "lead_1772733826103:3h": {
+    "leadId": "lead_1772733826103",
+    "slot": "3h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:36.580Z",
+    "lastFailedAt": "2026-03-07T02:11:11.949Z"
+  },
+  "lead_1772733826103:1h": {
+    "leadId": "lead_1772733826103",
+    "slot": "1h",
+    "attempts": 7,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:05:36.687Z",
+    "lastFailedAt": "2026-03-07T02:11:12.023Z"
+  },
+  "imported-1772622343800-36:24h": {
+    "leadId": "imported-1772622343800-36",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.257Z",
+    "lastFailedAt": "2026-03-07T02:10:34.772Z"
+  },
+  "imported-1772622343800-36:12h": {
+    "leadId": "imported-1772622343800-36",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.309Z",
+    "lastFailedAt": "2026-03-07T02:10:34.836Z"
+  },
+  "imported-1772622343800-36:3h": {
+    "leadId": "imported-1772622343800-36",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.376Z",
+    "lastFailedAt": "2026-03-07T02:10:34.873Z"
+  },
+  "imported-1772622343800-36:1h": {
+    "leadId": "imported-1772622343800-36",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.426Z",
+    "lastFailedAt": "2026-03-07T02:10:34.993Z"
+  },
+  "imported-1772622343800-37:24h": {
+    "leadId": "imported-1772622343800-37",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.478Z",
+    "lastFailedAt": "2026-03-07T02:10:35.096Z"
+  },
+  "imported-1772622343800-37:12h": {
+    "leadId": "imported-1772622343800-37",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.528Z",
+    "lastFailedAt": "2026-03-07T02:10:35.136Z"
+  },
+  "imported-1772622343800-37:3h": {
+    "leadId": "imported-1772622343800-37",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.577Z",
+    "lastFailedAt": "2026-03-07T02:10:35.180Z"
+  },
+  "imported-1772622343800-37:1h": {
+    "leadId": "imported-1772622343800-37",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.616Z",
+    "lastFailedAt": "2026-03-07T02:10:35.213Z"
+  },
+  "imported-1772622343800-38:24h": {
+    "leadId": "imported-1772622343800-38",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.658Z",
+    "lastFailedAt": "2026-03-07T02:10:35.246Z"
+  },
+  "imported-1772622343800-38:12h": {
+    "leadId": "imported-1772622343800-38",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.726Z",
+    "lastFailedAt": "2026-03-07T02:10:35.297Z"
+  },
+  "imported-1772622343800-38:3h": {
+    "leadId": "imported-1772622343800-38",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.772Z",
+    "lastFailedAt": "2026-03-07T02:10:35.403Z"
+  },
+  "imported-1772622343800-38:1h": {
+    "leadId": "imported-1772622343800-38",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.849Z",
+    "lastFailedAt": "2026-03-07T02:10:35.433Z"
+  },
+  "imported-1772622343800-41:24h": {
+    "leadId": "imported-1772622343800-41",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.891Z",
+    "lastFailedAt": "2026-03-07T02:10:35.472Z"
+  },
+  "imported-1772622343800-41:12h": {
+    "leadId": "imported-1772622343800-41",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:50.958Z",
+    "lastFailedAt": "2026-03-07T02:10:35.604Z"
+  },
+  "imported-1772622343800-41:3h": {
+    "leadId": "imported-1772622343800-41",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.091Z",
+    "lastFailedAt": "2026-03-07T02:10:35.633Z"
+  },
+  "imported-1772622343800-41:1h": {
+    "leadId": "imported-1772622343800-41",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.195Z",
+    "lastFailedAt": "2026-03-07T02:10:35.664Z"
+  },
+  "imported-1772622343800-42:24h": {
+    "leadId": "imported-1772622343800-42",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.298Z",
+    "lastFailedAt": "2026-03-07T02:10:35.705Z"
+  },
+  "imported-1772622343800-42:12h": {
+    "leadId": "imported-1772622343800-42",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.328Z",
+    "lastFailedAt": "2026-03-07T02:10:35.813Z"
+  },
+  "imported-1772622343800-42:3h": {
+    "leadId": "imported-1772622343800-42",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.366Z",
+    "lastFailedAt": "2026-03-07T02:10:35.863Z"
+  },
+  "imported-1772622343800-42:1h": {
+    "leadId": "imported-1772622343800-42",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.407Z",
+    "lastFailedAt": "2026-03-07T02:10:35.899Z"
+  },
+  "imported-1772622343800-50:24h": {
+    "leadId": "imported-1772622343800-50",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.470Z",
+    "lastFailedAt": "2026-03-07T02:10:35.934Z"
+  },
+  "imported-1772622343800-50:12h": {
+    "leadId": "imported-1772622343800-50",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.510Z",
+    "lastFailedAt": "2026-03-07T02:10:35.979Z"
+  },
+  "imported-1772622343800-50:3h": {
+    "leadId": "imported-1772622343800-50",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.549Z",
+    "lastFailedAt": "2026-03-07T02:10:36.119Z"
+  },
+  "imported-1772622343800-50:1h": {
+    "leadId": "imported-1772622343800-50",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.582Z",
+    "lastFailedAt": "2026-03-07T02:10:36.222Z"
+  },
+  "imported-1772622343800-53:24h": {
+    "leadId": "imported-1772622343800-53",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.614Z",
+    "lastFailedAt": "2026-03-07T02:10:36.260Z"
+  },
+  "imported-1772622343800-53:12h": {
+    "leadId": "imported-1772622343800-53",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.708Z",
+    "lastFailedAt": "2026-03-07T02:10:36.312Z"
+  },
+  "imported-1772622343800-53:3h": {
+    "leadId": "imported-1772622343800-53",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.810Z",
+    "lastFailedAt": "2026-03-07T02:10:36.411Z"
+  },
+  "imported-1772622343800-53:1h": {
+    "leadId": "imported-1772622343800-53",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:51.912Z",
+    "lastFailedAt": "2026-03-07T02:10:36.529Z"
+  },
+  "imported-1772622343800-59:24h": {
+    "leadId": "imported-1772622343800-59",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.015Z",
+    "lastFailedAt": "2026-03-07T02:10:36.624Z"
+  },
+  "imported-1772622343800-59:12h": {
+    "leadId": "imported-1772622343800-59",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.117Z",
+    "lastFailedAt": "2026-03-07T02:10:36.734Z"
+  },
+  "imported-1772622343800-59:3h": {
+    "leadId": "imported-1772622343800-59",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.219Z",
+    "lastFailedAt": "2026-03-07T02:10:36.780Z"
+  },
+  "imported-1772622343800-59:1h": {
+    "leadId": "imported-1772622343800-59",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.272Z",
+    "lastFailedAt": "2026-03-07T02:10:36.827Z"
+  },
+  "imported-1772622343800-60:24h": {
+    "leadId": "imported-1772622343800-60",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.312Z",
+    "lastFailedAt": "2026-03-07T02:10:36.919Z"
+  },
+  "imported-1772622343800-60:12h": {
+    "leadId": "imported-1772622343800-60",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.424Z",
+    "lastFailedAt": "2026-03-07T02:10:36.971Z"
+  },
+  "imported-1772622343800-60:3h": {
+    "leadId": "imported-1772622343800-60",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.525Z",
+    "lastFailedAt": "2026-03-07T02:10:37.004Z"
+  },
+  "imported-1772622343800-60:1h": {
+    "leadId": "imported-1772622343800-60",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.629Z",
+    "lastFailedAt": "2026-03-07T02:10:37.041Z"
+  },
+  "imported-1772622343800-61:24h": {
+    "leadId": "imported-1772622343800-61",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.690Z",
+    "lastFailedAt": "2026-03-07T02:10:37.075Z"
+  },
+  "imported-1772622343800-61:12h": {
+    "leadId": "imported-1772622343800-61",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.735Z",
+    "lastFailedAt": "2026-03-07T02:10:37.124Z"
+  },
+  "imported-1772622343800-61:3h": {
+    "leadId": "imported-1772622343800-61",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.834Z",
+    "lastFailedAt": "2026-03-07T02:10:37.156Z"
+  },
+  "imported-1772622343800-61:1h": {
+    "leadId": "imported-1772622343800-61",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.936Z",
+    "lastFailedAt": "2026-03-07T02:10:37.197Z"
+  },
+  "imported-1772622343800-63:24h": {
+    "leadId": "imported-1772622343800-63",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:52.968Z",
+    "lastFailedAt": "2026-03-07T02:10:37.230Z"
+  },
+  "imported-1772622343800-63:12h": {
+    "leadId": "imported-1772622343800-63",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.010Z",
+    "lastFailedAt": "2026-03-07T02:10:37.263Z"
+  },
+  "imported-1772622343800-63:3h": {
+    "leadId": "imported-1772622343800-63",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.042Z",
+    "lastFailedAt": "2026-03-07T02:10:37.305Z"
+  },
+  "imported-1772622343800-63:1h": {
+    "leadId": "imported-1772622343800-63",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.141Z",
+    "lastFailedAt": "2026-03-07T02:10:37.340Z"
+  },
+  "imported-1772622343800-64:24h": {
+    "leadId": "imported-1772622343800-64",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.244Z",
+    "lastFailedAt": "2026-03-07T02:10:37.370Z"
+  },
+  "imported-1772622343800-64:12h": {
+    "leadId": "imported-1772622343800-64",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.284Z",
+    "lastFailedAt": "2026-03-07T02:10:37.656Z"
+  },
+  "imported-1772622343800-64:3h": {
+    "leadId": "imported-1772622343800-64",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.326Z",
+    "lastFailedAt": "2026-03-07T02:10:37.735Z"
+  },
+  "imported-1772622343800-64:1h": {
+    "leadId": "imported-1772622343800-64",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.448Z",
+    "lastFailedAt": "2026-03-07T02:10:37.860Z"
+  },
+  "imported-1772622343800-75:24h": {
+    "leadId": "imported-1772622343800-75",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.551Z",
+    "lastFailedAt": "2026-03-07T02:10:37.963Z"
+  },
+  "imported-1772622343800-75:12h": {
+    "leadId": "imported-1772622343800-75",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.648Z",
+    "lastFailedAt": "2026-03-07T02:10:38.022Z"
+  },
+  "imported-1772622343800-75:3h": {
+    "leadId": "imported-1772622343800-75",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.756Z",
+    "lastFailedAt": "2026-03-07T02:10:38.051Z"
+  },
+  "imported-1772622343800-75:1h": {
+    "leadId": "imported-1772622343800-75",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:53.800Z",
+    "lastFailedAt": "2026-03-07T02:10:38.093Z"
+  },
+  "imported-1772622343800-77:24h": {
+    "leadId": "imported-1772622343800-77",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.165Z",
+    "lastFailedAt": "2026-03-07T02:10:38.330Z"
+  },
+  "imported-1772622343800-77:12h": {
+    "leadId": "imported-1772622343800-77",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.264Z",
+    "lastFailedAt": "2026-03-07T02:10:38.365Z"
+  },
+  "imported-1772622343800-77:3h": {
+    "leadId": "imported-1772622343800-77",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.370Z",
+    "lastFailedAt": "2026-03-07T02:10:38.406Z"
+  },
+  "imported-1772622343800-77:1h": {
+    "leadId": "imported-1772622343800-77",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.474Z",
+    "lastFailedAt": "2026-03-07T02:10:38.444Z"
+  },
+  "imported-1772622343800-78:24h": {
+    "leadId": "imported-1772622343800-78",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.576Z",
+    "lastFailedAt": "2026-03-07T02:10:38.564Z"
+  },
+  "imported-1772622343800-78:12h": {
+    "leadId": "imported-1772622343800-78",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.694Z",
+    "lastFailedAt": "2026-03-07T02:10:38.661Z"
+  },
+  "imported-1772622343800-78:3h": {
+    "leadId": "imported-1772622343800-78",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.781Z",
+    "lastFailedAt": "2026-03-07T02:10:38.693Z"
+  },
+  "imported-1772622343800-78:1h": {
+    "leadId": "imported-1772622343800-78",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.822Z",
+    "lastFailedAt": "2026-03-07T02:10:38.760Z"
+  },
+  "imported-1772622343800-100:24h": {
+    "leadId": "imported-1772622343800-100",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.853Z",
+    "lastFailedAt": "2026-03-07T02:10:38.885Z"
+  },
+  "imported-1772622343800-100:12h": {
+    "leadId": "imported-1772622343800-100",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.885Z",
+    "lastFailedAt": "2026-03-07T02:10:38.942Z"
+  },
+  "imported-1772622343800-100:3h": {
+    "leadId": "imported-1772622343800-100",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:54.982Z",
+    "lastFailedAt": "2026-03-07T02:10:38.981Z"
+  },
+  "imported-1772622343800-100:1h": {
+    "leadId": "imported-1772622343800-100",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.087Z",
+    "lastFailedAt": "2026-03-07T02:10:39.090Z"
+  },
+  "imported-1772622343800-101:24h": {
+    "leadId": "imported-1772622343800-101",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.188Z",
+    "lastFailedAt": "2026-03-07T02:10:39.192Z"
+  },
+  "imported-1772622343800-101:12h": {
+    "leadId": "imported-1772622343800-101",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.291Z",
+    "lastFailedAt": "2026-03-07T02:10:39.277Z"
+  },
+  "imported-1772622343800-101:3h": {
+    "leadId": "imported-1772622343800-101",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.393Z",
+    "lastFailedAt": "2026-03-07T02:10:39.396Z"
+  },
+  "imported-1772622343800-101:1h": {
+    "leadId": "imported-1772622343800-101",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.435Z",
+    "lastFailedAt": "2026-03-07T02:10:39.480Z"
+  },
+  "imported-1772622343800-102:24h": {
+    "leadId": "imported-1772622343800-102",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.483Z",
+    "lastFailedAt": "2026-03-07T02:10:39.532Z"
+  },
+  "imported-1772622343800-102:12h": {
+    "leadId": "imported-1772622343800-102",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.515Z",
+    "lastFailedAt": "2026-03-07T02:10:39.601Z"
+  },
+  "imported-1772622343800-102:3h": {
+    "leadId": "imported-1772622343800-102",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.599Z",
+    "lastFailedAt": "2026-03-07T02:10:39.641Z"
+  },
+  "imported-1772622343800-102:1h": {
+    "leadId": "imported-1772622343800-102",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.648Z",
+    "lastFailedAt": "2026-03-07T02:10:39.674Z"
+  },
+  "imported-1772622343800-103:24h": {
+    "leadId": "imported-1772622343800-103",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.686Z",
+    "lastFailedAt": "2026-03-07T02:10:39.806Z"
+  },
+  "imported-1772622343800-103:12h": {
+    "leadId": "imported-1772622343800-103",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.749Z",
+    "lastFailedAt": "2026-03-07T02:10:39.856Z"
+  },
+  "imported-1772622343800-103:3h": {
+    "leadId": "imported-1772622343800-103",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.785Z",
+    "lastFailedAt": "2026-03-07T02:10:39.895Z"
+  },
+  "imported-1772622343800-103:1h": {
+    "leadId": "imported-1772622343800-103",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:55.816Z",
+    "lastFailedAt": "2026-03-07T02:10:39.929Z"
+  },
+  "imported-1772622343800-105:24h": {
+    "leadId": "imported-1772622343800-105",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:56.315Z",
+    "lastFailedAt": "2026-03-07T02:10:40.313Z"
+  },
+  "imported-1772622343800-105:12h": {
+    "leadId": "imported-1772622343800-105",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:56.346Z",
+    "lastFailedAt": "2026-03-07T02:10:40.351Z"
+  },
+  "imported-1772622343800-105:3h": {
+    "leadId": "imported-1772622343800-105",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:56.418Z",
+    "lastFailedAt": "2026-03-07T02:10:40.396Z"
+  },
+  "imported-1772622343800-105:1h": {
+    "leadId": "imported-1772622343800-105",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:56.512Z",
+    "lastFailedAt": "2026-03-07T02:10:40.433Z"
+  },
+  "imported-1772622343800-111:24h": {
+    "leadId": "imported-1772622343800-111",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:56.615Z",
+    "lastFailedAt": "2026-03-07T02:10:40.488Z"
+  },
+  "imported-1772622343800-111:12h": {
+    "leadId": "imported-1772622343800-111",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:56.725Z",
+    "lastFailedAt": "2026-03-07T02:10:40.518Z"
+  },
+  "imported-1772622343800-111:3h": {
+    "leadId": "imported-1772622343800-111",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:56.828Z",
+    "lastFailedAt": "2026-03-07T02:10:40.577Z"
+  },
+  "imported-1772622343800-111:1h": {
+    "leadId": "imported-1772622343800-111",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:56.919Z",
+    "lastFailedAt": "2026-03-07T02:10:40.617Z"
+  },
+  "imported-1772622343800-114:24h": {
+    "leadId": "imported-1772622343800-114",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.032Z",
+    "lastFailedAt": "2026-03-07T02:10:40.664Z"
+  },
+  "imported-1772622343800-114:12h": {
+    "leadId": "imported-1772622343800-114",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.135Z",
+    "lastFailedAt": "2026-03-07T02:10:40.713Z"
+  },
+  "imported-1772622343800-114:3h": {
+    "leadId": "imported-1772622343800-114",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.186Z",
+    "lastFailedAt": "2026-03-07T02:10:40.819Z"
+  },
+  "imported-1772622343800-114:1h": {
+    "leadId": "imported-1772622343800-114",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.247Z",
+    "lastFailedAt": "2026-03-07T02:10:40.932Z"
+  },
+  "imported-1772622343800-115:24h": {
+    "leadId": "imported-1772622343800-115",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.340Z",
+    "lastFailedAt": "2026-03-07T02:10:41.024Z"
+  },
+  "imported-1772622343800-115:12h": {
+    "leadId": "imported-1772622343800-115",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.442Z",
+    "lastFailedAt": "2026-03-07T02:10:41.061Z"
+  },
+  "imported-1772622343800-115:3h": {
+    "leadId": "imported-1772622343800-115",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.485Z",
+    "lastFailedAt": "2026-03-07T02:10:41.096Z"
+  },
+  "imported-1772622343800-115:1h": {
+    "leadId": "imported-1772622343800-115",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.525Z",
+    "lastFailedAt": "2026-03-07T02:10:41.155Z"
+  },
+  "imported-1772622343800-116:24h": {
+    "leadId": "imported-1772622343800-116",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.647Z",
+    "lastFailedAt": "2026-03-07T02:10:41.219Z"
+  },
+  "imported-1772622343800-116:12h": {
+    "leadId": "imported-1772622343800-116",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.689Z",
+    "lastFailedAt": "2026-03-07T02:10:41.264Z"
+  },
+  "imported-1772622343800-116:3h": {
+    "leadId": "imported-1772622343800-116",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.721Z",
+    "lastFailedAt": "2026-03-07T02:10:41.297Z"
+  },
+  "imported-1772622343800-116:1h": {
+    "leadId": "imported-1772622343800-116",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.755Z",
+    "lastFailedAt": "2026-03-07T02:10:41.339Z"
+  },
+  "imported-1772622343800-119:24h": {
+    "leadId": "imported-1772622343800-119",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.852Z",
+    "lastFailedAt": "2026-03-07T02:10:41.444Z"
+  },
+  "imported-1772622343800-119:12h": {
+    "leadId": "imported-1772622343800-119",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.900Z",
+    "lastFailedAt": "2026-03-07T02:10:41.491Z"
+  },
+  "imported-1772622343800-119:3h": {
+    "leadId": "imported-1772622343800-119",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:57.942Z",
+    "lastFailedAt": "2026-03-07T02:10:41.529Z"
+  },
+  "imported-1772622343800-119:1h": {
+    "leadId": "imported-1772622343800-119",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:58.057Z",
+    "lastFailedAt": "2026-03-07T02:10:41.565Z"
+  },
+  "imported-1772622343800-129:24h": {
+    "leadId": "imported-1772622343800-129",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:58.150Z",
+    "lastFailedAt": "2026-03-07T02:10:41.649Z"
+  },
+  "imported-1772622343800-129:12h": {
+    "leadId": "imported-1772622343800-129",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:58.261Z",
+    "lastFailedAt": "2026-03-07T02:10:41.691Z"
+  },
+  "imported-1772622343800-129:3h": {
+    "leadId": "imported-1772622343800-129",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:58.353Z",
+    "lastFailedAt": "2026-03-07T02:10:41.732Z"
+  },
+  "imported-1772622343800-129:1h": {
+    "leadId": "imported-1772622343800-129",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:58.465Z",
+    "lastFailedAt": "2026-03-07T02:10:41.854Z"
+  },
+  "imported-1772622343800-140:24h": {
+    "leadId": "imported-1772622343800-140",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:58.773Z",
+    "lastFailedAt": "2026-03-07T02:10:42.161Z"
+  },
+  "imported-1772622343800-140:12h": {
+    "leadId": "imported-1772622343800-140",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:58.875Z",
+    "lastFailedAt": "2026-03-07T02:10:42.226Z"
+  },
+  "imported-1772622343800-140:3h": {
+    "leadId": "imported-1772622343800-140",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:58.978Z",
+    "lastFailedAt": "2026-03-07T02:10:42.265Z"
+  },
+  "imported-1772622343800-140:1h": {
+    "leadId": "imported-1772622343800-140",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.021Z",
+    "lastFailedAt": "2026-03-07T02:10:42.365Z"
+  },
+  "imported-1772622343800-141:24h": {
+    "leadId": "imported-1772622343800-141",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.062Z",
+    "lastFailedAt": "2026-03-07T02:10:42.468Z"
+  },
+  "imported-1772622343800-141:12h": {
+    "leadId": "imported-1772622343800-141",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.182Z",
+    "lastFailedAt": "2026-03-07T02:10:42.557Z"
+  },
+  "imported-1772622343800-141:3h": {
+    "leadId": "imported-1772622343800-141",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.280Z",
+    "lastFailedAt": "2026-03-07T02:10:42.631Z"
+  },
+  "imported-1772622343800-141:1h": {
+    "leadId": "imported-1772622343800-141",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.325Z",
+    "lastFailedAt": "2026-03-07T02:10:42.669Z"
+  },
+  "imported-1772622343801-148:24h": {
+    "leadId": "imported-1772622343801-148",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.366Z",
+    "lastFailedAt": "2026-03-07T02:10:42.739Z"
+  },
+  "imported-1772622343801-148:12h": {
+    "leadId": "imported-1772622343801-148",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.488Z",
+    "lastFailedAt": "2026-03-07T02:10:42.793Z"
+  },
+  "imported-1772622343801-148:3h": {
+    "leadId": "imported-1772622343801-148",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.593Z",
+    "lastFailedAt": "2026-03-07T02:10:42.825Z"
+  },
+  "imported-1772622343801-148:1h": {
+    "leadId": "imported-1772622343801-148",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.695Z",
+    "lastFailedAt": "2026-03-07T02:10:42.852Z"
+  },
+  "imported-1772622343801-149:24h": {
+    "leadId": "imported-1772622343801-149",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.797Z",
+    "lastFailedAt": "2026-03-07T02:10:42.892Z"
+  },
+  "imported-1772622343801-149:12h": {
+    "leadId": "imported-1772622343801-149",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.848Z",
+    "lastFailedAt": "2026-03-07T02:10:42.934Z"
+  },
+  "imported-1772622343801-149:3h": {
+    "leadId": "imported-1772622343801-149",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.899Z",
+    "lastFailedAt": "2026-03-07T02:10:42.967Z"
+  },
+  "imported-1772622343801-149:1h": {
+    "leadId": "imported-1772622343801-149",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.949Z",
+    "lastFailedAt": "2026-03-07T02:10:43.024Z"
+  },
+  "imported-1772622343801-151:24h": {
+    "leadId": "imported-1772622343801-151",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:44:59.994Z",
+    "lastFailedAt": "2026-03-07T02:10:43.067Z"
+  },
+  "imported-1772622343801-151:12h": {
+    "leadId": "imported-1772622343801-151",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.104Z",
+    "lastFailedAt": "2026-03-07T02:10:43.177Z"
+  },
+  "imported-1772622343801-151:3h": {
+    "leadId": "imported-1772622343801-151",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.145Z",
+    "lastFailedAt": "2026-03-07T02:10:43.233Z"
+  },
+  "imported-1772622343801-151:1h": {
+    "leadId": "imported-1772622343801-151",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.177Z",
+    "lastFailedAt": "2026-03-07T02:10:43.271Z"
+  },
+  "imported-1772622343801-152:24h": {
+    "leadId": "imported-1772622343801-152",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.213Z",
+    "lastFailedAt": "2026-03-07T02:10:43.314Z"
+  },
+  "imported-1772622343801-152:12h": {
+    "leadId": "imported-1772622343801-152",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.309Z",
+    "lastFailedAt": "2026-03-07T02:10:43.356Z"
+  },
+  "imported-1772622343801-152:3h": {
+    "leadId": "imported-1772622343801-152",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.411Z",
+    "lastFailedAt": "2026-03-07T02:10:43.407Z"
+  },
+  "imported-1772622343801-152:1h": {
+    "leadId": "imported-1772622343801-152",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.514Z",
+    "lastFailedAt": "2026-03-07T02:10:43.458Z"
+  },
+  "imported-1772622343801-153:24h": {
+    "leadId": "imported-1772622343801-153",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.616Z",
+    "lastFailedAt": "2026-03-07T02:10:43.581Z"
+  },
+  "imported-1772622343801-153:12h": {
+    "leadId": "imported-1772622343801-153",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.718Z",
+    "lastFailedAt": "2026-03-07T02:10:43.630Z"
+  },
+  "imported-1772622343801-153:3h": {
+    "leadId": "imported-1772622343801-153",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.815Z",
+    "lastFailedAt": "2026-03-07T02:10:43.670Z"
+  },
+  "imported-1772622343801-153:1h": {
+    "leadId": "imported-1772622343801-153",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:00.924Z",
+    "lastFailedAt": "2026-03-07T02:10:43.698Z"
+  },
+  "imported-1772622343801-155:24h": {
+    "leadId": "imported-1772622343801-155",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.026Z",
+    "lastFailedAt": "2026-03-07T02:10:43.759Z"
+  },
+  "imported-1772622343801-155:12h": {
+    "leadId": "imported-1772622343801-155",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.128Z",
+    "lastFailedAt": "2026-03-07T02:10:43.795Z"
+  },
+  "imported-1772622343801-155:3h": {
+    "leadId": "imported-1772622343801-155",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.231Z",
+    "lastFailedAt": "2026-03-07T02:10:43.841Z"
+  },
+  "imported-1772622343801-155:1h": {
+    "leadId": "imported-1772622343801-155",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.333Z",
+    "lastFailedAt": "2026-03-07T02:10:43.885Z"
+  },
+  "imported-1772622343801-156:24h": {
+    "leadId": "imported-1772622343801-156",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.378Z",
+    "lastFailedAt": "2026-03-07T02:10:43.925Z"
+  },
+  "imported-1772622343801-156:12h": {
+    "leadId": "imported-1772622343801-156",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.435Z",
+    "lastFailedAt": "2026-03-07T02:10:43.961Z"
+  },
+  "imported-1772622343801-156:3h": {
+    "leadId": "imported-1772622343801-156",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.494Z",
+    "lastFailedAt": "2026-03-07T02:10:43.997Z"
+  },
+  "imported-1772622343801-156:1h": {
+    "leadId": "imported-1772622343801-156",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.528Z",
+    "lastFailedAt": "2026-03-07T02:10:44.091Z"
+  },
+  "imported-1772622343801-158:24h": {
+    "leadId": "imported-1772622343801-158",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.622Z",
+    "lastFailedAt": "2026-03-07T02:10:44.130Z"
+  },
+  "imported-1772622343801-158:12h": {
+    "leadId": "imported-1772622343801-158",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.653Z",
+    "lastFailedAt": "2026-03-07T02:10:44.166Z"
+  },
+  "imported-1772622343801-158:3h": {
+    "leadId": "imported-1772622343801-158",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.743Z",
+    "lastFailedAt": "2026-03-07T02:10:44.205Z"
+  },
+  "imported-1772622343801-158:1h": {
+    "leadId": "imported-1772622343801-158",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.831Z",
+    "lastFailedAt": "2026-03-07T02:10:44.311Z"
+  },
+  "imported-1772622343801-159:24h": {
+    "leadId": "imported-1772622343801-159",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.879Z",
+    "lastFailedAt": "2026-03-07T02:10:44.397Z"
+  },
+  "imported-1772622343801-159:12h": {
+    "leadId": "imported-1772622343801-159",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:01.929Z",
+    "lastFailedAt": "2026-03-07T02:10:44.441Z"
+  },
+  "imported-1772622343801-159:3h": {
+    "leadId": "imported-1772622343801-159",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.051Z",
+    "lastFailedAt": "2026-03-07T02:10:44.473Z"
+  },
+  "imported-1772622343801-159:1h": {
+    "leadId": "imported-1772622343801-159",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.152Z",
+    "lastFailedAt": "2026-03-07T02:10:44.503Z"
+  },
+  "imported-1772622343801-161:24h": {
+    "leadId": "imported-1772622343801-161",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.234Z",
+    "lastFailedAt": "2026-03-07T02:10:44.607Z"
+  },
+  "imported-1772622343801-161:12h": {
+    "leadId": "imported-1772622343801-161",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.277Z",
+    "lastFailedAt": "2026-03-07T02:10:44.652Z"
+  },
+  "imported-1772622343801-161:3h": {
+    "leadId": "imported-1772622343801-161",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.306Z",
+    "lastFailedAt": "2026-03-07T02:10:44.700Z"
+  },
+  "imported-1772622343801-161:1h": {
+    "leadId": "imported-1772622343801-161",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.338Z",
+    "lastFailedAt": "2026-03-07T02:10:44.755Z"
+  },
+  "imported-1772622343801-164:24h": {
+    "leadId": "imported-1772622343801-164",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.460Z",
+    "lastFailedAt": "2026-03-07T02:10:44.816Z"
+  },
+  "imported-1772622343801-164:12h": {
+    "leadId": "imported-1772622343801-164",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.562Z",
+    "lastFailedAt": "2026-03-07T02:10:44.849Z"
+  },
+  "imported-1772622343801-164:3h": {
+    "leadId": "imported-1772622343801-164",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.663Z",
+    "lastFailedAt": "2026-03-07T02:10:44.880Z"
+  },
+  "imported-1772622343801-164:1h": {
+    "leadId": "imported-1772622343801-164",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.695Z",
+    "lastFailedAt": "2026-03-07T02:10:44.913Z"
+  },
+  "imported-1772622343801-165:24h": {
+    "leadId": "imported-1772622343801-165",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.767Z",
+    "lastFailedAt": "2026-03-07T02:10:45.016Z"
+  },
+  "imported-1772622343801-165:12h": {
+    "leadId": "imported-1772622343801-165",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.808Z",
+    "lastFailedAt": "2026-03-07T02:10:45.055Z"
+  },
+  "imported-1772622343801-165:3h": {
+    "leadId": "imported-1772622343801-165",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.851Z",
+    "lastFailedAt": "2026-03-07T02:10:45.109Z"
+  },
+  "imported-1772622343801-165:1h": {
+    "leadId": "imported-1772622343801-165",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.884Z",
+    "lastFailedAt": "2026-03-07T02:10:45.230Z"
+  },
+  "imported-1772622343801-172:24h": {
+    "leadId": "imported-1772622343801-172",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:02.972Z",
+    "lastFailedAt": "2026-03-07T02:10:45.335Z"
+  },
+  "imported-1772622343801-172:12h": {
+    "leadId": "imported-1772622343801-172",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.075Z",
+    "lastFailedAt": "2026-03-07T02:10:45.440Z"
+  },
+  "imported-1772622343801-172:3h": {
+    "leadId": "imported-1772622343801-172",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.176Z",
+    "lastFailedAt": "2026-03-07T02:10:45.480Z"
+  },
+  "imported-1772622343801-172:1h": {
+    "leadId": "imported-1772622343801-172",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.213Z",
+    "lastFailedAt": "2026-03-07T02:10:45.508Z"
+  },
+  "imported-1772622343801-173:24h": {
+    "leadId": "imported-1772622343801-173",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.246Z",
+    "lastFailedAt": "2026-03-07T02:10:45.546Z"
+  },
+  "imported-1772622343801-173:12h": {
+    "leadId": "imported-1772622343801-173",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.293Z",
+    "lastFailedAt": "2026-03-07T02:10:45.589Z"
+  },
+  "imported-1772622343801-173:3h": {
+    "leadId": "imported-1772622343801-173",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.321Z",
+    "lastFailedAt": "2026-03-07T02:10:45.630Z"
+  },
+  "imported-1772622343801-173:1h": {
+    "leadId": "imported-1772622343801-173",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.362Z",
+    "lastFailedAt": "2026-03-07T02:10:45.661Z"
+  },
+  "imported-1772622343801-174:24h": {
+    "leadId": "imported-1772622343801-174",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.392Z",
+    "lastFailedAt": "2026-03-07T02:10:45.698Z"
+  },
+  "imported-1772622343801-174:12h": {
+    "leadId": "imported-1772622343801-174",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.483Z",
+    "lastFailedAt": "2026-03-07T02:10:45.744Z"
+  },
+  "imported-1772622343801-174:3h": {
+    "leadId": "imported-1772622343801-174",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.586Z",
+    "lastFailedAt": "2026-03-07T02:10:45.848Z"
+  },
+  "imported-1772622343801-174:1h": {
+    "leadId": "imported-1772622343801-174",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.629Z",
+    "lastFailedAt": "2026-03-07T02:10:45.889Z"
+  },
+  "imported-1772622343801-177:24h": {
+    "leadId": "imported-1772622343801-177",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.663Z",
+    "lastFailedAt": "2026-03-07T02:10:45.930Z"
+  },
+  "imported-1772622343801-177:12h": {
+    "leadId": "imported-1772622343801-177",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.693Z",
+    "lastFailedAt": "2026-03-07T02:10:45.979Z"
+  },
+  "imported-1772622343801-177:3h": {
+    "leadId": "imported-1772622343801-177",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.791Z",
+    "lastFailedAt": "2026-03-07T02:10:46.026Z"
+  },
+  "imported-1772622343801-177:1h": {
+    "leadId": "imported-1772622343801-177",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.834Z",
+    "lastFailedAt": "2026-03-07T02:10:46.063Z"
+  },
+  "imported-1772622343801-178:24h": {
+    "leadId": "imported-1772622343801-178",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.870Z",
+    "lastFailedAt": "2026-03-07T02:10:46.122Z"
+  },
+  "imported-1772622343801-178:12h": {
+    "leadId": "imported-1772622343801-178",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.907Z",
+    "lastFailedAt": "2026-03-07T02:10:46.169Z"
+  },
+  "imported-1772622343801-178:3h": {
+    "leadId": "imported-1772622343801-178",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:03.996Z",
+    "lastFailedAt": "2026-03-07T02:10:46.234Z"
+  },
+  "imported-1772622343801-178:1h": {
+    "leadId": "imported-1772622343801-178",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.046Z",
+    "lastFailedAt": "2026-03-07T02:10:46.276Z"
+  },
+  "imported-1772622343801-179:24h": {
+    "leadId": "imported-1772622343801-179",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.098Z",
+    "lastFailedAt": "2026-03-07T02:10:46.323Z"
+  },
+  "imported-1772622343801-179:12h": {
+    "leadId": "imported-1772622343801-179",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.147Z",
+    "lastFailedAt": "2026-03-07T02:10:46.387Z"
+  },
+  "imported-1772622343801-179:3h": {
+    "leadId": "imported-1772622343801-179",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.182Z",
+    "lastFailedAt": "2026-03-07T02:10:46.425Z"
+  },
+  "imported-1772622343801-179:1h": {
+    "leadId": "imported-1772622343801-179",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.303Z",
+    "lastFailedAt": "2026-03-07T02:10:46.458Z"
+  },
+  "imported-1772622343801-180:24h": {
+    "leadId": "imported-1772622343801-180",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.343Z",
+    "lastFailedAt": "2026-03-07T02:10:46.494Z"
+  },
+  "imported-1772622343801-180:12h": {
+    "leadId": "imported-1772622343801-180",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.371Z",
+    "lastFailedAt": "2026-03-07T02:10:46.535Z"
+  },
+  "imported-1772622343801-180:3h": {
+    "leadId": "imported-1772622343801-180",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.416Z",
+    "lastFailedAt": "2026-03-07T02:10:46.667Z"
+  },
+  "imported-1772622343801-180:1h": {
+    "leadId": "imported-1772622343801-180",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.501Z",
+    "lastFailedAt": "2026-03-07T02:10:46.769Z"
+  },
+  "imported-1772622343801-182:24h": {
+    "leadId": "imported-1772622343801-182",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.812Z",
+    "lastFailedAt": "2026-03-07T02:10:46.997Z"
+  },
+  "imported-1772622343801-182:12h": {
+    "leadId": "imported-1772622343801-182",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:04.917Z",
+    "lastFailedAt": "2026-03-07T02:10:47.037Z"
+  },
+  "imported-1772622343801-182:3h": {
+    "leadId": "imported-1772622343801-182",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.010Z",
+    "lastFailedAt": "2026-03-07T02:10:47.067Z"
+  },
+  "imported-1772622343801-182:1h": {
+    "leadId": "imported-1772622343801-182",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.101Z",
+    "lastFailedAt": "2026-03-07T02:10:47.138Z"
+  },
+  "imported-1772622343801-183:24h": {
+    "leadId": "imported-1772622343801-183",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.131Z",
+    "lastFailedAt": "2026-03-07T02:10:47.175Z"
+  },
+  "imported-1772622343801-183:12h": {
+    "leadId": "imported-1772622343801-183",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.212Z",
+    "lastFailedAt": "2026-03-07T02:10:47.281Z"
+  },
+  "imported-1772622343801-183:3h": {
+    "leadId": "imported-1772622343801-183",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.240Z",
+    "lastFailedAt": "2026-03-07T02:10:47.383Z"
+  },
+  "imported-1772622343801-183:1h": {
+    "leadId": "imported-1772622343801-183",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.306Z",
+    "lastFailedAt": "2026-03-07T02:10:47.486Z"
+  },
+  "imported-1772622343801-184:24h": {
+    "leadId": "imported-1772622343801-184",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.352Z",
+    "lastFailedAt": "2026-03-07T02:10:47.588Z"
+  },
+  "imported-1772622343801-184:12h": {
+    "leadId": "imported-1772622343801-184",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.429Z",
+    "lastFailedAt": "2026-03-07T02:10:47.626Z"
+  },
+  "imported-1772622343801-184:3h": {
+    "leadId": "imported-1772622343801-184",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.469Z",
+    "lastFailedAt": "2026-03-07T02:10:47.666Z"
+  },
+  "imported-1772622343801-184:1h": {
+    "leadId": "imported-1772622343801-184",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.500Z",
+    "lastFailedAt": "2026-03-07T02:10:47.706Z"
+  },
+  "imported-1772622343801-186:24h": {
+    "leadId": "imported-1772622343801-186",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.537Z",
+    "lastFailedAt": "2026-03-07T02:10:47.782Z"
+  },
+  "imported-1772622343801-186:12h": {
+    "leadId": "imported-1772622343801-186",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.633Z",
+    "lastFailedAt": "2026-03-07T02:10:47.813Z"
+  },
+  "imported-1772622343801-186:3h": {
+    "leadId": "imported-1772622343801-186",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.736Z",
+    "lastFailedAt": "2026-03-07T02:10:47.867Z"
+  },
+  "imported-1772622343801-186:1h": {
+    "leadId": "imported-1772622343801-186",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.780Z",
+    "lastFailedAt": "2026-03-07T02:10:47.923Z"
+  },
+  "imported-1772622343801-191:24h": {
+    "leadId": "imported-1772622343801-191",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.816Z",
+    "lastFailedAt": "2026-03-07T02:10:47.975Z"
+  },
+  "imported-1772622343801-191:12h": {
+    "leadId": "imported-1772622343801-191",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.843Z",
+    "lastFailedAt": "2026-03-07T02:10:48.031Z"
+  },
+  "imported-1772622343801-191:3h": {
+    "leadId": "imported-1772622343801-191",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.942Z",
+    "lastFailedAt": "2026-03-07T02:10:48.079Z"
+  },
+  "imported-1772622343801-191:1h": {
+    "leadId": "imported-1772622343801-191",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:05.981Z",
+    "lastFailedAt": "2026-03-07T02:10:48.203Z"
+  },
+  "imported-1772622343801-192:24h": {
+    "leadId": "imported-1772622343801-192",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.017Z",
+    "lastFailedAt": "2026-03-07T02:10:48.284Z"
+  },
+  "imported-1772622343801-192:12h": {
+    "leadId": "imported-1772622343801-192",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.048Z",
+    "lastFailedAt": "2026-03-07T02:10:48.353Z"
+  },
+  "imported-1772622343801-192:3h": {
+    "leadId": "imported-1772622343801-192",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.146Z",
+    "lastFailedAt": "2026-03-07T02:10:48.400Z"
+  },
+  "imported-1772622343801-192:1h": {
+    "leadId": "imported-1772622343801-192",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.248Z",
+    "lastFailedAt": "2026-03-07T02:10:48.510Z"
+  },
+  "imported-1772622343801-193:24h": {
+    "leadId": "imported-1772622343801-193",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.351Z",
+    "lastFailedAt": "2026-03-07T02:10:48.612Z"
+  },
+  "imported-1772622343801-193:12h": {
+    "leadId": "imported-1772622343801-193",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.398Z",
+    "lastFailedAt": "2026-03-07T02:10:48.663Z"
+  },
+  "imported-1772622343801-193:3h": {
+    "leadId": "imported-1772622343801-193",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.454Z",
+    "lastFailedAt": "2026-03-07T02:10:48.705Z"
+  },
+  "imported-1772622343801-193:1h": {
+    "leadId": "imported-1772622343801-193",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.556Z",
+    "lastFailedAt": "2026-03-07T02:10:48.817Z"
+  },
+  "imported-1772622343801-194:24h": {
+    "leadId": "imported-1772622343801-194",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.630Z",
+    "lastFailedAt": "2026-03-07T02:10:48.881Z"
+  },
+  "imported-1772622343801-194:12h": {
+    "leadId": "imported-1772622343801-194",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.669Z",
+    "lastFailedAt": "2026-03-07T02:10:49.013Z"
+  },
+  "imported-1772622343801-194:3h": {
+    "leadId": "imported-1772622343801-194",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.699Z",
+    "lastFailedAt": "2026-03-07T02:10:49.082Z"
+  },
+  "imported-1772622343801-194:1h": {
+    "leadId": "imported-1772622343801-194",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.733Z",
+    "lastFailedAt": "2026-03-07T02:10:49.124Z"
+  },
+  "imported-1772622343801-195:24h": {
+    "leadId": "imported-1772622343801-195",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.860Z",
+    "lastFailedAt": "2026-03-07T02:10:49.218Z"
+  },
+  "imported-1772622343801-195:12h": {
+    "leadId": "imported-1772622343801-195",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:06.965Z",
+    "lastFailedAt": "2026-03-07T02:10:49.289Z"
+  },
+  "imported-1772622343801-195:3h": {
+    "leadId": "imported-1772622343801-195",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.007Z",
+    "lastFailedAt": "2026-03-07T02:10:49.347Z"
+  },
+  "imported-1772622343801-195:1h": {
+    "leadId": "imported-1772622343801-195",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.043Z",
+    "lastFailedAt": "2026-03-07T02:10:49.395Z"
+  },
+  "imported-1772622343801-196:24h": {
+    "leadId": "imported-1772622343801-196",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.075Z",
+    "lastFailedAt": "2026-03-07T02:10:49.466Z"
+  },
+  "imported-1772622343801-196:12h": {
+    "leadId": "imported-1772622343801-196",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.170Z",
+    "lastFailedAt": "2026-03-07T02:10:49.501Z"
+  },
+  "imported-1772622343801-196:3h": {
+    "leadId": "imported-1772622343801-196",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.273Z",
+    "lastFailedAt": "2026-03-07T02:10:49.572Z"
+  },
+  "imported-1772622343801-196:1h": {
+    "leadId": "imported-1772622343801-196",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.375Z",
+    "lastFailedAt": "2026-03-07T02:10:49.615Z"
+  },
+  "imported-1772622343801-197:24h": {
+    "leadId": "imported-1772622343801-197",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.477Z",
+    "lastFailedAt": "2026-03-07T02:10:49.738Z"
+  },
+  "imported-1772622343801-197:12h": {
+    "leadId": "imported-1772622343801-197",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.580Z",
+    "lastFailedAt": "2026-03-07T02:10:49.772Z"
+  },
+  "imported-1772622343801-197:3h": {
+    "leadId": "imported-1772622343801-197",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.631Z",
+    "lastFailedAt": "2026-03-07T02:10:49.815Z"
+  },
+  "imported-1772622343801-197:1h": {
+    "leadId": "imported-1772622343801-197",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.670Z",
+    "lastFailedAt": "2026-03-07T02:10:49.866Z"
+  },
+  "imported-1772622343801-200:24h": {
+    "leadId": "imported-1772622343801-200",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.785Z",
+    "lastFailedAt": "2026-03-07T02:10:49.913Z"
+  },
+  "imported-1772622343801-200:12h": {
+    "leadId": "imported-1772622343801-200",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.836Z",
+    "lastFailedAt": "2026-03-07T02:10:50.047Z"
+  },
+  "imported-1772622343801-200:3h": {
+    "leadId": "imported-1772622343801-200",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.880Z",
+    "lastFailedAt": "2026-03-07T02:10:50.129Z"
+  },
+  "imported-1772622343801-200:1h": {
+    "leadId": "imported-1772622343801-200",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:07.990Z",
+    "lastFailedAt": "2026-03-07T02:10:50.176Z"
+  },
+  "imported-1772622348160-5:24h": {
+    "leadId": "imported-1772622348160-5",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.092Z",
+    "lastFailedAt": "2026-03-07T02:10:50.213Z"
+  },
+  "imported-1772622348160-5:12h": {
+    "leadId": "imported-1772622348160-5",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.134Z",
+    "lastFailedAt": "2026-03-07T02:10:50.259Z"
+  },
+  "imported-1772622348160-5:3h": {
+    "leadId": "imported-1772622348160-5",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.174Z",
+    "lastFailedAt": "2026-03-07T02:10:50.346Z"
+  },
+  "imported-1772622348160-5:1h": {
+    "leadId": "imported-1772622348160-5",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.204Z",
+    "lastFailedAt": "2026-03-07T02:10:50.456Z"
+  },
+  "imported-1772622348160-6:24h": {
+    "leadId": "imported-1772622348160-6",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.243Z",
+    "lastFailedAt": "2026-03-07T02:10:50.495Z"
+  },
+  "imported-1772622348160-6:12h": {
+    "leadId": "imported-1772622348160-6",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.296Z",
+    "lastFailedAt": "2026-03-07T02:10:50.533Z"
+  },
+  "imported-1772622348160-6:3h": {
+    "leadId": "imported-1772622348160-6",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.347Z",
+    "lastFailedAt": "2026-03-07T02:10:50.657Z"
+  },
+  "imported-1772622348160-6:1h": {
+    "leadId": "imported-1772622348160-6",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.376Z",
+    "lastFailedAt": "2026-03-07T02:10:50.686Z"
+  },
+  "imported-1772622348160-7:24h": {
+    "leadId": "imported-1772622348160-7",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.409Z",
+    "lastFailedAt": "2026-03-07T02:10:50.719Z"
+  },
+  "imported-1772622348160-7:12h": {
+    "leadId": "imported-1772622348160-7",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.491Z",
+    "lastFailedAt": "2026-03-07T02:10:50.748Z"
+  },
+  "imported-1772622348160-7:3h": {
+    "leadId": "imported-1772622348160-7",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.603Z",
+    "lastFailedAt": "2026-03-07T02:10:50.819Z"
+  },
+  "imported-1772622348160-7:1h": {
+    "leadId": "imported-1772622348160-7",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.707Z",
+    "lastFailedAt": "2026-03-07T02:10:50.846Z"
+  },
+  "imported-1772622348160-9:24h": {
+    "leadId": "imported-1772622348160-9",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.809Z",
+    "lastFailedAt": "2026-03-07T02:10:50.904Z"
+  },
+  "imported-1772622348160-9:12h": {
+    "leadId": "imported-1772622348160-9",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.911Z",
+    "lastFailedAt": "2026-03-07T02:10:50.937Z"
+  },
+  "imported-1772622348160-9:3h": {
+    "leadId": "imported-1772622348160-9",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:08.982Z",
+    "lastFailedAt": "2026-03-07T02:10:50.968Z"
+  },
+  "imported-1772622348160-9:1h": {
+    "leadId": "imported-1772622348160-9",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.024Z",
+    "lastFailedAt": "2026-03-07T02:10:51.001Z"
+  },
+  "imported-1772622348160-10:24h": {
+    "leadId": "imported-1772622348160-10",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.115Z",
+    "lastFailedAt": "2026-03-07T02:10:51.070Z"
+  },
+  "imported-1772622348160-10:12h": {
+    "leadId": "imported-1772622348160-10",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.191Z",
+    "lastFailedAt": "2026-03-07T02:10:51.172Z"
+  },
+  "imported-1772622348160-10:3h": {
+    "leadId": "imported-1772622348160-10",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.273Z",
+    "lastFailedAt": "2026-03-07T02:10:51.206Z"
+  },
+  "imported-1772622348160-10:1h": {
+    "leadId": "imported-1772622348160-10",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.304Z",
+    "lastFailedAt": "2026-03-07T02:10:51.251Z"
+  },
+  "imported-1772622348160-11:24h": {
+    "leadId": "imported-1772622348160-11",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.423Z",
+    "lastFailedAt": "2026-03-07T02:10:51.377Z"
+  },
+  "imported-1772622348160-11:12h": {
+    "leadId": "imported-1772622348160-11",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.525Z",
+    "lastFailedAt": "2026-03-07T02:10:51.479Z"
+  },
+  "imported-1772622348160-11:3h": {
+    "leadId": "imported-1772622348160-11",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.628Z",
+    "lastFailedAt": "2026-03-07T02:10:51.576Z"
+  },
+  "imported-1772622348160-11:1h": {
+    "leadId": "imported-1772622348160-11",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.703Z",
+    "lastFailedAt": "2026-03-07T02:10:51.684Z"
+  },
+  "imported-1772622348160-15:24h": {
+    "leadId": "imported-1772622348160-15",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.768Z",
+    "lastFailedAt": "2026-03-07T02:10:51.719Z"
+  },
+  "imported-1772622348160-15:12h": {
+    "leadId": "imported-1772622348160-15",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.801Z",
+    "lastFailedAt": "2026-03-07T02:10:51.768Z"
+  },
+  "imported-1772622348160-15:3h": {
+    "leadId": "imported-1772622348160-15",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.836Z",
+    "lastFailedAt": "2026-03-07T02:10:51.870Z"
+  },
+  "imported-1772622348160-15:1h": {
+    "leadId": "imported-1772622348160-15",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:09.935Z",
+    "lastFailedAt": "2026-03-07T02:10:51.907Z"
+  },
+  "imported-1772622348160-17:24h": {
+    "leadId": "imported-1772622348160-17",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:10.236Z",
+    "lastFailedAt": "2026-03-07T02:10:52.369Z"
+  },
+  "imported-1772622348160-17:12h": {
+    "leadId": "imported-1772622348160-17",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:10.345Z",
+    "lastFailedAt": "2026-03-07T02:10:52.502Z"
+  },
+  "imported-1772622348160-17:3h": {
+    "leadId": "imported-1772622348160-17",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:10.435Z",
+    "lastFailedAt": "2026-03-07T02:10:52.606Z"
+  },
+  "imported-1772622348160-17:1h": {
+    "leadId": "imported-1772622348160-17",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:10.549Z",
+    "lastFailedAt": "2026-03-07T02:10:52.651Z"
+  },
+  "imported-1772622348160-18:24h": {
+    "leadId": "imported-1772622348160-18",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:10.662Z",
+    "lastFailedAt": "2026-03-07T02:10:52.689Z"
+  },
+  "imported-1772622348160-18:12h": {
+    "leadId": "imported-1772622348160-18",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:10.755Z",
+    "lastFailedAt": "2026-03-07T02:10:52.754Z"
+  },
+  "imported-1772622348160-18:3h": {
+    "leadId": "imported-1772622348160-18",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:10.854Z",
+    "lastFailedAt": "2026-03-07T02:10:52.783Z"
+  },
+  "imported-1772622348160-18:1h": {
+    "leadId": "imported-1772622348160-18",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:10.960Z",
+    "lastFailedAt": "2026-03-07T02:10:52.913Z"
+  },
+  "imported-1772622348160-19:24h": {
+    "leadId": "imported-1772622348160-19",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.043Z",
+    "lastFailedAt": "2026-03-07T02:10:53.009Z"
+  },
+  "imported-1772622348160-19:12h": {
+    "leadId": "imported-1772622348160-19",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.098Z",
+    "lastFailedAt": "2026-03-07T02:10:53.070Z"
+  },
+  "imported-1772622348160-19:3h": {
+    "leadId": "imported-1772622348160-19",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.163Z",
+    "lastFailedAt": "2026-03-07T02:10:53.110Z"
+  },
+  "imported-1772622348160-19:1h": {
+    "leadId": "imported-1772622348160-19",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.237Z",
+    "lastFailedAt": "2026-03-07T02:10:53.156Z"
+  },
+  "imported-1772622348160-20:24h": {
+    "leadId": "imported-1772622348160-20",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.278Z",
+    "lastFailedAt": "2026-03-07T02:10:53.189Z"
+  },
+  "imported-1772622348160-20:12h": {
+    "leadId": "imported-1772622348160-20",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.368Z",
+    "lastFailedAt": "2026-03-07T02:10:53.221Z"
+  },
+  "imported-1772622348160-20:3h": {
+    "leadId": "imported-1772622348160-20",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.398Z",
+    "lastFailedAt": "2026-03-07T02:10:53.267Z"
+  },
+  "imported-1772622348160-20:1h": {
+    "leadId": "imported-1772622348160-20",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.445Z",
+    "lastFailedAt": "2026-03-07T02:10:53.311Z"
+  },
+  "imported-1772622348160-22:24h": {
+    "leadId": "imported-1772622348160-22",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.481Z",
+    "lastFailedAt": "2026-03-07T02:10:53.345Z"
+  },
+  "imported-1772622348160-22:12h": {
+    "leadId": "imported-1772622348160-22",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.574Z",
+    "lastFailedAt": "2026-03-07T02:10:53.390Z"
+  },
+  "imported-1772622348160-22:3h": {
+    "leadId": "imported-1772622348160-22",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.617Z",
+    "lastFailedAt": "2026-03-07T02:10:53.438Z"
+  },
+  "imported-1772622348160-22:1h": {
+    "leadId": "imported-1772622348160-22",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.652Z",
+    "lastFailedAt": "2026-03-07T02:10:53.482Z"
+  },
+  "imported-1772622348160-23:24h": {
+    "leadId": "imported-1772622348160-23",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.778Z",
+    "lastFailedAt": "2026-03-07T02:10:53.514Z"
+  },
+  "imported-1772622348160-23:12h": {
+    "leadId": "imported-1772622348160-23",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.822Z",
+    "lastFailedAt": "2026-03-07T02:10:53.552Z"
+  },
+  "imported-1772622348160-23:3h": {
+    "leadId": "imported-1772622348160-23",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.857Z",
+    "lastFailedAt": "2026-03-07T02:10:53.592Z"
+  },
+  "imported-1772622348160-23:1h": {
+    "leadId": "imported-1772622348160-23",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:11.984Z",
+    "lastFailedAt": "2026-03-07T02:10:53.630Z"
+  },
+  "imported-1772622348160-32:24h": {
+    "leadId": "imported-1772622348160-32",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.086Z",
+    "lastFailedAt": "2026-03-07T02:10:53.671Z"
+  },
+  "imported-1772622348160-32:12h": {
+    "leadId": "imported-1772622348160-32",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.188Z",
+    "lastFailedAt": "2026-03-07T02:10:53.700Z"
+  },
+  "imported-1772622348160-32:3h": {
+    "leadId": "imported-1772622348160-32",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.291Z",
+    "lastFailedAt": "2026-03-07T02:10:53.733Z"
+  },
+  "imported-1772622348160-32:1h": {
+    "leadId": "imported-1772622348160-32",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.372Z",
+    "lastFailedAt": "2026-03-07T02:10:53.835Z"
+  },
+  "imported-1772622348160-34:24h": {
+    "leadId": "imported-1772622348160-34",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.495Z",
+    "lastFailedAt": "2026-03-07T02:10:53.938Z"
+  },
+  "imported-1772622348160-34:12h": {
+    "leadId": "imported-1772622348160-34",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.538Z",
+    "lastFailedAt": "2026-03-07T02:10:54.040Z"
+  },
+  "imported-1772622348160-34:3h": {
+    "leadId": "imported-1772622348160-34",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.597Z",
+    "lastFailedAt": "2026-03-07T02:10:54.133Z"
+  },
+  "imported-1772622348160-34:1h": {
+    "leadId": "imported-1772622348160-34",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.670Z",
+    "lastFailedAt": "2026-03-07T02:10:54.177Z"
+  },
+  "imported-1772622348160-45:24h": {
+    "leadId": "imported-1772622348160-45",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.710Z",
+    "lastFailedAt": "2026-03-07T02:10:54.246Z"
+  },
+  "imported-1772622348160-45:12h": {
+    "leadId": "imported-1772622348160-45",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.765Z",
+    "lastFailedAt": "2026-03-07T02:10:54.349Z"
+  },
+  "imported-1772622348160-45:3h": {
+    "leadId": "imported-1772622348160-45",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.793Z",
+    "lastFailedAt": "2026-03-07T02:10:54.388Z"
+  },
+  "imported-1772622348160-45:1h": {
+    "leadId": "imported-1772622348160-45",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:12.904Z",
+    "lastFailedAt": "2026-03-07T02:10:54.441Z"
+  },
+  "imported-1772622348160-47:24h": {
+    "leadId": "imported-1772622348160-47",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.004Z",
+    "lastFailedAt": "2026-03-07T02:10:54.551Z"
+  },
+  "imported-1772622348160-47:12h": {
+    "leadId": "imported-1772622348160-47",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.076Z",
+    "lastFailedAt": "2026-03-07T02:10:54.598Z"
+  },
+  "imported-1772622348160-47:3h": {
+    "leadId": "imported-1772622348160-47",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.121Z",
+    "lastFailedAt": "2026-03-07T02:10:54.642Z"
+  },
+  "imported-1772622348160-47:1h": {
+    "leadId": "imported-1772622348160-47",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.150Z",
+    "lastFailedAt": "2026-03-07T02:10:54.686Z"
+  },
+  "imported-1772622348160-50:24h": {
+    "leadId": "imported-1772622348160-50",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.181Z",
+    "lastFailedAt": "2026-03-07T02:10:54.729Z"
+  },
+  "imported-1772622348160-50:12h": {
+    "leadId": "imported-1772622348160-50",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.214Z",
+    "lastFailedAt": "2026-03-07T02:10:54.786Z"
+  },
+  "imported-1772622348160-50:3h": {
+    "leadId": "imported-1772622348160-50",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.314Z",
+    "lastFailedAt": "2026-03-07T02:10:54.813Z"
+  },
+  "imported-1772622348160-50:1h": {
+    "leadId": "imported-1772622348160-50",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.366Z",
+    "lastFailedAt": "2026-03-07T02:10:54.851Z"
+  },
+  "imported-1772622348160-52:24h": {
+    "leadId": "imported-1772622348160-52",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.416Z",
+    "lastFailedAt": "2026-03-07T02:10:54.961Z"
+  },
+  "imported-1772622348160-52:12h": {
+    "leadId": "imported-1772622348160-52",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.457Z",
+    "lastFailedAt": "2026-03-07T02:10:55.008Z"
+  },
+  "imported-1772622348160-52:3h": {
+    "leadId": "imported-1772622348160-52",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.519Z",
+    "lastFailedAt": "2026-03-07T02:10:55.039Z"
+  },
+  "imported-1772622348160-52:1h": {
+    "leadId": "imported-1772622348160-52",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.570Z",
+    "lastFailedAt": "2026-03-07T02:10:55.111Z"
+  },
+  "imported-1772622348160-54:24h": {
+    "leadId": "imported-1772622348160-54",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.612Z",
+    "lastFailedAt": "2026-03-07T02:10:55.150Z"
+  },
+  "imported-1772622348160-54:12h": {
+    "leadId": "imported-1772622348160-54",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.710Z",
+    "lastFailedAt": "2026-03-07T02:10:55.181Z"
+  },
+  "imported-1772622348160-54:3h": {
+    "leadId": "imported-1772622348160-54",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.775Z",
+    "lastFailedAt": "2026-03-07T02:10:55.246Z"
+  },
+  "imported-1772622348160-54:1h": {
+    "leadId": "imported-1772622348160-54",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.814Z",
+    "lastFailedAt": "2026-03-07T02:10:55.290Z"
+  },
+  "imported-1772622348160-55:24h": {
+    "leadId": "imported-1772622348160-55",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.865Z",
+    "lastFailedAt": "2026-03-07T02:10:55.334Z"
+  },
+  "imported-1772622348160-55:12h": {
+    "leadId": "imported-1772622348160-55",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.906Z",
+    "lastFailedAt": "2026-03-07T02:10:55.369Z"
+  },
+  "imported-1772622348160-55:3h": {
+    "leadId": "imported-1772622348160-55",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.939Z",
+    "lastFailedAt": "2026-03-07T02:10:55.401Z"
+  },
+  "imported-1772622348160-55:1h": {
+    "leadId": "imported-1772622348160-55",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:13.974Z",
+    "lastFailedAt": "2026-03-07T02:10:55.438Z"
+  },
+  "imported-1772622348160-56:24h": {
+    "leadId": "imported-1772622348160-56",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.134Z",
+    "lastFailedAt": "2026-03-07T02:10:55.490Z"
+  },
+  "imported-1772622348160-56:12h": {
+    "leadId": "imported-1772622348160-56",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.176Z",
+    "lastFailedAt": "2026-03-07T02:10:55.536Z"
+  },
+  "imported-1772622348160-56:3h": {
+    "leadId": "imported-1772622348160-56",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.223Z",
+    "lastFailedAt": "2026-03-07T02:10:55.576Z"
+  },
+  "imported-1772622348160-56:1h": {
+    "leadId": "imported-1772622348160-56",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.275Z",
+    "lastFailedAt": "2026-03-07T02:10:55.653Z"
+  },
+  "imported-1772622348160-57:24h": {
+    "leadId": "imported-1772622348160-57",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.305Z",
+    "lastFailedAt": "2026-03-07T02:10:55.730Z"
+  },
+  "imported-1772622348160-57:12h": {
+    "leadId": "imported-1772622348160-57",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.344Z",
+    "lastFailedAt": "2026-03-07T02:10:55.764Z"
+  },
+  "imported-1772622348160-57:3h": {
+    "leadId": "imported-1772622348160-57",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.432Z",
+    "lastFailedAt": "2026-03-07T02:10:55.803Z"
+  },
+  "imported-1772622348160-57:1h": {
+    "leadId": "imported-1772622348160-57",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.469Z",
+    "lastFailedAt": "2026-03-07T02:10:55.837Z"
+  },
+  "imported-1772622348160-60:24h": {
+    "leadId": "imported-1772622348160-60",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.515Z",
+    "lastFailedAt": "2026-03-07T02:10:55.876Z"
+  },
+  "imported-1772622348160-60:12h": {
+    "leadId": "imported-1772622348160-60",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.544Z",
+    "lastFailedAt": "2026-03-07T02:10:55.971Z"
+  },
+  "imported-1772622348160-60:3h": {
+    "leadId": "imported-1772622348160-60",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.645Z",
+    "lastFailedAt": "2026-03-07T02:10:56.010Z"
+  },
+  "imported-1772622348160-60:1h": {
+    "leadId": "imported-1772622348160-60",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.690Z",
+    "lastFailedAt": "2026-03-07T02:10:56.048Z"
+  },
+  "imported-1772622348160-64:24h": {
+    "leadId": "imported-1772622348160-64",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.724Z",
+    "lastFailedAt": "2026-03-07T02:10:56.190Z"
+  },
+  "imported-1772622348160-64:12h": {
+    "leadId": "imported-1772622348160-64",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.851Z",
+    "lastFailedAt": "2026-03-07T02:10:56.245Z"
+  },
+  "imported-1772622348160-64:3h": {
+    "leadId": "imported-1772622348160-64",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:14.948Z",
+    "lastFailedAt": "2026-03-07T02:10:56.280Z"
+  },
+  "imported-1772622348160-64:1h": {
+    "leadId": "imported-1772622348160-64",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.040Z",
+    "lastFailedAt": "2026-03-07T02:10:56.329Z"
+  },
+  "imported-1772622348160-65:24h": {
+    "leadId": "imported-1772622348160-65",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.157Z",
+    "lastFailedAt": "2026-03-07T02:10:56.371Z"
+  },
+  "imported-1772622348160-65:12h": {
+    "leadId": "imported-1772622348160-65",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.240Z",
+    "lastFailedAt": "2026-03-07T02:10:56.406Z"
+  },
+  "imported-1772622348160-65:3h": {
+    "leadId": "imported-1772622348160-65",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.333Z",
+    "lastFailedAt": "2026-03-07T02:10:56.497Z"
+  },
+  "imported-1772622348160-65:1h": {
+    "leadId": "imported-1772622348160-65",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.371Z",
+    "lastFailedAt": "2026-03-07T02:10:56.529Z"
+  },
+  "imported-1772622348160-71:24h": {
+    "leadId": "imported-1772622348160-71",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.405Z",
+    "lastFailedAt": "2026-03-07T02:10:56.561Z"
+  },
+  "imported-1772622348160-71:12h": {
+    "leadId": "imported-1772622348160-71",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.435Z",
+    "lastFailedAt": "2026-03-07T02:10:56.593Z"
+  },
+  "imported-1772622348160-71:3h": {
+    "leadId": "imported-1772622348160-71",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.466Z",
+    "lastFailedAt": "2026-03-07T02:10:56.633Z"
+  },
+  "imported-1772622348160-71:1h": {
+    "leadId": "imported-1772622348160-71",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.568Z",
+    "lastFailedAt": "2026-03-07T02:10:56.671Z"
+  },
+  "imported-1772622348160-73:24h": {
+    "leadId": "imported-1772622348160-73",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.669Z",
+    "lastFailedAt": "2026-03-07T02:10:56.774Z"
+  },
+  "imported-1772622348160-73:12h": {
+    "leadId": "imported-1772622348160-73",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.767Z",
+    "lastFailedAt": "2026-03-07T02:10:56.838Z"
+  },
+  "imported-1772622348160-73:3h": {
+    "leadId": "imported-1772622348160-73",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.812Z",
+    "lastFailedAt": "2026-03-07T02:10:56.875Z"
+  },
+  "imported-1772622348160-73:1h": {
+    "leadId": "imported-1772622348160-73",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.843Z",
+    "lastFailedAt": "2026-03-07T02:10:57.010Z"
+  },
+  "imported-1772622348160-75:24h": {
+    "leadId": "imported-1772622348160-75",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.878Z",
+    "lastFailedAt": "2026-03-07T02:10:57.112Z"
+  },
+  "imported-1772622348160-75:12h": {
+    "leadId": "imported-1772622348160-75",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:15.985Z",
+    "lastFailedAt": "2026-03-07T02:10:57.144Z"
+  },
+  "imported-1772622348160-75:3h": {
+    "leadId": "imported-1772622348160-75",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.057Z",
+    "lastFailedAt": "2026-03-07T02:10:57.185Z"
+  },
+  "imported-1772622348160-75:1h": {
+    "leadId": "imported-1772622348160-75",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.092Z",
+    "lastFailedAt": "2026-03-07T02:10:57.222Z"
+  },
+  "imported-1772622348160-76:24h": {
+    "leadId": "imported-1772622348160-76",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.182Z",
+    "lastFailedAt": "2026-03-07T02:10:57.255Z"
+  },
+  "imported-1772622348160-76:12h": {
+    "leadId": "imported-1772622348160-76",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.254Z",
+    "lastFailedAt": "2026-03-07T02:10:57.298Z"
+  },
+  "imported-1772622348160-76:3h": {
+    "leadId": "imported-1772622348160-76",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.293Z",
+    "lastFailedAt": "2026-03-07T02:10:57.329Z"
+  },
+  "imported-1772622348160-76:1h": {
+    "leadId": "imported-1772622348160-76",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.346Z",
+    "lastFailedAt": "2026-03-07T02:10:57.363Z"
+  },
+  "imported-1772622348160-83:24h": {
+    "leadId": "imported-1772622348160-83",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.386Z",
+    "lastFailedAt": "2026-03-07T02:10:57.417Z"
+  },
+  "imported-1772622348160-83:12h": {
+    "leadId": "imported-1772622348160-83",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.455Z",
+    "lastFailedAt": "2026-03-07T02:10:57.466Z"
+  },
+  "imported-1772622348160-83:3h": {
+    "leadId": "imported-1772622348160-83",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.492Z",
+    "lastFailedAt": "2026-03-07T02:10:57.506Z"
+  },
+  "imported-1772622348160-83:1h": {
+    "leadId": "imported-1772622348160-83",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:16.565Z",
+    "lastFailedAt": "2026-03-07T02:10:57.617Z"
+  },
+  "imported-1772622348160-86:24h": {
+    "leadId": "imported-1772622348160-86",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.001Z",
+    "lastFailedAt": "2026-03-07T02:10:58.053Z"
+  },
+  "imported-1772622348160-86:12h": {
+    "leadId": "imported-1772622348160-86",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.051Z",
+    "lastFailedAt": "2026-03-07T02:10:58.097Z"
+  },
+  "imported-1772622348160-86:3h": {
+    "leadId": "imported-1772622348160-86",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.097Z",
+    "lastFailedAt": "2026-03-07T02:10:58.140Z"
+  },
+  "imported-1772622348160-86:1h": {
+    "leadId": "imported-1772622348160-86",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.205Z",
+    "lastFailedAt": "2026-03-07T02:10:58.183Z"
+  },
+  "imported-1772622348160-89:24h": {
+    "leadId": "imported-1772622348160-89",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.303Z",
+    "lastFailedAt": "2026-03-07T02:10:58.226Z"
+  },
+  "imported-1772622348160-89:12h": {
+    "leadId": "imported-1772622348160-89",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.358Z",
+    "lastFailedAt": "2026-03-07T02:10:58.337Z"
+  },
+  "imported-1772622348160-89:3h": {
+    "leadId": "imported-1772622348160-89",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.397Z",
+    "lastFailedAt": "2026-03-07T02:10:58.378Z"
+  },
+  "imported-1772622348160-89:1h": {
+    "leadId": "imported-1772622348160-89",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.427Z",
+    "lastFailedAt": "2026-03-07T02:10:58.446Z"
+  },
+  "imported-1772622348160-90:24h": {
+    "leadId": "imported-1772622348160-90",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.513Z",
+    "lastFailedAt": "2026-03-07T02:10:58.491Z"
+  },
+  "imported-1772622348160-90:12h": {
+    "leadId": "imported-1772622348160-90",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.615Z",
+    "lastFailedAt": "2026-03-07T02:10:58.536Z"
+  },
+  "imported-1772622348160-90:3h": {
+    "leadId": "imported-1772622348160-90",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.657Z",
+    "lastFailedAt": "2026-03-07T02:10:58.642Z"
+  },
+  "imported-1772622348160-90:1h": {
+    "leadId": "imported-1772622348160-90",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.690Z",
+    "lastFailedAt": "2026-03-07T02:10:58.694Z"
+  },
+  "imported-1772622348160-91:24h": {
+    "leadId": "imported-1772622348160-91",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.723Z",
+    "lastFailedAt": "2026-03-07T02:10:58.740Z"
+  },
+  "imported-1772622348160-91:12h": {
+    "leadId": "imported-1772622348160-91",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.788Z",
+    "lastFailedAt": "2026-03-07T02:10:58.791Z"
+  },
+  "imported-1772622348160-91:3h": {
+    "leadId": "imported-1772622348160-91",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.829Z",
+    "lastFailedAt": "2026-03-07T02:10:58.840Z"
+  },
+  "imported-1772622348160-91:1h": {
+    "leadId": "imported-1772622348160-91",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:17.922Z",
+    "lastFailedAt": "2026-03-07T02:10:58.906Z"
+  },
+  "imported-1772622348160-92:24h": {
+    "leadId": "imported-1772622348160-92",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.005Z",
+    "lastFailedAt": "2026-03-07T02:10:58.942Z"
+  },
+  "imported-1772622348160-92:12h": {
+    "leadId": "imported-1772622348160-92",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.049Z",
+    "lastFailedAt": "2026-03-07T02:10:59.001Z"
+  },
+  "imported-1772622348160-92:3h": {
+    "leadId": "imported-1772622348160-92",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.106Z",
+    "lastFailedAt": "2026-03-07T02:10:59.069Z"
+  },
+  "imported-1772622348160-92:1h": {
+    "leadId": "imported-1772622348160-92",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.332Z",
+    "lastFailedAt": "2026-03-07T02:10:59.118Z"
+  },
+  "imported-1772622348160-93:24h": {
+    "leadId": "imported-1772622348160-93",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.434Z",
+    "lastFailedAt": "2026-03-07T02:10:59.165Z"
+  },
+  "imported-1772622348160-93:12h": {
+    "leadId": "imported-1772622348160-93",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.537Z",
+    "lastFailedAt": "2026-03-07T02:10:59.212Z"
+  },
+  "imported-1772622348160-93:3h": {
+    "leadId": "imported-1772622348160-93",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.578Z",
+    "lastFailedAt": "2026-03-07T02:10:59.253Z"
+  },
+  "imported-1772622348160-93:1h": {
+    "leadId": "imported-1772622348160-93",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.610Z",
+    "lastFailedAt": "2026-03-07T02:10:59.288Z"
+  },
+  "imported-1772622348160-94:24h": {
+    "leadId": "imported-1772622348160-94",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.642Z",
+    "lastFailedAt": "2026-03-07T02:10:59.364Z"
+  },
+  "imported-1772622348160-94:12h": {
+    "leadId": "imported-1772622348160-94",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.688Z",
+    "lastFailedAt": "2026-03-07T02:10:59.392Z"
+  },
+  "imported-1772622348160-94:3h": {
+    "leadId": "imported-1772622348160-94",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.730Z",
+    "lastFailedAt": "2026-03-07T02:10:59.436Z"
+  },
+  "imported-1772622348160-94:1h": {
+    "leadId": "imported-1772622348160-94",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:18.811Z",
+    "lastFailedAt": "2026-03-07T02:10:59.470Z"
+  },
+  "imported-1772622348160-99:24h": {
+    "leadId": "imported-1772622348160-99",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.253Z",
+    "lastFailedAt": "2026-03-07T02:10:59.774Z"
+  },
+  "imported-1772622348160-99:12h": {
+    "leadId": "imported-1772622348160-99",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.297Z",
+    "lastFailedAt": "2026-03-07T02:10:59.876Z"
+  },
+  "imported-1772622348160-99:3h": {
+    "leadId": "imported-1772622348160-99",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.356Z",
+    "lastFailedAt": "2026-03-07T02:10:59.970Z"
+  },
+  "imported-1772622348160-99:1h": {
+    "leadId": "imported-1772622348160-99",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.458Z",
+    "lastFailedAt": "2026-03-07T02:11:00.082Z"
+  },
+  "imported-1772622348160-116:24h": {
+    "leadId": "imported-1772622348160-116",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.560Z",
+    "lastFailedAt": "2026-03-07T02:11:00.183Z"
+  },
+  "imported-1772622348160-116:12h": {
+    "leadId": "imported-1772622348160-116",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.663Z",
+    "lastFailedAt": "2026-03-07T02:11:00.223Z"
+  },
+  "imported-1772622348160-116:3h": {
+    "leadId": "imported-1772622348160-116",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.766Z",
+    "lastFailedAt": "2026-03-07T02:11:00.255Z"
+  },
+  "imported-1772622348160-116:1h": {
+    "leadId": "imported-1772622348160-116",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.818Z",
+    "lastFailedAt": "2026-03-07T02:11:00.286Z"
+  },
+  "imported-1772622348160-117:24h": {
+    "leadId": "imported-1772622348160-117",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.857Z",
+    "lastFailedAt": "2026-03-07T02:11:00.328Z"
+  },
+  "imported-1772622348160-117:12h": {
+    "leadId": "imported-1772622348160-117",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.886Z",
+    "lastFailedAt": "2026-03-07T02:11:00.362Z"
+  },
+  "imported-1772622348160-117:3h": {
+    "leadId": "imported-1772622348160-117",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:19.970Z",
+    "lastFailedAt": "2026-03-07T02:11:00.452Z"
+  },
+  "imported-1772622348160-117:1h": {
+    "leadId": "imported-1772622348160-117",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.025Z",
+    "lastFailedAt": "2026-03-07T02:11:00.485Z"
+  },
+  "imported-1772622348160-118:24h": {
+    "leadId": "imported-1772622348160-118",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.062Z",
+    "lastFailedAt": "2026-03-07T02:11:00.567Z"
+  },
+  "imported-1772622348160-118:12h": {
+    "leadId": "imported-1772622348160-118",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.102Z",
+    "lastFailedAt": "2026-03-07T02:11:00.611Z"
+  },
+  "imported-1772622348160-118:3h": {
+    "leadId": "imported-1772622348160-118",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.175Z",
+    "lastFailedAt": "2026-03-07T02:11:00.642Z"
+  },
+  "imported-1772622348160-118:1h": {
+    "leadId": "imported-1772622348160-118",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.232Z",
+    "lastFailedAt": "2026-03-07T02:11:00.672Z"
+  },
+  "imported-1772622348160-122:24h": {
+    "leadId": "imported-1772622348160-122",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.273Z",
+    "lastFailedAt": "2026-03-07T02:11:00.705Z"
+  },
+  "imported-1772622348160-122:12h": {
+    "leadId": "imported-1772622348160-122",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.368Z",
+    "lastFailedAt": "2026-03-07T02:11:00.750Z"
+  },
+  "imported-1772622348160-122:3h": {
+    "leadId": "imported-1772622348160-122",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.397Z",
+    "lastFailedAt": "2026-03-07T02:11:00.780Z"
+  },
+  "imported-1772622348160-122:1h": {
+    "leadId": "imported-1772622348160-122",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.482Z",
+    "lastFailedAt": "2026-03-07T02:11:00.844Z"
+  },
+  "imported-1772622348160-123:24h": {
+    "leadId": "imported-1772622348160-123",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.568Z",
+    "lastFailedAt": "2026-03-07T02:11:00.879Z"
+  },
+  "imported-1772622348160-123:12h": {
+    "leadId": "imported-1772622348160-123",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.623Z",
+    "lastFailedAt": "2026-03-07T02:11:00.933Z"
+  },
+  "imported-1772622348160-123:3h": {
+    "leadId": "imported-1772622348160-123",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.654Z",
+    "lastFailedAt": "2026-03-07T02:11:00.969Z"
+  },
+  "imported-1772622348160-123:1h": {
+    "leadId": "imported-1772622348160-123",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.685Z",
+    "lastFailedAt": "2026-03-07T02:11:01.012Z"
+  },
+  "imported-1772622348160-128:24h": {
+    "leadId": "imported-1772622348160-128",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.789Z",
+    "lastFailedAt": "2026-03-07T02:11:01.077Z"
+  },
+  "imported-1772622348160-128:12h": {
+    "leadId": "imported-1772622348160-128",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.827Z",
+    "lastFailedAt": "2026-03-07T02:11:01.208Z"
+  },
+  "imported-1772622348160-128:3h": {
+    "leadId": "imported-1772622348160-128",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.861Z",
+    "lastFailedAt": "2026-03-07T02:11:01.244Z"
+  },
+  "imported-1772622348160-128:1h": {
+    "leadId": "imported-1772622348160-128",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.906Z",
+    "lastFailedAt": "2026-03-07T02:11:01.273Z"
+  },
+  "imported-1772622348160-132:24h": {
+    "leadId": "imported-1772622348160-132",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:20.970Z",
+    "lastFailedAt": "2026-03-07T02:11:01.310Z"
+  },
+  "imported-1772622348160-132:12h": {
+    "leadId": "imported-1772622348160-132",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.028Z",
+    "lastFailedAt": "2026-03-07T02:11:01.337Z"
+  },
+  "imported-1772622348160-132:3h": {
+    "leadId": "imported-1772622348160-132",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.084Z",
+    "lastFailedAt": "2026-03-07T02:11:01.370Z"
+  },
+  "imported-1772622348160-132:1h": {
+    "leadId": "imported-1772622348160-132",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.157Z",
+    "lastFailedAt": "2026-03-07T02:11:01.401Z"
+  },
+  "imported-1772622348160-134:24h": {
+    "leadId": "imported-1772622348160-134",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.201Z",
+    "lastFailedAt": "2026-03-07T02:11:01.515Z"
+  },
+  "imported-1772622348160-134:12h": {
+    "leadId": "imported-1772622348160-134",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.301Z",
+    "lastFailedAt": "2026-03-07T02:11:01.599Z"
+  },
+  "imported-1772622348160-134:3h": {
+    "leadId": "imported-1772622348160-134",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.338Z",
+    "lastFailedAt": "2026-03-07T02:11:01.643Z"
+  },
+  "imported-1772622348160-134:1h": {
+    "leadId": "imported-1772622348160-134",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.369Z",
+    "lastFailedAt": "2026-03-07T02:11:01.684Z"
+  },
+  "imported-1772622348160-135:24h": {
+    "leadId": "imported-1772622348160-135",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.403Z",
+    "lastFailedAt": "2026-03-07T02:11:01.722Z"
+  },
+  "imported-1772622348160-135:12h": {
+    "leadId": "imported-1772622348160-135",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.448Z",
+    "lastFailedAt": "2026-03-07T02:11:01.824Z"
+  },
+  "imported-1772622348160-135:3h": {
+    "leadId": "imported-1772622348160-135",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.491Z",
+    "lastFailedAt": "2026-03-07T02:11:01.884Z"
+  },
+  "imported-1772622348160-135:1h": {
+    "leadId": "imported-1772622348160-135",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.524Z",
+    "lastFailedAt": "2026-03-07T02:11:01.920Z"
+  },
+  "imported-1772622348160-137:24h": {
+    "leadId": "imported-1772622348160-137",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.606Z",
+    "lastFailedAt": "2026-03-07T02:11:02.002Z"
+  },
+  "imported-1772622348160-137:12h": {
+    "leadId": "imported-1772622348160-137",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.649Z",
+    "lastFailedAt": "2026-03-07T02:11:02.049Z"
+  },
+  "imported-1772622348160-137:3h": {
+    "leadId": "imported-1772622348160-137",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.708Z",
+    "lastFailedAt": "2026-03-07T02:11:02.096Z"
+  },
+  "imported-1772622348160-137:1h": {
+    "leadId": "imported-1772622348160-137",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.760Z",
+    "lastFailedAt": "2026-03-07T02:11:02.136Z"
+  },
+  "imported-1772622348160-141:24h": {
+    "leadId": "imported-1772622348160-141",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.795Z",
+    "lastFailedAt": "2026-03-07T02:11:02.223Z"
+  },
+  "imported-1772622348160-141:12h": {
+    "leadId": "imported-1772622348160-141",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.876Z",
+    "lastFailedAt": "2026-03-07T02:11:02.305Z"
+  },
+  "imported-1772622348160-141:3h": {
+    "leadId": "imported-1772622348160-141",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.916Z",
+    "lastFailedAt": "2026-03-07T02:11:02.436Z"
+  },
+  "imported-1772622348160-141:1h": {
+    "leadId": "imported-1772622348160-141",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.959Z",
+    "lastFailedAt": "2026-03-07T02:11:02.496Z"
+  },
+  "imported-1772622348160-143:24h": {
+    "leadId": "imported-1772622348160-143",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:21.996Z",
+    "lastFailedAt": "2026-03-07T02:11:02.535Z"
+  },
+  "imported-1772622348160-143:12h": {
+    "leadId": "imported-1772622348160-143",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.068Z",
+    "lastFailedAt": "2026-03-07T02:11:02.641Z"
+  },
+  "imported-1772622348160-143:3h": {
+    "leadId": "imported-1772622348160-143",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.103Z",
+    "lastFailedAt": "2026-03-07T02:11:02.742Z"
+  },
+  "imported-1772622348160-143:1h": {
+    "leadId": "imported-1772622348160-143",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.135Z",
+    "lastFailedAt": "2026-03-07T02:11:02.846Z"
+  },
+  "imported-1772622348160-144:24h": {
+    "leadId": "imported-1772622348160-144",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.210Z",
+    "lastFailedAt": "2026-03-07T02:11:02.897Z"
+  },
+  "imported-1772622348160-144:12h": {
+    "leadId": "imported-1772622348160-144",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.272Z",
+    "lastFailedAt": "2026-03-07T02:11:02.940Z"
+  },
+  "imported-1772622348160-144:3h": {
+    "leadId": "imported-1772622348160-144",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.307Z",
+    "lastFailedAt": "2026-03-07T02:11:02.983Z"
+  },
+  "imported-1772622348160-144:1h": {
+    "leadId": "imported-1772622348160-144",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.338Z",
+    "lastFailedAt": "2026-03-07T02:11:03.018Z"
+  },
+  "imported-1772622348160-146:24h": {
+    "leadId": "imported-1772622348160-146",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.376Z",
+    "lastFailedAt": "2026-03-07T02:11:03.108Z"
+  },
+  "imported-1772622348160-146:12h": {
+    "leadId": "imported-1772622348160-146",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.415Z",
+    "lastFailedAt": "2026-03-07T02:11:03.141Z"
+  },
+  "imported-1772622348160-146:3h": {
+    "leadId": "imported-1772622348160-146",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.443Z",
+    "lastFailedAt": "2026-03-07T02:11:03.256Z"
+  },
+  "imported-1772622348160-146:1h": {
+    "leadId": "imported-1772622348160-146",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.527Z",
+    "lastFailedAt": "2026-03-07T02:11:03.358Z"
+  },
+  "imported-1772622348160-148:24h": {
+    "leadId": "imported-1772622348160-148",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.579Z",
+    "lastFailedAt": "2026-03-07T02:11:03.422Z"
+  },
+  "imported-1772622348160-148:12h": {
+    "leadId": "imported-1772622348160-148",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.613Z",
+    "lastFailedAt": "2026-03-07T02:11:03.451Z"
+  },
+  "imported-1772622348160-148:3h": {
+    "leadId": "imported-1772622348160-148",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.642Z",
+    "lastFailedAt": "2026-03-07T02:11:03.563Z"
+  },
+  "imported-1772622348160-148:1h": {
+    "leadId": "imported-1772622348160-148",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.675Z",
+    "lastFailedAt": "2026-03-07T02:11:03.659Z"
+  },
+  "imported-1772622348160-149:24h": {
+    "leadId": "imported-1772622348160-149",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.705Z",
+    "lastFailedAt": "2026-03-07T02:11:03.768Z"
+  },
+  "imported-1772622348160-149:12h": {
+    "leadId": "imported-1772622348160-149",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.739Z",
+    "lastFailedAt": "2026-03-07T02:11:03.822Z"
+  },
+  "imported-1772622348160-149:3h": {
+    "leadId": "imported-1772622348160-149",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.838Z",
+    "lastFailedAt": "2026-03-07T02:11:03.867Z"
+  },
+  "imported-1772622348160-149:1h": {
+    "leadId": "imported-1772622348160-149",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.880Z",
+    "lastFailedAt": "2026-03-07T02:11:03.971Z"
+  },
+  "imported-1772622348160-151:24h": {
+    "leadId": "imported-1772622348160-151",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.910Z",
+    "lastFailedAt": "2026-03-07T02:11:04.065Z"
+  },
+  "imported-1772622348160-151:12h": {
+    "leadId": "imported-1772622348160-151",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.943Z",
+    "lastFailedAt": "2026-03-07T02:11:04.100Z"
+  },
+  "imported-1772622348160-151:3h": {
+    "leadId": "imported-1772622348160-151",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:22.973Z",
+    "lastFailedAt": "2026-03-07T02:11:04.147Z"
+  },
+  "imported-1772622348160-151:1h": {
+    "leadId": "imported-1772622348160-151",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.044Z",
+    "lastFailedAt": "2026-03-07T02:11:04.207Z"
+  },
+  "imported-1772622348160-152:24h": {
+    "leadId": "imported-1772622348160-152",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.083Z",
+    "lastFailedAt": "2026-03-07T02:11:04.247Z"
+  },
+  "imported-1772622348160-152:12h": {
+    "leadId": "imported-1772622348160-152",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.143Z",
+    "lastFailedAt": "2026-03-07T02:11:04.375Z"
+  },
+  "imported-1772622348160-152:3h": {
+    "leadId": "imported-1772622348160-152",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.229Z",
+    "lastFailedAt": "2026-03-07T02:11:04.413Z"
+  },
+  "imported-1772622348160-152:1h": {
+    "leadId": "imported-1772622348160-152",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.350Z",
+    "lastFailedAt": "2026-03-07T02:11:04.458Z"
+  },
+  "imported-1772622348160-153:24h": {
+    "leadId": "imported-1772622348160-153",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.449Z",
+    "lastFailedAt": "2026-03-07T02:11:04.577Z"
+  },
+  "imported-1772622348160-153:12h": {
+    "leadId": "imported-1772622348160-153",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.554Z",
+    "lastFailedAt": "2026-03-07T02:11:04.628Z"
+  },
+  "imported-1772622348160-153:3h": {
+    "leadId": "imported-1772622348160-153",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.597Z",
+    "lastFailedAt": "2026-03-07T02:11:04.659Z"
+  },
+  "imported-1772622348160-153:1h": {
+    "leadId": "imported-1772622348160-153",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.627Z",
+    "lastFailedAt": "2026-03-07T02:11:04.691Z"
+  },
+  "imported-1772622348160-155:24h": {
+    "leadId": "imported-1772622348160-155",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.660Z",
+    "lastFailedAt": "2026-03-07T02:11:04.723Z"
+  },
+  "imported-1772622348160-155:12h": {
+    "leadId": "imported-1772622348160-155",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.730Z",
+    "lastFailedAt": "2026-03-07T02:11:04.760Z"
+  },
+  "imported-1772622348160-155:3h": {
+    "leadId": "imported-1772622348160-155",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.809Z",
+    "lastFailedAt": "2026-03-07T02:11:04.862Z"
+  },
+  "imported-1772622348160-155:1h": {
+    "leadId": "imported-1772622348160-155",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:23.862Z",
+    "lastFailedAt": "2026-03-07T02:11:04.896Z"
+  },
+  "imported-1772622348160-159:24h": {
+    "leadId": "imported-1772622348160-159",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.054Z",
+    "lastFailedAt": "2026-03-07T02:11:05.135Z"
+  },
+  "imported-1772622348160-159:12h": {
+    "leadId": "imported-1772622348160-159",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.099Z",
+    "lastFailedAt": "2026-03-07T02:11:05.201Z"
+  },
+  "imported-1772622348160-159:3h": {
+    "leadId": "imported-1772622348160-159",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.128Z",
+    "lastFailedAt": "2026-03-07T02:11:05.244Z"
+  },
+  "imported-1772622348160-159:1h": {
+    "leadId": "imported-1772622348160-159",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.157Z",
+    "lastFailedAt": "2026-03-07T02:11:05.272Z"
+  },
+  "imported-1772622348160-165:24h": {
+    "leadId": "imported-1772622348160-165",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.214Z",
+    "lastFailedAt": "2026-03-07T02:11:05.326Z"
+  },
+  "imported-1772622348160-165:12h": {
+    "leadId": "imported-1772622348160-165",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.251Z",
+    "lastFailedAt": "2026-03-07T02:11:05.425Z"
+  },
+  "imported-1772622348160-165:3h": {
+    "leadId": "imported-1772622348160-165",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.285Z",
+    "lastFailedAt": "2026-03-07T02:11:05.461Z"
+  },
+  "imported-1772622348160-165:1h": {
+    "leadId": "imported-1772622348160-165",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.314Z",
+    "lastFailedAt": "2026-03-07T02:11:05.565Z"
+  },
+  "imported-1772622348160-175:24h": {
+    "leadId": "imported-1772622348160-175",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.345Z",
+    "lastFailedAt": "2026-03-07T02:11:05.616Z"
+  },
+  "imported-1772622348160-175:12h": {
+    "leadId": "imported-1772622348160-175",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.375Z",
+    "lastFailedAt": "2026-03-07T02:11:05.661Z"
+  },
+  "imported-1772622348160-175:3h": {
+    "leadId": "imported-1772622348160-175",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.410Z",
+    "lastFailedAt": "2026-03-07T02:11:05.709Z"
+  },
+  "imported-1772622348160-175:1h": {
+    "leadId": "imported-1772622348160-175",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.440Z",
+    "lastFailedAt": "2026-03-07T02:11:05.738Z"
+  },
+  "imported-1772622348160-177:24h": {
+    "leadId": "imported-1772622348160-177",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.474Z",
+    "lastFailedAt": "2026-03-07T02:11:05.814Z"
+  },
+  "imported-1772622348160-177:12h": {
+    "leadId": "imported-1772622348160-177",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.520Z",
+    "lastFailedAt": "2026-03-07T02:11:05.878Z"
+  },
+  "imported-1772622348160-177:3h": {
+    "leadId": "imported-1772622348160-177",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.549Z",
+    "lastFailedAt": "2026-03-07T02:11:05.995Z"
+  },
+  "imported-1772622348160-177:1h": {
+    "leadId": "imported-1772622348160-177",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.594Z",
+    "lastFailedAt": "2026-03-07T02:11:06.030Z"
+  },
+  "imported-1772622348160-182:24h": {
+    "leadId": "imported-1772622348160-182",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.680Z",
+    "lastFailedAt": "2026-03-07T02:11:06.061Z"
+  },
+  "imported-1772622348160-182:12h": {
+    "leadId": "imported-1772622348160-182",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.783Z",
+    "lastFailedAt": "2026-03-07T02:11:06.107Z"
+  },
+  "imported-1772622348160-182:3h": {
+    "leadId": "imported-1772622348160-182",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.886Z",
+    "lastFailedAt": "2026-03-07T02:11:06.202Z"
+  },
+  "imported-1772622348160-182:1h": {
+    "leadId": "imported-1772622348160-182",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:24.988Z",
+    "lastFailedAt": "2026-03-07T02:11:06.255Z"
+  },
+  "imported-1772622348160-185:24h": {
+    "leadId": "imported-1772622348160-185",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.077Z",
+    "lastFailedAt": "2026-03-07T02:11:06.296Z"
+  },
+  "imported-1772622348160-185:12h": {
+    "leadId": "imported-1772622348160-185",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.193Z",
+    "lastFailedAt": "2026-03-07T02:11:06.340Z"
+  },
+  "imported-1772622348160-185:3h": {
+    "leadId": "imported-1772622348160-185",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.295Z",
+    "lastFailedAt": "2026-03-07T02:11:06.370Z"
+  },
+  "imported-1772622348160-185:1h": {
+    "leadId": "imported-1772622348160-185",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.351Z",
+    "lastFailedAt": "2026-03-07T02:11:06.401Z"
+  },
+  "imported-1772622348160-187:24h": {
+    "leadId": "imported-1772622348160-187",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.392Z",
+    "lastFailedAt": "2026-03-07T02:11:06.448Z"
+  },
+  "imported-1772622348160-187:12h": {
+    "leadId": "imported-1772622348160-187",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.500Z",
+    "lastFailedAt": "2026-03-07T02:11:06.483Z"
+  },
+  "imported-1772622348160-187:3h": {
+    "leadId": "imported-1772622348160-187",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.602Z",
+    "lastFailedAt": "2026-03-07T02:11:06.525Z"
+  },
+  "imported-1772622348160-187:1h": {
+    "leadId": "imported-1772622348160-187",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.705Z",
+    "lastFailedAt": "2026-03-07T02:11:06.561Z"
+  },
+  "imported-1772622348160-195:24h": {
+    "leadId": "imported-1772622348160-195",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.774Z",
+    "lastFailedAt": "2026-03-07T02:11:06.635Z"
+  },
+  "imported-1772622348160-195:12h": {
+    "leadId": "imported-1772622348160-195",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.809Z",
+    "lastFailedAt": "2026-03-07T02:11:06.680Z"
+  },
+  "imported-1772622348160-195:3h": {
+    "leadId": "imported-1772622348160-195",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.841Z",
+    "lastFailedAt": "2026-03-07T02:11:06.732Z"
+  },
+  "imported-1772622348160-195:1h": {
+    "leadId": "imported-1772622348160-195",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.886Z",
+    "lastFailedAt": "2026-03-07T02:11:06.786Z"
+  },
+  "imported-1772622348160-196:24h": {
+    "leadId": "imported-1772622348160-196",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:25.920Z",
+    "lastFailedAt": "2026-03-07T02:11:06.826Z"
+  },
+  "imported-1772622348160-196:12h": {
+    "leadId": "imported-1772622348160-196",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.008Z",
+    "lastFailedAt": "2026-03-07T02:11:06.886Z"
+  },
+  "imported-1772622348160-196:3h": {
+    "leadId": "imported-1772622348160-196",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.083Z",
+    "lastFailedAt": "2026-03-07T02:11:06.917Z"
+  },
+  "imported-1772622348160-196:1h": {
+    "leadId": "imported-1772622348160-196",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.113Z",
+    "lastFailedAt": "2026-03-07T02:11:06.955Z"
+  },
+  "imported-1772622348160-199:24h": {
+    "leadId": "imported-1772622348160-199",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.157Z",
+    "lastFailedAt": "2026-03-07T02:11:06.997Z"
+  },
+  "imported-1772622348160-199:12h": {
+    "leadId": "imported-1772622348160-199",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.198Z",
+    "lastFailedAt": "2026-03-07T02:11:07.027Z"
+  },
+  "imported-1772622348160-199:3h": {
+    "leadId": "imported-1772622348160-199",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.228Z",
+    "lastFailedAt": "2026-03-07T02:11:07.056Z"
+  },
+  "imported-1772622348160-199:1h": {
+    "leadId": "imported-1772622348160-199",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.319Z",
+    "lastFailedAt": "2026-03-07T02:11:07.091Z"
+  },
+  "imported-1772622348160-200:24h": {
+    "leadId": "imported-1772622348160-200",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.422Z",
+    "lastFailedAt": "2026-03-07T02:11:07.144Z"
+  },
+  "imported-1772622348160-200:12h": {
+    "leadId": "imported-1772622348160-200",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.462Z",
+    "lastFailedAt": "2026-03-07T02:11:07.190Z"
+  },
+  "imported-1772622348160-200:3h": {
+    "leadId": "imported-1772622348160-200",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.493Z",
+    "lastFailedAt": "2026-03-07T02:11:07.236Z"
+  },
+  "imported-1772622348160-200:1h": {
+    "leadId": "imported-1772622348160-200",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.527Z",
+    "lastFailedAt": "2026-03-07T02:11:07.292Z"
+  },
+  "imported-1772622348160-202:24h": {
+    "leadId": "imported-1772622348160-202",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.626Z",
+    "lastFailedAt": "2026-03-07T02:11:07.340Z"
+  },
+  "imported-1772622348160-202:12h": {
+    "leadId": "imported-1772622348160-202",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.662Z",
+    "lastFailedAt": "2026-03-07T02:11:07.454Z"
+  },
+  "imported-1772622348160-202:3h": {
+    "leadId": "imported-1772622348160-202",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.695Z",
+    "lastFailedAt": "2026-03-07T02:11:07.603Z"
+  },
+  "imported-1772622348160-202:1h": {
+    "leadId": "imported-1772622348160-202",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.726Z",
+    "lastFailedAt": "2026-03-07T02:11:07.650Z"
+  },
+  "imported-1772622348161-205:24h": {
+    "leadId": "imported-1772622348161-205",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.831Z",
+    "lastFailedAt": "2026-03-07T02:11:07.696Z"
+  },
+  "imported-1772622348161-205:12h": {
+    "leadId": "imported-1772622348161-205",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.932Z",
+    "lastFailedAt": "2026-03-07T02:11:07.745Z"
+  },
+  "imported-1772622348161-205:3h": {
+    "leadId": "imported-1772622348161-205",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:26.975Z",
+    "lastFailedAt": "2026-03-07T02:11:07.850Z"
+  },
+  "imported-1772622348161-205:1h": {
+    "leadId": "imported-1772622348161-205",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.008Z",
+    "lastFailedAt": "2026-03-07T02:11:07.967Z"
+  },
+  "imported-1772622348161-207:24h": {
+    "leadId": "imported-1772622348161-207",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.039Z",
+    "lastFailedAt": "2026-03-07T02:11:08.009Z"
+  },
+  "imported-1772622348161-207:12h": {
+    "leadId": "imported-1772622348161-207",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.138Z",
+    "lastFailedAt": "2026-03-07T02:11:08.069Z"
+  },
+  "imported-1772622348161-207:3h": {
+    "leadId": "imported-1772622348161-207",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.241Z",
+    "lastFailedAt": "2026-03-07T02:11:08.140Z"
+  },
+  "imported-1772622348161-207:1h": {
+    "leadId": "imported-1772622348161-207",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.343Z",
+    "lastFailedAt": "2026-03-07T02:11:08.191Z"
+  },
+  "imported-1772622348161-209:24h": {
+    "leadId": "imported-1772622348161-209",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.389Z",
+    "lastFailedAt": "2026-03-07T02:11:08.245Z"
+  },
+  "imported-1772622348161-209:12h": {
+    "leadId": "imported-1772622348161-209",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.431Z",
+    "lastFailedAt": "2026-03-07T02:11:08.288Z"
+  },
+  "imported-1772622348161-209:3h": {
+    "leadId": "imported-1772622348161-209",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.548Z",
+    "lastFailedAt": "2026-03-07T02:11:08.333Z"
+  },
+  "imported-1772622348161-209:1h": {
+    "leadId": "imported-1772622348161-209",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.650Z",
+    "lastFailedAt": "2026-03-07T02:11:08.376Z"
+  },
+  "imported-1772622348161-212:24h": {
+    "leadId": "imported-1772622348161-212",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.744Z",
+    "lastFailedAt": "2026-03-07T02:11:08.415Z"
+  },
+  "imported-1772622348161-212:12h": {
+    "leadId": "imported-1772622348161-212",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.856Z",
+    "lastFailedAt": "2026-03-07T02:11:08.463Z"
+  },
+  "imported-1772622348161-212:3h": {
+    "leadId": "imported-1772622348161-212",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.895Z",
+    "lastFailedAt": "2026-03-07T02:11:08.505Z"
+  },
+  "imported-1772622348161-212:1h": {
+    "leadId": "imported-1772622348161-212",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.934Z",
+    "lastFailedAt": "2026-03-07T02:11:08.546Z"
+  },
+  "imported-1772622348161-213:24h": {
+    "leadId": "imported-1772622348161-213",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:27.998Z",
+    "lastFailedAt": "2026-03-07T02:11:08.664Z"
+  },
+  "imported-1772622348161-213:12h": {
+    "leadId": "imported-1772622348161-213",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.037Z",
+    "lastFailedAt": "2026-03-07T02:11:08.699Z"
+  },
+  "imported-1772622348161-213:3h": {
+    "leadId": "imported-1772622348161-213",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.067Z",
+    "lastFailedAt": "2026-03-07T02:11:08.786Z"
+  },
+  "imported-1772622348161-213:1h": {
+    "leadId": "imported-1772622348161-213",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.162Z",
+    "lastFailedAt": "2026-03-07T02:11:08.817Z"
+  },
+  "imported-1772622348161-214:24h": {
+    "leadId": "imported-1772622348161-214",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.265Z",
+    "lastFailedAt": "2026-03-07T02:11:08.888Z"
+  },
+  "imported-1772622348161-214:12h": {
+    "leadId": "imported-1772622348161-214",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.368Z",
+    "lastFailedAt": "2026-03-07T02:11:08.927Z"
+  },
+  "imported-1772622348161-214:3h": {
+    "leadId": "imported-1772622348161-214",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.431Z",
+    "lastFailedAt": "2026-03-07T02:11:08.961Z"
+  },
+  "imported-1772622348161-214:1h": {
+    "leadId": "imported-1772622348161-214",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.470Z",
+    "lastFailedAt": "2026-03-07T02:11:08.993Z"
+  },
+  "imported-1772622348161-215:24h": {
+    "leadId": "imported-1772622348161-215",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.509Z",
+    "lastFailedAt": "2026-03-07T02:11:09.057Z"
+  },
+  "imported-1772622348161-215:12h": {
+    "leadId": "imported-1772622348161-215",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.564Z",
+    "lastFailedAt": "2026-03-07T02:11:09.104Z"
+  },
+  "imported-1772622348161-215:3h": {
+    "leadId": "imported-1772622348161-215",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.618Z",
+    "lastFailedAt": "2026-03-07T02:11:09.150Z"
+  },
+  "imported-1772622348161-215:1h": {
+    "leadId": "imported-1772622348161-215",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.662Z",
+    "lastFailedAt": "2026-03-07T02:11:09.180Z"
+  },
+  "imported-1772622353669-0:24h": {
+    "leadId": "imported-1772622353669-0",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.777Z",
+    "lastFailedAt": "2026-03-07T02:11:09.251Z"
+  },
+  "imported-1772622353669-0:12h": {
+    "leadId": "imported-1772622353669-0",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.870Z",
+    "lastFailedAt": "2026-03-07T02:11:09.298Z"
+  },
+  "imported-1772622353669-0:3h": {
+    "leadId": "imported-1772622353669-0",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:28.982Z",
+    "lastFailedAt": "2026-03-07T02:11:09.400Z"
+  },
+  "imported-1772622353669-0:1h": {
+    "leadId": "imported-1772622353669-0",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.027Z",
+    "lastFailedAt": "2026-03-07T02:11:09.503Z"
+  },
+  "imported-1772622353669-1:24h": {
+    "leadId": "imported-1772622353669-1",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.084Z",
+    "lastFailedAt": "2026-03-07T02:11:09.603Z"
+  },
+  "imported-1772622353669-1:12h": {
+    "leadId": "imported-1772622353669-1",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.128Z",
+    "lastFailedAt": "2026-03-07T02:11:09.704Z"
+  },
+  "imported-1772622353669-1:3h": {
+    "leadId": "imported-1772622353669-1",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.158Z",
+    "lastFailedAt": "2026-03-07T02:11:09.772Z"
+  },
+  "imported-1772622353669-1:1h": {
+    "leadId": "imported-1772622353669-1",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.190Z",
+    "lastFailedAt": "2026-03-07T02:11:09.805Z"
+  },
+  "imported-1772622353669-6:24h": {
+    "leadId": "imported-1772622353669-6",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.289Z",
+    "lastFailedAt": "2026-03-07T02:11:09.912Z"
+  },
+  "imported-1772622353669-6:12h": {
+    "leadId": "imported-1772622353669-6",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.329Z",
+    "lastFailedAt": "2026-03-07T02:11:09.946Z"
+  },
+  "imported-1772622353669-6:3h": {
+    "leadId": "imported-1772622353669-6",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.369Z",
+    "lastFailedAt": "2026-03-07T02:11:10.016Z"
+  },
+  "imported-1772622353669-6:1h": {
+    "leadId": "imported-1772622353669-6",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.409Z",
+    "lastFailedAt": "2026-03-07T02:11:10.052Z"
+  },
+  "imported-1772622353669-7:24h": {
+    "leadId": "imported-1772622353669-7",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.442Z",
+    "lastFailedAt": "2026-03-07T02:11:10.091Z"
+  },
+  "imported-1772622353669-7:12h": {
+    "leadId": "imported-1772622353669-7",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.487Z",
+    "lastFailedAt": "2026-03-07T02:11:10.134Z"
+  },
+  "imported-1772622353669-7:3h": {
+    "leadId": "imported-1772622353669-7",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.539Z",
+    "lastFailedAt": "2026-03-07T02:11:10.165Z"
+  },
+  "imported-1772622353669-7:1h": {
+    "leadId": "imported-1772622353669-7",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.578Z",
+    "lastFailedAt": "2026-03-07T02:11:10.211Z"
+  },
+  "imported-1772622353669-11:24h": {
+    "leadId": "imported-1772622353669-11",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.882Z",
+    "lastFailedAt": "2026-03-07T02:11:10.605Z"
+  },
+  "imported-1772622353669-11:12h": {
+    "leadId": "imported-1772622353669-11",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.921Z",
+    "lastFailedAt": "2026-03-07T02:11:10.676Z"
+  },
+  "imported-1772622353669-11:3h": {
+    "leadId": "imported-1772622353669-11",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.955Z",
+    "lastFailedAt": "2026-03-07T02:11:10.712Z"
+  },
+  "imported-1772622353669-11:1h": {
+    "leadId": "imported-1772622353669-11",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:29.999Z",
+    "lastFailedAt": "2026-03-07T02:11:10.834Z"
+  },
+  "lead_1772719239893:24h": {
+    "leadId": "lead_1772719239893",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:30.185Z",
+    "lastFailedAt": "2026-03-07T02:11:11.346Z"
+  },
+  "lead_1772719239893:12h": {
+    "leadId": "lead_1772719239893",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:30.225Z",
+    "lastFailedAt": "2026-03-07T02:11:11.422Z"
+  },
+  "lead_1772719239893:3h": {
+    "leadId": "lead_1772719239893",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:30.269Z",
+    "lastFailedAt": "2026-03-07T02:11:11.552Z"
+  },
+  "lead_1772719239893:1h": {
+    "leadId": "lead_1772719239893",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:30.551Z",
+    "lastFailedAt": "2026-03-07T02:11:11.653Z"
+  },
+  "lead_1772743780877:24h": {
+    "leadId": "lead_1772743780877",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:30.873Z",
+    "lastFailedAt": "2026-03-07T02:11:12.062Z"
+  },
+  "lead_1772743780877:3h": {
+    "leadId": "lead_1772743780877",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:30.919Z",
+    "lastFailedAt": "2026-03-07T02:11:12.165Z"
+  },
+  "lead_1772743780877:1h": {
+    "leadId": "lead_1772743780877",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:31.030Z",
+    "lastFailedAt": "2026-03-07T02:11:12.268Z"
+  },
+  "lead_1772748645982:24h": {
+    "leadId": "lead_1772748645982",
+    "slot": "24h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:31.132Z",
+    "lastFailedAt": "2026-03-07T02:11:12.370Z"
+  },
+  "lead_1772748645982:12h": {
+    "leadId": "lead_1772748645982",
+    "slot": "12h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:31.234Z",
+    "lastFailedAt": "2026-03-07T02:11:12.472Z"
+  },
+  "lead_1772748645982:3h": {
+    "leadId": "lead_1772748645982",
+    "slot": "3h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:31.337Z",
+    "lastFailedAt": "2026-03-07T02:11:12.500Z"
+  },
+  "lead_1772748645982:1h": {
+    "leadId": "lead_1772748645982",
+    "slot": "1h",
+    "attempts": 6,
+    "lastError": "POST failed",
+    "firstFailedAt": "2026-03-07T01:45:31.439Z",
+    "lastFailedAt": "2026-03-07T02:11:12.541Z"
+  }
+}

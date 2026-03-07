@@ -21,8 +21,13 @@ export function generateAppointmentConfirmationMessage(leadPhone: string, dataAg
 }
 
 export function generateReminderText(dataAgendamento: string, type: "h24" | "today"): string {
-  const timeLabel = type === "h24" ? "amanhã" : "HOJE";
-  return `Olá!\nPassando só pra lembrar que sua avaliação está marcada para *${timeLabel}*.\n\nData e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui.\nTe esperamos!`;
+  if (type === "h24") {
+    // Lembrete 24h/12h antes (Amanhã)
+    return `⏰ Lembrete da sua avaliação | OdontoCompany Olimpia\n\nOlá! Passando só pra lembrar que sua avaliação está marcada para amanhã. 😊\n\n📅 Data e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui. Te esperamos! 💚`;
+  } else {
+    // Lembrete hoje (3h/1h antes)
+    return `⏰ Sua consulta na OdontoCompany Olimpia está chegando!\n\nOlá, tudo bem? Sua consulta está chegando. 😄\n\n📅 Data e Horário: ${dataAgendamento}\n\nEstamos prontos para te receber! Falta pouco! 💚`;
+  }
 }
 
 export function generateAppointmentConfirmationText(dataAgendamento: string): string {
