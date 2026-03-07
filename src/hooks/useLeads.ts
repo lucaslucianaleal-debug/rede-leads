@@ -72,11 +72,14 @@ const normalizeLead = (lead: Lead): Lead => ({
 
 // Garantir que todo lead tem dataCriacao (fallback para dataContato ou hoje)
 const ensureDateCriacao = (lead: Lead): Lead => {
-  if (lead.dataCriacao) return lead;
-  return {
-    ...lead,
-    dataCriacao: lead.dataContato || format(new Date(), "dd/MM/yyyy"),
-  };
+  const created = lead.dataCriacao || lead.dataContato || format(new Date(), "dd/MM/yyyy");
+  const out: Lead = { ...lead, dataCriacao: created };
+  // If there is an appointment but no recorded creation date for that appointment,
+  // use the lead creation date as an estimate for when the appointment was registered.
+  if (out.dataAgendamento && (!out.dataAgendamentoCriado || out.dataAgendamentoCriado.trim() === "")) {
+    out.dataAgendamentoCriado = created;
+  }
+  return out;
 };
 
 export function useLeads() {
@@ -484,7 +487,8 @@ export function useLeads() {
 
   const createLead = (leadData: Omit<Lead, 'id'>) => {
     const newId = `lead_${Date.now()}`;
-    const newLead: Lead = { ...leadData, id: newId };
+    const raw: Lead = { ...leadData, id: newId } as Lead;
+    const newLead = ensureDateCriacao(normalizeLead(raw));
     setLeads((prev) => [...prev, newLead]);
   };
 
@@ -892,6 +896,7 @@ export function useLeads() {
                 comparecimento: get(row, col.comparecimento) as any,
                 dataFollowUp: get(row, col.dataFollowUp),
                 dataAgendamento: get(row, col.dataAgendamento),
+                dataAgendamentoCriado: get(row, col.dataAgendamento) ? (get(row, col.dataCriacao) || format(new Date(), "dd/MM/yyyy")) : "",
                 dataRetornoLigacao: "",
                 observacao: get(row, col.observacao),
                 followUpCount: parseInt(etapaRaw?.match(/\d+/)?.[0] || "0", 10),
