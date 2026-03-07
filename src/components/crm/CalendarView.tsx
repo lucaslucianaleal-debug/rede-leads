@@ -32,7 +32,7 @@ interface SendFailures {
   [key: string]: SendFailureEntry;
 }
 
-const SLOTS: SlotKey[] = ["24h", "12h", "3h", "1h"];
+const SLOTS: SlotKey[] = ["24h", "1h"];
 
 const SLOT_OFFSETS_MS: Record<SlotKey, number> = {
   "24h": 24 * 60 * 60 * 1000,
@@ -207,7 +207,9 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
 
     return (
       <div key={slot} className="flex flex-col items-center gap-1">
-        <span className="text-[10px] text-muted-foreground font-semibold tracking-wide uppercase">{slot}</span>
+        <span className="text-[10px] text-muted-foreground font-semibold tracking-wide uppercase">
+          {slot === "24h" ? "24h" : "Hoje"}
+        </span>
         <Button
           size="sm"
           variant="outline"
