@@ -56,11 +56,10 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       ).length;
       const atendimentos = leadsNovos + followUpsDone;
 
-      // Agendamentos: leads com dataAgendamento === EXATAMENTE nesse dia
-      // (contabilizar apenas criados/atualizados nesse dia)
+      // Agendamentos: contar apenas agendamentos CRIADOS nesse dia (dataAgendamentoCriado)
       const agendamentos = leads.filter((l) => {
-        const da = l.dataAgendamento || "";
-        return da.startsWith(dayStr);
+        const dac = l.dataAgendamentoCriado || "";
+        return dac.startsWith(dayStr);
       }).length;
 
       return {

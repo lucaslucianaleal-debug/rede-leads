@@ -47,6 +47,8 @@ export interface Lead {
   dataFollowUp: string;
   // Data em que o último follow-up foi efetuado (registro de execução)
   lastFollowUpDone?: string;
+  // Data em que o agendamento foi CRIADO/registrado no sistema (dd/MM/yyyy)
+  dataAgendamentoCriado?: string;
   dataAgendamento: string;
   dataRetornoLigacao: string;
   observacao: string;

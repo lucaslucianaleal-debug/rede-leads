@@ -176,8 +176,9 @@ export function useLeads() {
   const scheduledTodayCount = useMemo(() => {
     const today = format(new Date(), "dd/MM/yyyy");
     return leads.filter((l) => {
-      const da = l.dataAgendamento || "";
-      return da.startsWith(today);
+      // Count appointments CREATED today (dataAgendamentoCriado)
+      const dac = l.dataAgendamentoCriado || "";
+      return dac.startsWith(today);
     }).length;
   }, [leads]);
 
@@ -195,8 +196,8 @@ export function useLeads() {
     const agendados = leads.filter((l) => l.dataAgendamento && l.dataAgendamento !== "").length;
     const todayFormatted = format(new Date(), "dd/MM/yyyy");
     const agendadosHoje = leads.filter((l) => {
-      const da = l.dataAgendamento || "";
-      return da.startsWith(todayFormatted);
+      const dac = l.dataAgendamentoCriado || "";
+      return dac.startsWith(todayFormatted);
     }).length;
     const followUpsPendentes = leads.filter((l) => l.etapaLead.startsWith("Follow-Up") && l.respostaLead !== "RESPONDEU").length;
     const compareceram = leads.filter((l) => l.comparecimento === "COMPARECEU").length;
@@ -425,7 +426,19 @@ export function useLeads() {
 
   const updateLead = (leadId: string, updates: Partial<Lead>) => {
     setLeads((prev) => {
-      const updated = prev.map((l) => (l.id === leadId ? { ...l, ...updates } : l));
+      const todayFormatted = format(new Date(), "dd/MM/yyyy");
+      const updated = prev.map((l) => {
+        if (l.id !== leadId) return l;
+        // If dataAgendamento is being set now (and previously empty), record the creation date
+        if (updates.dataAgendamento && (!l.dataAgendamento || l.dataAgendamento.trim() === "")) {
+          return { ...l, ...updates, dataAgendamentoCriado: todayFormatted };
+        }
+        // If dataAgendamento cleared, also clear the created date
+        if ((updates.dataAgendamento === "" || updates.dataAgendamento === undefined) && l.dataAgendamentoCriado) {
+          return { ...l, ...updates, dataAgendamentoCriado: undefined };
+        }
+        return { ...l, ...updates };
+      });
       // Se o nome foi alterado, sincroniza o leadNome na conversa do Firestore
       if (updates.nome !== undefined) {
         const lead = prev.find((l) => l.id === leadId);
@@ -509,6 +522,7 @@ export function useLeads() {
       TELEFONE: l.telefone,
       "SERVIÇO PROCURADO": l.servicoProcurado,
       "DATA DE AGENDAMENTO": l.dataAgendamento,
+      "DATA AGENDAMENTO CRIADO": l.dataAgendamentoCriado || "",
       COMPARECIMENTO: l.comparecimento,
       OBSERVAÇÃO: l.observacao,
     }));
