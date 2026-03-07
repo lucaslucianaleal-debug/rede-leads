@@ -9,6 +9,7 @@ import { normalizePhoneTo11Digits } from "@/lib/phone";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
+import { ProgressWithLabel } from "@/components/ui/progress-with-label";
 
 interface FollowUpQueueProps {
   leads: Lead[];
@@ -98,25 +99,15 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         )}
       </div>
       
-      {/* Daily Goal Progress */}
-      <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/50">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Target className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Meta Diária</span>
-          </div>
-          <span className="text-sm font-bold">
-            {followUpsDoneToday}/{followUpGoal}
-          </span>
-        </div>
-        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-          <div
-            className={`h-full transition-all duration-300 ${
-              progress >= 100 ? 'bg-success' : 'bg-primary'
-            }`}
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+      {/* Daily Goal Progress - Padronizado */}
+      <div className="mb-4 p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
+        <ProgressWithLabel
+          label="Meta Diária de Follow-ups"
+          current={followUpsDoneToday}
+          goal={followUpGoal}
+          icon={<Target className="h-4 w-4" />}
+          variant="warning"
+        />
       </div>
 
       <div className="space-y-2 max-h-[400px] overflow-y-auto">

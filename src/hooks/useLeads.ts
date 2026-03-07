@@ -163,10 +163,10 @@ export function useLeads() {
     });
   }, [leads, filters]);
 
-  // Count follow-ups done today
+  // Count follow-ups done today (sincronizado com PerformanceChart)
   const followUpsDoneToday = useMemo(() => {
     const today = format(new Date(), "dd/MM/yyyy");
-    return leads.filter((l) => l.dataFollowUp === today).length;
+    return leads.filter((l) => l.dataFollowUp === today && l.etapaLead.startsWith("Follow-Up")).length;
   }, [leads]);
 
   // Helper: pular fins de semana (sábado +2 dias, domingo +1 dia)

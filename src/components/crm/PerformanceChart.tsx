@@ -14,6 +14,7 @@ import {
 import { format, subDays, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Activity, CalendarCheck, TrendingUp } from "lucide-react";
+import { ProgressWithLabel } from "@/components/ui/progress-with-label";
 
 interface PerformanceChartProps {
   leads: Lead[];
@@ -75,7 +76,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       ? ((totalAgendamentos / totalAtendimentos) * 100).toFixed(1)
       : "0.0";
 
-  // Taxa de conversão apenas do dia de hoje
+  // Métricas do dia de hoje para as barras de progresso
   const todayStr = format(new Date(), "dd/MM/yyyy");
   const atendimentosHoje = leads.filter(
     (l) => l.dataCriacao === todayStr
@@ -92,6 +93,11 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
     atendimentosHoje > 0
       ? ((agendamentosHoje / atendimentosHoje) * 100).toFixed(1)
       : "0.0";
+
+  // Contagem de follow-ups concluídos hoje (para sincronizar com FollowUpQueue)
+  const checksDoneToday = leads.filter(
+    (l) => l.dataFollowUp === todayStr && l.etapaLead.startsWith("Follow-Up")
+  ).length;
 
   return (
     <div className="glass-card rounded-xl p-5">
@@ -119,35 +125,52 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </div>
       </div>
 
-      {/* Cards de resumo */}
+      {/* Cards de resumo com barras de progresso */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        {/* Atendimentos do período */}
-        <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-1">
-            Atendimentos
-          </p>
-          <p className="text-2xl font-bold text-primary">{totalAtendimentos}</p>
-          <p className="text-[10px] text-muted-foreground">Meta: {META_ATENDIMENTOS}/dia</p>
+        {/* Atendimentos do período + Barra Hoje */}
+        <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-50/50 border border-green-200/50">
+          <div className="mb-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+              Atendimentos
+            </p>
+            <p className="text-2xl font-bold text-green-600">{totalAtendimentos}</p>
+            <p className="text-[10px] text-muted-foreground">Período: meta {META_ATENDIMENTOS}/dia</p>
+          </div>
+          <ProgressWithLabel
+            label="Hoje"
+            current={atendimentosHoje}
+            goal={META_ATENDIMENTOS}
+            variant="success"
+          />
         </div>
 
-        {/* Agendamentos do período */}
-        <div className="p-3 rounded-lg bg-success/5 border border-success/20">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-1">
-            Agendamentos
-          </p>
-          <p className="text-2xl font-bold text-success">{totalAgendamentos}</p>
-          <p className="text-[10px] text-muted-foreground">Meta: {META_AGENDAMENTOS}/dia</p>
+        {/* Agendamentos do período + Barra Hoje + 🏆 */}
+        <div className="p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-200/50">
+          <div className="mb-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+              Agendamentos
+            </p>
+            <p className="text-2xl font-bold text-blue-600">{totalAgendamentos}</p>
+            <p className="text-[10px] text-muted-foreground">Período: meta {META_AGENDAMENTOS}/dia</p>
+          </div>
+          <ProgressWithLabel
+            label="Hoje"
+            current={agendamentosHoje}
+            goal={META_AGENDAMENTOS}
+            variant="info"
+            showTrophy={true}
+          />
         </div>
 
         {/* Taxa de conversão do dia */}
-        <div className="p-3 rounded-lg bg-warning/5 border border-warning/20">
+        <div className="p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-1 flex items-center gap-1">
             <TrendingUp className="h-3 w-3" />
             Conversão Hoje
           </p>
-          <p className="text-2xl font-bold text-warning">{taxaHoje}%</p>
-          <p className="text-[10px] text-muted-foreground">
-            {agendamentosHoje}/{atendimentosHoje} hoje
+          <p className="text-2xl font-bold text-amber-600">{taxaHoje}%</p>
+          <p className="text-[10px] text-muted-foreground mt-3">
+            {agendamentosHoje} agendamentos de {atendimentosHoje} atendimentos
           </p>
         </div>
       </div>
