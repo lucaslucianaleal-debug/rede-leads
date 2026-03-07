@@ -166,7 +166,10 @@ export function useLeads() {
   // Count follow-ups done today (sincronizado com PerformanceChart)
   const followUpsDoneToday = useMemo(() => {
     const today = format(new Date(), "dd/MM/yyyy");
-    return leads.filter((l) => l.dataFollowUp === today && l.etapaLead.startsWith("Follow-Up")).length;
+    return leads.filter((l) => {
+      const df = l.dataFollowUp || "";
+      return df.startsWith(today) && l.etapaLead.startsWith("Follow-Up");
+    }).length;
   }, [leads]);
 
   // Contar agendamentos criados/atualizados HOJE
@@ -515,8 +518,14 @@ export function useLeads() {
     const ExcelJS = (await import("exceljs")).default;
     const formatted = format(date, "dd/MM/yyyy");
 
-    const newLeads = leads.filter(l => l.dataContato === formatted);
-    const followUpsDone = leads.filter(l => l.dataFollowUp === formatted);
+    const newLeads = leads.filter(l => {
+      const dc = l.dataContato || "";
+      return dc.startsWith(formatted);
+    });
+    const followUpsDone = leads.filter(l => {
+      const df = l.dataFollowUp || "";
+      return df.startsWith(formatted);
+    });
     // Agendamentos feitos: follow-up foi hoje E a consulta agendada é na mesma data ou posterior
     const appointmentsMade = followUpsDone.filter(l => {
       if (!l.dataAgendamento) return false;

@@ -44,9 +44,15 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       const dayStr = format(day, "dd/MM/yyyy");
 
       // Atendimentos: leads criados nesse dia + follow-ups feitos nesse dia
-      const leadsNovos = leads.filter((l) => l.dataCriacao === dayStr).length;
+      const leadsNovos = leads.filter((l) => {
+        const dc = l.dataCriacao || "";
+        return dc.startsWith(dayStr);
+      }).length;
       const followUpsDone = leads.filter(
-        (l) => l.dataFollowUp === dayStr && l.etapaLead.startsWith("Follow-Up")
+        (l) => {
+          const df = l.dataFollowUp || "";
+          return df.startsWith(dayStr) && l.etapaLead.startsWith("Follow-Up");
+        }
       ).length;
       const atendimentos = leadsNovos + followUpsDone;
 
@@ -78,11 +84,13 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
 
   // Métricas do dia de hoje para as barras de progresso
   const todayStr = format(new Date(), "dd/MM/yyyy");
-  const atendimentosHoje = leads.filter(
-    (l) => l.dataCriacao === todayStr
-  ).length + leads.filter(
-    (l) => l.dataFollowUp === todayStr && l.etapaLead.startsWith("Follow-Up")
-  ).length;
+  const atendimentosHoje = leads.filter((l) => {
+    const dc = l.dataCriacao || "";
+    return dc.startsWith(todayStr);
+  }).length + leads.filter((l) => {
+    const df = l.dataFollowUp || "";
+    return df.startsWith(todayStr) && l.etapaLead.startsWith("Follow-Up");
+  }).length;
   // Agendamentos criados/atualizados HOJE (contabilizar vitórias do dia mesmo que comparecido)
   const agendamentosHoje = leads.filter((l) => {
     const da = l.dataAgendamento || "";
