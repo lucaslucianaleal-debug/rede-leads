@@ -167,8 +167,8 @@ export function useLeads() {
   const followUpsDoneToday = useMemo(() => {
     const today = format(new Date(), "dd/MM/yyyy");
     return leads.filter((l) => {
-      const df = l.dataFollowUp || "";
-      return df.startsWith(today) && l.etapaLead.startsWith("Follow-Up");
+      const done = l.lastFollowUpDone || "";
+      return done.startsWith(today) && l.etapaLead.startsWith("Follow-Up");
     }).length;
   }, [leads]);
 
@@ -354,6 +354,7 @@ export function useLeads() {
           etapaLead: "Avaliação agendada" as LeadStage,
           comparecimento: "AGUARDANDO DATA" as LeadComparecimento,
           dataFollowUp: todayFormatted,
+          lastFollowUpDone: todayFormatted,
           observacao: newObservacao,
         };
       }
@@ -366,6 +367,7 @@ export function useLeads() {
           ...l,
           etapaLead: "Desistência" as LeadStage,
           dataFollowUp: todayFormatted,
+          lastFollowUpDone: todayFormatted,
           observacao: l.observacao 
             ? `${l.observacao} | Ciclo de follow-ups completo (12 tentativas)`
             : "Ciclo de follow-ups completo (12 tentativas)",
@@ -385,6 +387,7 @@ export function useLeads() {
         followUpCount: nextCount,
         etapaLead: nextStage,
         dataFollowUp: nextFollowUpFormatted,
+        lastFollowUpDone: todayFormatted,
         observacao: newObservacao,
       };
     });
@@ -746,6 +749,7 @@ export function useLeads() {
       "RESPOSTA LEAD": l.respostaLead,
       "COMPARECIMENTO": l.comparecimento,
       "DATA DE FOLLOW UP": l.dataFollowUp,
+      "ÚLTIMO FOLLOW UP REALIZADO": l.lastFollowUpDone || "",
       "DATA DE AGENDAMENTO": l.dataAgendamento,
       "OBSERVAÇÃO": l.observacao,
       "LEMBRETE 24H": l.lembretes.h24 ? "SIM" : "NÃO",

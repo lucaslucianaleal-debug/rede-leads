@@ -45,6 +45,8 @@ export interface Lead {
   respostaLead: LeadResposta;
   comparecimento: LeadComparecimento;
   dataFollowUp: string;
+  // Data em que o último follow-up foi efetuado (registro de execução)
+  lastFollowUpDone?: string;
   dataAgendamento: string;
   dataRetornoLigacao: string;
   observacao: string;

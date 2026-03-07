@@ -118,7 +118,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         ) : (
           <AnimatePresence initial={false}>
             {filteredLeads.map((lead, i) => {
-              const daysSince = getDaysSince(lead.dataFollowUp);
+              const daysSince = getDaysSince(lead.lastFollowUpDone || lead.dataFollowUp);
               
               return (
                 <motion.div
