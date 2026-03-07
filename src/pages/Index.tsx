@@ -13,6 +13,7 @@ import { CalendarView } from "@/components/crm/CalendarView";
 import { AllLeadsView } from "@/components/crm/AllLeadsView";
 import { AgendaDoDia } from "@/components/crm/AgendaDoDia";
 import { ChatView } from "@/components/crm/ChatView";
+import { PerformanceChart } from "@/components/crm/PerformanceChart";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -311,6 +312,9 @@ const CRMDashboard = () => {
               </div>
               <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} onOpenChat={handleOpenChat} />
             </div>
+
+            {/* Gráfico de performance */}
+            <PerformanceChart leads={allLeads} />
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6">

@@ -1,10 +1,9 @@
-﻿import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Lead } from "@/types/crm";
 import { useMemo } from "react";
 import { format } from "date-fns";
-import { Clock, Phone, X } from "lucide-react";
+import { Bell, Clock, Phone, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface CalendarViewProps {
@@ -39,12 +38,12 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   const getReminder24h = (lead: Lead): string => {
     const data = lead.dataAgendamento?.split(" ")[0] || "amanhã";
     const hora = lead.dataAgendamento?.split(" ")[1] || "09:00";
-    return `⏰ Lembrete: Sua ${lead.procedimento?.toLowerCase() || 'consulta'} na OdontoCompany Olimpia é amanhã, ${data} às ${hora}. Confirmado? 💚`;
+    return `⏰ Lembrete: Sua ${(lead.servicoProcurado || 'consulta').toLowerCase()} na OdontoCompany Olimpia é amanhã, ${data} às ${hora}. Confirmado? 💚`;
   };
 
   const getReminder1h = (lead: Lead): string => {
     const hora = lead.dataAgendamento?.split(" ")[1] || "09:00";
-    return `⏰ Falta 1 hora! Já estamos te esperando para sua ${lead.procedimento?.toLowerCase() || 'consulta'} das ${hora}. Até logo! 💚`;
+    return `⏰ Falta 1 hora! Já estamos te esperando para sua ${(lead.servicoProcurado || 'consulta').toLowerCase()} das ${hora}. Até logo! 💚`;
   };
 
   const handleSend24h = (lead: Lead) => {
@@ -67,90 +66,94 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   };
 
   const renderLeadCard = (lead: Lead, isToday: boolean) => {
-    const [hora, minuto] = (lead.dataAgendamento?.split(" ")[1] || "09:00").split(":");
+    const hora = lead.dataAgendamento?.split(" ")[1] || "09:00";
+    const [h, m] = hora.split(":");
     const dayLabel = isToday ? "HOJE" : "AMANHÃ";
-    const colorBg = isToday ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200";
 
     return (
-      <Card
+      <div
         key={lead.id}
-        className={`relative overflow-hidden transition-all hover:shadow-lg ${colorBg}`}
+        className="flex items-center gap-3 p-3 rounded-lg bg-background/50 hover:bg-muted/50 transition-colors"
       >
-        <CardContent className="p-4">
-          {/* Header com nome, hora e X */}
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1">
-              <h3 className="text-lg font-bold text-gray-900">{lead.nome}</h3>
-              <p className="text-sm text-gray-600">{lead.procedimento || "Consulta"}</p>
-              <div className="flex items-center gap-2 mt-1">
-                <Clock className="h-4 w-4 text-gray-500" />
-                <span className="text-sm font-semibold text-gray-700">
-                  {hora}:{minuto}
-                </span>
-                <Badge
-                  variant="outline"
-                  className={isToday ? "bg-red-100 text-red-800 border-red-300" : "bg-blue-100 text-blue-800 border-blue-300"}
-                >
-                  {dayLabel}
-                </Badge>
-              </div>
-            </div>
+        {/* Horário */}
+        <span className="text-xl font-bold text-primary tabular-nums leading-none shrink-0 w-14 text-center">
+          {h}:{m}
+        </span>
 
-            {/* Botão X (desistência) */}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 w-8 p-0 hover:bg-red-200 hover:text-red-700 text-gray-500"
-              onClick={() => handleMarkAbsent(lead)}
-              title="Marcar como desistência"
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm truncate">{lead.nome}</span>
+            <Badge
+              variant="secondary"
+              className={`text-[10px] px-1.5 py-0.5 font-medium ${
+                isToday
+                  ? "bg-red-50 text-red-700 border border-red-200"
+                  : "bg-blue-50 text-blue-700 border border-blue-200"
+              }`}
             >
-              <X className="h-4 w-4" />
-            </Button>
+              {dayLabel}
+            </Badge>
           </div>
+          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+            <span>{lead.servicoProcurado || "Consulta"}</span>
+            <span className="flex items-center gap-1">
+              <Phone className="h-3 w-3" />
+              {lead.telefone}
+            </span>
+          </div>
+        </div>
 
-          {/* Telefone */}
-          <div className="flex items-center gap-2 mb-4 text-sm text-gray-600">
-            <Phone className="h-4 w-4" />
-            <span>{lead.telefone}</span>
-          </div>
-
-          {/* 2 Botões grandes */}
-          <div className="flex gap-2">
-            <Button
-              onClick={() => handleSend24h(lead)}
-              className="flex-1 h-10 bg-green-100 hover:bg-green-200 text-green-800 font-semibold border border-green-300"
-              variant="outline"
-            >
-              <span>📱 Enviar 24h</span>
-            </Button>
-            <Button
-              onClick={() => handleSend1h(lead)}
-              className="flex-1 h-10 bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold border border-blue-300"
-              variant="outline"
-            >
-              <span>📱 Enviar 1h</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Botões de ação */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            size="sm"
+            onClick={() => handleSend24h(lead)}
+            className="h-8 px-2.5 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-semibold border border-green-300"
+            variant="outline"
+            title="Enviar lembrete de 24h (amanhã)"
+          >
+            📱 24h
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => handleSend1h(lead)}
+            className="h-8 px-2.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-semibold border border-blue-300"
+            variant="outline"
+            title="Enviar lembrete de 1h (hoje)"
+          >
+            📱 1h
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-700 text-muted-foreground"
+            onClick={() => handleMarkAbsent(lead)}
+            title="Marcar como desistência"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
     );
   };
 
   return (
-    <div className="space-y-6 p-4 max-w-3xl mx-auto">
-      {/* Título */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">🎯 Controle de Presença</h1>
-        <p className="text-sm text-gray-600 mt-1">Clique nos botões para enviar lembretes via WhatsApp</p>
-      </div>
+    <div className="glass-card rounded-xl p-5">
+      {/* Título — idêntico ao FollowUpQueue */}
+      <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2">
+        <Bell className="h-5 w-5 text-primary" />
+        Lembretes de Agendamento
+        <span className="ml-auto text-sm font-body text-muted-foreground">{relevantLeads.length} agendamentos</span>
+      </h3>
 
       {/* HOJE */}
       {todayLeads.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-xl font-semibold text-red-700 flex items-center gap-2">
-            📅 Hoje ({todayLeads.length} agendamentos)
-          </h2>
-          <div className="space-y-3">
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            📅 Hoje ({todayLeads.length})
+          </p>
+          <div className="space-y-2">
             {todayLeads.map((lead) => renderLeadCard(lead, true))}
           </div>
         </div>
@@ -158,11 +161,11 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
 
       {/* AMANHÃ */}
       {tomorrowLeads.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-xl font-semibold text-blue-700 flex items-center gap-2">
-            📅 Amanhã ({tomorrowLeads.length} agendamentos)
-          </h2>
-          <div className="space-y-3">
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            📅 Amanhã ({tomorrowLeads.length})
+          </p>
+          <div className="space-y-2">
             {tomorrowLeads.map((lead) => renderLeadCard(lead, false))}
           </div>
         </div>
@@ -170,9 +173,9 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
 
       {/* Vazio */}
       {relevantLeads.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">📭 Nenhum agendamento para hoje ou amanhã</p>
-        </div>
+        <p className="text-sm text-muted-foreground py-4 text-center">
+          📭 Nenhum agendamento para hoje ou amanhã
+        </p>
       )}
     </div>
   );
