@@ -846,6 +846,7 @@ client.on("message_create", async (msg) => {
 
 // API: enviar mensagem
 app.post("/send-message", async (req, res) => {
+  console.log('[send-message] payload:', req.body);
   const { telefone, message } = req.body;
   if (!telefone || !message) return res.status(400).json({ error: "telefone e message sao obrigatorios" });
   try {

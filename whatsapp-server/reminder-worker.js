@@ -22,14 +22,27 @@ const db = admin.firestore();
 const MY_PHONE = '17991040452';
 const COOLDOWN_MINUTES = 60; // 1 hora
 const DRY_RUN = !process.argv.includes('--send');
-const BACKEND_URL = 'http://localhost:3000'; // URL do backend (porta do servidor Express)
+const ALLOW_SEND = process.env.ALLOW_SEND === 'true' && process.argv.includes('--send');
+const BACKEND_URL = 'http://localhost:3001'; // URL do backend (porta do servidor Express/WhatsApp)
 const NEXT_SENDS_FILE = resolve(__dirname, 'next-sends.json');
 const SEND_FAILURES_FILE = resolve(__dirname, 'send-failures.json');
 
-// Templates de lembrete (iguais ao whatsapp.ts)
+// Templates de lembrete personalizados por tempo
 function generateReminderText(dataAgendamento, type) {
-  const timeLabel = type === '24h' ? 'amanhã' : 'HOJE';
-  return `Olá!\nPassando só pra lembrar que sua avaliação está marcada para *${timeLabel}*.\n\nData e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui.\nTe esperamos!`;
+  switch(type) {
+    case '24h':
+    case '12h':
+      return `⏰ Lembrete da sua avaliação | OdontoCompany Olimpia\n\nOlá! Passando só pra lembrar que sua avaliação está marcada para amanhã. 😊\n\n📅 Data e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui. Te esperamos! 💚`;
+    
+    case '3h':
+      return `⏰ Faltam 3 horas para sua avaliação!\n\nOlá, tudo bem? Sua consulta na OdontoCompany Olimpia está chegando. 😄\n\n📅 Data e Horário: ${dataAgendamento}\n\nEstamos te esperando! 💚`;
+    
+    case '1h':
+      return `⏰ Falta apenas 1 hora para sua avaliação!\n\nOlá, tudo bem? Já estamos deixando tudo pronto para te receber na OdontoCompany Olimpia. 😄\n\n📅 Data e Horário: ${dataAgendamento}\n\nAté logo! 💚`;
+    
+    default:
+      return `⏰ Lembrete da sua avaliação | OdontoCompany Olimpia\n\n📅 Data e Horário: ${dataAgendamento}\n\nTe esperamos! 💚`;
+  }
 }
 
 // Parse "dd/MM/yyyy HH:mm" → Date
@@ -86,12 +99,14 @@ async function getLastBotMessageTime(phoneId) {
 }
 
 // Verificar se devemos enviar (passa em todas as travas)
-async function shouldSend(lead, slot, now) {
+// slotType: '24h'|'12h'|'3h'|'1h'
+// slotTime: Date correspondente ao horário programado
+async function shouldSend(lead, slotType, slotTime, now) {
   // Trava 1: Telefone válido?
   const normalized = normalizePhone(lead.telefone);
-  if (normalized.length < 10 || normalized.length > 12) {
+  if (normalized.length < 10 || normalized.length > 13) {
     console.log(
-      `[reminder-worker] 🚫 ${lead.nome}: telefone inválido (${normalized.length} dígitos, precisa 10-12)`
+      `[reminder-worker] 🚫 ${lead.nome}: telefone inválido (${normalized.length} dígitos, precisa 10-13)`
     );
     return false;
   }
@@ -103,18 +118,18 @@ async function shouldSend(lead, slot, now) {
   }
 
   // Trava 3: Ja foi enviado neste slot?
-  if (lead.lembretes?.sent?.[slot]) {
-    console.log(`[reminder-worker] ⏭️  ${lead.nome} (${slot}): já foi enviado em ${lead.lembretes.sent[slot]}`);
+  if (lead.lembretes?.sent?.[slotType]) {
+    console.log(`[reminder-worker] ⏭️  ${lead.nome} (${slotType}): já foi enviado em ${lead.lembretes.sent[slotType]}`);
     return false;
   }
 
   // Trava 4: Agora é >= horário programado?
-  if (now < slot) {
-    return false; // Ainda não é hora
+  if (now < slotTime) {
+    // Ainda não é hora
+    return false;
   }
 
   // Trava 5: Cooldown de 1h (última mensagem do vendedor)?
-  // Usar última 11 dígitos como ID da conversa (canonical)
   const phoneId = normalized.length >= 11 ? normalized.slice(-11) : normalized;
   const lastBotMsg = await getLastBotMessageTime(phoneId);
   
@@ -140,7 +155,7 @@ async function sendReminderToWhatsApp(phoneId, reminderText) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        phone: phoneId,
+        telefone: phoneId,
         message: reminderText,
         isReminder: true // flag para identificar que é um lembrete automático
       })
@@ -309,7 +324,7 @@ async function runReminder() {
           });
         }
 
-        if (!(await shouldSend(lead, slotType, now))) continue;
+        if (!(await shouldSend(lead, slotType, slotTime, now))) continue;
 
         eligible++;
 
@@ -318,14 +333,13 @@ async function runReminder() {
         const normalized = normalizePhone(lead.telefone);
         const phoneId = normalized.length >= 11 ? normalized.slice(-11) : normalized;
 
-        if (DRY_RUN) {
-          console.log(`[reminder-worker] 🔮 DRY RUN: Enviaria lembrete ${slotType} para ${lead.nome} (${lead.telefone})`);
+        if (DRY_RUN || !ALLOW_SEND) {
+          console.log(`[reminder-worker] 🔮 DRY RUN (SEGURO): Enviaria lembrete ${slotType} para ${lead.nome} (${lead.telefone})`);
           console.log(`[reminder-worker]    Mensagem: "${reminderText.split('\n')[0]}..."`);
           console.log(`[reminder-worker]    Conversa ID: ${phoneId}`);
           console.log(`[reminder-worker]    POST: ${BACKEND_URL}/send-message`);
-          
-          // Ainda marca como enviado no dry-run (para não repetir no próximo ciclo)
-          await markSent(lead.id, slotType, now);
+          console.log(`[reminder-worker]    ⚠️  NÃO SERÁ ENVIADO (use --send + ALLOW_SEND=true para ativar)`);
+          // NÃO marca como enviado em dry-run
         } else {
           console.log(`[reminder-worker] 📤 Enviando lembrete ${slotType} para ${lead.nome} (${phoneId})...`);
           
@@ -356,7 +370,11 @@ async function runReminder() {
 }
 
 // Iniciar worker
-console.log(`[reminder-worker] 🚀 Iniciando worker (DRY RUN: ${DRY_RUN})`);
+if (!ALLOW_SEND) {
+  console.log(`[reminder-worker] 🔐 MODO SEGURO: NÃO ENVIARÁ MENSAGENS`);
+  console.log(`[reminder-worker] Para enviar, use: ALLOW_SEND=true node reminder-worker.js --send`);
+}
+console.log(`[reminder-worker] 🚀 Iniciando worker (DRY RUN: ${DRY_RUN}, ALLOW_SEND: ${ALLOW_SEND})`);
 console.log(`[reminder-worker] Rodará a cada 5 minutos. Pressione Ctrl+C para parar.\n`);
 
 // Rodar imediatamente
