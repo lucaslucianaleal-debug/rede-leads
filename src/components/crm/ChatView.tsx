@@ -18,9 +18,10 @@ interface ChatViewProps {
   onUpdateLead: (id: string, updates: Partial<Lead>) => void;
   openTarget?: { phone: string; message?: string } | null;
   onOpenTargetHandled?: () => void;
+  onCreateLead?: (lead: Omit<Lead, 'id'>) => void;
 }
 
-export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled }: ChatViewProps) {
+export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled, onCreateLead }: ChatViewProps) {
   const {
     conversations,
     serverConnected,
@@ -386,6 +387,7 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled 
               currentLead={currentLead}
               onUpdateLead={onUpdateLead}
               prefilledMessage={prefilledMessage}
+              onCreateLead={onCreateLead}
               onPrefilledConsumed={() => setPrefilledMessage("")}
             />
           </div>

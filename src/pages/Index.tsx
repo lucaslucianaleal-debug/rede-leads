@@ -346,6 +346,7 @@ const CRMDashboard = () => {
               onUpdateLead={(id, updates) => updateLead(id, updates)}
               openTarget={chatTarget}
               onOpenTargetHandled={() => setChatTarget(null)}
+              onCreateLead={handleCreateLead}
             />
           </TabsContent>
         </Tabs>

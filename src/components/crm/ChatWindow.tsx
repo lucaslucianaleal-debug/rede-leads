@@ -29,6 +29,7 @@ interface ChatWindowProps {
   serverConnected: boolean | null;
   currentLead: Lead | null;
   onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
+  onCreateLead?: (lead: Omit<Lead, 'id'>) => void;
   prefilledMessage?: string;
   onPrefilledConsumed?: () => void;
 }
@@ -451,7 +452,51 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
             </div>
           )}
           {!currentLead && (
-            <p className="text-xs text-muted-foreground text-center p-3">Lead ainda nao cadastrado no CRM</p>
+            <div className="p-3">
+              <p className="text-xs text-muted-foreground text-center mb-3">Lead ainda nao cadastrado no CRM</p>
+              <Button
+                className="w-full h-8"
+                onClick={() => {
+                  // Build lead object from prefilled form
+                  const lead: Omit<Lead, 'id'> = {
+                    dataCriacao: format(new Date(), "dd/MM/yyyy"),
+                    dataContato: format(new Date(), "dd/MM/yyyy"),
+                    nome: (leadForm.nome as string) || (conversation.leadNome || "Novo Contato"),
+                    telefone: (leadForm.telefone as string) || conversation.telefone,
+                    servicoProcurado: leadForm.servicoProcurado as string || "",
+                    captador: leadForm.captador as string || "",
+                    fonteLead: leadForm.fonteLead as string || "Outro",
+                    etapaLead: (leadForm.etapaLead as any) || "Novo",
+                    status: (leadForm.status as any) || "",
+                    respostaLead: (leadForm.respostaLead as any) || "",
+                    comparecimento: (leadForm.comparecimento as any) || "",
+                    dataFollowUp: format(new Date(), "dd/MM/yyyy"),
+                    dataAgendamento: leadForm.dataAgendamento as string || "",
+                    dataRetornoLigacao: leadForm.dataRetornoLigacao as string || "",
+                    observacao: leadForm.observacao as string || "",
+                    followUpCount: 0,
+                    lembretes: { h24: false, today: false },
+                  };
+
+                  if (!onCreateLead) {
+                    toast.error("Criação de lead não disponível no contexto");
+                    return;
+                  }
+
+                  // Basic validation
+                  const cleanPhone = (lead.telefone || "").replace(/\D/g, "");
+                  if (!lead.nome || cleanPhone.length < 10) {
+                    toast.error("Nome e telefone válidos são necessários para criar lead");
+                    return;
+                  }
+
+                  onCreateLead(lead);
+                  toast.success("Lead criado a partir da conversa");
+                }}
+              >
+                <Save className="h-3.5 w-3.5 mr-1.5" /> Criar Lead
+              </Button>
+            </div>
           )}
         </div>
       )}

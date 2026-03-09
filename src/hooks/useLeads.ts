@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { Lead, ClinicFilter, DashboardStats, LeadStage, LeadComparecimento } from "@/types/crm";
 import { mockLeads } from "@/data/mockLeads";
 import { format, addDays, parse } from "date-fns";
+import { normalizePhoneTo11Digits } from "@/lib/phone";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc, updateDoc, getDoc } from "firebase/firestore";
@@ -490,6 +491,22 @@ export function useLeads() {
     const raw: Lead = { ...leadData, id: newId } as Lead;
     const newLead = ensureDateCriacao(normalizeLead(raw));
     setLeads((prev) => [...prev, newLead]);
+
+    // Try to link the new lead to an existing conversation in Firestore
+    (async () => {
+      try {
+        const telefone = leadData.telefone || "";
+        const normalized11 = normalizePhoneTo11Digits(telefone);
+        if (!normalized11) return;
+
+        const convRef = doc(db, "conversations", normalized11);
+        // Merge so we don't overwrite existing conversation fields
+        await setDoc(convRef, { telefone: normalized11, leadNome: leadData.nome || "", leadId: newId }, { merge: true });
+        console.log(`[createLead] Conversa vinculada/atualizada: ${normalized11} -> lead ${newId}`);
+      } catch (err) {
+        console.error("[createLead] Falha ao vincular conversa no Firestore:", err);
+      }
+    })();
   };
 
   const clearCallReturn = (leadId: string) => {
