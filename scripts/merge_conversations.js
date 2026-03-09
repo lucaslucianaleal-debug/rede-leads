@@ -16,10 +16,26 @@ function onlyDigits(s) {
   return String(s).replace(/\D/g, '');
 }
 
-function toLast11(phone) {
+function toLastN(phone, n) {
   const d = onlyDigits(phone);
   if (!d) return '';
-  return d.length >= 11 ? d.slice(-11) : d;
+  return d.length >= n ? d.slice(-n) : d;
+}
+
+async function resolveTargetId(db, phone) {
+  // Try existing conversation docs by suffix: prefer longest suffix that exists
+  const tries = [11, 10, 9, 8];
+  for (const n of tries) {
+    const candidate = toLastN(phone, n);
+    if (!candidate) continue;
+    try {
+      const doc = await db.collection('conversations').doc(candidate).get();
+      if (doc.exists) return { id: candidate, matchedBy: `last${n}` };
+    } catch (err) {
+      // ignore transient read errors here; caller will surface
+    }
+  }
+  return { id: toLastN(phone, 11), matchedBy: 'fallback-last11' };
 }
 
 async function main() {
@@ -31,25 +47,30 @@ async function main() {
   const apply = args.includes('--apply');
   const sourceId = args[0];
   const targetPhone = args[1];
-  const targetId = toLast11(targetPhone);
-
-  if (!targetId) {
-    console.error('Could not derive target conversation id from phone:', targetPhone);
-    process.exit(1);
-  }
 
   try {
-    admin.initializeApp({ credential: admin.credential.applicationDefault() });
+    // always read local service account and initialize with cert
+    const { readFileSync } = await import('fs');
+    const path = 'c:/CRM ODC - REDE NT/whatsapp-server/serviceAccountKey.json';
+    const svc = JSON.parse(readFileSync(path, 'utf8'));
+    process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || svc.project_id;
+    process.env.GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || svc.project_id;
+    admin.initializeApp({ credential: admin.credential.cert(svc), projectId: svc.project_id });
+    console.log('[init] Initialized firebase-admin using whatsapp-server/serviceAccountKey.json');
   } catch (e) {
-    console.error('Failed to initialize firebase-admin. Ensure GOOGLE_APPLICATION_CREDENTIALS is set.');
+    console.error('Failed to initialize firebase-admin with local service account.');
     console.error(e);
     process.exit(1);
   }
 
   const db = admin.firestore();
 
+  // Resolve target id by trying existing conversation docs with suffix fallbacks
+  const resolved = await resolveTargetId(db, targetPhone);
+  const targetId = resolved.id;
+
   console.log(`Source conversation: ${sourceId}`);
-  console.log(`Target conversation (last11): ${targetId}`);
+  console.log(`Target conversation: ${targetId} (matchedBy=${resolved.matchedBy})`);
 
   const sourceRef = db.collection('conversations').doc(sourceId);
   const targetRef = db.collection('conversations').doc(targetId);
@@ -72,9 +93,7 @@ async function main() {
   const srcMsgsSnap = await sourceRef.collection('messages').get();
   const tgtMsgsSnap = await targetRef.collection('messages').get();
 
-  const srcMsgIds = new Set(srcMsgsSnap.docs.map(d => d.id));
   const tgtMsgIds = new Set(tgtMsgsSnap.docs.map(d => d.id));
-
   const msgsToCopy = srcMsgsSnap.docs.filter(d => !tgtMsgIds.has(d.id));
 
   console.log(`Messages in source: ${srcMsgsSnap.size}`);
@@ -87,17 +106,43 @@ async function main() {
     process.exit(0);
   }
 
-  // Perform copy of messages
+  // Batch-write configuration (env overrides available)
+  const BATCH_SIZE = Number(process.env.MERGE_BATCH_SIZE) || 200; // Firestore limit 500
+  const DELAY_MS = Number(process.env.MERGE_BATCH_DELAY_MS) || 250;
+  const MAX_RETRIES = 5;
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
   let copied = 0;
-  for (const msgDoc of msgsToCopy) {
-    const msgData = msgDoc.data();
-    const targetMsgRef = targetRef.collection('messages').doc(msgDoc.id);
-    try {
-      await targetMsgRef.set(msgData);
-      copied++;
-    } catch (err) {
-      console.error('Failed to copy message', msgDoc.id, err.message || err);
+  const batches = [];
+  for (let i = 0; i < msgsToCopy.length; i += BATCH_SIZE) {
+    batches.push(msgsToCopy.slice(i, i + BATCH_SIZE));
+  }
+
+  for (let idx = 0; idx < batches.length; idx++) {
+    const batchDocs = batches[idx];
+    let attempt = 0;
+    while (attempt < MAX_RETRIES) {
+      try {
+        const batch = db.batch();
+        for (const msgDoc of batchDocs) {
+          const data = msgDoc.data();
+          const targetMsgRef = targetRef.collection('messages').doc(msgDoc.id);
+          batch.set(targetMsgRef, data);
+        }
+        await batch.commit();
+        copied += batchDocs.length;
+        console.log(`Batch ${idx + 1}/${batches.length} committed (${batchDocs.length} msgs)`);
+        break;
+      } catch (err) {
+        attempt++;
+        const backoff = 200 * Math.pow(2, attempt);
+        console.error(`Batch ${idx + 1} commit failed (attempt ${attempt}):`, err.message || err, `— retrying in ${backoff}ms`);
+        await sleep(backoff);
+      }
     }
+    // brief pause between batches to avoid quota bursts
+    if (idx < batches.length - 1) await sleep(DELAY_MS);
   }
 
   console.log(`Copied ${copied} messages to ${targetId}`);
