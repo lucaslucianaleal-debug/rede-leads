@@ -434,6 +434,10 @@ async function syncLead(telefone, pushName, firstMessage) {
       if (nomeAtual) {
         updateData.leadNome = nomeAtual;
       }
+      // Se temos o lead existente, garantir que registramos o leadId
+      if (existing && existing.id) {
+        updateData.leadId = existing.id;
+      }
       await db.collection("conversations").doc(conversationPhone).set(updateData, { merge: true });
 
       // Limpa leadNome duplicado em outras conversas
@@ -491,7 +495,7 @@ async function syncLead(telefone, pushName, firstMessage) {
     
     // Cria conversa com ÚLTIMOS 11 DÍGITOS (canonical ID)
     await db.collection("conversations").doc(telLast11).set(
-      { leadNome: nome, telefone: telLast11 },
+      { leadNome: nome, telefone: telLast11, leadId: newLead.id },
       { merge: true }
     );
     
