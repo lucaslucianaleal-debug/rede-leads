@@ -557,6 +557,47 @@ export function useLeads() {
     URL.revokeObjectURL(url);
   };
 
+  const exportWeeklyAppointments = (date: Date = new Date()) => {
+    // Calcular início e fim da semana (domingo a sábado)
+    const dayOfWeek = date.getDay();
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const appts = leads.filter((l) => {
+      if (!l.dataAgendamento) return false;
+      const parts = l.dataAgendamento.split('/');
+      if (parts.length < 3) return false;
+      // dataAgendamento may have time after space
+      const [day, month, yearAndRest] = parts;
+      const year = yearAndRest.split(' ')[0];
+      const agDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return agDate >= startOfWeek && agDate <= endOfWeek;
+    });
+
+    const data = appts.map((l) => ({
+      "NOME DO LEAD": l.nome,
+      TELEFONE: l.telefone,
+      "SERVIÇO PROCURADO": l.servicoProcurado,
+      "DATA DE AGENDAMENTO": l.dataAgendamento,
+      "DATA AGENDAMENTO CRIADO": l.dataAgendamentoCriado || "",
+      COMPARECIMENTO: l.comparecimento,
+      OBSERVAÇÃO: l.observacao,
+    }));
+
+    const csv = Papa.unparse(data, { delimiter: ";" });
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Rede_Leads_Agendados_Semana_${format(date, "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportDailyReport = async (date: Date = new Date()) => {
     const ExcelJS = (await import("exceljs")).default;
     const formatted = format(date, "dd/MM/yyyy");
@@ -1018,6 +1059,7 @@ export function useLeads() {
     exportAppointments,
     exportDailyReport,
     exportWeeklyReport,
+    exportWeeklyAppointments,
     deleteLeads,
     clearAllLeads,
     clearDuplicates,

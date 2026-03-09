@@ -19,6 +19,7 @@ import { motion } from "framer-motion";
 interface AgendaDoDiaProps {
   leads: Lead[];
   onMarkAttendance: (id: string, value: "COMPARECEU" | "NÃO COMPARECEU" | "") => void;
+  onExportWeek?: (date?: Date) => void;
 }
 
 export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
@@ -99,6 +100,11 @@ export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
               <span className="text-sm font-medium">{pendentes} pendentes</span>
             </div>
           )}
+          <div>
+            <Button size="sm" variant="outline" onClick={() => onExportWeek?.(selectedDate)}>
+              Exportar Semana
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -260,6 +260,7 @@ const CRMDashboard = () => {
           <AgendaDoDia
             leads={leads}
             onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
+            onExportWeek={exportWeeklyAppointments}
           />
         ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -321,6 +322,7 @@ const CRMDashboard = () => {
             <AgendaDoDia
               leads={leads}
               onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
+              onExportWeek={exportWeeklyAppointments}
             />
           </TabsContent>
 
