@@ -34,7 +34,7 @@ interface ChatWindowProps {
   onPrefilledConsumed?: () => void;
 }
 
-export function ChatWindow({ conversation, messages, onSend, onOpen, serverConnected, currentLead, onUpdateLead, prefilledMessage, onPrefilledConsumed }: ChatWindowProps) {
+export function ChatWindow({ conversation, messages, onSend, onOpen, serverConnected, currentLead, onUpdateLead, onCreateLead, prefilledMessage, onPrefilledConsumed }: ChatWindowProps) {
   const [text, setText] = useState("");
 
   // Pre-fill message when a shortcut sends a template
