@@ -22,7 +22,7 @@ interface AgendaDoDiaProps {
   onExportWeek?: (date?: Date) => void;
 }
 
-export function AgendaDoDia({ leads, onMarkAttendance }: AgendaDoDiaProps) {
+export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek }: AgendaDoDiaProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const dateStr = format(selectedDate, "dd/MM/yyyy");
