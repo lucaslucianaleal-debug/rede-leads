@@ -690,6 +690,15 @@ export function useLeads() {
       
       return agendDate >= startOfWeek && agendDate <= endOfWeek;
     }).length;
+
+    // Contar leads criados na semana (baseado em `dataCriacao` no formato dd/MM/yyyy)
+    const leadsCriadosSemana = leads.filter(l => {
+      if (!l.dataCriacao) return false;
+      const parts = l.dataCriacao.split('/');
+      if (parts.length !== 3) return false;
+      const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      return d >= startOfWeek && d <= endOfWeek;
+    }).length;
     
     const taxaComparecimento = agendadosSemana > 0 
       ? ((comparecimentos.length / agendadosSemana) * 100).toFixed(1)
@@ -730,6 +739,7 @@ export function useLeads() {
     ws.addRow([]);
     addInfoRow("RESUMO");
     addInfoRow("COMPARECIMENTOS", comparecimentos.length);
+    addInfoRow("LEADS CRIADOS", leadsCriadosSemana);
     addInfoRow("AGENDADOS NA SEMANA", agendadosSemana);
     addInfoRow("TAXA DE COMPARECIMENTO", `${taxaComparecimento}%`);
     ws.addRow([]);
