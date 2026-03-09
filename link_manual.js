@@ -30,6 +30,11 @@ const manualLinks = [
     leadName: 'Marina Siconelle',
     leadId: null,
   },
+  {
+    convId: '58237083780',
+    leadName: 'Erica',
+    leadId: null,
+  },
 ];
 
 async function linkManualMappings() {
@@ -57,10 +62,10 @@ async function linkManualMappings() {
       if (mapping.leadId) {
         console.log(`✓ ${mapping.convId} -> ${mapping.leadName} (${mapping.leadId})`);
         if (isApply) {
-          await db.collection('conversations').doc(mapping.convId).update({
+          await db.collection('conversations').doc(mapping.convId).set({
             leadNome: mapping.leadName,
             leadId: mapping.leadId,
-          });
+          }, { merge: true });
           console.log(`  Updated in Firestore`);
         } else {
           console.log(`  Would update in Firestore`);
