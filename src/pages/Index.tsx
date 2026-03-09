@@ -57,6 +57,7 @@ const CRMDashboard = () => {
     exportAppointments,
     exportDailyReport,
     exportWeeklyReport,
+    exportWeeklyAppointments,
     importCSV,
     deleteLeads,
     clearAllLeads,
