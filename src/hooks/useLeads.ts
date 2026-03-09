@@ -656,13 +656,23 @@ export function useLeads() {
     const comparecimentos = appts.filter(l => l.comparecimento === "COMPARECEU").length;
     const agendadosSemana = appts.length;
 
+    // Número de novos leads na semana (dataCriacao)
+    const leadsCriadosSemana = leads.filter(l => {
+      if (!l.dataCriacao) return false;
+      const parts = l.dataCriacao.split('/');
+      if (parts.length !== 3) return false;
+      const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      return d >= startOfWeek && d <= endOfWeek;
+    }).length;
+
     addInfoRow("AGENDADOS NA SEMANA", agendadosSemana);
     addInfoRow("COMPARECIMENTOS", comparecimentos);
+    addInfoRow("Nº DE NOVOS LEADS", leadsCriadosSemana);
     ws.addRow([]);
     addInfoRow("===== DETALHAMENTO =====");
     ws.addRow([]);
 
-    const headerRow = ws.addRow(["NOME", "TELEFONE", "SERVIÇO", "DATA AGENDAMENTO", "FONTE", "OBSERVAÇÃO", "COMPARECIMENTO"]);
+    const headerRow = ws.addRow(["NOME", "TELEFONE", "SERVIÇO", "DATA AGENDAMENTO", "FONTE", "COMPARECIMENTO"]);
     headerRow.eachCell(cell => {
       cell.font = { bold: true };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB8B8B8" } };
@@ -675,7 +685,6 @@ export function useLeads() {
         l.servicoProcurado || "",
         l.dataAgendamento || "",
         l.fonteLead || "",
-        l.observacao || "",
         l.comparecimento || "",
       ]);
     });
