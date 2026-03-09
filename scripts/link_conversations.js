@@ -10,7 +10,7 @@
  * 4. Apply changes: `node scripts/link_conversations.js --apply`
  */
 
-const admin = require('firebase-admin');
+import admin from 'firebase-admin';
 
 function normalizeToLast11(phone) {
   if (!phone) return '';
@@ -47,15 +47,27 @@ async function main() {
   const leads = sharedSnap.data().leads || [];
   console.log(`Loaded ${leads.length} leads`);
 
-  // Build maps
+  // Build maps (all possible normalizations)
   const map11 = new Map();
   const map8 = new Map();
+  const fullPhones = new Map(); // All variations
+  
   for (const l of leads) {
     const tel = l.telefone || '';
+    const digits = tel.replace(/\D/g, '');
+    
+    // Try all last-N variants
     const n11 = normalizeToLast11(tel);
     const n8 = lastN(tel, 8);
+    
     if (n11) map11.set(n11, l);
     if (n8) map8.set(n8, l);
+    
+    // Also try with leading "55" and without
+    if (digits) {
+      if (!digits.startsWith('55')) fullPhones.set('55' + digits, l);
+      fullPhones.set(digits, l);
+    }
   }
 
   console.log('Scanning conversations collection...');
@@ -64,42 +76,95 @@ async function main() {
 
   let matched = 0;
   let updated = 0;
+  const unmatched = [];
 
   for (const doc of convsSnap.docs) {
     const id = doc.id;
     const data = doc.data();
     // Skip if already linked
-    if (data && (data.leadId || data.leadNome)) continue;
+    if (data && (data.leadId || data.leadNome)) {
+      console.log(`  ✓ Already linked: ${id}`);
+      continue;
+    }
 
     const digits = id.replace(/\D/g, '');
     const last11 = digits.slice(-11);
+    const last10 = digits.slice(-10);
+    const last9 = digits.slice(-9);
     const last8 = digits.slice(-8);
 
     let lead = null;
-    if (last11 && map11.has(last11)) lead = map11.get(last11);
-    else if (last8 && map8.has(last8)) lead = map8.get(last8);
-    else {
-      // Try matching by normalizing leads variants
+
+    // Strategy 1: exact digit match (with or without 55)
+    if (fullPhones.has(digits)) lead = fullPhones.get(digits);
+    if (!lead && !digits.startsWith('55')) {
+      const with55 = '55' + digits;
+      if (fullPhones.has(with55)) lead = fullPhones.get(with55);
+    }
+
+    // Strategy 2: match by last 11 after adding 55 prefix if needed
+    if (!lead) {
+      const asLast11 = digits.length > 11 ? digits.slice(-11) : digits;
+      if (asLast11 && map11.has(asLast11)) lead = map11.get(asLast11);
+    }
+
+    // Strategy 3: match by last 8 digits
+    if (!lead && last8 && map8.has(last8)) lead = map8.get(last8);
+    
+    // Strategy 4: search for leads ending with last 8 digits
+    if (!lead) {
       for (const [k, l] of map11.entries()) {
         if (k.endsWith(last8)) { lead = l; break; }
       }
     }
 
+    // Strategy 5: search for leads ending with last 9 digits
+    if (!lead && last9) {
+      for (const [k, l] of map11.entries()) {
+        if (k.endsWith(last9)) { lead = l; break; }
+      }
+    }
+
+    // Strategy 6: search for leads ending with last 10 digits
+    if (!lead && last10) {
+      for (const [k, l] of map11.entries()) {
+        if (k.endsWith(last10)) { lead = l; break; }
+      }
+    }
+
+    // Strategy 7: try fullPhones map for exact or partial matches
+    if (!lead) {
+      for (const [phones, l] of fullPhones.entries()) {
+        // Match if the conv ID ends with last 8+ digits of a lead phone
+        if (phones.endsWith(last8) || phones.slice(-10).endsWith(last9) || phones.slice(-11).endsWith(last10)) {
+          lead = l;
+          break;
+        }
+      }
+    }
+
     if (lead) {
       matched++;
-      console.log(`Match: conversation ${id} -> lead ${lead.id} (${lead.nome})`);
+      console.log(`✓ Match: conversation ${id} -> lead ${lead.id} (${lead.nome})`);
       if (apply) {
         try {
           await db.collection('conversations').doc(id).set({ leadId: lead.id, leadNome: lead.nome }, { merge: true });
           updated++;
         } catch (e) {
-          console.error(`Failed to update conversation ${id}:`, e.message || e);
+          console.error(`✗ Failed to update conversation ${id}:`, e.message || e);
         }
       }
+    } else {
+      unmatched.push(id);
     }
   }
 
+  console.log(`\n=== SUMMARY ===`);
   console.log(`Matched ${matched} conversations. ${apply ? `Updated ${updated}.` : 'Dry-run only.'}`);
+  console.log(`Unmatched ${unmatched.length} conversations (orphaned):`);
+  unmatched.slice(0, 10).forEach(id => console.log(`  - ${id}`));
+  if (unmatched.length > 10) console.log(`  ... and ${unmatched.length - 10} more`);
+
   process.exit(0);
 }
 
