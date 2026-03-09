@@ -594,6 +594,80 @@ async function preloadPhoneAliasMapFromLeads() {
 await preloadPhoneAliasMap();
 await preloadPhoneAliasMapFromLeads();
 
+// Atualiza conversas associadas a um lead quando o lead é editado
+async function updateConversationsForLead(lead) {
+  try {
+    if (!lead || !lead.telefone) return;
+    const leadDigits = String(lead.telefone || "").replace(/\D/g, "");
+    const leadNorm = leadDigits.startsWith("55") ? leadDigits.slice(2) : leadDigits;
+    if (leadNorm.length < 8) return;
+    const leadLast11 = leadNorm.slice(-11);
+    const leadLast8 = leadNorm.slice(-8);
+
+    const convSnaps = await db.collection('conversations').get();
+    // Ensure target conversation exists (create if necessary)
+    const targetId = leadLast11;
+    const targetRef = db.collection('conversations').doc(targetId);
+    const targetSnap = await targetRef.get();
+    if (!targetSnap.exists) {
+      await targetRef.set({ telefone: leadLast11, leadId: lead.id, leadNome: lead.nome }, { merge: true });
+    } else {
+      // ensure leadId/leadNome present
+      await targetRef.set({ leadId: lead.id, leadNome: lead.nome }, { merge: true });
+    }
+
+    for (const doc of convSnaps.docs) {
+      const id = doc.id.replace(/\D/g, "").slice(-11);
+      if (id === leadLast11) continue; // already the canonical one
+      const data = doc.data() || {};
+      const telField = String(data.telefone || "").replace(/\D/g, "").slice(-11);
+      // match by last8 and different last11
+      if ((id && id.slice(-8) === leadLast8) || (telField && telField.slice(-8) === leadLast8)) {
+        // merge this doc into targetId
+        const srcRef = db.collection('conversations').doc(doc.id);
+        const msgs = await srcRef.collection('messages').get();
+        for (const m of msgs.docs) {
+          const targetMsgRef = targetRef.collection('messages').doc(m.id);
+          const exists = await targetMsgRef.get();
+          if (!exists.exists) {
+            await targetMsgRef.set(m.data());
+          }
+        }
+        // update metadata if target missing
+        const srcData = doc.data() || {};
+        const updates = {};
+        if (!targetSnap.exists || !targetSnap.data()?.leadId) updates.leadId = lead.id;
+        if (!targetSnap.exists || !targetSnap.data()?.leadNome) updates.leadNome = lead.nome;
+        if (!targetSnap.exists || !targetSnap.data()?.telefone) updates.telefone = leadLast11;
+        if (Object.keys(updates).length) await targetRef.set(updates, { merge: true });
+        // delete source
+        await srcRef.delete();
+        console.log(`[lead-sync] Mesclada conversa ${doc.id} -> ${targetId} para lead ${lead.id}`);
+      }
+    }
+  } catch (e) {
+    console.error('[lead-sync] erro ao atualizar conversas para lead', lead?.id, e.message || e);
+  }
+}
+
+// Escuta alterações no documento de leads e sincroniza conversas automaticamente
+const crmSharedRef = db.collection('crm_data').doc('shared');
+crmSharedRef.onSnapshot(async (snap) => {
+  try {
+    if (!snap.exists) return;
+    const leads = snap.data()?.leads || [];
+    console.log('[lead-sync] snapshot de leads recebido, sincronizando', leads.length, 'leads');
+    for (const l of leads) {
+      // executar sem bloquear tudo (fire-and-forget com await para ordem)
+      await updateConversationsForLead(l);
+    }
+    // repopular alias map após sync
+    await preloadPhoneAliasMapFromLeads();
+  } catch (e) {
+    console.error('[lead-sync] falha no snapshot handler:', e.message || e);
+  }
+});
+
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: "./auth_info" }),
   puppeteer: {
