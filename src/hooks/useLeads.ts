@@ -598,6 +598,98 @@ export function useLeads() {
     URL.revokeObjectURL(url);
   };
 
+  const exportWeeklyAppointmentsXlsx = async (date: Date = new Date()) => {
+    // Calcular início e fim da semana (domingo a sábado)
+    const dayOfWeek = date.getDay();
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const appts = leads.filter((l) => {
+      if (!l.dataAgendamento) return false;
+      const parts = l.dataAgendamento.split('/');
+      if (parts.length < 3) return false;
+      const [day, month, yearAndRest] = parts;
+      const year = yearAndRest.split(' ')[0];
+      const agDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return agDate >= startOfWeek && agDate <= endOfWeek;
+    });
+
+    const ExcelJS = (await import("exceljs")).default;
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Agendamentos Semana");
+
+    ws.columns = [
+      { width: 32 },
+      { width: 18 },
+      { width: 18 },
+      { width: 20 },
+      { width: 14 },
+      { width: 30 },
+    ];
+
+    const addInfoRow = (label: string, value?: string | number) => {
+      const row = ws.addRow(value !== undefined ? [label, value] : [label]);
+      row.getCell(1).font = { bold: !value };
+      return row;
+    };
+
+    const now = new Date();
+    const generatedAt = `${format(now, "dd/MM/yyyy")} ${format(now, "HH:mm")}`;
+
+    addInfoRow("REDE LEADS");
+    ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 14 };
+    addInfoRow("Central de Conversão de Leads");
+    addInfoRow("WhatsApp: (17) 99115-4763");
+    ws.addRow([]);
+    addInfoRow("AGENDA - RELATÓRIO SEMANAL");
+    ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 12 };
+    addInfoRow("Período", `${format(startOfWeek, "dd/MM/yyyy")} a ${format(endOfWeek, "dd/MM/yyyy")}`);
+    addInfoRow("Gerado em", generatedAt);
+    ws.addRow(["=========================================="]);
+    ws.addRow([]);
+    addInfoRow("RESUMO");
+
+    const comparecimentos = appts.filter(l => l.comparecimento === "COMPARECEU").length;
+    const agendadosSemana = appts.length;
+
+    addInfoRow("AGENDADOS NA SEMANA", agendadosSemana);
+    addInfoRow("COMPARECIMENTOS", comparecimentos);
+    ws.addRow([]);
+    addInfoRow("===== DETALHAMENTO =====");
+    ws.addRow([]);
+
+    const headerRow = ws.addRow(["NOME", "TELEFONE", "SERVIÇO", "DATA AGENDAMENTO", "FONTE", "OBSERVAÇÃO", "COMPARECIMENTO"]);
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB8B8B8" } };
+    });
+
+    appts.forEach(l => {
+      ws.addRow([
+        l.nome,
+        l.telefone,
+        l.servicoProcurado || "",
+        l.dataAgendamento || "",
+        l.fonteLead || "",
+        l.observacao || "",
+        l.comparecimento || "",
+      ]);
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Rede_Leads_Agendamentos_Semana_${format(startOfWeek, "yyyy-MM-dd")}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportDailyReport = async (date: Date = new Date()) => {
     const ExcelJS = (await import("exceljs")).default;
     const formatted = format(date, "dd/MM/yyyy");
@@ -1060,6 +1152,7 @@ export function useLeads() {
     exportDailyReport,
     exportWeeklyReport,
     exportWeeklyAppointments,
+    exportWeeklyAppointmentsXlsx,
     deleteLeads,
     clearAllLeads,
     clearDuplicates,
