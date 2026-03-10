@@ -38,6 +38,17 @@ const phoneAliasMap = new Map();
 const sentMsgConversationMap = new Map();
 // Número do próprio bot (capturado no evento "ready") — usado para trava anti-auto-conversa
 let myOwnPhone = null;
+// Flag para logs verbosos temporários (ligar por 24h)
+let VERBOSE_LOGGING = false;
+// agenda desligar os logs verbosos após 24h caso ativado
+function enableVerboseFor24h() {
+  VERBOSE_LOGGING = true;
+  console.log('[logs] Verbose logging ativado por 24h');
+  setTimeout(() => {
+    VERBOSE_LOGGING = false;
+    console.log('[logs] Verbose logging desativado automaticamente (24h)');
+  }, 24 * 60 * 60 * 1000);
+}
 // Constante fixa de segurança: mesmo que myOwnPhone não esteja populado ainda, este número NUNCA vira conversa
 const MY_PHONE = '17991040452';
 
@@ -188,7 +199,7 @@ function phoneToWAId(telefone) {
 // Salvar mensagem na conversa correta
 // BUSCA PROFUNDA: verifica doc ID + campo telefone para evitar duplicatas
 async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }) {
-  console.log(`[saveMessage] Mensagem recebida de ID: ${telefone}, tentando vincular ao lead...`);
+  if (VERBOSE_LOGGING) console.log(`[saveMessage] Entrada: telefone=${telefone}, fromMe=${fromMe}, msgId=${msgId}, targetConversation=${targetConversation}, body=${body}`);
 
   const digits = telefone.replace(/\D/g, "");
   const phoneAfter55 = digits.startsWith("55") ? digits.slice(2) : digits;
@@ -308,7 +319,33 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
   const targetAliasKey = (targetPhone || aliasKey).replace(/\D/g, "").slice(-11);
   if (targetAliasKey) phoneAliasMap.set(targetAliasKey, targetPhone);
 
-  const convRef = db.collection("conversations").doc(targetPhone);
+  // Garantir ID canônico (últimos 11 dígitos) e criar o documento de conversa
+  // dentro de uma transaction para evitar condições de corrida que geram
+  // conversas duplicadas com IDs diferentes.
+  const canonicalId = targetAliasKey; // últimos 11 dígitos sempre
+  const convRef = db.collection("conversations").doc(canonicalId);
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(convRef);
+      if (!snap.exists) {
+        // Cria conversa canônica com telefone (11 dígitos) e registra a origem
+        tx.set(convRef, { telefone: canonicalId }, { merge: true });
+        if (VERBOSE_LOGGING) console.log(`[saveMessage][tx] Criando conversa canônica ${canonicalId} (origem telefone: ${telefone})`);
+      } else {
+        // Garante que o campo 'telefone' esteja coerente
+        const cur = snap.data();
+        const curTel = String(cur?.telefone || "").replace(/\D/g, "").slice(-11);
+        if (curTel !== canonicalId) {
+          tx.set(convRef, { telefone: canonicalId }, { merge: true });
+          if (VERBOSE_LOGGING) console.log(`[saveMessage][tx] Atualizando campo telefone em ${canonicalId} -> ${canonicalId}`);
+        }
+      }
+    });
+  } catch (txErr) {
+    console.warn('[saveMessage] Transacao falhou ao garantir conversa canonica:', txErr && txErr.message ? txErr.message : txErr);
+  }
+
   const msgRef = convRef.collection("messages").doc(msgId);
   const existing = await msgRef.get();
   if (existing.exists) {
@@ -327,8 +364,7 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     { telefone: canonicalTelefone, lastMessage: cleanMessage, lastMessageAt: Timestamp.now(), unreadCount: fromMe ? 0 : currentUnread + 1 },
     { merge: true }
   );
-
-  console.log(`[saveMessage] Mensagem salva na conversa: ${targetPhone}, fromMe: ${fromMe}`);
+  if (VERBOSE_LOGGING) console.log(`[saveMessage] Mensagem salva na conversa: ${canonicalId}, fromMe: ${fromMe}, msgId: ${msgId}`);
 }
 
 // Sincronizar lead: cria se novo, NAO sobrescreve se ja existe
@@ -1005,6 +1041,35 @@ app.get("/status", (req, res) => {
   res.json({ connected: !!info, number: info?.wid?.user || null });
 });
 
+// Endpoint de debug: salvar mensagem diretamente (apenas localhost)
+app.post("/debug/save-message", async (req, res) => {
+  try {
+    if (req.ip !== '::1' && req.ip !== '127.0.0.1' && req.hostname !== 'localhost') {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    const { telefone, body, fromMe, msgId, targetConversation } = req.body || {};
+    if (!telefone || !msgId) return res.status(400).json({ error: 'telefone and msgId required' });
+    await saveMessage({ telefone, body: body || '(mídia)', fromMe: !!fromMe, msgId, targetConversation });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[debug/save-message] erro:', e && e.message ? e.message : e);
+    res.status(500).json({ error: e.message || String(e) });
+  }
+});
+
+// Endpoint para ativar logs verbosos (apenas localhost)
+app.post('/debug/enable-verbose', (req, res) => {
+  try {
+    if (req.ip !== '::1' && req.ip !== '127.0.0.1' && req.hostname !== 'localhost') {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    enableVerboseFor24h();
+    res.json({ success: true, verbose: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message || String(e) });
+  }
+});
+
 // API: QR Code para autenticacao no CRM
 app.get("/qr", (req, res) => {
   res.json({ qr: currentQR, connected: isConnected });
@@ -1078,6 +1143,90 @@ app.get("/cleanup-invalid-leads", async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// API: sincronizar histórico do WhatsApp desde um timestamp
+app.post('/sync-history', async (req, res) => {
+  const since = req.body?.since || req.query?.since;
+  if (!since) return res.status(400).json({ error: 'since is required (ISO or epoch ms)' });
+  const sinceMs = typeof since === 'number' ? since : Date.parse(String(since));
+  if (isNaN(sinceMs)) return res.status(400).json({ error: 'invalid since value' });
+  const sinceSec = Math.floor(sinceMs / 1000);
+
+  let recovered = 0;
+  let leadsAdded = 0;
+
+  try {
+    // obter todas as conversas (chats) do cliente
+    const chats = await client.getChats();
+    for (const chat of chats) {
+      try {
+        if (chat.isGroup) continue;
+        // paginação por 'before'
+        let before = undefined;
+        let done = false;
+        while (!done) {
+          const opts = { limit: 100 };
+          if (before) opts.before = before;
+          const msgs = await chat.fetchMessages(opts);
+          if (!msgs || msgs.length === 0) break;
+
+          for (const m of msgs) {
+            if (!m || !m.id) continue;
+            if (m.timestamp < sinceSec) { done = true; break; }
+
+            const raw = m.fromMe ? (m.to || m.from) : m.from;
+            const digits = String(raw || '').replace(/@c.us/g, '').replace(/\D/g, '');
+            if (!digits) continue;
+            const withCountry = digits.startsWith('55') ? digits : `55${digits}`;
+            const convId = withCountry.slice(-11);
+
+            const convRef = db.collection('conversations').doc(convId);
+            const msgId = m.id?._serialized || String(m.id);
+            const msgRef = convRef.collection('messages').doc(msgId);
+            const exists = await msgRef.get();
+            if (exists.exists) continue; // já existe
+
+            // preparar body simples (não baixa mídia nesta passagem)
+            let body = m.body || '';
+            if (m.hasMedia) {
+              if (m.type === 'image') body = m.body ? `📷 ${m.body}` : '📷 Imagem';
+              else if (m.type === 'video') body = m.body ? `🎥 ${m.body}` : '🎥 Vídeo';
+              else if (m.type === 'document') body = m.body || m._data?.filename || '📄 Documento';
+              else if (m.type === 'ptt' || m.type === 'audio') body = '🎙️ Áudio';
+              else body = body || '(mídia)';
+            }
+
+            const ts = Timestamp.fromMillis(m.timestamp * 1000);
+            await msgRef.set({ id: msgId, body, fromMe: !!m.fromMe, timestamp: ts, read: !!m.fromMe });
+
+            const convSnap = await convRef.get();
+            const cleanMessage = cleanLastMessage(body);
+            const currentUnread = convSnap.exists ? (convSnap.data().unreadCount || 0) : 0;
+            await convRef.set(
+              { telefone: convId, lastMessage: cleanMessage, lastMessageAt: ts, unreadCount: m.fromMe ? 0 : currentUnread + 1 },
+              { merge: true }
+            );
+
+            recovered++;
+            if (!convSnap.exists || !convSnap.data()?.leadId) leadsAdded++;
+          }
+
+          // preparar next page
+          const last = msgs[msgs.length - 1];
+          before = last && last.id ? (last.id._serialized || last.id) : undefined;
+          if (!before) break;
+        }
+      } catch (chatErr) {
+        console.warn('[sync-history] erro em chat', chat.id, chatErr?.message || chatErr);
+      }
+    }
+
+    return res.json({ recovered, leadsAdded });
+  } catch (e) {
+    console.error('[sync-history] erro geral:', e && e.stack ? e.stack : e);
+    return res.status(500).json({ error: e.message || String(e) });
   }
 });
 

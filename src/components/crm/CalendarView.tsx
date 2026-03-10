@@ -36,14 +36,14 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
 
   // Textos fixos dos lembretes
   const getReminder24h = (lead: Lead): string => {
-    const data = lead.dataAgendamento?.split(" ")[0] || "amanhã";
-    const hora = lead.dataAgendamento?.split(" ")[1] || "09:00";
-    return `⏰ Lembrete: Sua ${(lead.servicoProcurado || 'consulta').toLowerCase()} na OdontoCompany Olimpia é amanhã, ${data} às ${hora}. Confirmado? 💚`;
+    const data = lead.dataAgendamento?.split(" ")[0] || "[Data]";
+    const hora = lead.dataAgendamento?.split(" ")[1] || "[Horário]";
+    return `Olá, ${lead.nome}! Tudo bem? Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${data}, às ${hora}. Já deixamos tudo reservado para o seu atendimento. Até amanhã! 🦷💚`;
   };
 
   const getReminder1h = (lead: Lead): string => {
-    const hora = lead.dataAgendamento?.split(" ")[1] || "09:00";
-    return `⏰ Falta 1 hora! Já estamos te esperando para sua ${(lead.servicoProcurado || 'consulta').toLowerCase()} das ${hora}. Até logo! 💚`;
+    const hora = lead.dataAgendamento?.split(" ")[1] || "[Horário]";
+    return `Bom dia, ${lead.nome}! Tudo certo para o seu horário hoje às ${hora} aqui na OdontoCompany? Já estamos com sua sala preparada e te aguardando. Até logo! 💚✨`;
   };
 
   const handleSend24h = (lead: Lead) => {
@@ -111,18 +111,18 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
             onClick={() => handleSend24h(lead)}
             className="h-8 px-2.5 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-semibold border border-green-300"
             variant="outline"
-            title="Enviar lembrete de 24h (amanhã)"
+            title="Enviar lembrete Amanhã"
           >
-            📱 24h
+            📱 Amanhã
           </Button>
           <Button
             size="sm"
             onClick={() => handleSend1h(lead)}
             className="h-8 px-2.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-semibold border border-blue-300"
             variant="outline"
-            title="Enviar lembrete de 1h (hoje)"
+            title="Enviar lembrete Hoje"
           >
-            📱 1h
+            📱 Hoje
           </Button>
           <Button
             size="sm"

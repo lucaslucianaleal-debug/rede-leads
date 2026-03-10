@@ -13,7 +13,7 @@ interface ReminderQueueProps {
 }
 
 const reminderTypes = [
-  { key: "h24" as const, label: "24h antes" },
+  { key: "h24" as const, label: "Amanhã" },
   { key: "today" as const, label: "Hoje" },
 ];
 
@@ -163,8 +163,8 @@ export function ReminderQueue({ leads, onMarkReminder, onOpenChat }: ReminderQue
                                 : "bg-blue-500 hover:bg-blue-600 text-white"
                               : ""
                           }`}
-                          onClick={() => {
-                            const msg = generateReminderText(lead.dataAgendamento || "", rt.key);
+                            onClick={() => {
+                            const msg = generateReminderText(lead.dataAgendamento || "", rt.key, lead.nome);
                             onOpenChat?.(lead.telefone, msg);
                           }}
                         >

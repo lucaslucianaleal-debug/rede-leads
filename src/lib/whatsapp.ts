@@ -7,8 +7,14 @@ export function generateWhatsAppLink(
   dataAgendamento: string,
   reminderType: "h24" | "today"
 ): string {
-  const timeLabel = reminderType === "h24" ? "amanhã" : "HOJE";
-  const message = `Olá!\nPassando só pra lembrar que sua avaliação está marcada para *${timeLabel}*.\n\nData e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui.\nTe esperamos!`;
+  const [datePart, timePart] = (dataAgendamento || "").split(" ");
+  const date = datePart || "[Data]";
+  const time = timePart || "[Horário]";
+  const isTomorrow = reminderType === "h24";
+
+  const message = isTomorrow
+    ? `Olá, ${leadName}! Tudo bem? Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${date}, às ${time}. Já deixamos tudo reservado para o seu atendimento. Até amanhã! 🦷💚`
+    : `Bom dia, ${leadName}! Tudo certo para o seu horário hoje às ${time} aqui na OdontoCompany? Já estamos com sua sala preparada e te aguardando. Até logo! 💚✨`;
 
   const phone = leadPhone.replace(/[^0-9]/g, "");
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
@@ -20,13 +26,21 @@ export function generateAppointmentConfirmationMessage(leadPhone: string, dataAg
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
-export function generateReminderText(dataAgendamento: string, type: "h24" | "today"): string {
+export function generateReminderText(
+  dataAgendamento: string,
+  type: "h24" | "today",
+  name?: string
+): string {
+  const [datePart, timePart] = (dataAgendamento || "").split(" ");
+  const date = datePart || "[Data]";
+  const time = timePart || "[Horário]";
+
   if (type === "h24") {
-    // Lembrete 24h/12h antes (Amanhã)
-    return `⏰ Lembrete da sua avaliação | OdontoCompany Olimpia\n\nOlá! Passando só pra lembrar que sua avaliação está marcada para amanhã. 😊\n\n📅 Data e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui. Te esperamos! 💚`;
+    // Amanhã
+    return `Olá, ${name || "!"} Tudo bem? Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${date}, às ${time}. Já deixamos tudo reservado para o seu atendimento. Até amanhã! 🦷💚`;
   } else {
-    // Lembrete hoje (3h/1h antes)
-    return `⏰ Sua consulta na OdontoCompany Olimpia está chegando!\n\nOlá, tudo bem? Sua consulta está chegando. 😄\n\n📅 Data e Horário: ${dataAgendamento}\n\nEstamos prontos para te receber! Falta pouco! 💚`;
+    // Hoje
+    return `Bom dia, ${name || "!"} Tudo certo para o seu horário hoje às ${time} aqui na OdontoCompany? Já estamos com sua sala preparada e te aguardando. Até logo! 💚✨`;
   }
 }
 

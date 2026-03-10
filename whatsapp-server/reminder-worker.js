@@ -28,20 +28,24 @@ const NEXT_SENDS_FILE = resolve(__dirname, 'next-sends.json');
 const SEND_FAILURES_FILE = resolve(__dirname, 'send-failures.json');
 
 // Templates de lembrete personalizados por tempo
-function generateReminderText(dataAgendamento, type) {
+function generateReminderText(dataAgendamento, type, name) {
+  const [datePart, timePart] = (dataAgendamento || "").split(' ');
+  const date = datePart || '[Data]';
+  const time = timePart || '[Horário]';
+
   switch(type) {
     case '24h':
     case '12h':
-      return `⏰ Lembrete da sua avaliação | OdontoCompany Olimpia\n\nOlá! Passando só pra lembrar que sua avaliação está marcada para amanhã. 😊\n\n📅 Data e Horário: ${dataAgendamento}\n\nQualquer imprevisto me avise por aqui. Te esperamos! 💚`;
-    
+      return `Olá, ${name || ''}! Tudo bem? Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${date}, às ${time}. Já deixamos tudo reservado para o seu atendimento. Até amanhã! 🦷💚`;
+
     case '3h':
-      return `⏰ Faltam 3 horas para sua avaliação!\n\nOlá, tudo bem? Sua consulta na OdontoCompany Olimpia está chegando. 😄\n\n📅 Data e Horário: ${dataAgendamento}\n\nEstamos te esperando! 💚`;
-    
+      return `⏰ Faltam 3 horas para sua avaliação!\n\nOlá, ${name || ''}, sua consulta na OdontoCompany Olimpia está chegando. 😄\n\n📅 Data e Horário: ${dataAgendamento}\n\nEstamos te esperando! 💚`;
+
     case '1h':
-      return `⏰ Falta apenas 1 hora para sua avaliação!\n\nOlá, tudo bem? Já estamos deixando tudo pronto para te receber na OdontoCompany Olimpia. 😄\n\n📅 Data e Horário: ${dataAgendamento}\n\nAté logo! 💚`;
-    
+      return `Bom dia, ${name || ''}! Tudo certo para o seu horário hoje às ${time} aqui na OdontoCompany? Já estamos com sua sala preparada e te aguardando. Até logo! 💚✨`;
+
     default:
-      return `⏰ Lembrete da sua avaliação | OdontoCompany Olimpia\n\n📅 Data e Horário: ${dataAgendamento}\n\nTe esperamos! 💚`;
+      return `⏰ Lembrete | OdontoCompany Olimpia\n\n📅 Data e Horário: ${dataAgendamento}\n\nTe esperamos! 💚`;
   }
 }
 
@@ -329,7 +333,7 @@ async function runReminder() {
         eligible++;
 
         // Montar mensagem
-        const reminderText = generateReminderText(lead.dataAgendamento, slotType);
+        const reminderText = generateReminderText(lead.dataAgendamento, slotType, lead.nome);
         const normalized = normalizePhone(lead.telefone);
         const phoneId = normalized.length >= 11 ? normalized.slice(-11) : normalized;
 

@@ -418,9 +418,19 @@ export function useLeads() {
     setLeads((prev) =>
       prev.map((l) => {
         if (l.id !== leadId) return l;
+        // Map boolean slot to sent key (h24 -> '24h', today -> 'today')
+        const slotKey = type === 'h24' ? '24h' : 'today';
+        const nowIso = new Date().toISOString();
         return {
           ...l,
-          lembretes: { ...l.lembretes, [type]: true },
+          lembretes: {
+            ...l.lembretes,
+            [type]: true,
+            sent: {
+              ...(l.lembretes?.sent || {}),
+              [slotKey]: nowIso
+            }
+          },
           dataFollowUp: format(new Date(), "dd/MM/yyyy"),
           observacao: l.observacao ? `${l.observacao} | Lembrete ${type} enviado` : `Lembrete ${type} enviado`,
         };
