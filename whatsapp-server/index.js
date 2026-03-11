@@ -830,9 +830,37 @@ client.on("message_create", async (msg) => {
     const targetConversation = sentMsgConversationMap.get(msg.id._serialized || msg.id) || null;
     const telefone = await getRealPhone(msg, true, false);
     if (!telefone) return;
+    // Se for mídia, faça download e marque o body adequadamente (mesma lógica das mensagens recebidas)
+    let bodyToSave = msg.body || '';
+    if (msg.hasMedia) {
+      try {
+        const media = await msg.downloadMedia();
+        if (media) {
+          const ext = (media.mimetype || '').split('/')[1] || 'bin';
+          const filename = `${msg.id._serialized || msg.id}_${Date.now()}.${ext}`;
+          const filepath = join(MEDIA_DIR, filename);
+          writeFileSync(filepath, Buffer.from(media.data, 'base64'));
+          if ((media.mimetype || '').startsWith('audio')) {
+            bodyToSave = `[audio:${filename}]`;
+          } else if ((media.mimetype || '').startsWith('image')) {
+            bodyToSave = `[image:${filename}]`;
+          } else if ((media.mimetype || '').startsWith('video')) {
+            bodyToSave = `[video:${filename}]`;
+          } else if ((media.mimetype || '').startsWith('application')) {
+            bodyToSave = `[document:${filename}]`;
+          } else {
+            bodyToSave = `[media:${filename}]`;
+          }
+          console.log(`[media][outgoing] Arquivo salvo: ${filename} (${media.mimetype})`);
+        }
+      } catch (e) {
+        console.warn('[media][outgoing] falha ao baixar mídia enviada pelo bot:', e && e.message ? e.message : e);
+      }
+    }
+
     await saveMessage({
       telefone,
-      body: msg.body,
+      body: bodyToSave || '(mídia)',
       fromMe: true,
       msgId: msg.id._serialized || msg.id,
       targetConversation
