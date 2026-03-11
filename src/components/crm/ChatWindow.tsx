@@ -304,24 +304,34 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                       )}
                       {renderMessageBody(msg.body)}
                       {/* Renderiza mídia se for áudio, imagem, vídeo ou documento */}
-                      {msg.body.startsWith('[audio:') && (
-                        <audio controls className="mt-2 w-full">
-                          <source src={`/media/${msg.body.slice(7, -1)}`} type="audio/mpeg" />
-                          Seu navegador não suporta áudio.
-                        </audio>
-                      )}
-                      {msg.body.startsWith('[image:') && (
-                        <img src={`/media/${msg.body.slice(7, -1)}`} alt="Imagem" className="mt-2 max-w-full rounded" />
-                      )}
-                      {msg.body.startsWith('[video:') && (
-                        <video controls className="mt-2 w-full">
-                          <source src={`/media/${msg.body.slice(7, -1)}`} type="video/mp4" />
-                          Seu navegador não suporta vídeo.
-                        </video>
-                      )}
-                      {msg.body.startsWith('[document:') && (
-                        <a href={`/media/${msg.body.slice(10, -1)}`} download className="mt-2 text-blue-600 underline">Baixar documento</a>
-                      )}
+                      {msg.body.startsWith('[audio:') && (() => {
+                        const token = msg.body.slice(7, -1);
+                        const src = mediaUrlFor(token);
+                        return (
+                          <audio controls className="mt-2 w-full" src={src} preload="metadata">
+                            Seu navegador não suporta áudio.
+                          </audio>
+                        );
+                      })()}
+                      {msg.body.startsWith('[image:') && (() => {
+                        const token = msg.body.slice(7, -1);
+                        const src = mediaUrlFor(token);
+                        return <img src={src} alt="Imagem" className="mt-2 max-w-full rounded" />;
+                      })()}
+                      {msg.body.startsWith('[video:') && (() => {
+                        const token = msg.body.slice(7, -1);
+                        const src = mediaUrlFor(token);
+                        return (
+                          <video controls className="mt-2 w-full" src={src} preload="metadata">
+                            Seu navegador não suporta vídeo.
+                          </video>
+                        );
+                      })()}
+                      {msg.body.startsWith('[document:') && (() => {
+                        const token = msg.body.slice(10, -1);
+                        const src = mediaUrlFor(token);
+                        return <a href={src} download className="mt-2 text-blue-600 underline">Baixar documento</a>;
+                      })()}
                     <div className={cn(
                       "flex items-center gap-1 mt-0.5",
                       msg.fromMe ? "justify-end" : "justify-start"
@@ -583,15 +593,34 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Renderiza o corpo da mensagem — detecta audio
+// Remove query params, trailing codec hints and sanitize media names/URLs
+function cleanMediaName(input: string) {
+  if (!input) return input;
+  let s = input.trim();
+  // In some cases the URL may contain a space then codec hint like " codecs=opus"
+  if (s.indexOf(' ') !== -1) s = s.split(' ')[0];
+  // Remove query string
+  const q = s.indexOf('?');
+  if (q !== -1) s = s.slice(0, q);
+  return s;
+}
+
+function mediaUrlFor(token: string) {
+  const clean = cleanMediaName(token);
+  if (!clean) return '';
+  if (clean.startsWith('http')) return clean;
+  return `http://localhost:3001/media/${clean}`;
+}
+
 function renderMessageBody(body: string) {
   if (!body) return null;
   // Formato: [audio:filename.ogg] ou [audio:http://...]
   const audioMatch = body.match(/^\[audio:(.+)\]$/);
   if (audioMatch) {
-    const src = audioMatch[1].startsWith("http")
-      ? audioMatch[1]
-      : `http://localhost:3001/media/${audioMatch[1]}`;
+    const raw = audioMatch[1];
+    const src = mediaUrlFor(raw);
+    const ext = (src.split('.').pop() || '').toLowerCase();
+    const type = ext === 'ogg' ? 'audio/ogg' : ext === 'mp3' ? 'audio/mpeg' : undefined;
     return (
       <audio
         controls

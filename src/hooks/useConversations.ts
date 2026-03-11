@@ -37,6 +37,7 @@ const SERVER_URL = "http://localhost:3001";
 
 export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [serverConnected, setServerConnected] = useState<boolean | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const prevUnreadMap = useRef<Record<string, number>>({});
@@ -172,6 +173,20 @@ export function useConversations() {
     });
 
     return () => unsubscribe();
+  }, [refreshKey]);
+
+  // Listen to a meta doc to trigger client refreshes when server-side scripts update data
+  useEffect(() => {
+    try {
+      const metaRef = doc(db, "meta", "refreshMessages");
+      const unsub = onSnapshot(metaRef, (snap) => {
+        if (!snap.exists()) return;
+        setRefreshKey((k) => k + 1);
+      });
+      return () => unsub();
+    } catch (e) {
+      return () => {};
+    }
   }, []);
 
   // ─── Verificar status do servidor ─────────────────────────────────────────
@@ -339,6 +354,7 @@ export function useConversations() {
     totalUnread,
     serverConnected,
     qrCode,
+    refreshConversations: () => setRefreshKey((k) => k + 1),
     sendMessage,
     markAsRead,
     useMessages,
