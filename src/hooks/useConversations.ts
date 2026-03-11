@@ -212,64 +212,102 @@ export function useConversations() {
 
     useEffect(() => {
       if (!telefone) return;
-      
-      // Forçar normalização para 10 dígitos - garante matching com IDs canônicos no Firestore
-      // Se receber formatos com country code ou variações, retorna DDD + número (10 dígitos)
-      const normalizedTelefone = normalizePhoneTo10Digits(telefone);
-      console.log(`[useMessages] Buscando mensagens. Input: ${telefone} → Normalizado: ${normalizedTelefone}`);
-      
-      if (!normalizedTelefone) {
-        console.error(`[useMessages] Falha ao normalizar telefone: ${telefone}`);
-        setMessages([]);
-        return;
-      }
-      
-      const msgsRef = collection(db, "conversations", normalizedTelefone, "messages");
-      // Ordena pela data real da mensagem do WhatsApp (timestamp) em ordem decrescente
-      const q = query(msgsRef, orderBy("timestamp", "desc"));
+      // Implementa a mesma lógica de tentativa em cascata do backend para
+      // localizar o documento de conversa correto no Firestore.
+      // Ordem: 55+DDD+9, 10-digits canonical, raw input.
+      const rawDigits = String(telefone).replace(/\D/g, "");
+      const canonical = normalizePhoneTo10Digits(telefone);
+      const with9 = canonical && canonical.length === 10 ? `${canonical.slice(0,2)}9${canonical.slice(2)}` : null;
 
-      const unsub = onSnapshot(
-        q,
-        (snap) => {
-          const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ChatMessage));
-          console.log(`[useMessages] ${msgs.length} mensagens encontradas para ${normalizedTelefone}`);
-          setMessages(msgs);
-        },
-        (err) => {
-          // Se falhar com ID normalizado, será erro real - logar e limpar
-          console.error(`[useMessages] Erro ao buscar mensagens para ${normalizedTelefone}:`, err.message);
+      const tryIds: string[] = [];
+      if (with9) tryIds.push(`55${with9}`);
+      if (canonical) tryIds.push(canonical);
+      if (rawDigits) tryIds.push(rawDigits);
+
+      console.log(`[useMessages] Tentando localizar conversa. Input: ${telefone} → tentativas: ${JSON.stringify(tryIds)}`);
+
+      let unsub: (() => void) | null = null;
+      const tryNext = async (i: number) => {
+        if (i >= tryIds.length) {
+          console.warn(`[useMessages] Nenhuma conversa encontrada para ${telefone}`);
           setMessages([]);
+          return;
         }
-      );
+        const id = tryIds[i];
+        try {
+          const msgsRef = collection(db, "conversations", id, "messages");
+          const q = query(msgsRef, orderBy("timestamp", "desc"));
+          const listener = onSnapshot(
+            q,
+            (snap) => {
+              if (snap.docs.length > 0) {
+                const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ChatMessage));
+                console.log(`[useMessages] ${msgs.length} mensagens encontradas para conv ${id}`);
+                setMessages(msgs);
+                // found — keep this listener
+                unsub = () => listener();
+              } else {
+                // no messages here — try next id
+                listener();
+                tryNext(i + 1);
+              }
+            },
+            (err) => {
+              console.error(`[useMessages] Erro ao buscar mensagens para ${id}:`, err && err.message ? err.message : err);
+              listener();
+              tryNext(i + 1);
+            }
+          );
+        } catch (e) {
+          console.warn(`[useMessages] Falha ao tentar id ${id}:`, e && e.message ? e.message : e);
+          tryNext(i + 1);
+        }
+      };
 
-      return () => unsub();
+      tryNext(0);
+
+      return () => {
+        if (unsub) unsub();
+      };
     }, [telefone]);
 
     return messages;
   };
 
   // ─── Enviar mensagem ──────────────────────────────────────────────────────
-  const sendMessage = useCallback(async (telefone: string, message: string) => {
+    const sendMessage = useCallback(async (telefone: string, message: string) => {
     try {
-      // Normalizar telefone para 11 dígitos (compatível com phoneAliasMap do backend)
-      const normalizedPhone = normalizePhoneTo10Digits(telefone);
-      if (!normalizedPhone) {
-        toast.error("Telefone inválido. Impossível enviar mensagem.");
-        return false;
+      // Monte as variações na ordem oficial: 55+DDD+9, 10-digits, raw
+      const rawDigits = String(telefone).replace(/\D/g, "");
+      const canonical = normalizePhoneTo10Digits(telefone);
+      const with9 = canonical && canonical.length === 10 ? `${canonical.slice(0,2)}9${canonical.slice(2)}` : null;
+
+      const variants: string[] = [];
+      if (with9) variants.push(`55${with9}`);
+      if (canonical) variants.push(canonical);
+      if (rawDigits) variants.push(rawDigits);
+
+      for (const v of variants) {
+        try {
+          const res = await fetch(`${SERVER_URL}/send-message`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ telefone: v, message }),
+          });
+          if (res.ok) {
+            // success — no need to try other variants
+            toast.success("Mensagem enviada");
+            return true;
+          }
+          const data = await res.json().catch(() => ({}));
+          console.warn(`[sendMessage] tentativa ${v} falhou:`, data.error || res.statusText);
+        } catch (err) {
+          console.warn(`[sendMessage] Erro na tentativa ${v}:`, err && err.message ? err.message : err);
+        }
       }
 
-      const res = await fetch(`${SERVER_URL}/send-message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telefone: normalizedPhone, message }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error || "Falha ao enviar mensagem.");
-        return false;
-      }
-      return true;
+      toast.error("Falha ao enviar mensagem com todas as variações.");
+      return false;
     } catch {
       toast.error("Servidor WhatsApp offline. Verifique se o servidor está rodando.");
       return false;

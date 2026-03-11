@@ -821,14 +821,13 @@ app.post("/send-message", async (req, res) => {
   const { telefone, message } = req.body;
   if (!telefone || !message) return res.status(400).json({ error: "telefone e message sao obrigatorios" });
   try {
-    // Normaliza o input para o ID canônico de 10 dígitos
     const rawInput = String(telefone || "").replace(/\D/g, "");
     const canonical = ensure10Digits(telefone) || (rawInput.length >= 10 ? rawInput.slice(-10) : null);
     if (!canonical) {
       return res.status(400).json({ error: "Não foi possível derivar o ID de 10 dígitos a partir do telefone informado" });
     }
 
-    // Busca o lead no CRM para obter o nome
+    // busca nome do lead (se disponível) — não é crítico para envio
     let leadName = null;
     try {
       const crmRef = db.collection("crm_data").doc("shared");
@@ -836,86 +835,101 @@ app.post("/send-message", async (req, res) => {
       const leads = crmSnap.exists ? (crmSnap.data()?.leads || []) : [];
       const matchedLead = leads.find((l) => {
         const leadDigits = String(l?.telefone || "").replace(/\D/g, "");
-        return leadDigits.length === 10 && leadDigits === digits;
+        const lead10 = ensure10Digits(leadDigits) || (leadDigits.length >= 10 ? leadDigits.slice(-10) : null);
+        return lead10 === canonical;
       });
       if (matchedLead) {
         leadName = String(matchedLead.nome || "").trim();
-        console.log(`[send-message] Lead encontrado: "${leadName}" para telefone ${digits}`);
+        console.log(`[send-message] Lead encontrado: "${leadName}" para telefone ${canonical}`);
       }
     } catch (leadErr) {
-      console.warn("[send-message] Falha ao buscar lead do CRM:", leadErr.message);
+      console.warn("[send-message] Falha ao buscar lead do CRM:", leadErr && leadErr.message ? leadErr.message : leadErr);
     }
-    // Determine target conversation via syncLead
+
     const syncedConversation = await syncLead(canonical, leadName || null, message);
     const targetConv = syncedConversation || canonical;
 
-    // Tenta várias formas do número no WhatsApp (prioridade):
-    // 1) 55 + canonical (DDD + número sem 9 extra)
-    // 2) 55 + with 9 after DDD (mobile)
-    // 3) 55 + rawInput (fallback)
-    const candidates = [];
-    candidates.push(`55${canonical}`);
-    // candidate with 9 after DDD
-    if (canonical && canonical.length === 10) {
-      candidates.push(`55${canonical.slice(0,2)}9${canonical.slice(2)}`);
-    }
-    if (rawInput && rawInput.length >= 8) candidates.push(rawInput.startsWith('55') ? rawInput : `55${rawInput}`);
+    // Sequência oficial (Trindade do Envio):
+    // 1) 55 + DDD + 9 + Número (formato internacional completo)
+    // 2) ID canônico de 10 dígitos (DDD + número sem o 9 extra)
+    // 3) raw (exatamente como foi digitado)
+    const attempts = [];
+    const with9 = canonical && canonical.length === 10 ? `${canonical.slice(0,2)}9${canonical.slice(2)}` : null;
+    // 1ª tentativa: 55 + with9 (bala de prata)
+    if (with9) attempts.push({ label: '55+add-9', digits: `55${with9}` });
+    // 2ª tentativa: canonical 10-digits
+    attempts.push({ label: '10-digits', digits: canonical });
+    // 3ª tentativa: raw input as provided (fallback)
+    if (rawInput) attempts.push({ label: 'raw', digits: rawInput.startsWith('55') ? rawInput : rawInput });
 
-    let waId = null;
-    let numberId = null;
-    console.log(`[send-message] Tentando candidates WA IDs: ${JSON.stringify(candidates)}`);
-    for (const cand of candidates) {
+    let succeeded = false;
+    let successfulVariant = null;
+    let lastError = null;
+    let sentMsg = null;
+
+    for (const att of attempts) {
       try {
-        const maybe = cand.replace(/\D/g, '');
-        console.log(`[send-message] Checking getNumberId for: ${maybe}`);
-        const nid = await client.getNumberId(maybe);
-        if (nid) {
-          numberId = nid;
-          waId = `${maybe}@c.us`;
-          console.log(`[send-message] Found numberId for ${maybe}`);
-          break;
+        const maybe = String(att.digits).replace(/\D/g, '');
+        console.log(`[send-message] Tentativa ${att.label}: verificando getNumberId para ${maybe}`);
+        let nid = null;
+        try {
+          nid = await client.getNumberId(maybe);
+        } catch (gErr) {
+          console.warn(`[send-message] getNumberId error (${att.label}) for ${maybe}:`, gErr && gErr.message ? gErr.message : gErr);
         }
-      } catch (err) {
-        console.warn(`[send-message] getNumberId error for ${cand}:`, err && err.message ? err.message : err);
+        // if getNumberId not found we still may attempt to send (client.sendMessage may return 'No LID')
+        const waId = `${maybe}@c.us`;
+        try {
+          sentMsg = await client.sendMessage(waId, message);
+          console.log(`[send-message] Enviado com sucesso usando variação '${att.label}' -> ${waId}`);
+          succeeded = true;
+          successfulVariant = att.label;
+          // Mapear msgId -> conversa alvo
+          if (sentMsg?.id?._serialized) {
+            sentMsgConversationMap.set(sentMsg.id._serialized, targetConv);
+            setTimeout(() => sentMsgConversationMap.delete(sentMsg.id._serialized), 10 * 60 * 1000);
+          }
+          break;
+        } catch (sendErr) {
+          lastError = sendErr;
+          // If sendErr mentions 'No LID' treat as retriable and continue to next attempt
+          const msgText = String(sendErr && sendErr.message ? sendErr.message : sendErr || '');
+          console.warn(`[send-message] Falha ao enviar usando '${att.label}' (${waId}):`, msgText);
+          if (!/no lid/i.test(msgText)) {
+            // for non-No LID errors, log and continue trying other variants
+            console.warn(`[send-message] Erro não-retratável detectado (mas continuando tentativas): ${msgText}`);
+          }
+        }
+      } catch (e) {
+        lastError = e;
+        console.warn('[send-message] Erro inesperado durante tentativa:', e && e.message ? e.message : e);
       }
     }
-    if (!numberId) {
-      return res.status(400).json({ error: `Número ${canonical} não é WhatsApp ativo ou não existe (tentadas variações)` });
+
+    if (!succeeded) {
+      console.error('[send-message] Todas as tentativas falharam. Último erro:', lastError && lastError.message ? lastError.message : lastError);
+      return res.status(500).json({ error: `Falha ao enviar para ${canonical}: nenhuma variação funcionou` });
     }
 
-    // Agora tenta enviar
-    let sentMsg;
+    // Registrar alias e salvar mensagem na conversa
     try {
-      sentMsg = await client.sendMessage(waId, message);
-    } catch (sendErr) {
-      console.error(`[send-message] Erro ao enviar para ${waId}:`, sendErr.message);
-      return res.status(500).json({ error: `Falha ao enviar: ${sendErr.message}` });
+      const aliasKey = canonical;
+      phoneAliasMap.set(aliasKey, targetConv);
+      await saveMessage({
+        telefone: canonical,
+        body: message,
+        fromMe: true,
+        msgId: sentMsg?.id?._serialized || `api_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        targetConversation: targetConv,
+      });
+    } catch (saveErr) {
+      console.warn('[send-message] enviado mas falha ao salvar mensagem:', saveErr && saveErr.message ? saveErr.message : saveErr);
     }
 
-    // Mapeia msgId -> conversa CORRETA (para message_create usar a mesma)
-    if (sentMsg?.id?._serialized) {
-      sentMsgConversationMap.set(sentMsg.id._serialized, targetConv);
-      setTimeout(() => sentMsgConversationMap.delete(sentMsg.id._serialized), 10 * 60 * 1000);
-    }
-
-    // Registra alias para consistência (usar 10 dígitos canônicos)
-    const aliasKey = digits;
-    phoneAliasMap.set(aliasKey, targetConv);
-
-    // Salva mensagem usando conversa retornada pelo syncLead
-    await saveMessage({
-      telefone: digits,
-      body: message,
-      fromMe: true,
-      msgId: sentMsg?.id?._serialized || `api_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      targetConversation: targetConv,
-    });
-
-    console.log(`[send-message] Mensagem enviada para ${targetConv}: ${message}`);
-    res.json({ success: true });
+    res.json({ success: true, variant: successfulVariant });
   } catch (e) {
-    console.error("[send-message] Erro:", e.message);
-    res.status(500).json({ error: e.message });
+    console.error("[send-message] Erro:", e && e.message ? e.message : e);
+    res.status(500).json({ error: e && e.message ? e.message : String(e) });
   }
 });
 

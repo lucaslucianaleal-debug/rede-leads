@@ -111,11 +111,17 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
         
         console.log(`[ChatView] Lead encontrado para criar conversa:`, lead?.nome || "Nenhum");
         
-        // Normalizar para 10 dígitos (padrão atual: DDD + número sem o 9 extra)
+        // Preferir abrir a conversa usando a 'Trindade do Envio' —
+        // 1) 55 + DDD + 9 + Número (se aplicável)
+        // 2) ID canônico de 10 dígitos
+        // 3) raw
+        const rawDigits = String(openTarget.phone).replace(/\D/g, "");
         const normalized10 = normalizePhoneTo10Digits(openTarget.phone);
-        console.log(`[ChatView] Telefone normalizado para 10 dígitos: ${normalized10}`);
+        const with9 = normalized10 && normalized10.length === 10 ? `${normalized10.slice(0,2)}9${normalized10.slice(2)}` : null;
+        const preferredId = with9 ? `55${with9}` : (normalized10 || rawDigits);
+        console.log(`[ChatView] Tentativa de abrir com preferência: ${preferredId} (entrada: ${openTarget.phone})`);
 
-        if (!normalized10) {
+        if (!preferredId) {
           console.error(`[ChatView] FALHA: normalização retornou vazio. Input: ${openTarget.phone}`);
           toast.error("Telefone inválido. Não foi possível abrir conversa.");
           onOpenTargetHandled?.();
@@ -124,7 +130,7 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
         
         // Adicionar conversa ao estado LOCAL imediatamente (otimistic update)
         const newConversation = {
-          telefone: normalized10,
+          telefone: normalized10 || preferredId,
           leadNome: lead?.nome || "Novo Contato",
           lastMessage: "",
           lastMessageAt: null,
@@ -137,9 +143,9 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
         console.log(`[ChatView] ✓ Conversa adicionada ao estado LOCAL: ${normalized10}`);
         
         // Criar documento no Firebase (merge para not overwrite se já existe)
-        const convRef = doc(db, "conversations", normalized10);
+        const convRef = doc(db, "conversations", normalized10 || preferredId);
         await setDoc(convRef, {
-          telefone: normalized10,
+          telefone: normalized10 || preferredId,
           leadNome: lead?.nome || "Novo Contato",
           createdAt: Timestamp.now(),
           lastMessageAt: null,
