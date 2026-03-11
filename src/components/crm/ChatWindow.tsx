@@ -40,7 +40,8 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
 
   // Helper para buscar nome do lead
   function getLeadName(conv) {
-    const lead = leads.find(l => l.id === conv.leadId || l.telefone.replace(/\D/g,"") === conv.telefone.replace(/\D/g,""));
+    const leadsArray = Array.isArray(leads) ? leads : [];
+    const lead = leadsArray.find(l => l.id === conv.leadId || l.telefone.replace(/\D/g,"") === conv.telefone.replace(/\D/g,""));
     return lead ? lead.nome : conv.leadNome;
   }
 

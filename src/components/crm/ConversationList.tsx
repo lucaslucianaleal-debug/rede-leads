@@ -38,7 +38,8 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
   // Helper para buscar nome do lead
   function getLeadName(conv) {
     // Busca por leadId ou telefone
-    const lead = leads.find(l => l.id === conv.leadId || l.telefone.replace(/\D/g,"") === conv.telefone.replace(/\D/g,""));
+    const leadsArray = Array.isArray(leads) ? leads : [];
+    const lead = leadsArray.find(l => l.id === conv.leadId || l.telefone.replace(/\D/g,"") === conv.telefone.replace(/\D/g,""));
     return lead ? lead.nome : conv.leadNome;
   }
 
