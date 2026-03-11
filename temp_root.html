@@ -9,7 +9,7 @@
     <meta name="description" content="Sistema de Gerenciamento de Leads">
     <meta name="author" content="Rede Leads" />
     <!-- Corrige Content-Security-Policy para permitir recursos locais -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' http://localhost:3001 data: https://fonts.gstatic.com; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' http://localhost:3001 ws://localhost:3001 https://identitytoolkit.googleapis.com https://www.googleapis.com https://securetoken.googleapis.com;"> 
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' http://localhost:3001 data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3001 ws://localhost:3001;"> 
 
     <!-- TODO: Update og:title to match your application name -->
     
@@ -23,10 +23,11 @@
   <meta name="twitter:title" content="Rede Leads">
   <meta property="og:description" content="Sistema de Gerenciamento de Leads">
   <meta name="twitter:description" content="Sistema de Gerenciamento de Leads">
+  <script type="module" crossorigin src="/assets/index-HSknR_Ze.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CjHPcWEu.css">
 </head>
 
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

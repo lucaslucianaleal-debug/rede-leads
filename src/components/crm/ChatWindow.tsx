@@ -268,7 +268,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                 </span>
               </div>
 
-              {msgs.map((msg) => (
+              {[...msgs].sort((a, b) => a.timestamp - b.timestamp).map((msg) => (
                 <div
                   key={msg.id}
                   className={cn(
@@ -303,6 +303,25 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                         </div>
                       )}
                       {renderMessageBody(msg.body)}
+                      {/* Renderiza mídia se for áudio, imagem, vídeo ou documento */}
+                      {msg.body.startsWith('[audio:') && (
+                        <audio controls className="mt-2 w-full">
+                          <source src={`/media/${msg.body.slice(7, -1)}`} type="audio/mpeg" />
+                          Seu navegador não suporta áudio.
+                        </audio>
+                      )}
+                      {msg.body.startsWith('[image:') && (
+                        <img src={`/media/${msg.body.slice(7, -1)}`} alt="Imagem" className="mt-2 max-w-full rounded" />
+                      )}
+                      {msg.body.startsWith('[video:') && (
+                        <video controls className="mt-2 w-full">
+                          <source src={`/media/${msg.body.slice(7, -1)}`} type="video/mp4" />
+                          Seu navegador não suporta vídeo.
+                        </video>
+                      )}
+                      {msg.body.startsWith('[document:') && (
+                        <a href={`/media/${msg.body.slice(10, -1)}`} download className="mt-2 text-blue-600 underline">Baixar documento</a>
+                      )}
                     <div className={cn(
                       "flex items-center gap-1 mt-0.5",
                       msg.fromMe ? "justify-end" : "justify-start"

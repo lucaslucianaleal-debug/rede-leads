@@ -134,6 +134,19 @@ const MEDIA_DIR = join(__dirname, "media");
 mkdirSync(MEDIA_DIR, { recursive: true });
 app.use("/media", express.static(MEDIA_DIR));
 
+// Serve frontend build if present (allows accessing the SPA at /)
+const FRONTEND_DIST = join(__dirname, '..', 'dist');
+if (existsSync(FRONTEND_DIST)) {
+  console.log(`[static] Servindo frontend estático de ${FRONTEND_DIST}`);
+  app.use(express.static(FRONTEND_DIST));
+  // fallback para SPA - serve index.html para rotas desconhecidas (apenas GET)
+  app.get('*', (req, res, next) => {
+    if (req.method !== 'GET') return next();
+    res.sendFile(join(FRONTEND_DIST, 'index.html'));
+  });
+} else {
+  console.log('[static] Frontend build não encontrado em ../dist — acesse o frontend via npm run dev ou gere o build');
+}
 // Verifica se e um LID (ID interno do WA) em vez de telefone real
 function isLID(jid) {
   const digits = normalizeToCanvas(jid);
@@ -749,19 +762,46 @@ async function handleIncomingMessage(msg) {
 client.on("message", async (msg) => {
   if (!msg || !msg.id) return;
   let raw = String(msg.from || "").replace(/\D/g, "");
-  // Remove prefixo 55 se existir
   if (raw.startsWith("55")) raw = raw.slice(2);
-  // Se tiver 11 dígitos e o 9 na terceira posição, remove o 9
   if (raw.length === 11 && raw[2] === "9") raw = raw.slice(0,2) + raw.slice(3);
-  // Pega apenas os últimos 10 dígitos
   if (raw.length > 10) raw = raw.slice(-10);
-  // Só salva se tiver exatamente 10 dígitos
   if (raw.length !== 10) {
     console.warn('[IGNORADO] Número inválido:', msg.from, 'após limpeza:', raw);
     return;
   }
+
+  // Detecta e salva mídia (áudio, imagem, vídeo, documento)
+  let body = msg.body;
+  if (msg.hasMedia) {
+    try {
+      const media = await msg.downloadMedia();
+      if (media) {
+        // Salva arquivo na pasta media/
+        const ext = media.mimetype.split('/')[1] || 'bin';
+        const filename = `${msg.id._serialized || msg.id}_${Date.now()}.${ext}`;
+        const filepath = join(MEDIA_DIR, filename);
+        writeFileSync(filepath, Buffer.from(media.data, 'base64'));
+        // Marca o body para exibição no frontend
+        if (media.mimetype.startsWith('audio')) {
+          body = `[audio:${filename}]`;
+        } else if (media.mimetype.startsWith('image')) {
+          body = `[image:${filename}]`;
+        } else if (media.mimetype.startsWith('video')) {
+          body = `[video:${filename}]`;
+        } else if (media.mimetype.startsWith('application')) {
+          body = `[document:${filename}]`;
+        } else {
+          body = `[media:${filename}]`;
+        }
+        console.log(`[media] Arquivo salvo: ${filename} (${media.mimetype})`);
+      }
+    } catch (mediaErr) {
+      console.warn('[media] Falha ao baixar/salvar mídia:', mediaErr && mediaErr.message ? mediaErr.message : mediaErr);
+    }
+  }
+
   console.log('✅ SUCESSO: Gravando mensagem para o número de 10 dígitos:', raw);
-  await saveMessage({ telefone: raw, body: msg.body, fromMe: false, msgId: msg.id._serialized || msg.id, targetConversation: null });
+  await saveMessage({ telefone: raw, body, fromMe: false, msgId: msg.id._serialized || msg.id, targetConversation: null });
 });
 // Graceful Shutdown (Desligamento Suave)
 function shutdownHandler(signal) {
