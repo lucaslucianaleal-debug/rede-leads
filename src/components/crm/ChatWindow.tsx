@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { ChatMessage, Conversation } from "@/hooks/useConversations";
 import { Lead } from "@/types/crm";
 import { Button } from "@/components/ui/button";
@@ -42,10 +44,16 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
   function getLeadName(conv) {
     const leadsArray = Array.isArray(leads) ? leads : [];
     const lead = leadsArray.find(l => l.id === conv.leadId || l.telefone.replace(/\D/g,"") === conv.telefone.replace(/\D/g,""));
-    return lead ? lead.nome : conv.leadNome;
+    // Se não houver nome, mostra telefone real (11+ dígitos), nunca o ID de rastreio (10 dígitos)
+    if (lead && lead.nome && lead.nome.trim() && !/^\d{10}$/.test(lead.nome.trim())) return lead.nome;
+    const digits = conv.telefone.replace(/\D/g,"");
+    if (digits.length === 11 || digits.length === 13) return conv.telefone;
+    return "Novo Contato";
   }
 
   const [text, setText] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
+  const [showManualDialog, setShowManualDialog] = useState(false);
 
   // Pre-fill message when a shortcut sends a template
   useEffect(() => {
@@ -168,6 +176,9 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
     );
   }
 
+  // Checagem: telefone real válido (11 ou 13 dígitos)
+  const digits = conversation.telefone?.replace(/\D/g, "") || "";
+  const isValidPhone = digits.length === 11 || digits.length === 13;
   const groupedMessages = groupByDate(messages);
 
   return (
@@ -186,6 +197,16 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Botão de vínculo manual */}
+          {!isValidPhone && (
+            <button
+              onClick={() => setShowManualDialog(true)}
+              title="Vincular WhatsApp"
+              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-primary transition-colors border border-primary"
+            >
+              <UserPen className="h-4 w-4" /> Vincular WhatsApp
+            </button>
+          )}
           {/* Botão ligação (CallLog) */}
           {currentLead && (
             <button
@@ -268,7 +289,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                 </span>
               </div>
 
-              {[...msgs].sort((a, b) => a.timestamp - b.timestamp).map((msg) => (
+              {[...msgs].sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0)).map((msg) => (
                 <div
                   key={msg.id}
                   className={cn(
@@ -302,36 +323,8 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                           <div className="max-h-10 overflow-hidden line-clamp-2 opacity-85">{msg.replyTo.bodyPreview}</div>
                         </div>
                       )}
-                      {renderMessageBody(msg.body)}
-                      {/* Renderiza mídia se for áudio, imagem, vídeo ou documento */}
-                      {msg.body.startsWith('[audio:') && (() => {
-                        const token = msg.body.slice(7, -1);
-                        const src = mediaUrlFor(token);
-                        return (
-                          <audio controls className="mt-2 w-full" src={src} preload="metadata">
-                            Seu navegador não suporta áudio.
-                          </audio>
-                        );
-                      })()}
-                      {msg.body.startsWith('[image:') && (() => {
-                        const token = msg.body.slice(7, -1);
-                        const src = mediaUrlFor(token);
-                        return <img src={src} alt="Imagem" className="mt-2 max-w-full rounded" />;
-                      })()}
-                      {msg.body.startsWith('[video:') && (() => {
-                        const token = msg.body.slice(7, -1);
-                        const src = mediaUrlFor(token);
-                        return (
-                          <video controls className="mt-2 w-full" src={src} preload="metadata">
-                            Seu navegador não suporta vídeo.
-                          </video>
-                        );
-                      })()}
-                      {msg.body.startsWith('[document:') && (() => {
-                        const token = msg.body.slice(10, -1);
-                        const src = mediaUrlFor(token);
-                        return <a href={src} download className="mt-2 text-blue-600 underline">Baixar documento</a>;
-                      })()}
+                      {renderMessageBody(msg.body, (msg as any).mediaUrl)}
+                      {/* Apenas renderiza texto. mediaUrlFor e checagens abaixo cuidam da mídia */}
                     <div className={cn(
                       "flex items-center gap-1 mt-0.5",
                       msg.fromMe ? "justify-end" : "justify-start"
@@ -380,7 +373,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
         </div>
       )}
 
-      {/* Input de envio */}
+      {/* Input de envio — SEM bloqueio */}
       <div className="p-3 border-t border-border bg-card flex items-center gap-2 shrink-0">
         <Input
           placeholder={serverConnected === false ? "Servidor offline..." : "Digite uma mensagem..."}
@@ -404,6 +397,44 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
           <Send className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Dialog vínculo manual */}
+      {showManualDialog && (
+        <AlertDialog open={showManualDialog} onOpenChange={setShowManualDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Vincular WhatsApp real</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cole o número real do WhatsApp (ex: 17991234567 ou 5517991234567).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Input
+              value={manualPhone}
+              onChange={e => setManualPhone(e.target.value.replace(/\D/g, ""))}
+              placeholder="Digite o número real"
+              className="mt-2"
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setShowManualDialog(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (!manualPhone || (manualPhone.length !== 11 && manualPhone.length !== 13)) {
+                    toast.error("Número inválido. Informe 11 ou 13 dígitos.");
+                    return;
+                  }
+                  // Atualiza conversa no Firestore
+                  const convRef = doc(db, "conversations", conversation.telefone);
+                  await setDoc(convRef, { telefone: manualPhone }, { merge: true });
+                  toast.success("Telefone vinculado com sucesso!");
+                  setShowManualDialog(false);
+                  setManualPhone("");
+                }}
+                className="bg-primary"
+              >Salvar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
       </div>{/* fim coluna principal */}
 
       {/* Painel lateral: editar lead */}
@@ -609,28 +640,46 @@ function mediaUrlFor(token: string) {
   const clean = cleanMediaName(token);
   if (!clean) return '';
   if (clean.startsWith('http')) return clean;
-  return `http://localhost:3001/media/${clean}`;
+  // ensure any @ or special chars are percent-encoded (CSP-safe)
+  const encoded = encodeURIComponent(clean).replace(/%40/g, '%40');
+  return `http://localhost:3001/media/${encoded}`;
 }
 
-function renderMessageBody(body: string) {
-  if (!body) return null;
-  // Formato: [audio:filename.ogg] ou [audio:http://...]
-  const audioMatch = body.match(/^\[audio:(.+)\]$/);
-  if (audioMatch) {
-    const raw = audioMatch[1];
-    const src = mediaUrlFor(raw);
-    const ext = (src.split('.').pop() || '').toLowerCase();
-    const type = ext === 'ogg' ? 'audio/ogg' : ext === 'mp3' ? 'audio/mpeg' : undefined;
-    return (
-      <audio
-        controls
-        src={src}
-        className="max-w-[220px] h-10 rounded"
-        preload="metadata"
-      />
-    );
+
+// helper that actually renders an <audio> tag for a given url
+function renderAudioElement(src: string) {
+  if (!src) return null;
+  const ext = (src.split('.').pop() || '').toLowerCase();
+  const type = ext === 'ogg' ? 'audio/ogg' : ext === 'mp3' ? 'audio/mpeg' : undefined;
+  return (
+    <audio controls className="max-w-[220px] h-10 rounded" preload="metadata">
+      {type ? <source src={src} type={type} /> : <source src={src} />}
+      Seu navegador não suporta áudio.
+    </audio>
+  );
+}
+
+// body is the stored text; mediaUrl is an optional field attached by the server
+function renderMessageBody(body: string, mediaUrl?: string) {
+  if (!body && !mediaUrl) return null;
+
+  // if there's an explicit audio token, use it and ignore mediaUrl
+  if (body) {
+    const audioMatch = body.match(/^\[audio:(.+)\]$/);
+    if (audioMatch) {
+      const raw = audioMatch[1];
+      const src = mediaUrlFor(raw);
+      return renderAudioElement(src);
+    }
   }
-  return <p className="whitespace-pre-wrap break-words">{body}</p>;
+
+  // otherwise if the server provided a mediaUrl (whatsapp-web.js may supply it), render that
+  if (mediaUrl) {
+    return renderAudioElement(mediaUrl);
+  }
+
+  // fall back to text
+  return <p className="whitespace-pre-wrap break-words">{body || ''}</p>;
 }
 
 function groupByDate(messages: ChatMessage[]): Record<string, ChatMessage[]> {

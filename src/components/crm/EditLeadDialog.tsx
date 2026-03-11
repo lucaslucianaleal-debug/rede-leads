@@ -14,6 +14,8 @@ import { CalendarIcon } from "lucide-react";
 import { format, parse, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { saveLeadWithSync } from "@/lib/crmSync";
+import { db } from "@/lib/firebase";
 
 interface EditLeadDialogProps {
   lead: Lead | null;
@@ -37,10 +39,12 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
   const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [previousPhone, setPreviousPhone] = useState<string | null>(null);
 
   useEffect(() => {
     if (lead) {
       setForm({ ...lead });
+      setPreviousPhone(lead.telefone || "");
       // Parse existing dataAgendamento
       if (lead.dataAgendamento) {
         const parts = lead.dataAgendamento.split(" ");
@@ -66,21 +70,30 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const set = (field: keyof Lead, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  const [previousPhone, setPreviousPhone] = useState<string | null>(null);
+
   const NONE = "__none__";
 
   const selectValue = (v: string | undefined) => v || NONE;
   const fromSelect = (v: string) => v === NONE ? "" : v;
 
-  const handleSave = () => {
-    // Nunca alterar followUpCount via edição manual — só o "Feito" pode avançar o follow-up
+  const handleSave = async () => {
     const { followUpCount, ...safeUpdates } = form as Lead;
-    // Montar dataAgendamento a partir do seletor
     const finalAgendamento = agendamentoDate
       ? `${format(agendamentoDate, "dd/MM/yyyy")} ${agendamentoTime}`
       : "";
-    onSave(lead.id, { ...safeUpdates, dataAgendamento: finalAgendamento });
-    toast.success("Lead atualizado!");
-    onClose();
+    const updates = { ...safeUpdates, dataAgendamento: finalAgendamento };
+
+    try {
+      const result = await saveLeadWithSync(db, updates, { previousPhone });
+      // Notify and update parent state
+      toast.success("Lead sincronizado com sucesso!");
+      onSave(lead.id, updates);
+      onClose();
+    } catch (e: any) {
+      console.error('Erro ao salvar lead com sync', e);
+      toast.error('Falha ao salvar lead. Veja console para detalhes.');
+    }
   };
 
   return (
