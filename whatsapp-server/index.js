@@ -104,19 +104,13 @@ const MY_PHONE = '17991040452';
 // Centralização da Normalização (A 'Régua')
 // Agora retorna o ID canônico de 10 dígitos (DDD + número sem o 9 extra)
 function normalizeToCanvas(phoneOrId) {
-  if (!phoneOrId) return null;
-  let digits = String(phoneOrId)
-    .replace(/@lid|@c\.us/g, "")
-    .replace(/\D/g, "");
-  // Remove prefixo 55
-  if (digits.startsWith("55")) digits = digits.slice(2);
-  // Retorna sufixo de 10 dígitos como canonical
-  if (digits.length >= 10) {
-    return digits.slice(-10);
-  } else if (digits.length === 10) {
-    return digits;
+  // normalizeToCanvas agora delega ao ensure10Digits para garantir
+  // comportamento unificado: remover prefixo 55 e o '9' extra quando aplicável
+  try {
+    return ensure10Digits(phoneOrId);
+  } catch (e) {
+    return null;
   }
-  return null;
 }
 
 // Força ID canônico de 10 dígitos: remove '55' e o '9' extra após o DDD quando presente
@@ -827,10 +821,11 @@ app.post("/send-message", async (req, res) => {
   const { telefone, message } = req.body;
   if (!telefone || !message) return res.status(400).json({ error: "telefone e message sao obrigatorios" });
   try {
-    // Pega o ID do lead (10 dígitos)
-    let digits = String(telefone).replace(/\D/g, "");
-    if (digits.length !== 10) {
-      return res.status(400).json({ error: "ID do lead deve ter 10 dígitos (DDD + número)" });
+    // Normaliza o input para o ID canônico de 10 dígitos
+    const rawInput = String(telefone || "").replace(/\D/g, "");
+    const canonical = ensure10Digits(telefone) || (rawInput.length >= 10 ? rawInput.slice(-10) : null);
+    if (!canonical) {
+      return res.status(400).json({ error: "Não foi possível derivar o ID de 10 dígitos a partir do telefone informado" });
     }
 
     // Busca o lead no CRM para obter o nome
@@ -850,24 +845,42 @@ app.post("/send-message", async (req, res) => {
     } catch (leadErr) {
       console.warn("[send-message] Falha ao buscar lead do CRM:", leadErr.message);
     }
+    // Determine target conversation via syncLead
+    const syncedConversation = await syncLead(canonical, leadName || null, message);
+    const targetConv = syncedConversation || canonical;
 
-    // syncLead PRIMEIRO para obter a conversa correta
-    const syncedConversation = await syncLead(digits, leadName || null, message);
-    const targetConv = syncedConversation || digits;
+    // Tenta várias formas do número no WhatsApp (prioridade):
+    // 1) 55 + canonical (DDD + número sem 9 extra)
+    // 2) 55 + with 9 after DDD (mobile)
+    // 3) 55 + rawInput (fallback)
+    const candidates = [];
+    candidates.push(`55${canonical}`);
+    // candidate with 9 after DDD
+    if (canonical && canonical.length === 10) {
+      candidates.push(`55${canonical.slice(0,2)}9${canonical.slice(2)}`);
+    }
+    if (rawInput && rawInput.length >= 8) candidates.push(rawInput.startsWith('55') ? rawInput : `55${rawInput}`);
 
-    // Tenta enviar para 55 + DDD + número
-    let waId = `55${digits}@c.us`;
-    let numberId = await client.getNumberId(`55${digits}`);
-    if (!numberId) {
-      // Tenta com '9' após o DDD
-      const withNine = `55${digits.slice(0,2)}9${digits.slice(2)}@c.us`;
-      const numberIdNine = await client.getNumberId(`55${digits.slice(0,2)}9${digits.slice(2)}`);
-      if (numberIdNine) {
-        waId = withNine;
-        numberId = numberIdNine;
-      } else {
-        return res.status(400).json({ error: `Número ${digits} não é WhatsApp ativo ou não existe (nem com 9 após DDD)` });
+    let waId = null;
+    let numberId = null;
+    console.log(`[send-message] Tentando candidates WA IDs: ${JSON.stringify(candidates)}`);
+    for (const cand of candidates) {
+      try {
+        const maybe = cand.replace(/\D/g, '');
+        console.log(`[send-message] Checking getNumberId for: ${maybe}`);
+        const nid = await client.getNumberId(maybe);
+        if (nid) {
+          numberId = nid;
+          waId = `${maybe}@c.us`;
+          console.log(`[send-message] Found numberId for ${maybe}`);
+          break;
+        }
+      } catch (err) {
+        console.warn(`[send-message] getNumberId error for ${cand}:`, err && err.message ? err.message : err);
       }
+    }
+    if (!numberId) {
+      return res.status(400).json({ error: `Número ${canonical} não é WhatsApp ativo ou não existe (tentadas variações)` });
     }
 
     // Agora tenta enviar

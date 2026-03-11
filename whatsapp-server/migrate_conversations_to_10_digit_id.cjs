@@ -7,19 +7,13 @@ const serviceAccount = require('./serviceAccountKey.json');
 
 // Função copiada do index.js
 function normalizeToCanvas(phoneOrId) {
+  // Mesma lógica do ensure10Digits: remover prefixo 55 e o '9' extra quando aplicável
   if (!phoneOrId) return null;
-  let digits = String(phoneOrId)
-    .replace(/@lid|@c\.us/g, "")
-    .replace(/\D/g, "");
-  // Remove prefixo 55
+  let digits = String(phoneOrId).replace(/@lid|@c\.us/g, "").replace(/\D/g, "");
   if (digits.startsWith("55")) digits = digits.slice(2);
-  // Retorna sufixo de 10 dígitos como canonical
-  if (digits.length >= 10) {
-    // Se tiver 11 dígitos e o terceiro for '9', remover o 9
-    if (digits.length === 11 && digits[2] === '9') return digits.slice(0,2) + digits.slice(3);
-    return digits.slice(-10);
-  }
-  return null;
+  if (digits.length === 11 && digits[2] === '9') digits = digits.slice(0,2) + digits.slice(3);
+  if (digits.length > 10) digits = digits.slice(-10);
+  return digits.length === 10 ? digits : null;
 }
 
 if (!admin.apps.length) {
