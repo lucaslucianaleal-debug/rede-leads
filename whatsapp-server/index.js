@@ -68,7 +68,7 @@ const sentMsgConversationMap = new Map();
 // Número do próprio bot (capturado no evento "ready") — usado para trava anti-auto-conversa
 let myOwnPhone = null;
 // Flag para logs verbosos temporários (ligar por 24h)
-let VERBOSE_LOGGING = false;
+let VERBOSE_LOGGING = true; // ativado por solicitação do operador (ligado por 24h via endpoint também)
 // agenda desligar os logs verbosos após 24h caso ativado
 function enableVerboseFor24h() {
   VERBOSE_LOGGING = true;
@@ -113,6 +113,14 @@ function normalizeToCanvas(phoneOrId) {
   }
 }
 
+// Sanitiza número: remove apenas caracteres não numéricos, preservando prefixos (55) e
+// dígitos extras (9). Usar para salvar exatamente o que veio do anúncio/webhook.
+function sanitizeNumber(input) {
+  if (!input) return null;
+  const digits = String(input).replace(/\D/g, "");
+  return digits || null;
+}
+
 // Força ID canônico de 10 dígitos: remove '55' e o '9' extra após o DDD quando presente
 function ensure10Digits(phoneOrId) {
   if (!phoneOrId) return null;
@@ -132,6 +140,21 @@ function ensure10Digits(phoneOrId) {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MEDIA_DIR = join(__dirname, "media");
 mkdirSync(MEDIA_DIR, { recursive: true });
+// Ensure audio files are served with correct Content-Type before static
+app.use('/media', (req, res, next) => {
+  try {
+    const p = req.path || '';
+    const ext = p.split('.').pop() || '';
+    if (ext.toLowerCase() === 'ogg') {
+      res.setHeader('Content-Type', 'audio/ogg');
+    } else if (ext.toLowerCase() === 'mp3') {
+      res.setHeader('Content-Type', 'audio/mpeg');
+    }
+  } catch (e) {
+    // ignore
+  }
+  next();
+});
 app.use("/media", express.static(MEDIA_DIR));
 
 // Serve frontend build if present (allows accessing the SPA at /)
@@ -139,11 +162,6 @@ const FRONTEND_DIST = join(__dirname, '..', 'dist');
 if (existsSync(FRONTEND_DIST)) {
   console.log(`[static] Servindo frontend estático de ${FRONTEND_DIST}`);
   app.use(express.static(FRONTEND_DIST));
-  // fallback para SPA - serve index.html para rotas desconhecidas (apenas GET)
-  app.get('*', (req, res, next) => {
-    if (req.method !== 'GET') return next();
-    res.sendFile(join(FRONTEND_DIST, 'index.html'));
-  });
 } else {
   console.log('[static] Frontend build não encontrado em ../dist — acesse o frontend via npm run dev ou gere o build');
 }
@@ -241,7 +259,8 @@ function phoneToWAId(telefone) {
 
 // Salvar mensagem na conversa correta
 async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }) {
-  const normalizedPhone = normalizeToCanvas(telefone);
+  // Preserve the full number as stored in the DB (only sanitize non-digits)
+  const normalizedPhone = sanitizeNumber(telefone);
   if (!normalizedPhone) {
     console.warn(`[saveMessage] BLOQUEADO: telefone inválido (${telefone})`);
     return;
@@ -250,27 +269,67 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     console.warn(`[saveMessage] BLOQUEADO (auto-conversa): "${telefone}" é o próprio número do bot (${MY_PHONE}). Mensagem descartada.`);
     return;
   }
-  let aliasKey = normalizedPhone;
-  // PRIORIDADE AO LEAD CADASTRADO
+  let aliasKey = normalizedPhone; // aliasKey stores the full sanitized number (no 10-digit forcing)
+  // PRIORIDADE: 1) tentar match EXATO (numero completo salvo no CRM/conversations)
+  // 2) tentar mapear pela conversa existente no Firestore
+  // 3) por último recurso, fallback por sufixo (apenas se não houver correspondência melhor)
   try {
     const crmSnap = await db.collection("crm_data").doc("shared").get();
     const leads = crmSnap.exists ? (crmSnap.data()?.leads || []) : [];
-    const suffix8 = aliasKey.slice(-8);
-    const receivedDDD = aliasKey.slice(0, 2);
+    let aliasCandidate = null;
+
+    // 1) procura por match exato no array de leads
     for (const lead of leads) {
-      const leadNorm = normalizeToCanvas(lead.telefone);
-      if (!leadNorm) continue;
-      const leadDDD = leadNorm.slice(0, 2);
-      const leadSuffix8 = leadNorm.slice(-8);
-      if (leadSuffix8 === suffix8 && leadDDD !== receivedDDD) {
-        aliasKey = leadNorm;
+      const leadSan = sanitizeNumber(lead.telefone);
+      if (!leadSan) continue;
+      if (leadSan === aliasKey) {
+        aliasKey = leadSan;
+        if (VERBOSE_LOGGING) console.log('[saveMessage] matched lead by exact full number', leadSan);
         break;
       }
     }
+
+    // 2) se não houve match direto, tenta encontrar um documento de conversa com ID exato
+    if (!phoneAliasMap.has(aliasKey)) {
+      try {
+        const doc = await db.collection('conversations').doc(aliasKey).get();
+        if (doc.exists) {
+          phoneAliasMap.set(aliasKey, aliasKey);
+          if (VERBOSE_LOGGING) console.log('[saveMessage] matched existing conversation by exact id', aliasKey);
+        }
+      } catch (e) {
+        if (VERBOSE_LOGGING) console.warn('[saveMessage] erro ao verificar conversa exata:', e && e.message ? e.message : e);
+      }
+    }
+
+    // 3) como último recurso, tenta fallback por sufixo (preservando DDD preferido quando possível)
+    if (!phoneAliasMap.has(aliasKey)) {
+      const suffix8 = aliasKey.slice(-8);
+      const receivedDDD = aliasKey.slice(0, 2);
+      for (const lead of leads) {
+        const leadNorm = sanitizeNumber(lead.telefone);
+        if (!leadNorm) continue;
+        const leadDDD = leadNorm.slice(0, 2);
+        const leadSuffix8 = leadNorm.slice(-8);
+        if (leadSuffix8 === suffix8) {
+          if (leadDDD === receivedDDD) {
+            aliasKey = leadNorm;
+            if (VERBOSE_LOGGING) console.log('[saveMessage] matched lead by suffix+DDD', leadNorm);
+            break;
+          }
+          // keep candidate if DDD differs — only use if nothing better found
+          if (!aliasCandidate) aliasCandidate = leadNorm;
+        }
+      }
+      if (!phoneAliasMap.has(aliasKey) && aliasCandidate) {
+        aliasKey = aliasCandidate;
+        if (VERBOSE_LOGGING) console.log('[saveMessage] matched lead by suffix fallback', aliasCandidate);
+      }
+    }
   } catch (leadLookupErr) {
-    console.warn("[saveMessage] Erro ao buscar lead por sufixo:", leadLookupErr.message);
+    console.warn('[saveMessage] Erro ao buscar lead para correspondência:', leadLookupErr && leadLookupErr.message ? leadLookupErr.message : leadLookupErr);
   }
-  let targetPhone = targetConversation ? normalizeToCanvas(targetConversation) : null;
+  let targetPhone = targetConversation ? sanitizeNumber(targetConversation) : null;
   if (targetPhone) {
     const directSnap = await db.collection("conversations").doc(targetPhone).get();
     if (!directSnap.exists) {
@@ -284,9 +343,9 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     } else {
       const allConvs = await db.collection("conversations").get();
       for (const convDoc of allConvs.docs) {
-        const idAs10 = normalizeToCanvas(convDoc.id);
-        const telAs10 = normalizeToCanvas(convDoc.data().telefone);
-        if ((idAs10 && idAs10 === aliasKey) || (telAs10 && telAs10 === aliasKey)) {
+        const idSan = sanitizeNumber(convDoc.id);
+        const telSan = sanitizeNumber(convDoc.data().telefone);
+        if ((idSan && idSan === aliasKey) || (telSan && telSan === aliasKey)) {
           targetPhone = convDoc.id;
           phoneAliasMap.set(aliasKey, targetPhone);
           break;
@@ -295,8 +354,8 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
       if (!targetPhone) {
         const convSnaps2 = await db.collection("conversations").get();
         for (const convDoc2 of convSnaps2.docs) {
-          const idAs102 = normalizeToCanvas(convDoc2.id);
-          if (idAs102 && idAs102 === aliasKey) {
+          const idSan2 = sanitizeNumber(convDoc2.id);
+          if (idSan2 && idSan2 === aliasKey) {
             targetPhone = convDoc2.id;
             phoneAliasMap.set(aliasKey, targetPhone);
             break;
@@ -308,15 +367,15 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
       }
     }
   }
-  // Garante ID canônico de 10 dígitos para conversas
-  const targetAliasKey = normalizeToCanvas(targetPhone || aliasKey);
-  const canonicalId = ensure10Digits(targetAliasKey || aliasKey);
-  if (canonicalId) phoneAliasMap.set(canonicalId, targetPhone || aliasKey);
-  if (!canonicalId) {
-    console.warn('[saveMessage] Falha ao derivar canonicalId (ignorar)');
+  // Use the full sanitized number (no 10-digit forcing) as conversation ID
+  const targetId = targetPhone || aliasKey;
+  // canonicalId: versão canônica de 10 dígitos quando aplicável — usada para comparar/mesclar conversas
+  const canonicalId = ensure10Digits(targetId) || sanitizeNumber(targetId) || targetId;
+  if (!targetId) {
+    console.warn('[saveMessage] Falha ao derivar targetId (ignorar)');
     return;
   }
-  const convRef = db.collection("conversations").doc(canonicalId);
+  const convRef = db.collection("conversations").doc(targetId);
   try {
     const markerSnap = await convRef.get();
     if (markerSnap.exists && markerSnap.data()?.doNotRecreate) {
@@ -772,15 +831,23 @@ client.on("message", async (msg) => {
 
   // Detecta e salva mídia (áudio, imagem, vídeo, documento)
   let body = msg.body;
-  if (msg.hasMedia) {
-    try {
-      const media = await msg.downloadMedia();
-      if (media) {
-        // Salva arquivo na pasta media/
-        const ext = media.mimetype.split('/')[1] || 'bin';
-        const filename = `${msg.id._serialized || msg.id}_${Date.now()}.${ext}`;
-        const filepath = join(MEDIA_DIR, filename);
-        writeFileSync(filepath, Buffer.from(media.data, 'base64'));
+    if (msg.hasMedia) {
+      try {
+        const media = await msg.downloadMedia();
+        if (media) {
+          // Salva arquivo na pasta media/
+          const ext = media.mimetype.split('/')[1] || 'bin';
+          // derive safe base: prefer phone id if available, else sanitize msg id
+          let base = '';
+          try { base = String(msg.from || msg._data?.author || ''); } catch (e) { base = ''; }
+          if (!base) base = (msg.id && (msg.id._serialized || msg.id)) ? String(msg.id._serialized || msg.id) : '';
+          // strip repeated false_ prefixes and non-alphanum
+          if (base.startsWith('false_')) base = base.replace(/^false_+/, '');
+          base = base.replace(/[^0-9a-zA-Z._-]/g, '_');
+          if (!base) base = String(Date.now());
+          const filename = `${base}_${Date.now()}.${ext}`;
+          const filepath = join(MEDIA_DIR, filename);
+          writeFileSync(filepath, Buffer.from(media.data, 'base64'));
         // Marca o body para exibição no frontend
         if (media.mimetype.startsWith('audio')) {
           body = `[audio:${filename}]`;
@@ -837,7 +904,12 @@ client.on("message_create", async (msg) => {
         const media = await msg.downloadMedia();
         if (media) {
           const ext = (media.mimetype || '').split('/')[1] || 'bin';
-          const filename = `${msg.id._serialized || msg.id}_${Date.now()}.${ext}`;
+          // prefer telefone (resolved), else sanitize id; avoid 'false_' prefix
+          let base = telefone || '';
+          if (!base) base = (msg.id && (msg.id._serialized || msg.id)) ? String(msg.id._serialized || msg.id) : '';
+          if (base.startsWith('false_')) base = base.replace(/^false_+/, '');
+          base = String(base).replace(/[^0-9a-zA-Z._-]/g, '_') || String(Date.now());
+          const filename = `${base}_${Date.now()}.${ext}`;
           const filepath = join(MEDIA_DIR, filename);
           writeFileSync(filepath, Buffer.from(media.data, 'base64'));
           if ((media.mimetype || '').startsWith('audio')) {
@@ -919,23 +991,43 @@ app.post("/send-message", async (req, res) => {
 
     // Sequência oficial (Trindade do Envio):
     // 1) 55 + DDD + 9 + Número (formato internacional completo)
-    // 2) ID canônico de 10 dígitos (DDD + número sem o 9 extra)
-    // 3) raw (exatamente como foi digitado)
-    const attempts = [];
-    const with9 = canonical && canonical.length === 10 ? `${canonical.slice(0,2)}9${canonical.slice(2)}` : null;
-    // 1ª tentativa: 55 + with9 (bala de prata)
-    if (with9) attempts.push({ label: '55+add-9', digits: `55${with9}` });
-    // 2ª tentativa: canonical 10-digits
-    attempts.push({ label: '10-digits', digits: canonical });
-    // 3ª tentativa: raw input as provided (fallback)
-    if (rawInput) attempts.push({ label: 'raw', digits: rawInput.startsWith('55') ? rawInput : rawInput });
+      // Strategy: try the full number from the DB first (sanitize only), then try variations
+      const stored = sanitizeNumber(telefone) || rawInput;
+      const attempts = [];
+      if (stored) attempts.push({ label: 'stored', digits: stored });
+      // If stored starts with 55, add variant without 55; else add variant with 55
+      if (stored && stored.startsWith('55')) {
+        attempts.push({ label: 'without-55', digits: stored.slice(2) });
+      } else if (stored) {
+        attempts.push({ label: 'with-55', digits: `55${stored}` });
+      }
+      // Try removing a '9' after DDD if present (both with and without 55)
+      const maybeRemove9 = (s) => {
+        if (!s) return null;
+        let d = s;
+        if (d.length >= 11 && d[2] === '9') return d.slice(0,2) + d.slice(3);
+        if (d.length >= 13 && d.startsWith('55') && d[4] === '9') return d.slice(0,4) + d.slice(5);
+        return null;
+      };
+      const r1 = maybeRemove9(stored);
+      if (r1) attempts.push({ label: 'remove-9', digits: r1 });
+      // ensure unique order
+      const seen = new Set();
+      const uniqAttempts = [];
+      for (const a of attempts) {
+        const d = String(a.digits || '').replace(/\D/g, '');
+        if (!d) continue;
+        if (seen.has(d)) continue;
+        seen.add(d);
+        uniqAttempts.push({ label: a.label, digits: d });
+      }
 
     let succeeded = false;
     let successfulVariant = null;
     let lastError = null;
     let sentMsg = null;
 
-    for (const att of attempts) {
+    for (const att of uniqAttempts) {
       try {
         const maybe = String(att.digits).replace(/\D/g, '');
         console.log(`[send-message] Tentativa ${att.label}: verificando getNumberId para ${maybe}`);
@@ -1182,6 +1274,17 @@ app.listen(PORT, () => {
   });
   console.log(`\nServidor CRM WhatsApp na porta ${PORT}\n`);
 });
+
+// SPA fallback: serve index.html for unknown GET routes AFTER API routes are declared
+if (existsSync(FRONTEND_DIST)) {
+  app.get('*', (req, res, next) => {
+    if (req.method !== 'GET') return next();
+    // don't override API or media routes
+    const p = req.path || '';
+    if (p.startsWith('/api/') || p === '/status' || p.startsWith('/send-message') || p.startsWith('/media') || p.startsWith('/qr') || p.startsWith('/debug')) return next();
+    res.sendFile(join(FRONTEND_DIST, 'index.html'));
+  });
+}
 
 console.log("Iniciando WhatsApp... aguarde o QR Code...\n");
 client.initialize();
