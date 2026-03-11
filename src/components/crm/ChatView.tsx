@@ -144,14 +144,22 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
         
         // Criar documento no Firebase (merge para not overwrite se já existe)
         const convRef = doc(db, "conversations", normalized10 || preferredId);
-        await setDoc(convRef, {
-          telefone: normalized10 || preferredId,
+        // Não sobrescrever o campo `telefone` com valores que não normalizam para 10 dígitos.
+        // Se não houver `normalized10`, preserve o valor original em `adTrackingNumber`.
+        const payload: any = {
           leadNome: lead?.nome || "Novo Contato",
           createdAt: Timestamp.now(),
           lastMessageAt: null,
           unreadCount: 0,
           lastMessage: ""
-        }, { merge: true });
+        };
+        if (normalized10) {
+          payload.telefone = normalized10;
+        } else {
+          // armazenar o valor bruto do anúncio para analytics, sem poluir `telefone`
+          payload.adTrackingNumber = rawDigits || preferredId;
+        }
+        await setDoc(convRef, payload, { merge: true });
         
         console.log(`[ChatView] ✓ Conversa criada no Firebase com ID: ${normalized10}`);
         
