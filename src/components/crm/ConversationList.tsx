@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Search, MessageCircle, MoreVertical, UserPen, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useLeads } from "@/hooks/useLeads";
 
 // Função para limpar nomes técnicos de arquivos na prévia de mensagem
 function formatLastMessagePreview(msg: string): string {
@@ -32,9 +33,18 @@ interface ConversationListProps {
 export function ConversationList({ conversations, selectedPhone, onSelect, onEditLead, onDeleteConversation }: ConversationListProps) {
   const [search, setSearch] = useState("");
 
+  const leads = useLeads();
+
+  // Helper para buscar nome do lead
+  function getLeadName(conv) {
+    // Busca por leadId ou telefone
+    const lead = leads.find(l => l.id === conv.leadId || l.telefone.replace(/\D/g,"") === conv.telefone.replace(/\D/g,""));
+    return lead ? lead.nome : conv.leadNome;
+  }
+
   const filtered = conversations.filter(
     (c) =>
-      c.leadNome.toLowerCase().includes(search.toLowerCase()) ||
+      getLeadName(c).toLowerCase().includes(search.toLowerCase()) ||
       c.telefone.includes(search)
   );
 
@@ -80,7 +90,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
                 {/* Avatar */}
                 <div className="relative shrink-0">
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
-                    {conv.leadNome.charAt(0).toUpperCase()}
+                    {getLeadName(conv).charAt(0).toUpperCase()}
                   </div>
                   {conv.unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center">
@@ -93,7 +103,7 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-1">
                     <span className={cn("text-sm font-medium truncate block flex-1 min-w-0", conv.unreadCount > 0 && "font-semibold")}>
-                      {conv.leadNome}
+                      {getLeadName(conv)}
                     </span>
                     {conv.lastMessageAt && (
                       <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap ml-1 max-w-[84px] truncate">

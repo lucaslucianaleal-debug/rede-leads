@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone, Calendar, Reply, UserMinus } from "lucide-react";
 import { toast } from "sonner";
+import { useLeads } from "@/hooks/useLeads";
 
 const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
 const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Outro"];
@@ -35,6 +36,14 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ conversation, messages, onSend, onOpen, serverConnected, currentLead, onUpdateLead, onCreateLead, prefilledMessage, onPrefilledConsumed }: ChatWindowProps) {
+  const leads = useLeads();
+
+  // Helper para buscar nome do lead
+  function getLeadName(conv) {
+    const lead = leads.find(l => l.id === conv.leadId || l.telefone.replace(/\D/g,"") === conv.telefone.replace(/\D/g,""));
+    return lead ? lead.nome : conv.leadNome;
+  }
+
   const [text, setText] = useState("");
 
   // Pre-fill message when a shortcut sends a template
@@ -168,10 +177,10 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
       <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
-            {conversation.leadNome.charAt(0).toUpperCase()}
+            {getLeadName(conversation).charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="font-semibold text-sm">{conversation.leadNome}</p>
+            <p className="font-semibold text-sm">{getLeadName(conversation)}</p>
             <p className="text-xs text-muted-foreground">{formatPhone(conversation.telefone)}</p>
           </div>
         </div>
