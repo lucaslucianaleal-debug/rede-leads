@@ -10,7 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
-import { normalizePhoneTo11Digits } from "@/lib/phone";
+import { normalizePhoneTo11Digits, normalizePhoneTo10Digits } from "@/lib/phone";
 
 export interface ChatMessage {
   id: string;
@@ -49,8 +49,10 @@ export function useConversations() {
 
       snapshot.docs.forEach((d) => {
         const data = d.data();
+        const rawPhone = data.telefone || d.id || "";
+        const normalizedPhone = normalizePhoneTo10Digits(String(rawPhone));
         const conv: Conversation = {
-          telefone: data.telefone || d.id,
+          telefone: normalizedPhone || rawPhone,
           leadNome: data.leadNome || data.telefone || d.id,
           lastMessage: data.lastMessage || "",
           lastMessageAt: data.lastMessageAt || null,
@@ -138,8 +140,11 @@ export function useConversations() {
       // Ordenar por mensagem mais recente (sem filtrar órfãs automaticamente)
       // O sistema mantém conversas mesmo que temporariamente sem lead sincronizado
       finalList.sort((a, b) => {
+        // Preferir timestamp real da última mensagem, se disponível
         const ta = a.lastMessageAt?.toMillis() || 0;
         const tb = b.lastMessageAt?.toMillis() || 0;
+        // Se lastMessageAt for nulo, buscar timestamp da última mensagem (se existir)
+        // (opcional: pode ser ajustado se houver campo timestamp na mensagem)
         return tb - ta;
       });
 
@@ -210,7 +215,7 @@ export function useConversations() {
       
       // FORÇAR normalização para 11 dígitos - garante matching com ID do Firestore
       // Se receber "5517991164762" (13 dig) ou "17991164762" (11 dig), ambos retornam "17991164762"
-      const normalizedTelefone = normalizePhoneTo11Digits(telefone);
+      const normalizedTelefone = normalizePhoneTo10Digits(telefone);
       console.log(`[useMessages] Buscando mensagens. Input: ${telefone} → Normalizado: ${normalizedTelefone}`);
       
       if (!normalizedTelefone) {
@@ -220,7 +225,8 @@ export function useConversations() {
       }
       
       const msgsRef = collection(db, "conversations", normalizedTelefone, "messages");
-      const q = query(msgsRef, orderBy("timestamp", "asc"));
+      // Ordena pela data real da mensagem do WhatsApp (timestamp) em ordem decrescente
+      const q = query(msgsRef, orderBy("timestamp", "desc"));
 
       const unsub = onSnapshot(
         q,
@@ -246,7 +252,7 @@ export function useConversations() {
   const sendMessage = useCallback(async (telefone: string, message: string) => {
     try {
       // Normalizar telefone para 11 dígitos (compatível com phoneAliasMap do backend)
-      const normalizedPhone = normalizePhoneTo11Digits(telefone);
+      const normalizedPhone = normalizePhoneTo10Digits(telefone);
       if (!normalizedPhone) {
         toast.error("Telefone inválido. Impossível enviar mensagem.");
         return false;
@@ -274,7 +280,7 @@ export function useConversations() {
   const markAsRead = useCallback(async (telefone: string) => {
     try {
       // Normalizar telefone para 11 dígitos (compatível com backend)
-      const normalizedPhone = normalizePhoneTo11Digits(telefone);
+      const normalizedPhone = normalizePhoneTo10Digits(telefone);
       if (!normalizedPhone) return; // silencioso se não conseguir normalizar
 
       await fetch(`${SERVER_URL}/mark-read`, {

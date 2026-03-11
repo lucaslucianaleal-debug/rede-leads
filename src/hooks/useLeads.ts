@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { Lead, ClinicFilter, DashboardStats, LeadStage, LeadComparecimento } from "@/types/crm";
 import { mockLeads } from "@/data/mockLeads";
 import { format, addDays, parse } from "date-fns";
-import { normalizePhoneTo11Digits } from "@/lib/phone";
+import { normalizePhoneTo11Digits, normalizePhoneTo10Digits } from "@/lib/phone";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc, updateDoc, getDoc } from "firebase/firestore";
@@ -453,45 +453,9 @@ export function useLeads() {
         }
         return { ...l, ...updates };
       });
-      // Se o nome foi alterado, sincroniza o leadNome na conversa do Firestore
-      if (updates.nome !== undefined) {
-        const lead = prev.find((l) => l.id === leadId);
-        if (lead?.telefone) {
-          const cleanPhone = lead.telefone.replace(/\D/g, "");
-          console.log(`Atualizando leadNome para ${updates.nome} na conversa ${cleanPhone}`);
-          
-          // Variações do telefone para buscar a conversa existente
-          const phoneVariants = [
-            cleanPhone,                           // 17992633297
-            `55${cleanPhone}`,                   // 5517992633297  
-            cleanPhone.startsWith('55') ? cleanPhone.substring(2) : cleanPhone  // Remove 55 se existir
-          ];
-
-          // Busca qual variação já existe no Firestore antes de atualizar
-          const findAndUpdateConversation = async () => {
-            for (const [index, phone] of phoneVariants.entries()) {
-              try {
-                const convRef = doc(db, "conversations", phone);
-                const convSnap = await getDoc(convRef);
-                
-                if (convSnap.exists()) {
-                  // Encontrou! Atualiza só esta conversa
-                  await updateDoc(convRef, { leadNome: updates.nome });
-                  console.log(`leadNome atualizado na conversa existente ${phone}: ${updates.nome}`);
-                  return; // Para aqui, não tenta outras variações
-                } else {
-                  console.log(`Tentativa ${index + 1} (${phone}): conversa não existe`);
-                }
-              } catch (err) {
-                console.log(`Erro na tentativa ${index + 1} (${phone}):`, err);
-              }
-            }
-            console.log('Nenhuma conversa existente encontrada para atualizar');
-          };
-
-          findAndUpdateConversation();
-        }
-      }
+      // NOTE: não sincronizamos mais `leadNome` diretamente nas conversas.
+      // O frontend deve buscar o nome dinamicamente a partir da coleção `leads`
+      // para evitar escritas redundantes no Firestore (Rota A).
       return updated;
     });
   };
@@ -506,13 +470,13 @@ export function useLeads() {
     (async () => {
       try {
         const telefone = leadData.telefone || "";
-        const normalized11 = normalizePhoneTo11Digits(telefone);
-        if (!normalized11) return;
+        const normalized10 = normalizePhoneTo10Digits(telefone);
+        if (!normalized10) return;
 
-        const convRef = doc(db, "conversations", normalized11);
+        const convRef = doc(db, "conversations", normalized10);
         // Merge so we don't overwrite existing conversation fields
-        await setDoc(convRef, { telefone: normalized11, leadNome: leadData.nome || "", leadId: newId }, { merge: true });
-        console.log(`[createLead] Conversa vinculada/atualizada: ${normalized11} -> lead ${newId}`);
+        await setDoc(convRef, { telefone: normalized10, leadNome: leadData.nome || "", leadId: newId }, { merge: true });
+        console.log(`[createLead] Conversa vinculada/atualizada: ${normalized10} -> lead ${newId}`);
       } catch (err) {
         console.error("[createLead] Falha ao vincular conversa no Firestore:", err);
       }
