@@ -30,3 +30,4 @@ whatsapp-server/.wwebjs_cache/
 whatsapp-server/.wwebjs_auth/
 whatsapp-server/media/
 whatsapp-server/package-lock.json
+serviceAccountKey.json
