@@ -1,20 +1,4 @@
-  // ...existing code...
-  // Busca leadId no phoneAliasMap
-  let leadId = null;
-  if (phoneAliasMap.has(raw)) {
-    const convId = phoneAliasMap.get(raw);
-    try {
-      const convSnap = await db.collection('conversations').doc(convId).get();
-      leadId = convSnap.data()?.leadId || null;
-    } catch {}
-  }
-  // Se não existir, cria lead e usa o ID
-  if (!leadId) {
-    leadId = await syncLead(raw, null, msg.body);
-  }
-  // Salva leadId no documento da conversa
-  await db.collection('conversations').doc(raw).set({ leadId }, { merge: true });
-  // ...existing code...
+
 import pkg from "whatsapp-web.js";
 const { Client, LocalAuth } = pkg;
 
@@ -45,13 +29,29 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://rede-leads.vercel.app',
 ];
-app.use(cors({
+// CORS configuration: allow known origins and handle preflight explicitly.
+const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+    console.warn(`[CORS] Rejected origin: ${origin}`);
     return callback(new Error('CORS policy: origin not allowed'), false);
+  },
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+// Handle preflight requests for all routes
+app.options('*', cors(corsOptions));
+
+// Middleware to log CORS-related rejects with method info for easier debugging
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.indexOf(origin) === -1) {
+    console.warn(`[CORS] Incoming request from disallowed origin ${origin} - method ${req.method} - path ${req.path}`);
   }
-}));
+  next();
+});
 app.use(express.json());
 const PORT = process.env.PORT || 3001;
 
@@ -102,6 +102,7 @@ function isDuplicateMessage(msgId) {
 const MY_PHONE = '17991040452';
 
 // Centralização da Normalização (A 'Régua')
+// Agora retorna o ID canônico de 10 dígitos (DDD + número sem o 9 extra)
 function normalizeToCanvas(phoneOrId) {
   if (!phoneOrId) return null;
   let digits = String(phoneOrId)
@@ -109,9 +110,9 @@ function normalizeToCanvas(phoneOrId) {
     .replace(/\D/g, "");
   // Remove prefixo 55
   if (digits.startsWith("55")) digits = digits.slice(2);
-  // Retorna sufixo de 11 ou 10 dígitos
-  if (digits.length >= 11) {
-    return digits.slice(-11);
+  // Retorna sufixo de 10 dígitos como canonical
+  if (digits.length >= 10) {
+    return digits.slice(-10);
   } else if (digits.length === 10) {
     return digits;
   }
@@ -276,9 +277,9 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     } else {
       const allConvs = await db.collection("conversations").get();
       for (const convDoc of allConvs.docs) {
-        const idLast11 = normalizeToCanvas(convDoc.id);
-        const telLast11 = normalizeToCanvas(convDoc.data().telefone);
-        if ((idLast11 && idLast11 === aliasKey) || (telLast11 && telLast11 === aliasKey)) {
+        const idAs10 = normalizeToCanvas(convDoc.id);
+        const telAs10 = normalizeToCanvas(convDoc.data().telefone);
+        if ((idAs10 && idAs10 === aliasKey) || (telAs10 && telAs10 === aliasKey)) {
           targetPhone = convDoc.id;
           phoneAliasMap.set(aliasKey, targetPhone);
           break;
@@ -287,8 +288,8 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
       if (!targetPhone) {
         const convSnaps2 = await db.collection("conversations").get();
         for (const convDoc2 of convSnaps2.docs) {
-          const idLast112 = normalizeToCanvas(convDoc2.id);
-          if (idLast112 && idLast112 === aliasKey) {
+          const idAs102 = normalizeToCanvas(convDoc2.id);
+          if (idAs102 && idAs102 === aliasKey) {
             targetPhone = convDoc2.id;
             phoneAliasMap.set(aliasKey, targetPhone);
             break;
@@ -322,9 +323,9 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     for (const docSnap of convSnaps.docs) {
       const docId = docSnap.id;
       if (docId === canonicalId) continue;
-      const idLast11 = normalizeToCanvas(docId);
-      const telLast11 = normalizeToCanvas(docSnap.data()?.telefone);
-      if ((idLast11 && idLast11 === canonicalId) || (telLast11 && telLast11 === canonicalId)) {
+      const idAs10 = normalizeToCanvas(docId);
+      const telAs10 = normalizeToCanvas(docSnap.data()?.telefone);
+      if ((idAs10 && idAs10 === canonicalId) || (telAs10 && telAs10 === canonicalId)) {
         try {
           const srcRef = db.collection('conversations').doc(docId);
           const srcMsgs = await srcRef.collection('messages').get();
@@ -463,19 +464,18 @@ async function preloadPhoneAliasMap() {
       const docId = docSnap.id;
 
       // Registra pelo ID do documento (mapear também para versão 10 dígitos)
-      const rawDigits = docId.replace(/\D/g, "");
-      const idLast11 = rawDigits.slice(-11);
-      const idAs10 = (idLast11.length === 11 && idLast11[2] === '9') ? (idLast11.slice(0,2) + idLast11.slice(3)) : rawDigits.slice(-10);
-      if (idAs10 && idAs10.length === 10 && !phoneAliasMap.has(idAs10)) {
-        phoneAliasMap.set(idAs10, docId);
-        count++;
-      }
+        const rawDigits = docId.replace(/\D/g, "");
+        const idAs10 = ensure10Digits(rawDigits);
+        if (idAs10 && idAs10.length === 10 && !phoneAliasMap.has(idAs10)) {
+          phoneAliasMap.set(idAs10, docId);
+          count++;
+        }
 
       // Registra também pelo campo 'telefone' dentro do documento
       // (pode ter formato diferente do ID, ex: "5527..." vs "270...")
       if (data.telefone) {
         const telDigits = (data.telefone || "").replace(/\D/g, "");
-        const telAs10 = (telDigits.length >= 11 && telDigits.slice(-11)[2] === '9') ? (telDigits.slice(-11).slice(0,2) + telDigits.slice(-11).slice(3)) : telDigits.slice(-10);
+        const telAs10 = ensure10Digits(telDigits);
         if (telAs10 && telAs10.length === 10 && !phoneAliasMap.has(telAs10)) {
           phoneAliasMap.set(telAs10, docId);
           count++;
@@ -501,21 +501,18 @@ async function preloadPhoneAliasMapFromLeads() {
     for (const l of leads) {
       const tel = String(l.telefone || "").replace(/\D/g, "");
       if (!tel || tel.length < 8) continue;
-      const last11 = tel.slice(-11);
-      if (last11.length !== 11) continue;
-
-      // Deriva versão 10 dígitos
-      const as10 = (last11[2] === '9') ? (last11.slice(0,2) + last11.slice(3)) : last11.slice(-10);
+      // Deriva versão 10 dígitos canonical
+      const as10 = ensure10Digits(tel);
       if (!as10) continue;
 
       // Se já tem no alias map, pula
       if (phoneAliasMap.has(as10)) continue;
 
-      // Tenta encontrar um documento cuja ID corresponda (tanto 11 quanto 10)
+      // Tenta encontrar um documento cuja ID corresponda (versão canônica de 10 dígitos)
       let found = null;
       for (const convDoc of convSnaps.docs) {
         const convIdDigits = convDoc.id.replace(/\D/g, "");
-        const convAs10 = (convIdDigits.length >= 11 && convIdDigits.slice(-11)[2] === '9') ? (convIdDigits.slice(-11).slice(0,2) + convIdDigits.slice(-11).slice(3)) : convIdDigits.slice(-10);
+        const convAs10 = ensure10Digits(convIdDigits);
         if (convAs10 === as10) {
           found = convDoc.id;
           break;
@@ -649,7 +646,7 @@ client.on("ready", async () => {
   try {
     if (client.info?.wid?._serialized) {
       const ownDigits = client.info.wid._serialized.replace("@c.us", "").replace(/\D/g, "");
-      myOwnPhone = ownDigits.slice(-11);
+      myOwnPhone = ensure10Digits(ownDigits);
       console.log(`[ready] Meu número (bot): ${myOwnPhone}`);
     }
   } catch (e) {
@@ -888,7 +885,7 @@ app.post("/send-message", async (req, res) => {
       setTimeout(() => sentMsgConversationMap.delete(sentMsg.id._serialized), 10 * 60 * 1000);
     }
 
-    // Registra alias para consistência (usar últimos 11 dígitos)
+    // Registra alias para consistência (usar 10 dígitos canônicos)
     const aliasKey = digits;
     phoneAliasMap.set(aliasKey, targetConv);
 
@@ -958,16 +955,16 @@ app.post("/mark-read", async (req, res) => {
     
     // Encontra a conversa correta (pode ter ID diferente)
     let targetPhone = normalizedPhone;
-    const last11 = normalizedPhone.slice(-11);
+    const last10 = ensure10Digits(normalizedPhone) || normalizedPhone.slice(-10);
     
     // Tenta com ID exato primeiro
     const directSnap = await db.collection("conversations").doc(normalizedPhone).get();
     if (!directSnap.exists) {
-      // Procura por últimos 11 dígitos (mais preciso)
+      // Procura por últimos 10 dígitos (mais preciso)
       const allConvs = await db.collection("conversations").get();
       for (const doc of allConvs.docs) {
         const docDigits = doc.id.replace(/\D/g, "");
-        if (docDigits.length >= 11 && last11.length >= 11 && docDigits.slice(-11) === last11) {
+        if (ensure10Digits(docDigits) === last10) {
           targetPhone = doc.id;
           break;
         }

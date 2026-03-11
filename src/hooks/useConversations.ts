@@ -10,7 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
-import { normalizePhoneTo11Digits, normalizePhoneTo10Digits } from "@/lib/phone";
+import { normalizePhoneTo10Digits } from "@/lib/phone";
 
 export interface ChatMessage {
   id: string;
@@ -65,7 +65,7 @@ export function useConversations() {
       const dedupMap = new Map<string, Conversation>();
       const getKey = (conv: Conversation) => {
         const digits = conv.telefone.replace(/\D/g, "");
-        if (digits.length >= 11) return `11:${digits.slice(-11)}`;
+        if (digits.length >= 10) return `10:${digits.slice(-10)}`;
         if (digits.length >= 8) return `8:${digits.slice(-8)}`;
         return `raw:${conv.telefone}`;
       };
@@ -213,8 +213,8 @@ export function useConversations() {
     useEffect(() => {
       if (!telefone) return;
       
-      // FORÇAR normalização para 11 dígitos - garante matching com ID do Firestore
-      // Se receber "5517991164762" (13 dig) ou "17991164762" (11 dig), ambos retornam "17991164762"
+      // Forçar normalização para 10 dígitos - garante matching com IDs canônicos no Firestore
+      // Se receber formatos com country code ou variações, retorna DDD + número (10 dígitos)
       const normalizedTelefone = normalizePhoneTo10Digits(telefone);
       console.log(`[useMessages] Buscando mensagens. Input: ${telefone} → Normalizado: ${normalizedTelefone}`);
       

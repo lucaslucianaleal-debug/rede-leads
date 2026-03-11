@@ -28,11 +28,11 @@ const db = getFirestore();
     }
     const leads = snap.data()?.leads || [];
     const norm = phone.startsWith('55') ? phone : `55${phone}`;
-    const last11 = norm.replace(/\D/g, '').slice(-11);
+    const last11 = norm.replace(/\D/g, '').slice(-10);
     let found = false;
     const updated = leads.map((l) => {
       const ld = String(l.telefone || '').replace(/\D/g, '');
-      const llast11 = (ld.startsWith('55') ? ld : `55${ld}`).slice(-11);
+      const llast11 = (ld.startsWith('55') ? ld : `55${ld}`).slice(-10);
       if (llast11 === last11) {
         found = true;
         return { ...l, _triggeredAt: Date.now() };

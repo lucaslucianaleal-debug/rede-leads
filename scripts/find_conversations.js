@@ -8,7 +8,7 @@ if (!arg) {
   process.exit(1);
 }
 
-const suffix = String(arg).replace(/\D/g, '').slice(-11);
+const suffix = String(arg).replace(/\D/g, '').slice(-10);
 try {
   const serviceAccount = JSON.parse(readFileSync(new URL('../whatsapp-server/serviceAccountKey.json', import.meta.url)));
   initializeApp({ credential: cert(serviceAccount) });
@@ -24,8 +24,8 @@ const db = getFirestore();
     const snaps = await db.collection('conversations').get();
     const matches = [];
     for (const doc of snaps.docs) {
-      const idLast = doc.id.replace(/\D/g, '').slice(-11);
-      const telField = String(doc.data()?.telefone || '').replace(/\D/g, '').slice(-11);
+      const idLast = doc.id.replace(/\D/g, '').slice(-10);
+      const telField = String(doc.data()?.telefone || '').replace(/\D/g, '').slice(-10);
       if (idLast === suffix || telField === suffix) {
         matches.push({ id: doc.id, data: doc.data() });
       }

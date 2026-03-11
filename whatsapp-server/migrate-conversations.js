@@ -2,15 +2,15 @@
  * migrate-conversations.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Percorre a coleção "conversations" do Firestore e renomeia todos os documentos
- * cujo ID tenha 13 dígitos começando com "55" para o ID canônico de 11 dígitos.
+ * cujo ID tenha 13 dígitos começando com "55" para o ID canônico de 10 dígitos.
  *
  * O que é feito:
  *  1. Lista todos os docs de "conversations"
  *  2. Para cada doc cujo ID tem exatamente 13 dígitos e começa com "55":
- *     a. Calcula o ID canônico (últimos 11 dígitos)
+ *     a. Calcula o ID canônico (últimos 10 dígitos)
  *     b. Verifica se já existe um doc com esse ID canônico
- *        - Se existir:  move as mensagens do doc 13-dig para o 11-dig, depois deleta o 13-dig
- *        - Se não existir: cria o doc 11-dig com os mesmos dados, migra mensagens, deleta 13-dig
+ *        - Se existir:  move as mensagens do doc 13-dig para o 10-dig, depois deleta o 13-dig
+ *        - Se não existir: cria o doc 10-dig com os mesmos dados, migra mensagens, deleta 13-dig
  *  3. Exibe resumo detalhado de tudo que foi feito / ignorado / erros
  *
  * Uso:
@@ -47,9 +47,20 @@ function is13DigitBR(id) {
   return d.length === 13 && d.startsWith("55");
 }
 
-/** Converte "5517991164762" → "17991164762" */
-function toCanonical11(id) {
-  return onlyDigits(id).slice(-11);
+/** Converte telefone para ID canônico de 10 dígitos (remove 55 e o 9 extra quando presente)
+ * Ex: "5517991164762" -> "1791164762" (10 dígitos canônicos)
+ */
+function toCanonical10(id) {
+  const d = onlyDigits(id);
+  // Remover código do país
+  const withoutCC = d.startsWith('55') ? d.slice(2) : d;
+  // Se for 11 e tem 9 na posição 3, remover o 9 para formar o ID canônico de 10
+  if (withoutCC.length === 11 && withoutCC[2] === '9') {
+    return withoutCC.slice(0,2) + withoutCC.slice(3);
+  }
+  // Fallback: pegar últimos 10
+  if (withoutCC.length >= 10) return withoutCC.slice(-10);
+  return withoutCC;
 }
 
 // ─── copia subcoleção "messages" de srcDocRef para dstDocRef ──────────────────
@@ -99,7 +110,7 @@ async function run() {
       continue;
     }
 
-    const canonical = toCanonical11(id);
+    const canonical = toCanonical10(id);
     const srcRef = db.collection("conversations").doc(id);
     const dstRef = db.collection("conversations").doc(canonical);
 
@@ -115,8 +126,8 @@ async function run() {
       console.log(`    Mensagens: ${msgCount} a migrar`);
 
       if (dstSnap.exists) {
-        // Documento canônico já existe → apenas migra as mensagens e apaga o 13-dig
-        console.log(`    Destino "${canonical}" já existe — mesclando mensagens`);
+      // Documento canônico já existe → apenas migra as mensagens e apaga o 13-dig
+      console.log(`    Destino "${canonical}" já existe — mesclando mensagens`);
         if (!DRY_RUN) {
           // Atualiza campos que podem ter vindo do 13-dig (sem sobrescrever dados bons)
           await dstRef.set(
@@ -152,9 +163,9 @@ async function run() {
   console.log(`\n${"═".repeat(60)}`);
   console.log(`  RESUMO`);
   console.log(`${"═".repeat(60)}`);
-  console.log(`  Migrados (novo doc 11-dig criado):     ${countMigrated}`);
-  console.log(`  Mesclados (11-dig já existia):         ${countMerged}`);
-  console.log(`  Ignorados (já era 11-dig ou inválido): ${countSkipped}`);
+  console.log(`  Migrados (novo doc 10-dig criado):     ${countMigrated}`);
+  console.log(`  Mesclados (10-dig já existia):         ${countMerged}`);
+  console.log(`  Ignorados (já era 10-dig ou inválido): ${countSkipped}`);
   console.log(`  Erros:                                 ${countErrors}`);
   console.log(`  Modo: ${DRY_RUN ? "DRY-RUN — rode com --apply para executar" : "APLICADO ✅"}`);
   console.log(`${"═".repeat(60)}\n`);

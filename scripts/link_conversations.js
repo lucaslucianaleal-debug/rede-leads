@@ -12,11 +12,14 @@
 
 import admin from 'firebase-admin';
 
-function normalizeToLast11(phone) {
-  if (!phone) return '';
-  const digits = String(phone).replace(/\D/g, '');
-  if (digits.length >= 11) return digits.slice(-11);
-  return digits;
+// Canonical 10-digit normalizer: remove country code 55 and extra leading 9 when present
+function ensure10Digits(phone) {
+  if (!phone) return null;
+  let d = String(phone).replace(/\D/g, '');
+  if (d.startsWith('55')) d = d.slice(2);
+  if (d.length === 11 && d[2] === '9') d = d.slice(0,2) + d.slice(3);
+  if (d.length >= 10) return d.slice(-10);
+  return null;
 }
 
 function lastN(phone, n) {
@@ -48,7 +51,7 @@ async function main() {
   console.log(`Loaded ${leads.length} leads`);
 
   // Build maps (all possible normalizations)
-  const map11 = new Map();
+  const map10 = new Map();
   const map8 = new Map();
   const fullPhones = new Map(); // All variations
   
@@ -57,10 +60,10 @@ async function main() {
     const digits = tel.replace(/\D/g, '');
     
     // Try all last-N variants
-    const n11 = normalizeToLast11(tel);
+    const n10 = ensure10Digits(tel);
     const n8 = lastN(tel, 8);
-    
-    if (n11) map11.set(n11, l);
+
+    if (n10) map10.set(n10, l);
     if (n8) map8.set(n8, l);
     
     // Also try with leading "55" and without
@@ -88,7 +91,6 @@ async function main() {
     }
 
     const digits = id.replace(/\D/g, '');
-    const last11 = digits.slice(-11);
     const last10 = digits.slice(-10);
     const last9 = digits.slice(-9);
     const last8 = digits.slice(-8);
@@ -102,10 +104,10 @@ async function main() {
       if (fullPhones.has(with55)) lead = fullPhones.get(with55);
     }
 
-    // Strategy 2: match by last 11 after adding 55 prefix if needed
+    // Strategy 2: exact 10-digit canonical match
     if (!lead) {
-      const asLast11 = digits.length > 11 ? digits.slice(-11) : digits;
-      if (asLast11 && map11.has(asLast11)) lead = map11.get(asLast11);
+      const as10 = ensure10Digits(digits);
+      if (as10 && map10.has(as10)) lead = map10.get(as10);
     }
 
     // Strategy 3: match by last 8 digits
@@ -113,21 +115,21 @@ async function main() {
     
     // Strategy 4: search for leads ending with last 8 digits
     if (!lead) {
-      for (const [k, l] of map11.entries()) {
+      for (const [k, l] of map10.entries()) {
         if (k.endsWith(last8)) { lead = l; break; }
       }
     }
 
     // Strategy 5: search for leads ending with last 9 digits
     if (!lead && last9) {
-      for (const [k, l] of map11.entries()) {
+      for (const [k, l] of map10.entries()) {
         if (k.endsWith(last9)) { lead = l; break; }
       }
     }
 
     // Strategy 6: search for leads ending with last 10 digits
     if (!lead && last10) {
-      for (const [k, l] of map11.entries()) {
+      for (const [k, l] of map10.entries()) {
         if (k.endsWith(last10)) { lead = l; break; }
       }
     }
@@ -136,7 +138,7 @@ async function main() {
     if (!lead) {
       for (const [phones, l] of fullPhones.entries()) {
         // Match if the conv ID ends with last 8+ digits of a lead phone
-        if (phones.endsWith(last8) || phones.slice(-10).endsWith(last9) || phones.slice(-11).endsWith(last10)) {
+        if (phones.endsWith(last8) || phones.slice(-10).endsWith(last9) || phones.slice(-10).endsWith(last10)) {
           lead = l;
           break;
         }

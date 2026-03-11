@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { Lead, ClinicFilter, DashboardStats, LeadStage, LeadComparecimento } from "@/types/crm";
 import { mockLeads } from "@/data/mockLeads";
 import { format, addDays, parse } from "date-fns";
-import { normalizePhoneTo11Digits, normalizePhoneTo10Digits } from "@/lib/phone";
+import { normalizePhoneTo10Digits } from "@/lib/phone";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc, updateDoc, getDoc } from "firebase/firestore";
@@ -439,6 +439,9 @@ export function useLeads() {
   };
 
   const updateLead = (leadId: string, updates: Partial<Lead>) => {
+    // Antes de atualizar o estado local, capturamos o telefone atual do lead
+    const existingLead = leads.find((l) => l.id === leadId);
+
     setLeads((prev) => {
       const todayFormatted = format(new Date(), "dd/MM/yyyy");
       const updated = prev.map((l) => {
@@ -453,9 +456,59 @@ export function useLeads() {
         }
         return { ...l, ...updates };
       });
-      // NOTE: não sincronizamos mais `leadNome` diretamente nas conversas.
-      // O frontend deve buscar o nome dinamicamente a partir da coleção `leads`
-      // para evitar escritas redundantes no Firestore (Rota A).
+      // Sincroniza `leadNome` na coleção `conversations` quando houver alteração de nome.
+      // Prioridade de tentativas (novo padrão):
+      // 1) ID canônico de 10 dígitos (DDD + número sem o 9 extra)
+      // 2) número bruto extraído do lead
+      // 3) com prefixo `55` + canônico de 10 dígitos
+      // 4) tentar remover o "9" extra (caso exista) e usar esse 10 dígitos
+      // Paramos na primeira conversa encontrada e atualizamos `leadNome` imediatamente.
+      if (updates.nome !== undefined && existingLead && existingLead.telefone) {
+        (async () => {
+          try {
+            const raw = (existingLead.telefone || "").replace(/\D/g, "");
+            const normalized10 = normalizePhoneTo10Digits(existingLead.telefone || "");
+
+            const candidates: string[] = [];
+            if (normalized10) candidates.push(normalized10);
+            if (raw && raw !== normalized10) candidates.push(raw);
+            if (normalized10) candidates.push(`55${normalized10}`);
+            // Tentativa extra: se raw tem 11 dígitos e o terceiro dígito é '9', remover esse '9'
+            if (raw && raw.length === 11 && raw[2] === "9") {
+              const without9 = raw.slice(0, 2) + raw.slice(3);
+              if (without9 !== normalized10 && without9 !== raw) candidates.push(without9);
+            }
+
+            // Deduplicar mantendo ordem
+            const seen = new Set();
+            const ordered = candidates.filter((c) => {
+              if (!c) return false;
+              if (seen.has(c)) return false;
+              seen.add(c);
+              return true;
+            });
+
+            for (const [i, candidate] of ordered.entries()) {
+              try {
+                const convRef = doc(db, "conversations", candidate);
+                const snap = await getDoc(convRef);
+                if (snap.exists()) {
+                  await updateDoc(convRef, { leadNome: updates.nome });
+                  console.log(`[syncLeadName] leadNome atualizado na conversa ${candidate} (Tentativa ${i + 1}): ${updates.nome}`);
+                  return;
+                } else {
+                  console.log(`[syncLeadName] Tentativa ${i + 1} (${candidate}): conversa não existe`);
+                }
+              } catch (err) {
+                console.warn(`[syncLeadName] Erro na tentativa ${i + 1} (${candidate}):`, err);
+              }
+            }
+            console.log("[syncLeadName] Nenhuma conversa existente encontrada para atualizar leadNome");
+          } catch (err) {
+            console.error("[syncLeadName] Falha ao sincronizar leadNome:", err);
+          }
+        })();
+      }
       return updated;
     });
   };

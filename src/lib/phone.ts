@@ -4,48 +4,31 @@
  * Input: "5517991164762", "(17) 99116-4762", "+55 17 99116-4762", "1733256789"
  * Output: "17991164762" (11 digits) or original if cannot normalize
  */
+// Deprecated: previously returned 11-digit form. For frontend we now standardize on
+// the 10-digit canonical form (DDD + number without the extra leading '9').
+// Keep this function as a safe alias that returns the 10-digit canonical value.
 export function normalizePhoneTo11Digits(phone: string): string {
-  if (!phone) {
-    console.warn(`[normalizePhoneTo11Digits] Input vazio`);
-    return "";
-  }
-  
-  // Remove all non-digit characters
+  // Delegate to the 10-digit normalizer to avoid accidental 11-digit usage.
+  return normalizePhoneTo10Digits(phone);
+}
+
+/**
+ * Normalize Brazilian phone to canonical 10 digits (DDD + number) by removing
+ * country code 55 and removing the extra leading '9' for mobile numbers when present.
+ * Returns empty string on invalid input.
+ */
+export function normalizePhoneTo10Digits(phone: string): string {
+  if (!phone) return "";
   const digits = phone.replace(/\D/g, "");
-  console.log(`[normalizePhoneTo11Digits] Input: "${phone}" → Dígitos: "${digits}" (${digits.length} chars)`);
-  
-  // If already 11 digits, return as-is
-  if (digits.length === 11) {
-    console.log(`[normalizePhoneTo11Digits] ✓ Retorno direto: ${digits}`);
-    return digits;
+  let d = digits;
+  if (d.startsWith("55")) d = d.slice(2);
+  if (d.length === 11 && d[2] === '9') {
+    return d.slice(0,2) + d.slice(3);
   }
-  
-  // If has country code (55), remove it and verify length
-  if (digits.startsWith("55")) {
-    const withoutCC = digits.slice(2);
-    if (withoutCC.length === 11) {
-      console.log(`[normalizePhoneTo11Digits] ✓ Removido código país: ${withoutCC}`);
-      return withoutCC;
-    }
-  }
-  
-  // If has country code and is 13 digits total, extract last 11
-  if (digits.length === 13 && digits.startsWith("55")) {
-    const last11 = digits.slice(-11);
-    console.log(`[normalizePhoneTo11Digits] ✓ Extraído últimos 11 de 13 dígitos: ${last11}`);
-    return last11;
-  }
-  
-  // If length >= 11, take last 11 digits (safety fallback)
-  if (digits.length >= 11) {
-    const last11 = digits.slice(-11);
-    console.log(`[normalizePhoneTo11Digits] ⚠ Fallback: tomados últimos 11 de ${digits.length}: ${last11}`);
-    return last11;
-  }
-  
-  // Cannot normalize - return original (will be handled by backend)
-  console.warn(`[normalizePhoneTo11Digits] ✗ Insuficiente dígitos (${digits.length}): ${phone}`);
-  return phone;
+  if (d.length === 10) return d;
+  // fallback: if longer, take last 10
+  if (d.length > 10) return d.slice(-10);
+  return "";
 }
 
 /**

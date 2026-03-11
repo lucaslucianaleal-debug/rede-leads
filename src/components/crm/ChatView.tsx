@@ -11,7 +11,7 @@ import { Lead } from "@/types/crm";
 import { db } from "@/lib/firebase";
 import { collection, doc, getDocs, writeBatch, deleteDoc, setDoc, Timestamp } from "firebase/firestore";
 import { toast } from "sonner";
-import { normalizePhoneTo11Digits } from "@/lib/phone";
+import { normalizePhoneTo10Digits } from "@/lib/phone";
 
 interface ChatViewProps {
   leads: Lead[];
@@ -46,13 +46,13 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
   const messages = useMessages(selectedPhone);
 
   // Combinar conversas do Firebase + conversas locais criadas
-  const allConversations = [
+    const allConversations = [
     ...conversations,
     ...Object.values(localConversations).filter(
       (local) => !conversations.some((fb) => {
         const fbDigits = fb.telefone.replace(/\D/g, "");
         const localDigits = local.telefone.replace(/\D/g, "");
-        return fbDigits.slice(-11) === localDigits.slice(-11);
+        return fbDigits.slice(-10) === localDigits.slice(-10);
       })
     ),
   ];
@@ -111,11 +111,11 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
         
         console.log(`[ChatView] Lead encontrado para criar conversa:`, lead?.nome || "Nenhum");
         
-        // Normalizar para 11 dígitos (padrão do backend: últimos 11 dígitos)
-        const normalized11 = normalizePhoneTo11Digits(openTarget.phone);
-        console.log(`[ChatView] Telefone normalizado para 11 dígitos: ${normalized11}`);
-        
-        if (!normalized11) {
+        // Normalizar para 10 dígitos (padrão atual: DDD + número sem o 9 extra)
+        const normalized10 = normalizePhoneTo10Digits(openTarget.phone);
+        console.log(`[ChatView] Telefone normalizado para 10 dígitos: ${normalized10}`);
+
+        if (!normalized10) {
           console.error(`[ChatView] FALHA: normalização retornou vazio. Input: ${openTarget.phone}`);
           toast.error("Telefone inválido. Não foi possível abrir conversa.");
           onOpenTargetHandled?.();
@@ -124,7 +124,7 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
         
         // Adicionar conversa ao estado LOCAL imediatamente (otimistic update)
         const newConversation = {
-          telefone: normalized11,
+          telefone: normalized10,
           leadNome: lead?.nome || "Novo Contato",
           lastMessage: "",
           lastMessageAt: null,
@@ -132,14 +132,14 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
         };
         setLocalConversations((prev) => ({
           ...prev,
-          [normalized11]: newConversation,
+          [normalized10]: newConversation,
         }));
-        console.log(`[ChatView] ✓ Conversa adicionada ao estado LOCAL: ${normalized11}`);
+        console.log(`[ChatView] ✓ Conversa adicionada ao estado LOCAL: ${normalized10}`);
         
         // Criar documento no Firebase (merge para not overwrite se já existe)
-        const convRef = doc(db, "conversations", normalized11);
+        const convRef = doc(db, "conversations", normalized10);
         await setDoc(convRef, {
-          telefone: normalized11,
+          telefone: normalized10,
           leadNome: lead?.nome || "Novo Contato",
           createdAt: Timestamp.now(),
           lastMessageAt: null,
@@ -147,11 +147,11 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
           lastMessage: ""
         }, { merge: true });
         
-        console.log(`[ChatView] ✓ Conversa criada no Firebase com ID: ${normalized11}`);
+        console.log(`[ChatView] ✓ Conversa criada no Firebase com ID: ${normalized10}`);
         
         // Abrir a conversa IMEDIATAMENTE (sem esperar sincronização)
         console.log(`[ChatView] ✓ Abrindo conversa criada...`);
-        setSelectedPhone(normalized11);
+        setSelectedPhone(normalized10);
         if (openTarget.message) setPrefilledMessage(openTarget.message);
         onOpenTargetHandled?.();
         console.log(`[ChatView] ✓ openTargetHandled chamado - resetando estado`);
@@ -164,7 +164,7 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
         // Remover do estado local em caso de erro
         setLocalConversations((prev) => {
           const updated = { ...prev };
-          delete updated[normalizePhoneTo11Digits(openTarget.phone)];
+          delete updated[normalizePhoneTo10Digits(openTarget.phone)];
           return updated;
         });
         onOpenTargetHandled?.();
@@ -260,15 +260,15 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
               break;
             }
           } else {
-            // Para IDs normais, tenta matching por 11 dígitos
+            // Para IDs normais, tenta matching por 10 dígitos (DDD + número sem o 9 extra)
             const digits = deletePhone.replace(/\D/g, "");
-            const last11 = digits.slice(-11);
+            const last10 = digits.slice(-10);
             const convDigits = convDoc.id.replace(/\D/g, "");
-            
+
             if (
-              last11.length >= 11 &&
-              convDigits.length >= 11 &&
-              convDigits.slice(-11) === last11
+              last10.length >= 10 &&
+              convDigits.length >= 10 &&
+              convDigits.slice(-10) === last10
             ) {
               const msgsSnap = await getDocs(
                 collection(db, "conversations", convDoc.id, "messages")

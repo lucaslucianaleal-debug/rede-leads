@@ -49,10 +49,10 @@ async function main(){
       await cdoc.ref.set({ leadId: primary.id, leadNome: primary.nome }, { merge: true });
       console.log(`Updated conversation ${cdoc.id} -> lead ${primary.id}`);
     }
-    // also if telefone matches others variants, set telefone to primary last11
+    // also if telefone matches others variants, set telefone to primary last10
     const tel = onlyDigits(data.telefone||'');
-    if(tel && matches.some(m => onlyDigits(m.telefone || '').slice(-11) === tel.slice(-11))){
-      const primaryTel = onlyDigits(primary.telefone||'').slice(-11) || onlyDigits(primary.telefone||'');
+    if(tel && matches.some(m => onlyDigits(m.telefone || '').slice(-10) === tel.slice(-10))){
+      const primaryTel = onlyDigits(primary.telefone||'').slice(-10) || onlyDigits(primary.telefone||'');
       if(primaryTel) await cdoc.ref.set({ telefone: primaryTel, leadId: primary.id, leadNome: primary.nome }, { merge: true });
     }
   }

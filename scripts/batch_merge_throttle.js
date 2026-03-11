@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 
 function onlyDigits(s) { return String(s||'').replace(/\D/g, ''); }
-function toLast11(phone) { const d = onlyDigits(phone); return d.length>=11?d.slice(-11):d; }
+function toLast11(phone) { const d = onlyDigits(phone); return d.length>=11?d.slice(-10):d; }
 function delay(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
 async function mergeOne(db, sourceId, targetPhone, apply){

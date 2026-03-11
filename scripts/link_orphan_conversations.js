@@ -27,9 +27,10 @@ const db = admin.firestore();
 const isApply = process.argv.includes('--apply');
 
 function normalizeToLast11(phone) {
+  // Deprecated: keep API but return canonical last-10 instead
   if (!phone) return '';
   const digits = String(phone).replace(/\D/g, '');
-  if (digits.length >= 11) return digits.slice(-11);
+  if (digits.length >= 10) return digits.slice(-10);
   return digits;
 }
 
@@ -78,7 +79,6 @@ async function linkOrphanConversations() {
     // Try to match each orphan to a lead by phone
     for (const orphan of orphans) {
       const convPhone = orphan.data.telefone || orphan.id;
-      const convPhoneNorm11 = normalizeToLast11(convPhone);
       const convPhoneNorm10 = normalizeToLast10(convPhone);
       const convPhoneNorm8 = normalizeToLast8(convPhone);
 
@@ -86,29 +86,17 @@ async function linkOrphanConversations() {
 
       let foundLead = null;
 
-      // Strategy 1: Match by last 11 digits (DDD + number)
+      // Strategy 1: Match by last 10 digits (canonical DDD + number)
       for (const lead of leads) {
-        const leadPhoneNorm11 = normalizeToLast11(lead.telefone);
-        if (leadPhoneNorm11 === convPhoneNorm11 && leadPhoneNorm11.length === 11) {
+        const leadPhoneNorm10 = normalizeToLast10(lead.telefone);
+        if (leadPhoneNorm10 === convPhoneNorm10 && leadPhoneNorm10.length === 10) {
           foundLead = lead;
-          console.log(`  ✓ Matched by last-11: "${lead.nome}" (${lead.telefone})`);
+          console.log(`  ✓ Matched by last-10: "${lead.nome}" (${lead.telefone})`);
           break;
         }
       }
 
-      // Strategy 2: Match by last 10 digits (number without DDD)
-      if (!foundLead) {
-        for (const lead of leads) {
-          const leadPhoneNorm10 = normalizeToLast10(lead.telefone);
-          if (leadPhoneNorm10 === convPhoneNorm10 && leadPhoneNorm10.length === 10) {
-            foundLead = lead;
-            console.log(`  ✓ Matched by last-10: "${lead.nome}" (${lead.telefone})`);
-            break;
-          }
-        }
-      }
-
-      // Strategy 3: Match by last 8 digits (suffix)
+      // Strategy 2: Match by last 8 digits (suffix)
       if (!foundLead) {
         for (const lead of leads) {
           const leadPhoneNorm8 = normalizeToLast8(lead.telefone);

@@ -79,6 +79,16 @@ function normalizePhone(phone) {
   return phone.replace(/\D/g, '');
 }
 
+// Garantir ID canônico de 10 dígitos: remove '55' e o '9' extra após o DDD quando presente
+function ensure10DigitsLocal(phone) {
+  if (!phone) return null;
+  let d = String(phone).replace(/\D/g, '');
+  if (d.startsWith('55')) d = d.slice(2);
+  if (d.length === 11 && d[2] === '9') d = d.slice(0,2) + d.slice(3);
+  if (d.length > 10) d = d.slice(-10);
+  return d.length === 10 ? d : null;
+}
+
 // Obter a última mensagem enviada pelo bot para este lead (cooldown check)
 async function getLastBotMessageTime(phoneId) {
   try {
@@ -116,7 +126,8 @@ async function shouldSend(lead, slotType, slotTime, now) {
   }
 
   // Trava 2: É o meu próprio número?
-  if (normalized.endsWith(MY_PHONE) || normalized === MY_PHONE) {
+  const canonicalMyPhone = ensure10DigitsLocal(MY_PHONE) || (MY_PHONE.length > 10 ? MY_PHONE.slice(-10) : MY_PHONE);
+  if (normalized.endsWith(canonicalMyPhone) || normalized === canonicalMyPhone) {
     console.log(`[reminder-worker] 🚫 ${lead.nome}: é o meu próprio número (MY_PHONE)`);
     return false;
   }
@@ -134,7 +145,7 @@ async function shouldSend(lead, slotType, slotTime, now) {
   }
 
   // Trava 5: Cooldown de 1h (última mensagem do vendedor)?
-  const phoneId = normalized.length >= 11 ? normalized.slice(-11) : normalized;
+  const phoneId = ensure10DigitsLocal(normalized) || (normalized.length >= 10 ? normalized.slice(-10) : normalized);
   const lastBotMsg = await getLastBotMessageTime(phoneId);
   
   if (lastBotMsg) {
@@ -335,7 +346,7 @@ async function runReminder() {
         // Montar mensagem
         const reminderText = generateReminderText(lead.dataAgendamento, slotType, lead.nome);
         const normalized = normalizePhone(lead.telefone);
-        const phoneId = normalized.length >= 11 ? normalized.slice(-11) : normalized;
+        const phoneId = ensure10DigitsLocal(normalized) || (normalized.length >= 10 ? normalized.slice(-10) : normalized);
 
         // REPORT-ONLY: Apenas registra que o lembrete está pronto, nÃO envia
         console.log(`[reminder-worker] 📄 REPORT: Lembrete ${slotType} pronto para ENVIO MANUAL para ${lead.nome} (${phoneId})`);

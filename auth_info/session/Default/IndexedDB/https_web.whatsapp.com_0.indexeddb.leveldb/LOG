@@ -1,0 +1,11 @@
+2026/03/10-17:21:43.776 7414 Reusing MANIFEST C:\CRM ODC - REDE NT\auth_info\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/03/10-17:21:43.776 7414 Recovering log #430
+2026/03/10-17:21:43.778 7414 Reusing old log C:\CRM ODC - REDE NT\auth_info\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000430.log 
+2026/03/10-17:21:48.158 2ff4 Compacting 1@1 + 2@2 files
+2026/03/10-17:21:48.206 2ff4 Generated table #446@1: 94801 keys, 2243374 bytes
+2026/03/10-17:21:48.232 2ff4 Generated table #447@1: 51701 keys, 1339993 bytes
+2026/03/10-17:21:48.232 2ff4 Compacted 1@1 + 2@2 files => 3583367 bytes
+2026/03/10-17:21:48.233 2ff4 compacted to: files[ 0 0 14 0 0 0 0 ]
+2026/03/10-17:21:48.233 2ff4 Delete type=2 #413
+2026/03/10-17:21:48.234 2ff4 Delete type=2 #414
+2026/03/10-17:21:48.234 2ff4 Delete type=2 #433

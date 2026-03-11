@@ -1,0 +1,39 @@
+2026/03/10-17:20:51.443 7da4 Reusing MANIFEST C:\CRM ODC - REDE NT\auth_info\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/03/10-17:20:51.444 7da4 Recovering log #416
+2026/03/10-17:20:51.487 7da4 Reusing old log C:\CRM ODC - REDE NT\auth_info\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000416.log 
+2026/03/10-17:20:51.562 79d8 Level-0 table #431: started
+2026/03/10-17:20:51.596 79d8 Level-0 table #431: 1141169 bytes OK
+2026/03/10-17:20:51.598 79d8 Delete type=0 #416
+2026/03/10-17:20:51.987 79d8 Compacting 1@0 + 1@1 files
+2026/03/10-17:20:52.011 79d8 Generated table #432@0: 23488 keys, 528115 bytes
+2026/03/10-17:20:52.013 79d8 Generated table #433@0: 81 keys, 5452 bytes
+2026/03/10-17:20:52.013 79d8 Compacted 1@0 + 1@1 files => 533567 bytes
+2026/03/10-17:20:52.014 79d8 compacted to: files[ 0 2 14 0 0 0 0 ]
+2026/03/10-17:20:52.014 79d8 Delete type=2 #419
+2026/03/10-17:20:52.014 79d8 Delete type=2 #431
+2026/03/10-17:20:52.667 7848 Compacting 1@1 + 11@2 files
+2026/03/10-17:20:52.747 7848 Generated table #434@1: 68197 keys, 2233035 bytes
+2026/03/10-17:20:52.781 7848 Generated table #435@1: 5274 keys, 2156473 bytes
+2026/03/10-17:20:52.808 7848 Generated table #436@1: 2295 keys, 2147914 bytes
+2026/03/10-17:20:52.830 7848 Generated table #437@1: 2338 keys, 2147362 bytes
+2026/03/10-17:20:52.854 7848 Generated table #438@1: 2456 keys, 2149147 bytes
+2026/03/10-17:20:52.881 7848 Generated table #439@1: 12719 keys, 2161416 bytes
+2026/03/10-17:20:52.937 7848 Generated table #440@1: 30902 keys, 2273692 bytes
+2026/03/10-17:20:52.969 7848 Generated table #441@1: 16895 keys, 2154229 bytes
+2026/03/10-17:20:53.013 7848 Generated table #442@1: 60209 keys, 2200087 bytes
+2026/03/10-17:20:53.064 7848 Generated table #443@1: 95080 keys, 2242844 bytes
+2026/03/10-17:20:53.074 7848 Generated table #444@1: 13914 keys, 329051 bytes
+2026/03/10-17:20:53.074 7848 Compacted 1@1 + 11@2 files => 22195250 bytes
+2026/03/10-17:20:53.075 7848 compacted to: files[ 0 1 14 0 0 0 0 ]
+2026/03/10-17:20:53.075 7848 Delete type=2 #409
+2026/03/10-17:20:53.075 7848 Delete type=2 #410
+2026/03/10-17:20:53.075 7848 Delete type=2 #420
+2026/03/10-17:20:53.075 7848 Delete type=2 #421
+2026/03/10-17:20:53.075 7848 Delete type=2 #422
+2026/03/10-17:20:53.075 7848 Delete type=2 #423
+2026/03/10-17:20:53.075 7848 Delete type=2 #424
+2026/03/10-17:20:53.075 7848 Delete type=2 #425
+2026/03/10-17:20:53.075 7848 Delete type=2 #426
+2026/03/10-17:20:53.075 7848 Delete type=2 #427
+2026/03/10-17:20:53.075 7848 Delete type=2 #428
+2026/03/10-17:20:53.075 7848 Delete type=2 #432

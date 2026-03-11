@@ -30,8 +30,8 @@ async function main(){
   if(!targetLead){ console.error('Target lead not found for fragment', targetFrag); process.exit(1); }
   console.log('Target lead:', targetLead.id, targetLead.nome, targetLead.telefone);
 
-  const targetLast11 = onlyDigits(targetLead.telefone||'').slice(-11);
-  const targetRef = db.collection('conversations').doc(targetLast11);
+  const targetLast10 = onlyDigits(targetLead.telefone||'').slice(-10);
+  const targetRef = db.collection('conversations').doc(targetLast10);
   const targetSnap = await targetRef.get();
   if(!targetSnap.exists){
     console.log('Creating target conversation', targetLast11);
@@ -50,7 +50,7 @@ async function main(){
     const telField = onlyDigits(data.telefone||'');
     if(idDigits.includes(sourceFrag) || telField.includes(sourceFrag) || idDigits.slice(-8) === sourceFrag.slice(-8) || telField.slice(-8) === sourceFrag.slice(-8)){
       // skip if already the target
-      if(id.replace(/\D/g,'').slice(-11) === targetLast11) continue;
+      if(id.replace(/\D/g,'').slice(-10) === targetLast10) continue;
       matches.push({ id: doc.id, data });
     }
   }
@@ -58,7 +58,7 @@ async function main(){
   console.log('Found source conversations to merge:', matches.length);
   let totalCopied = 0;
   for(const m of matches){
-    console.log('Merging', m.id, '->', targetLast11);
+    console.log('Merging', m.id, '->', targetLast10);
     const srcRef = db.collection('conversations').doc(m.id);
     const msgs = await srcRef.collection('messages').get();
     let copied = 0;
@@ -74,7 +74,7 @@ async function main(){
   }
 
   // ensure target metadata
-  await targetRef.set({ leadId: targetLead.id, leadNome: targetLead.nome, telefone: targetLast11 }, { merge: true });
+  await targetRef.set({ leadId: targetLead.id, leadNome: targetLead.nome, telefone: targetLast10 }, { merge: true });
 
   console.log('Done. Total messages copied:', totalCopied);
   process.exit(0);

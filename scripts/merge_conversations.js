@@ -6,7 +6,7 @@
  *   node scripts/merge_conversations.js 48859916343 "(17) 99727-3860" --apply
  *
  * The script will copy messages from source conversation to target conversation (target id
- * is derived from the provided phone by taking the last 11 digits). If --apply is provided,
+ * is derived from the provided phone by taking the last 10 digits). If --apply is provided,
  * writes are performed and the source conversation document is deleted.
  */
 
@@ -24,7 +24,7 @@ function toLastN(phone, n) {
 
 async function resolveTargetId(db, phone) {
   // Try existing conversation docs by suffix: prefer longest suffix that exists
-  const tries = [11, 10, 9, 8];
+  const tries = [10, 9, 8];
   for (const n of tries) {
     const candidate = toLastN(phone, n);
     if (!candidate) continue;
@@ -35,7 +35,7 @@ async function resolveTargetId(db, phone) {
       // ignore transient read errors here; caller will surface
     }
   }
-  return { id: toLastN(phone, 11), matchedBy: 'fallback-last11' };
+  return { id: toLastN(phone, 10), matchedBy: 'fallback-last10' };
 }
 
 async function main() {

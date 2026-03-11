@@ -14,7 +14,7 @@ function last8(id) {
 
 function last11(id) {
   const d = String(id || '').replace(/\D/g, '');
-  return d.slice(-11);
+  return d.slice(-10);
 }
 
 (async function main(){

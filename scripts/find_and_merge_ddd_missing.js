@@ -26,9 +26,9 @@ async function main(){
     const leadDigits = onlyDigits(lead.telefone || '');
     const leadNorm = leadDigits.startsWith('55') ? leadDigits.slice(2) : leadDigits;
     if(leadNorm.length < 8) continue;
-    const leadLast11 = leadNorm.slice(-11);
+    const leadLast10 = leadNorm.slice(-10);
     const leadLast8 = leadNorm.slice(-8);
-    const targetId = leadLast11;
+    const targetId = leadLast10;
 
     // ensure target exists
     const targetRef = db.collection('conversations').doc(targetId);
@@ -38,12 +38,12 @@ async function main(){
     }
 
     for(const conv of convs){
-      const idLast11 = onlyDigits(conv.id).slice(-11);
-      if(!idLast11) continue;
-      if(idLast11 === leadLast11) continue;
-      const convTelField = onlyDigits(conv.data.telefone || '').slice(-11);
+      const idLast10 = onlyDigits(conv.id).slice(-10);
+      if(!idLast10) continue;
+      if(idLast10 === leadLast10) continue;
+      const convTelField = onlyDigits(conv.data.telefone || '').slice(-10);
       // match by last8
-      if((idLast11 && idLast11.slice(-8) === leadLast8) || (convTelField && convTelField.slice(-8) === leadLast8)){
+      if((idLast10 && idLast10.slice(-8) === leadLast8) || (convTelField && convTelField.slice(-8) === leadLast8)){
         console.log(`Merging ${conv.id} -> ${targetId} for lead ${lead.nome} (${lead.id})`);
         const srcRef = db.collection('conversations').doc(conv.id);
         const msgs = await srcRef.collection('messages').get();
