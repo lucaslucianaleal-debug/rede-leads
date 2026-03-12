@@ -12,6 +12,11 @@ const STORAGE_KEY = "rede_leads_data";
 // FIREBASE_DOC will be resolved per-clinic inside the hook when available
 let DEFAULT_FIREBASE_DOC = doc(db, "crm_data", "shared");
 
+const resolveTargetDoc = (clinicId?: string) => {
+  // Use clinics/{clinicId}/shared/shared as the document path (4 segments)
+  return clinicId ? doc(db, "clinics", clinicId, "shared", "shared") : DEFAULT_FIREBASE_DOC;
+};
+
 // Normalizar fontes antigas para as novas (unificar variações de maiúscula e agrupar online)
 const normalizeFonteLead = (fonte: string): string => {
   if (!fonte) return "Outro";
@@ -107,12 +112,16 @@ export function useLeads() {
     busca: "",
   });
 
-  // Use clinic-specific document when available
-  const { currentClinic } = useAuth();
+  // Use clinic-specific document when available. Prefer `currentClinic`,
+  // but fall back to `selectedClinic` (chosen on login form) to avoid
+  // race conditions while auth state resolves.
+  const { currentClinic, selectedClinic } = useAuth();
 
   useEffect(() => {
     isMounted.current = true;
-    const targetDoc = currentClinic ? doc(db, "clinics", currentClinic, "shared") : DEFAULT_FIREBASE_DOC;
+    const effectiveClinic = currentClinic || selectedClinic || undefined;
+    const targetDoc = resolveTargetDoc(effectiveClinic);
+    try { console.log(`[useLeads] subscribing to ${effectiveClinic ? `clinics/${effectiveClinic}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
     const unsubscribe = onSnapshot(targetDoc, (snapshot) => {
       if (!isMounted.current) return;
       if (snapshot.exists()) {
@@ -123,6 +132,13 @@ export function useLeads() {
           setLeads(data);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         }
+      } else {
+        // If clinic document does not exist, clear leads (new clinic)
+        try {
+          setLeads([]);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+          console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
+        } catch {}
       }
     }, () => {
       // If Firebase fails, keep localStorage silently
@@ -131,7 +147,7 @@ export function useLeads() {
       isMounted.current = false;
       unsubscribe();
     };
-  }, [currentClinic]);
+  }, [currentClinic, selectedClinic]);
 
   // Salvar no Firebase + localStorage quando leads mudarem (com debounce)
   useEffect(() => {
@@ -146,15 +162,8 @@ export function useLeads() {
     const timer = setTimeout(async () => {
       try {
         const normalizedLeads = leads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-        const targetDoc = ((): any => {
-          try {
-            // prefer clinic-scoped doc if available
-            const rc = (window as any).__REDE_CURRENT_CLINIC__;
-            return rc ? doc(db, "clinics", rc, "shared") : DEFAULT_FIREBASE_DOC;
-          } catch {
-            return DEFAULT_FIREBASE_DOC;
-          }
-        })();
+        const effectiveClinic = currentClinic || selectedClinic || undefined;
+        const targetDoc = resolveTargetDoc(effectiveClinic);
         await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
       } catch {
         // Falha silenciosa — dados ainda estão no localStorage
@@ -437,8 +446,9 @@ export function useLeads() {
     setTimeout(async () => {
       try {
         const normalizedLeads = newLeads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-        await setDoc(FIREBASE_DOC, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
-        console.log(`[sendFollowUp] Lead ${leadId} salvo no Firebase`);
+        const targetDoc = resolveTargetDoc(currentClinic);
+        await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
+        console.log(`[sendFollowUp] Lead ${leadId} salvo no Firebase (clinic=${currentClinic || 'shared'})`);
         // Mark que veio do nosso save, não do listener
         isFromFirebase.current = false;
       } catch (e) {

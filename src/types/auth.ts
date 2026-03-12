@@ -4,6 +4,7 @@ export interface CRMUser {
   uid: string;
   username: string;
   role: UserRole;
+  clinicId?: string | null;
   createdAt: string;
   createdBy: string;
 }

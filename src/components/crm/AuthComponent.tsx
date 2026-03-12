@@ -15,7 +15,7 @@ import { LogOut, LogIn } from "lucide-react";
 import { toast } from "sonner";
 
 export function AuthComponent() {
-  const { user, login, logout, register, error } = useAuth();
+  const { user, login, logout, register, error, selectedClinic } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
@@ -48,7 +48,7 @@ export function AuthComponent() {
         await register(email, password);
         toast.success(`Usuário "${displayName}" criado com sucesso!`);
       } else {
-        await login(email, password);
+        await login(email, password, selectedClinic);
         toast.success(`Bem-vindo, ${displayName}!`);
       }
       setUsername("");

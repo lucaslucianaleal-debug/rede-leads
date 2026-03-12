@@ -13,7 +13,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, clinic?: string | null) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   selectedClinic: string | null;
@@ -33,6 +33,14 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
   const [userProfile, setUserProfile] = useState<any | null>(null);
 
   useEffect(() => {
+    try { console.log('[AuthProvider] selectedClinic ->', selectedClinic); } catch {}
+  }, [selectedClinic]);
+
+  useEffect(() => {
+    try { console.log('[AuthProvider] currentClinic ->', currentClinic); } catch {}
+  }, [currentClinic]);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser as User | null);
       setLoading(false);
@@ -45,11 +53,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
             if (profile.role === "admin") {
               const val = selectedClinic || profile.clinicId || null;
               setCurrentClinic(val);
-              try { (window as any).__REDE_CURRENT_CLINIC__ = val; } catch {}
+              console.log("[AuthProvider] admin currentClinic set ->", val, "selectedClinic:", selectedClinic);
             } else {
               const clinicFromProfile = profile.clinicId || (profile.clinics && profile.clinics[0]);
               setCurrentClinic(clinicFromProfile || null);
-              try { (window as any).__REDE_CURRENT_CLINIC__ = clinicFromProfile || null; } catch {}
+              console.log("[AuthProvider] user currentClinic ->", clinicFromProfile);
             }
           }
         } catch (e) {
@@ -63,7 +71,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
     return unsubscribe;
   }, [selectedClinic]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, clinic?: string | null) => {
     setLoading(true);
     setError(null);
     try {
@@ -74,20 +82,21 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       setUserProfile(profile);
       if (profile) {
         if (profile.role === "admin") {
-          const val = selectedClinic || profile.clinicId || null;
+          const val = clinic ?? selectedClinic ?? profile.clinicId ?? null;
           setCurrentClinic(val);
-          try { (window as any).__REDE_CURRENT_CLINIC__ = val; } catch {}
+          console.log("[AuthProvider][login] admin set currentClinic ->", val);
         } else {
-          const allowed = profile.clinicId === selectedClinic || (Array.isArray(profile.clinics) && profile.clinics.includes(selectedClinic));
+          const effective = clinic ?? selectedClinic ?? profile.clinicId ?? null;
+          const allowed = profile.clinicId === effective || (Array.isArray(profile.clinics) && profile.clinics.includes(effective));
           if (!allowed) {
             await signOut(auth);
             setError("Usuário não autorizado para a clínica selecionada");
             setLoading(false);
             return;
           }
-          const val = selectedClinic || profile.clinicId || null;
+          const val = effective ?? null;
           setCurrentClinic(val);
-          try { (window as any).__REDE_CURRENT_CLINIC__ = val; } catch {}
+          console.log("[AuthProvider][login] user set currentClinic ->", val);
         }
       }
     } catch (err: any) {

@@ -36,7 +36,7 @@ export default function Landing() {
     setLoading(true);
     setSelectedClinic(localClinic);
     try {
-      await login(email, password);
+      await (login as any)(email, password, localClinic);
       toast.success("Bem-vindo!");
     } catch {
       toast.error(error || "Usuário ou senha incorretos.");

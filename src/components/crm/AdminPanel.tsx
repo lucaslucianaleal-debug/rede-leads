@@ -46,17 +46,19 @@ export function AdminPanel() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("viewer");
+  const [clinic, setClinic] = useState<string | null>("odontocompany-olimpia");
   const [open, setOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createUser(username, password, role);
+      await createUser(username, password, role, clinic);
       toast.success(`Usuário "${username}" criado com sucesso!`);
       setUsername("");
       setPassword("");
       setRole("viewer");
+      setClinic("odontocompany-olimpia");
       setOpen(false);
     } catch {
       toast.error(error || "Erro ao criar usuário");
@@ -146,6 +148,19 @@ export function AdminPanel() {
               </div>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="clinic-select">Clínica</Label>
+              <select
+                id="clinic-select"
+                value={clinic || "odontocompany-olimpia"}
+                onChange={(e) => setClinic(e.target.value)}
+                className="w-full bg-slate-700 border-slate-600 text-white p-2 rounded"
+              >
+                <option value="odontocompany-olimpia">Odontocompany Olimpia</option>
+                <option value="odontocompany-badybassit">Odontocompany Bady Bassit</option>
+                <option value="odontocompany-novohorizonte">Odontocompany Novo Horizonte</option>
+              </select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="role-select">Função</Label>
               <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
                 <SelectTrigger id="role-select">
@@ -180,8 +195,9 @@ export function AdminPanel() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Função</TableHead>
+                    <TableHead>Usuário</TableHead>
+                    <TableHead>Função</TableHead>
+                    <TableHead>Clínica</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -217,6 +233,17 @@ export function AdminPanel() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
+                      </TableCell>
+                      <TableCell>
+                        {user.clinicId
+                          ? user.clinicId === 'odontocompany-olimpia'
+                            ? 'Olimpia'
+                            : user.clinicId === 'odontocompany-badybassit'
+                            ? 'Bady Bassit'
+                            : user.clinicId === 'odontocompany-novohorizonte'
+                            ? 'Novo Horizonte'
+                            : user.clinicId
+                          : '-'}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

@@ -37,7 +37,8 @@ export function useCRMUsers() {
   const createUser = async (
     username: string,
     password: string,
-    role: UserRole
+    role: UserRole,
+    clinicId?: string | null
   ) => {
     setLoading(true);
     setError(null);
@@ -58,6 +59,7 @@ export function useCRMUsers() {
         uid: user.uid,
         username,
         role,
+        clinicId: clinicId || null,
         createdAt: new Date().toISOString(),
         createdBy: auth.currentUser?.uid || "system",
       };
