@@ -216,12 +216,7 @@ const CRMDashboard = () => {
                       Limpar Duplicatas ({duplicatesInfo.count})
                     </Button>
                   )}
-                  {permissions?.canDelete && (
-                    <Button variant="destructive" size="sm" onClick={() => setShowClearDialog(true)}>
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Limpar Base
-                    </Button>
-                  )}
+                  {/* Destructive "Limpar Base" removed to prevent accidental data loss */}
                   {user && <AdminPanel />}
                 </div>
 
@@ -257,12 +252,7 @@ const CRMDashboard = () => {
                           Limpar Duplicatas ({duplicatesInfo.count})
                         </DropdownMenuItem>
                       )}
-                      {permissions?.canDelete && (
-                        <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Limpar Base
-                        </DropdownMenuItem>
-                      )}
+                      {/* "Limpar Base" removed from mobile menu to avoid accidental clearing */}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

@@ -1175,8 +1175,24 @@ export function useLeads() {
     setLeads((prev) => prev.filter((lead) => !leadIds.includes(lead.id)));
   };
 
-  const clearAllLeads = () => {
-    setLeads([]);
+  const clearAllLeads = async () => {
+    try {
+      const timestamp = new Date().toISOString();
+      const backupId = `clear-${timestamp}`;
+      const target = currentClinic || selectedClinic || undefined;
+      const backupDocRef = doc(db, 'backups', backupId);
+      await setDoc(backupDocRef, {
+        createdAt: timestamp,
+        clinic: target || 'crm_data/shared',
+        leads,
+      }, { merge: true });
+      console.log(`[clearAllLeads] Backup criado: backups/${backupId} (clinic=${target})`);
+      // Do NOT clear local leads automatically to avoid accidental data loss.
+      return { backedUp: true, backupId };
+    } catch (e) {
+      console.error('[clearAllLeads] Falha ao criar backup antes de limpar:', e);
+      return { backedUp: false };
+    }
   };
 
   const clearDuplicates = () => {
