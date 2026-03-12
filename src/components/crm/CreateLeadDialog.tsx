@@ -274,7 +274,7 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave}>Criar e Enviar Mensagem</Button>
+          <Button onClick={handleSave}>Criar e Ligar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
