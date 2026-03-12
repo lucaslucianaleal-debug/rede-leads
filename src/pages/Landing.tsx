@@ -12,6 +12,13 @@ export default function Landing() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const { selectedClinic, setSelectedClinic } = useAuth();
+  const clinics = [
+    { id: "odontocompany-olimpia", label: "Odontocompany Olimpia" },
+    { id: "odontocompany-badybassit", label: "Odontocompany Bady Bassit" },
+    { id: "odontocompany-novohorizonte", label: "Odontocompany Novo Horizonte" },
+  ];
+  const [localClinic, setLocalClinic] = useState(selectedClinic || clinics[0].id);
 
   const resolveEmail = (input: string): string => {
     const trimmed = input.trim().toLowerCase();
@@ -27,8 +34,9 @@ export default function Landing() {
     e.preventDefault();
     const email = resolveEmail(username);
     setLoading(true);
+    setSelectedClinic(localClinic);
     try {
-      await login(email, password);
+      await (login as any)(email, password, localClinic);
       toast.success("Bem-vindo!");
     } catch {
       toast.error(error || "Usuário ou senha incorretos.");
@@ -110,6 +118,18 @@ export default function Landing() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-slate-300">Clínica</Label>
+                    <select
+                      value={localClinic}
+                      onChange={(e) => setLocalClinic(e.target.value)}
+                      className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
+                    >
+                      {clinics.map((c) => (
+                        <option key={c.id} value={c.id}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="username" className="text-slate-300">Usuário ou E-mail</Label>
                     <Input

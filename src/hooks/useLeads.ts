@@ -5,10 +5,17 @@ import { format, addDays, parse } from "date-fns";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, setDoc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection } from "firebase/firestore";
+import { useAuth } from "./useAuth";
 
 const STORAGE_KEY = "rede_leads_data";
-const FIREBASE_DOC = doc(db, "crm_data", "shared");
+// FIREBASE_DOC will be resolved per-clinic inside the hook when available
+let DEFAULT_FIREBASE_DOC = doc(db, "crm_data", "shared");
+
+const resolveTargetDoc = (clinicId?: string) => {
+  // Use clinics/{clinicId}/shared/shared as the document path (4 segments)
+  return clinicId ? doc(db, "clinics", clinicId, "shared", "shared") : DEFAULT_FIREBASE_DOC;
+};
 
 // Normalizar fontes antigas para as novas (unificar variações de maiúscula e agrupar online)
 const normalizeFonteLead = (fonte: string): string => {
@@ -105,29 +112,42 @@ export function useLeads() {
     busca: "",
   });
 
-  // Escutar mudanças em tempo real do Firebase (todos os usuários compartilham os mesmos dados)
+  // Use clinic-specific document when available. Prefer `currentClinic`,
+  // but fall back to `selectedClinic` (chosen on login form) to avoid
+  // race conditions while auth state resolves.
+  const { currentClinic, selectedClinic } = useAuth();
+
   useEffect(() => {
     isMounted.current = true;
-    const unsubscribe = onSnapshot(FIREBASE_DOC, (snapshot) => {
+    const effectiveClinic = currentClinic || selectedClinic || undefined;
+    const targetDoc = resolveTargetDoc(effectiveClinic);
+    try { console.log(`[useLeads] subscribing to ${effectiveClinic ? `clinics/${effectiveClinic}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
+    const unsubscribe = onSnapshot(targetDoc, (snapshot) => {
       if (!isMounted.current) return;
       if (snapshot.exists()) {
-        let data = snapshot.data().leads as Lead[];
+        let data = (snapshot.data() as any).leads as Lead[];
         if (data && Array.isArray(data)) {
-          // Normalizar fontes antigas para novos padrões e garantir dataCriacao
           data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
           isFromFirebase.current = true;
           setLeads(data);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         }
+      } else {
+        // If clinic document does not exist, clear leads (new clinic)
+        try {
+          setLeads([]);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+          console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
+        } catch {}
       }
     }, () => {
-      // Se Firebase falhar, mantém dados do localStorage silenciosamente
+      // If Firebase fails, keep localStorage silently
     });
     return () => {
       isMounted.current = false;
       unsubscribe();
     };
-  }, []);
+  }, [currentClinic, selectedClinic]);
 
   // Salvar no Firebase + localStorage quando leads mudarem (com debounce)
   useEffect(() => {
@@ -142,7 +162,9 @@ export function useLeads() {
     const timer = setTimeout(async () => {
       try {
         const normalizedLeads = leads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-        await setDoc(FIREBASE_DOC, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
+        const effectiveClinic = currentClinic || selectedClinic || undefined;
+        const targetDoc = resolveTargetDoc(effectiveClinic);
+        await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
       } catch {
         // Falha silenciosa — dados ainda estão no localStorage
       }
@@ -424,8 +446,9 @@ export function useLeads() {
     setTimeout(async () => {
       try {
         const normalizedLeads = newLeads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-        await setDoc(FIREBASE_DOC, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
-        console.log(`[sendFollowUp] Lead ${leadId} salvo no Firebase`);
+        const targetDoc = resolveTargetDoc(currentClinic);
+        await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
+        console.log(`[sendFollowUp] Lead ${leadId} salvo no Firebase (clinic=${currentClinic || 'shared'})`);
         // Mark que veio do nosso save, não do listener
         isFromFirebase.current = false;
       } catch (e) {
