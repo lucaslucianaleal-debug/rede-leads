@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:crmSync": "vitest run src/test/crmSync.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

@@ -67,9 +67,51 @@ export function WhatsAppMessageDialog({
       return;
     }
 
-    // Fallback: abre link externo se servidor offline
-    const whatsAppLink = generateFollowUpWhatsAppLink(lead.telefone, lead.nome, message);
-    window.open(whatsAppLink, "_blank");
+    // Try to open native WhatsApp app first (protocol), then fallback to wa.me
+    const phone = lead.telefone.replace(/[^0-9]/g, "");
+    const appLink = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
+    const webLink = generateFollowUpWhatsAppLink(lead.telefone, lead.nome, message);
+
+    // Open native link (may prompt the browser). Set a fallback timer to open web link.
+    let fallbackFired = false;
+    const fallbackTimer = window.setTimeout(() => {
+      fallbackFired = true;
+      window.open(webLink, "_blank");
+      toast.success(`Abrindo WhatsApp Web para ${lead.nome}`);
+      onDone?.();
+      onClose();
+    }, 900);
+
+    try {
+      const opened = window.open(appLink);
+      // If window.open returned null (blocked), immediately open web link
+      if (!opened) {
+        clearTimeout(fallbackTimer);
+        window.open(webLink, "_blank");
+        toast.success(`Abrindo WhatsApp Web para ${lead.nome}`);
+        onDone?.();
+        onClose();
+        return;
+      }
+    } catch (e) {
+      clearTimeout(fallbackTimer);
+      window.open(webLink, "_blank");
+      toast.success(`Abrindo WhatsApp Web para ${lead.nome}`);
+      onDone?.();
+      onClose();
+      return;
+    }
+
+    // If fallback already executed, nothing else to do. Otherwise keep dialog open briefly
+    // Close dialog after a short grace period if app link likely worked
+    setTimeout(() => {
+      if (!fallbackFired) {
+        clearTimeout(fallbackTimer);
+        toast.success(`Tentativa de abrir WhatsApp nativo para ${lead.nome}`);
+        onDone?.();
+        onClose();
+      }
+    }, 1200);
   };
 
   const handleDone = () => {

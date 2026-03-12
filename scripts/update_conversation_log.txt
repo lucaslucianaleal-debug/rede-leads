@@ -1,0 +1,3 @@
+[2026-03-11T21:01:07.585Z] Updated conversation 551781041260 with {"leadId":"1781041260","leadNome":"WhatsApp 1260","telefone":"1781041260","nome":"WhatsApp 1260"}
+[2026-03-11T21:01:07.640Z] Verify exists= true data= {"createdAt":{"_seconds":1773239161,"_nanoseconds":816000000},"migratedAt":"2026-03-11T15:33:34.955Z","lastMessageAt":{"_seconds":1773239685,"_nanoseconds":23000000},"lastMessage":"Tentei falar com você por telefone mas a ligação caiu direto na caixa de mensagem...","unreadCount":0,"nome":"WhatsApp 1260","adTrackingNumber":"1781041260","migratedBy":"migrate_ad_tracking.cjs","telefone":"1781041260","leadNome":"WhatsApp 1260","leadId":"1781041260"}
+[2026-03-11T21:01:07.640Z] Done

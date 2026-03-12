@@ -421,15 +421,20 @@ export function useLeads() {
         // Map boolean slot to sent key (h24 -> '24h', today -> 'today')
         const slotKey = type === 'h24' ? '24h' : 'today';
         const nowIso = new Date().toISOString();
+        // Garante todos campos sent definidos
+        const sent = {
+          "24h": String(l.lembretes?.sent?.["24h"] ?? ""),
+          "12h": String(l.lembretes?.sent?.["12h"] ?? ""),
+          "3h": String(l.lembretes?.sent?.["3h"] ?? ""),
+          "1h": String(l.lembretes?.sent?.["1h"] ?? ""),
+        };
+        sent[slotKey] = nowIso;
         return {
           ...l,
           lembretes: {
             ...l.lembretes,
             [type]: true,
-            sent: {
-              ...(l.lembretes?.sent || {}),
-              [slotKey]: nowIso
-            }
+            sent
           },
           dataFollowUp: format(new Date(), "dd/MM/yyyy"),
           observacao: l.observacao ? `${l.observacao} | Lembrete ${type} enviado` : `Lembrete ${type} enviado`,

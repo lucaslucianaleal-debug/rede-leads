@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { FollowUpDialog } from "./FollowUpDialog";
+import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 import { ProgressWithLabel } from "@/components/ui/progress-with-label";
@@ -36,6 +37,8 @@ const getDaysSince = (dateString: string): number => {
 export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
+  const [whatsLead, setWhatsLead] = useState<Lead | null>(null);
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const [search, setSearch] = useState("");
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
 
@@ -60,16 +63,15 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   };
 
   const handleWhatsAppClick = (lead: Lead) => {
-    const template = getFollowUpMessage(lead.etapaLead);
-    const message = template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : undefined;
-    const normalizedPhone = normalizePhoneTo10Digits(lead.telefone);
-    onOpenChat?.(normalizedPhone, message);
+    // Open local popup for editing message (prefill with template when available)
+    setWhatsLead(lead);
+    setShowWhatsAppDialog(true);
   };
 
   const handleConfirmationClick = (lead: Lead) => {
     const message = generateAppointmentConfirmationText(lead.dataAgendamento || "");
-    const normalizedPhone = normalizePhoneTo10Digits(lead.telefone);
-    onOpenChat?.(normalizedPhone, message);
+    setWhatsLead(lead);
+    setShowWhatsAppDialog(true);
   };
   
   return (
@@ -210,6 +212,19 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         onClose={() => setCallLead(null)}
         onConfirm={handleConfirmCall}
       />
+
+      {whatsLead && showWhatsAppDialog && (
+        <WhatsAppMessageDialog
+          lead={whatsLead}
+          open={showWhatsAppDialog}
+          onClose={() => setShowWhatsAppDialog(false)}
+          suggestedMessage={(() => {
+            const template = getFollowUpMessage(whatsLead.etapaLead);
+            if (template) return formatFollowUpMessage(template, whatsLead.nome, whatsLead.servicoProcurado);
+            return "";
+          })()}
+        />
+      )}
     </div>
   );
 }

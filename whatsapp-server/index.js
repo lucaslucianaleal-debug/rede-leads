@@ -293,31 +293,9 @@ function generateAudioFilename(phone, ext) {
 
 // Salvar mensagem na conversa correta
 async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }) {
-    // Extração do número real do WhatsApp
-    const realDigits = String(remoteJid).replace(/\D/g, "");
-    if (!realDigits || realDigits.length < 11) {
-      console.warn(`[saveMessage] Telefone real ausente ou inválido: ${remoteJid}`);
-      return;
-    }
-    // Salva adTrackingId como referência, nunca como ID
-    const convRef = db.collection("conversations").doc(realDigits);
-    await convRef.set({ telefone: realDigits, adTrackingId: adTrackingId || null, lastMessage: body, lastMessageAt: Timestamp.now() }, { merge: true });
-    await convRef.collection("messages").doc(msgId).set({ id: msgId, body, fromMe, timestamp: Timestamp.now(), read: fromMe });
-    // Migração silenciosa: se existir doc antigo com ID de 10 dígitos, move dados e deleta
-    if (adTrackingId && adTrackingId.length === 10) {
-      const oldConvRef = db.collection("conversations").doc(adTrackingId);
-      const oldSnap = await oldConvRef.get();
-      if (oldSnap.exists) {
-        const msgsSnap = await oldConvRef.collection("messages").get();
-        for (const m of msgsSnap.docs) {
-          await convRef.collection("messages").doc(m.id).set(m.data());
-        }
-        await oldConvRef.delete();
-        console.log(`[MIGRATION] Conversa antiga ${adTrackingId} migrada para ${realDigits}`);
-      }
-    }
-    console.log(`[SUCCESS] Mensagem salva na conversa ${realDigits}`);
-    return;
+  // normalize input phone and prepare alias key for lookups
+  const normalizedPhone = String(telefone || "").replace(/\D/g, "");
+  let aliasKey = normalizedPhone || String(telefone || "").replace(/\D/g, "") || null;
   // Se telefone tem 10 dígitos, trata como adTrackingNumber
   const digits = String(telefone).replace(/\D/g, "");
   let telefoneReal = null;
@@ -358,10 +336,9 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     lastMessage: body,
     lastMessageAt: Timestamp.now()
   }, { merge: true });
-  // Salva mensagem
-  const msgRef = convRef.collection("messages").doc(msgId);
-  await msgRef.set({ id: msgId, body, fromMe, timestamp: Timestamp.now(), read: fromMe });
-  console.log(`[SUCCESS] Mensagem salva na conversa ${conversationId}`);
+  // mensagem será salva mais abaixo após validações e normalizações
+  // aliasKey may still be null; ensure it's defined for later logic
+  if (!aliasKey) aliasKey = normalizedPhone || conversationId;
   // PRIORIDADE: 1) tentar match EXATO (numero completo salvo no CRM/conversations)
   // 2) tentar mapear pela conversa existente no Firestore
   // 3) por último recurso, fallback por sufixo (apenas se não houver correspondência melhor)
@@ -369,6 +346,8 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     const crmSnap = await db.collection("crm_data").doc("shared").get();
     const leads = crmSnap.exists ? (crmSnap.data()?.leads || []) : [];
     let aliasCandidate = null;
+    // Inicializa aliasKey com conversationId
+    let aliasKey = conversationId;
 
     // 1) procura por match exato no array de leads
     for (const lead of leads) {
@@ -467,7 +446,7 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     console.warn('[saveMessage] Falha ao derivar targetId (ignorar)');
     return;
   }
-  const convRef = db.collection("conversations").doc(targetId);
+  // convRef já foi declarado anteriormente neste escopo, reutilize se necessário
   try {
     const markerSnap = await convRef.get();
     if (markerSnap.exists && markerSnap.data()?.doNotRecreate) {
@@ -563,6 +542,7 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
 // Sincronizar lead: cria se novo, NAO sobrescreve se ja existe
 // RETORNA o telefone correto da conversa para ser usado pelo saveMessage
 async function syncLead(telefone, pushName, firstMessage) {
+  try {
     // Criação do perfil imediata: cria lead com adTrackingNumber mesmo sem telefone
     let digits = String(telefone).replace(/\D/g, "");
     let adTrackingNumber = null;
@@ -597,6 +577,10 @@ async function syncLead(telefone, pushName, firstMessage) {
     await leadRef.set(newLead, { merge: true });
     console.log(`[syncLead] Lead criado/vinculado: ${nome}`);
     return telefoneReal || adTrackingNumber;
+  } catch (e) {
+    console.error("Erro ao sincronizar lead:", e);
+    return null;
+  }
   try {
     // Normaliza para 10 dígitos: DDD + número sem o 9 extra
     let digits = String(telefone).replace(/\D/g, "");
@@ -619,66 +603,71 @@ async function syncLead(telefone, pushName, firstMessage) {
     // Busca lead diretamente pelo ID normalizado
     const leadRef = db.collection("leads").doc(digits);
     const leadSnap = await leadRef.get();
-    try {
-      let digits = String(telefone).replace(/\D/g, "");
-      let adTrackingNumber = null;
-      let telefoneReal = null;
-      if (digits.length === 10) {
-        adTrackingNumber = digits;
-      } else if (digits.length === 11 && digits.startsWith("9")) {
-        telefoneReal = digits;
-      } else if (digits.length === 13 && digits.startsWith("55")) {
-        telefoneReal = digits;
-      }
-      // Busca lead por adTrackingNumber
-      if (adTrackingNumber) {
-        const leadsSnap = await db.collection("leads").where("id_rastreio_anuncio", "==", adTrackingNumber).get();
-        if (!leadsSnap.empty) {
-          const lead = leadsSnap.docs[0].data();
-          if (lead.telefone_real) {
-            telefoneReal = lead.telefone_real;
-          }
-        }
-      }
-      // Cria lead
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, "0");
-      const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
-      const nome = pushName || `WhatsApp ${digits.slice(-4)}`;
-      const leadRef = db.collection("leads").doc(adTrackingNumber || telefoneReal);
-      const newLead = {
-        id_rastreio_anuncio: adTrackingNumber || null,
-        telefone_real: telefoneReal || null,
-        dataCriacao: dateStr,
-        dataContato: dateStr,
-        nome,
-        servicoProcurado: "",
-        captador: "",
-        fonteLead: "",
-        etapaLead: "Novo",
-        status: "",
-        respostaLead: "RESPONDEU",
-        comparecimento: "",
-        dataFollowUp: "",
-        dataAgendamento: "",
-        dataRetornoLigacao: "",
-        observacao: "",
-        followUpCount: 0,
-        lembretes: { h24: false, today: false },
-      };
-      await leadRef.set(newLead, { merge: true });
-      console.log(`[syncLead] Lead criado/vinculado: ${nome}`);
-      return telefoneReal || adTrackingNumber;
-    } catch (e) {
-      console.error("Erro ao sincronizar lead:", e);
-      return null;
+    let adTrackingNumber = null;
+    let telefoneReal = null;
+    if (digits.length === 10) {
+      adTrackingNumber = digits;
+    } else if (digits.length === 11 && digits.startsWith("9")) {
+      telefoneReal = digits;
+    } else if (digits.length === 13 && digits.startsWith("55")) {
+      telefoneReal = digits;
     }
-          count++;
+    // Busca lead por adTrackingNumber
+    if (adTrackingNumber) {
+      const leadsSnap = await db.collection("leads").where("id_rastreio_anuncio", "==", adTrackingNumber).get();
+      if (!leadsSnap.empty) {
+        const lead = leadsSnap.docs[0].data();
+        if (lead.telefone_real) {
+          telefoneReal = lead.telefone_real;
         }
+      }
+    }
+    // Cria lead
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+    const nome = pushName || `WhatsApp ${digits.slice(-4)}`;
+    const leadRef2 = db.collection("leads").doc(adTrackingNumber || telefoneReal);
+    const newLead = {
+      id_rastreio_anuncio: adTrackingNumber || null,
+      telefone_real: telefoneReal || null,
+      dataCriacao: dateStr,
+      dataContato: dateStr,
+      nome,
+      servicoProcurado: "",
+      captador: "",
+      fonteLead: "",
+      etapaLead: "Novo",
+      status: "",
+      respostaLead: "RESPONDEU",
+      comparecimento: "",
+      dataFollowUp: "",
+      dataAgendamento: "",
+      dataRetornoLigacao: "",
+      observacao: "",
+      followUpCount: 0,
+      lembretes: { h24: false, today: false },
+    };
+    await leadRef2.set(newLead, { merge: true });
+    console.log(`[syncLead] Lead criado/vinculado: ${nome}`);
+    return telefoneReal || adTrackingNumber;
+  } catch (e) {
+    console.error("Erro ao sincronizar lead (phase2):", e && e.message ? e.message : e);
+    return null;
+  }
 
-      // Registra também pelo campo 'telefone' dentro do documento
-      // (pode ter formato diferente do ID, ex: "5527..." vs "270...")
-      if (data.telefone) {
+}
+
+// Preload: registra também pelo campo 'telefone' dentro do documento
+// (pode ter formato diferente do ID, ex: "5527..." vs "270...")
+async function preloadPhoneAliasMap() {
+  try {
+    const convSnaps = await db.collection("conversations").get();
+    let count = 0;
+    for (const doc of convSnaps.docs) {
+      const data = doc.data();
+      const docId = doc.id;
+      if (data && data.telefone) {
         const telDigits = (data.telefone || "").replace(/\D/g, "");
         const telAs10 = ensure10Digits(telDigits);
         if (telAs10 && telAs10.length === 10 && !phoneAliasMap.has(telAs10)) {
@@ -689,7 +678,7 @@ async function syncLead(telefone, pushName, firstMessage) {
     }
     console.log(`[preload] phoneAliasMap: ${count} entradas de ${convSnaps.size} conversas`);
   } catch (e) {
-    console.error("[preload] Erro ao pré-carregar alias map:", e.message);
+    console.error("[preload] erro ao pré-carregar alias map:", e && e.message ? e.message : e);
   }
 }
 

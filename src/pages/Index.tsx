@@ -75,12 +75,7 @@ const CRMDashboard = () => {
   const [showClearDuplicatesDialog, setShowClearDuplicatesDialog] = useState(false);
   const [reportDate, setReportDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [chatTarget, setChatTarget] = useState<{ phone: string; message?: string } | null>(null);
-
-  const handleOpenChat = (phone: string, message?: string) => {
-    setChatTarget({ phone, message });
-    setActiveTab("chat");
-  };
+  // ...chat logic removido...
 
   // Calcular quantidade de duplicatas
   const duplicatesInfo = useMemo(() => {
@@ -279,15 +274,7 @@ const CRMDashboard = () => {
               <Database className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Todos os Leads</span>
             </TabsTrigger>
-            <TabsTrigger value="chat" className="flex items-center gap-1.5 relative">
-              <MessageCircle className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Chat</span>
-              {totalUnread > 0 && (
-                <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                  {totalUnread > 9 ? "9+" : totalUnread}
-                </span>
-              )}
-            </TabsTrigger>
+            {/* Chat tab removido */}
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6 mt-6">
@@ -303,7 +290,6 @@ const CRMDashboard = () => {
                   onRegisterCall={handleRegisterCall}
                   followUpsDoneToday={followUpsDoneToday}
                   followUpGoal={followUpGoal}
-                  onOpenChat={handleOpenChat}
                 />
                 {callReturnQueue.length > 0 && (
                   <CallReturnQueue
@@ -313,7 +299,7 @@ const CRMDashboard = () => {
                   />
                 )}
               </div>
-              <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} onOpenChat={handleOpenChat} />
+              <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} />
             </div>
 
             {/* Gráfico de performance */}
@@ -340,19 +326,11 @@ const CRMDashboard = () => {
               onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
               onSendFollowUp={handleFollowUp}
               onRegisterCall={handleRegisterCall}
-              onOpenChat={handleOpenChat}
+              // onOpenChat removido
             />
           </TabsContent>
 
-          <TabsContent value="chat">
-            <ChatView
-              leads={leads}
-              onUpdateLead={(id, updates) => updateLead(id, updates)}
-              openTarget={chatTarget}
-              onOpenTargetHandled={() => setChatTarget(null)}
-              onCreateLead={handleCreateLead}
-            />
-          </TabsContent>
+          {/* Chat content removido */}
         </Tabs>
         )}
       </main>

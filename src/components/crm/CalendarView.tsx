@@ -1,10 +1,12 @@
 ﻿import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Lead } from "@/types/crm";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import { format } from "date-fns";
 import { Bell, Clock, Phone, X } from "lucide-react";
 import { toast } from "sonner";
+import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
+import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 
 interface CalendarViewProps {
   leads: Lead[];
@@ -46,18 +48,19 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
     return `Bom dia, ${lead.nome}! Tudo certo para o seu horário hoje às ${hora} aqui na OdontoCompany? Já estamos com sua sala preparada e te aguardando. Até logo! 💚✨`;
   };
 
+  const [whatsLead, setWhatsLead] = React.useState<Lead | null>(null);
+  const [showWhatsDialog, setShowWhatsDialog] = React.useState(false);
+
   const handleSend24h = (lead: Lead) => {
-    const msg = getReminder24h(lead);
-    onOpenChat?.(lead.telefone, msg);
-    onMarkReminder(lead.id, "h24");
-    toast.success(`✓ ${lead.nome} — Lembrete 24h enviado!`);
+    // Open local popup to edit/send reminder (prefilled)
+    setWhatsLead(lead);
+    setShowWhatsDialog(true);
+    // onMarkReminder will be called after send via onDone
   };
 
   const handleSend1h = (lead: Lead) => {
-    const msg = getReminder1h(lead);
-    onOpenChat?.(lead.telefone, msg);
-    onMarkReminder(lead.id, "today");
-    toast.success(`✓ ${lead.nome} — Lembrete 1h enviado!`);
+    setWhatsLead(lead);
+    setShowWhatsDialog(true);
   };
 
   const handleMarkAbsent = (lead: Lead) => {
@@ -169,6 +172,28 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
             {tomorrowLeads.map((lead) => renderLeadCard(lead, false))}
           </div>
         </div>
+      )}
+
+      {whatsLead && showWhatsDialog && (
+        <WhatsAppMessageDialog
+          lead={whatsLead}
+          open={showWhatsDialog}
+          onClose={() => setShowWhatsDialog(false)}
+          suggestedMessage={(() => {
+            // choose template based on whether it's today or tomorrow
+            const tomorrow = whatsLead.dataAgendamento?.startsWith(tomorrowStr);
+            return tomorrow ? getReminder24h(whatsLead) : getReminder1h(whatsLead);
+          })()}
+          onDone={() => {
+            if (whatsLead) {
+              // determine type
+              const isTomorrow = whatsLead.dataAgendamento?.startsWith(tomorrowStr);
+              onMarkReminder(whatsLead.id, isTomorrow ? "h24" : "today");
+              toast.success(`✓ ${whatsLead.nome} — Lembrete enviado!`);
+            }
+            setShowWhatsDialog(false);
+          }}
+        />
       )}
 
       {/* Vazio */}

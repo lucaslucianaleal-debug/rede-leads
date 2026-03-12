@@ -40,7 +40,11 @@ export function ConversationList({ conversations, selectedPhone, onSelect, onEdi
     // Busca por leadId ou telefone
     const leadsArray = Array.isArray(leads) ? leads : [];
     const lead = leadsArray.find(l => l.id === conv.leadId || l.telefone.replace(/\D/g,"") === conv.telefone.replace(/\D/g,""));
-    return lead ? lead.nome : conv.leadNome;
+    // Se não houver nome, mostra telefone real (11+ dígitos), nunca o ID de rastreio (10 dígitos)
+    if (lead && lead.nome && lead.nome.trim() && !/^\d{10}$/.test(lead.nome.trim())) return lead.nome;
+    const digits = conv.telefone.replace(/\D/g,"");
+    if (digits.length === 11 || digits.length === 13) return conv.telefone;
+    return "Novo Contato";
   }
 
   const filtered = conversations.filter(
