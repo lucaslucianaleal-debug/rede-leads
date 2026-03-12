@@ -19,6 +19,10 @@ import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/phone";
+import { AgendamentoDialog } from "./AgendamentoDialog";
+import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
+import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
+import { useLeads } from "@/hooks/useLeads";
 
 interface CallLogDialogProps {
   lead: Lead | null;
@@ -35,12 +39,16 @@ const OUTCOMES = [
 ];
 
 export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogProps) {
+  const { updateLead } = useLeads();
   const [outcome, setOutcome] = useState("Caixa de mensagem");
   const [obs, setObs] = useState("");
   const [agendarRetorno, setAgendarRetorno] = useState(false);
   const [returnDate, setReturnDate] = useState<Date | undefined>(new Date());
   const [returnTime, setReturnTime] = useState("17:00");
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [agendamentoOpen, setAgendamentoOpen] = useState(false);
+  const [whatsOpen, setWhatsOpen] = useState(false);
+  const [suggestedMessage, setSuggestedMessage] = useState<string | undefined>(undefined);
 
   // Pré-preencher se já tem retorno ligação agendado
   useEffect(() => {
@@ -88,9 +96,33 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     onClose();
   };
 
+  const handleOpenAgendamento = () => {
+    setAgendamentoOpen(true);
+  };
+
+  const handleConfirmAgendamento = (leadId: string, dataAgendamento: string) => {
+    if (!updateLead) return;
+    updateLead(leadId, {
+      dataAgendamento,
+      etapaLead: "Avaliação agendada",
+      lembretes: {
+        h24: false,
+        today: false,
+        disabled: false,
+        sent: { "24h": null, "12h": null, "3h": null, "1h": null },
+      },
+    });
+    toast.success("Agendamento atualizado! Automação reativada.");
+    const text = generateAppointmentConfirmationText(dataAgendamento);
+    setSuggestedMessage(text);
+    setAgendamentoOpen(false);
+    setWhatsOpen(true);
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar Ligação</DialogTitle>
           <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
@@ -117,7 +149,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
                 <button
                   key={o.value}
                   onClick={() => setOutcome(o.value)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors text-left ${
+                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors text-left whitespace-normal break-words ${
                     outcome === o.value
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-background border-border hover:bg-muted"
@@ -178,9 +210,25 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button variant="secondary" onClick={handleOpenAgendamento}>Agendar Atendimento</Button>
           <Button onClick={handleConfirm}>Registrar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AgendamentoDialog
+      lead={lead}
+      open={agendamentoOpen}
+      onClose={() => setAgendamentoOpen(false)}
+      onConfirm={handleConfirmAgendamento}
+    />
+
+    <WhatsAppMessageDialog
+      lead={lead}
+      open={whatsOpen}
+      onClose={() => setWhatsOpen(false)}
+      suggestedMessage={suggestedMessage}
+    />
+    </>
   );
 }

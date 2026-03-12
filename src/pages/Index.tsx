@@ -14,6 +14,7 @@ import { AllLeadsView } from "@/components/crm/AllLeadsView";
 import { AgendaDoDia } from "@/components/crm/AgendaDoDia";
 import { ChatView } from "@/components/crm/ChatView";
 import { PerformanceChart } from "@/components/crm/PerformanceChart";
+import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -73,6 +74,7 @@ const CRMDashboard = () => {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showClearDuplicatesDialog, setShowClearDuplicatesDialog] = useState(false);
+  const [callLead, setCallLead] = useState<Lead | null>(null);
   const [reportDate, setReportDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState("dashboard");
   // ...chat logic removido...
@@ -103,8 +105,26 @@ const CRMDashboard = () => {
   };
 
   const handleCreateLead = (lead: Omit<Lead, 'id'>) => {
-    createLead(lead);
+    const created = createLead(lead);
     toast.success(`Lead "${lead.nome}" criado com sucesso!`);
+    if (created) setCallLead(created);
+  };
+
+  const handleOpenCall = (phone: string) => {
+    const clean = (s: string) => s.replace(/\D/g, "");
+    const target = clean(phone);
+    // find candidates with matching phone (prefer exact or suffix), pick most recently created
+    const candidates = leads.filter((l) => {
+      const lp = clean(l.telefone);
+      return lp === target || lp.endsWith(target) || target.endsWith(lp);
+    });
+    if (candidates.length === 0) return;
+    const chosen = candidates.reduce((best, cur) => {
+      const bestTs = Number(best.id.split("_")[1] || 0);
+      const curTs = Number(cur.id.split("_")[1] || 0);
+      return curTs > bestTs ? cur : best;
+    }, candidates[0]);
+    setCallLead(chosen);
   };
 
   const handleReminder = (id: string, type: "h24" | "today") => {
@@ -326,7 +346,7 @@ const CRMDashboard = () => {
               onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
               onSendFollowUp={handleFollowUp}
               onRegisterCall={handleRegisterCall}
-              // onOpenChat removido
+              onOpenCall={handleOpenCall}
             />
           </TabsContent>
 
@@ -352,6 +372,14 @@ const CRMDashboard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Global Call Log Dialog (openable after creating a lead) */}
+      <CallLogDialog
+        lead={callLead}
+        open={!!callLead}
+        onClose={() => setCallLead(null)}
+        onConfirm={handleRegisterCall}
+      />
 
       {/* Delete Selected Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
