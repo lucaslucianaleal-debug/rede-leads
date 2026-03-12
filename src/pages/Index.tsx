@@ -105,10 +105,9 @@ const CRMDashboard = () => {
   };
 
   const handleCreateLead = (lead: Omit<Lead, 'id'>) => {
-    createLead(lead);
+    const created = createLead(lead);
     toast.success(`Lead "${lead.nome}" criado com sucesso!`);
-    // Abrir diálogo de ligação pouco depois para garantir que o lead foi inserido no estado
-    setTimeout(() => handleOpenCall(lead.telefone), 120);
+    if (created) setCallLead(created);
   };
 
   const handleOpenCall = (phone: string) => {

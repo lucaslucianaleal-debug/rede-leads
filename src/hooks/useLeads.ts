@@ -559,6 +559,7 @@ export function useLeads() {
         console.error("[createLead] Falha ao vincular conversa no Firestore:", err);
       }
     })();
+    return newLead;
   };
 
   const clearCallReturn = (leadId: string) => {
