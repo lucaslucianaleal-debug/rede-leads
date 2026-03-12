@@ -5,10 +5,12 @@ import { format, addDays, parse } from "date-fns";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, setDoc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection } from "firebase/firestore";
+import { useAuth } from "./useAuth";
 
 const STORAGE_KEY = "rede_leads_data";
-const FIREBASE_DOC = doc(db, "crm_data", "shared");
+// FIREBASE_DOC will be resolved per-clinic inside the hook when available
+let DEFAULT_FIREBASE_DOC = doc(db, "crm_data", "shared");
 
 // Normalizar fontes antigas para as novas (unificar variações de maiúscula e agrupar online)
 const normalizeFonteLead = (fonte: string): string => {
@@ -105,15 +107,17 @@ export function useLeads() {
     busca: "",
   });
 
-  // Escutar mudanças em tempo real do Firebase (todos os usuários compartilham os mesmos dados)
+  // Use clinic-specific document when available
+  const { currentClinic } = useAuth();
+
   useEffect(() => {
     isMounted.current = true;
-    const unsubscribe = onSnapshot(FIREBASE_DOC, (snapshot) => {
+    const targetDoc = currentClinic ? doc(db, "clinics", currentClinic, "shared") : DEFAULT_FIREBASE_DOC;
+    const unsubscribe = onSnapshot(targetDoc, (snapshot) => {
       if (!isMounted.current) return;
       if (snapshot.exists()) {
-        let data = snapshot.data().leads as Lead[];
+        let data = (snapshot.data() as any).leads as Lead[];
         if (data && Array.isArray(data)) {
-          // Normalizar fontes antigas para novos padrões e garantir dataCriacao
           data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
           isFromFirebase.current = true;
           setLeads(data);
@@ -121,13 +125,13 @@ export function useLeads() {
         }
       }
     }, () => {
-      // Se Firebase falhar, mantém dados do localStorage silenciosamente
+      // If Firebase fails, keep localStorage silently
     });
     return () => {
       isMounted.current = false;
       unsubscribe();
     };
-  }, []);
+  }, [currentClinic]);
 
   // Salvar no Firebase + localStorage quando leads mudarem (com debounce)
   useEffect(() => {
@@ -142,7 +146,16 @@ export function useLeads() {
     const timer = setTimeout(async () => {
       try {
         const normalizedLeads = leads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-        await setDoc(FIREBASE_DOC, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
+        const targetDoc = ((): any => {
+          try {
+            // prefer clinic-scoped doc if available
+            const rc = (window as any).__REDE_CURRENT_CLINIC__;
+            return rc ? doc(db, "clinics", rc, "shared") : DEFAULT_FIREBASE_DOC;
+          } catch {
+            return DEFAULT_FIREBASE_DOC;
+          }
+        })();
+        await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
       } catch {
         // Falha silenciosa — dados ainda estão no localStorage
       }
