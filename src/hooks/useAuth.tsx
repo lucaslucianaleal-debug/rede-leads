@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, createContext, useContext } from "react";
 import { auth, db } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
@@ -9,7 +9,22 @@ import {
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
-export function useAuth() {
+type AuthContextType = {
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  selectedClinic: string | null;
+  setSelectedClinic: (c: string | null) => void;
+  currentClinic: string | null;
+  userProfile: any | null;
+};
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,25 +34,19 @@ export function useAuth() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
+      setUser(currentUser as User | null);
       setLoading(false);
       if (currentUser) {
         try {
           const ud = await getDoc(doc(db, "users", currentUser.uid));
           const profile = ud.exists() ? ud.data() : null;
           setUserProfile(profile);
-          // If profile defines clinicId and no selectedClinic provided, use it
           if (profile) {
             if (profile.role === "admin") {
-              // admin: allow previously selected clinic (if any)
-              const c = (prev => prev || selectedClinic || profile.clinicId || null);
-              setCurrentClinic((prev) => {
-                const val = (prev || selectedClinic || profile.clinicId || null);
-                try { (window as any).__REDE_CURRENT_CLINIC__ = val; } catch {};
-                return val;
-              });
+              const val = selectedClinic || profile.clinicId || null;
+              setCurrentClinic(val);
+              try { (window as any).__REDE_CURRENT_CLINIC__ = val; } catch {}
             } else {
-              // regular user: enforce their clinic
               const clinicFromProfile = profile.clinicId || (profile.clinics && profile.clinics[0]);
               setCurrentClinic(clinicFromProfile || null);
               try { (window as any).__REDE_CURRENT_CLINIC__ = clinicFromProfile || null; } catch {}
@@ -63,7 +72,6 @@ export function useAuth() {
       const ud = await getDoc(doc(db, "users", uid));
       const profile = ud.exists() ? ud.data() : null;
       setUserProfile(profile);
-      // Authorization: admin or mapped to selectedClinic
       if (profile) {
         if (profile.role === "admin") {
           const val = selectedClinic || profile.clinicId || null;
@@ -72,7 +80,6 @@ export function useAuth() {
         } else {
           const allowed = profile.clinicId === selectedClinic || (Array.isArray(profile.clinics) && profile.clinics.includes(selectedClinic));
           if (!allowed) {
-            // unauthorized for this clinic
             await signOut(auth);
             setError("Usuário não autorizado para a clínica selecionada");
             setLoading(false);
@@ -114,5 +121,17 @@ export function useAuth() {
     }
   };
 
-  return { user, loading, error, login, register, logout, selectedClinic, setSelectedClinic, currentClinic, userProfile };
+  return (
+    <AuthContext.Provider
+      value={{ user, loading, error, login, register, logout, selectedClinic, setSelectedClinic, currentClinic, userProfile }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 }
