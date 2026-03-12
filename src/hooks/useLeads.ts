@@ -133,11 +133,12 @@ export function useLeads() {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         }
       } else {
-        // If clinic document does not exist, clear leads (new clinic)
+        // If clinic document does not exist, DO NOT automatically clear local leads.
+        // Clearing here caused accidental data loss when listeners switched
+        // (e.g. during quick saves or auth state changes). Keep local state
+        // and let explicit actions (admin scripts / clear button) remove data.
         try {
-          setLeads([]);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-          console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
+          console.log(`[useLeads] clinic doc not found -> keeping local leads for clinic=${effectiveClinic}`);
         } catch {}
       }
     }, () => {
