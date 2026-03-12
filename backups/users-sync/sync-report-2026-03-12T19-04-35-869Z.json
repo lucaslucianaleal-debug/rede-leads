@@ -1,0 +1,44 @@
+{
+  "generatedAt": "2026-03-12T19:04:35.869Z",
+  "report": [
+    {
+      "uid": "1o0d9Z11LbZSUH3BP61ZQ1FcjIn2",
+      "action": "created",
+      "payload": {
+        "name": "lucaslucianaleal",
+        "role": "admin",
+        "clinicId": null,
+        "clinics": [
+          "*"
+        ],
+        "createdAt": "2026-03-09T17:50:12.763Z"
+      }
+    },
+    {
+      "uid": "TNcworPqijYVKarXbaNV5zbkXVs2",
+      "action": "created",
+      "payload": {
+        "name": "lucianalucasleal@gmail.com",
+        "role": "admin",
+        "clinicId": "odontocompany-badybassit",
+        "clinics": [
+          "odontocompany-badybassit"
+        ],
+        "createdAt": "2026-03-12T13:17:29.512Z"
+      }
+    },
+    {
+      "uid": "sPRVo4z3aUdJm2fsG0CPxMEUAIG2",
+      "action": "created",
+      "payload": {
+        "name": "adm.novohorizonte@gmail.com",
+        "role": "admin",
+        "clinicId": "odontocompany-novohorizonte",
+        "clinics": [
+          "odontocompany-novohorizonte"
+        ],
+        "createdAt": "2026-03-12T17:17:43.110Z"
+      }
+    }
+  ]
+}
