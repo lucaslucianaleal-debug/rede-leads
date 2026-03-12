@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-03-12T19-52-28-255Z",
+  "targetData": {
+    "lastUpdated": "2026-03-12T19:26:41.162Z",
+    "leads": [
+      {
+        "servicoProcurado": "Prótese",
+        "respostaLead": "RESPONDEU",
+        "fonteLead": "Online",
+        "captador": "",
+        "dataRetornoLigacao": "",
+        "etapaLead": "Avaliação agendada",
+        "nome": "Roseli Milanez",
+        "id": "lead_1773342609728",
+        "status": "QUENTE",
+        "lembretes": {
+          "h24": false,
+          "today": false,
+          "disabled": false,
+          "sent": {
+            "24h": null,
+            "12h": null,
+            "3h": null,
+            "1h": null
+          }
+        },
+        "dataCriacao": "12/03/2026",
+        "comparecimento": "",
+        "telefone": "16981577451",
+        "followUpCount": 0,
+        "dataAgendamento": "13/03/2026 14:00",
+        "dataContato": "12/03/2026",
+        "dataFollowUp": "12/03/2026",
+        "observacao": "📞 Atendeu (12/03/2026 16:20) — Continuamos conversando pelo whats lead ja utiliza protese, ela perdeu 2 dentes",
+        "dataAgendamentoCriado": "12/03/2026"
+      }
+    ]
+  },
+  "picksCount": 0,
+  "picksSample": []
+}

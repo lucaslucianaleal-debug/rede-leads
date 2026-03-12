@@ -502,7 +502,21 @@ export function useLeads() {
         if ((updates.dataAgendamento === "" || updates.dataAgendamento === undefined) && l.dataAgendamentoCriado) {
           return { ...l, ...updates, dataAgendamentoCriado: undefined };
         }
-        return { ...l, ...updates };
+
+        // Merge updates first
+        const merged: Lead = { ...l, ...updates } as Lead;
+
+        // If user updated `dataFollowUp` but didn't set `lastFollowUpDone`, copy it so reports count the follow-up
+        if ((updates as any).dataFollowUp && !(merged as any).lastFollowUpDone) {
+          merged.lastFollowUpDone = (updates as any).dataFollowUp;
+        }
+
+        // If etapaLead moved to a Follow-Up stage and lastFollowUpDone is missing, mark it as today
+        if ((updates as any).etapaLead && String((updates as any).etapaLead).startsWith("Follow-Up") && !(merged as any).lastFollowUpDone) {
+          merged.lastFollowUpDone = todayFormatted;
+        }
+
+        return merged;
       });
       // Sincroniza `leadNome` na coleção `conversations` quando houver alteração de nome.
       // Prioridade de tentativas (novo padrão):

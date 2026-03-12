@@ -65,6 +65,16 @@ export function useCRMUsers() {
       };
 
       await setDoc(doc(db, "crm_users", user.uid), crmUser);
+      // Also write a lightweight entry into `users/` used by AuthProvider
+      try {
+        await setDoc(doc(db, "users", user.uid), {
+          role: role,
+          clinicId: clinicId || null,
+          clinics: clinicId ? [clinicId] : [],
+        }, { merge: true });
+      } catch (e) {
+        // ignore
+      }
       
       setUsers([...users, crmUser]);
       return crmUser;
