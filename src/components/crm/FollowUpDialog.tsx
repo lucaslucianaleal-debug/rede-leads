@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
+import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 
 interface FollowUpDialogProps {
   lead: Lead | null;
@@ -21,6 +23,7 @@ interface FollowUpDialogProps {
 
 export function FollowUpDialog({ lead, open, onClose, onConfirm }: FollowUpDialogProps) {
   const [observacao, setObservacao] = useState("");
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
 
   if (!lead) return null;
 
@@ -57,10 +60,30 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm }: FollowUpDialo
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setShowWhatsAppDialog(true)}
+          >
+            WhatsApp
+          </Button>
           <Button onClick={handleConfirm}>
             Feito
           </Button>
         </DialogFooter>
+        {lead && showWhatsAppDialog && (
+          <WhatsAppMessageDialog
+            lead={lead}
+            open={showWhatsAppDialog}
+            onClose={() => setShowWhatsAppDialog(false)}
+            suggestedMessage={(() => {
+              const template = getFollowUpMessage(lead.etapaLead);
+              if (template) {
+                return formatFollowUpMessage(template, lead.nome, lead.servicoProcurado);
+              }
+              return observacao || "";
+            })()}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -79,14 +79,18 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
   const handleWhatsAppClick = (lead: Lead) => {
     const template = getFollowUpMessage(lead.etapaLead);
     const message = template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : undefined;
-    const normalizedPhone = normalizePhoneTo10Digits(lead.telefone);
-    onOpenChat?.(normalizedPhone, message);
+    const digits = String(lead.telefone).replace(/[^0-9]/g, "");
+    let url = `https://wa.me/${digits}`;
+    if (message) url += `?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
   };
 
   const handleConfirmationClick = (lead: Lead) => {
     const message = generateAppointmentConfirmationText(lead.dataAgendamento || "");
-    const normalizedPhone = normalizePhoneTo10Digits(lead.telefone);
-    onOpenChat?.(normalizedPhone, message);
+    const digits = String(lead.telefone).replace(/[^0-9]/g, "");
+    let url = `https://wa.me/${digits}`;
+    if (message) url += `?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
   };
   
   const allSelected = leads.length > 0 && selectedLeads.length === leads.length;
@@ -292,6 +296,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{lead.telefone}</TableCell>
+                                    {/* Coluna duplicada removida */}
                   <TableCell className="text-sm">{lead.servicoProcurado}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{lead.fonteLead}</TableCell>
                   <TableCell>
@@ -347,7 +352,15 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                             Ligar
                           </Button>
                         )}
-                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success/10" onClick={() => handleWhatsAppClick(lead)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs text-success border-success/30 hover:bg-success/10"
+                          onClick={() => {
+                            const phone = lead.telefone.replace(/[^0-9]/g, "");
+                            window.open(`https://wa.me/${phone}`, "_blank");
+                          }}
+                        >
                           <ExternalLink className="h-3 w-3 mr-1" />
                           WhatsApp
                         </Button>

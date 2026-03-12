@@ -1,0 +1,113 @@
+{
+  "timestamp": "2026-03-11T20:49:31.154Z",
+  "issues": [
+    {
+      "leadId": "1352553534",
+      "nome": "Dionatan Danilo Machado de Souza",
+      "telefone_raw": "1352553534",
+      "telefone_norm": "551352553534",
+      "last10": "1352553534",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": true
+    },
+    {
+      "leadId": "1781041260",
+      "nome": "WhatsApp 1260",
+      "telefone_raw": "1781041260",
+      "telefone_norm": "551781041260",
+      "last10": "1781041260",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": true
+    },
+    {
+      "leadId": "1781785946",
+      "nome": "Eveli Regina",
+      "telefone_raw": "1781785946",
+      "telefone_norm": "551781785946",
+      "last10": "1781785946",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": true
+    },
+    {
+      "leadId": "1791154763",
+      "nome": "Lucas Leal",
+      "telefone_raw": "5517991154763",
+      "telefone_norm": "5517991154763",
+      "last10": "7991154763",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": false
+    },
+    {
+      "leadId": "1792127838",
+      "nome": "WhatsApp 7838",
+      "telefone_raw": "5517992127838",
+      "telefone_norm": "5517992127838",
+      "last10": "7992127838",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": false
+    },
+    {
+      "leadId": "1792688487",
+      "nome": "WhatsApp 8487",
+      "telefone_raw": "1792688487",
+      "telefone_norm": "551792688487",
+      "last10": "1792688487",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": true
+    },
+    {
+      "leadId": "1792702010",
+      "nome": "WhatsApp 2010",
+      "telefone_raw": "1792702010",
+      "telefone_norm": "551792702010",
+      "last10": "1792702010",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": true
+    },
+    {
+      "leadId": "1796287598",
+      "nome": "Francisco Clemente",
+      "telefone_raw": "1796287598",
+      "telefone_norm": "551796287598",
+      "last10": "1796287598",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": false
+    },
+    {
+      "leadId": "1797791492",
+      "nome": "Celia",
+      "telefone_raw": "1797791492",
+      "telefone_norm": "551797791492",
+      "last10": "1797791492",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": true
+    },
+    {
+      "leadId": "5431547932",
+      "nome": "WhatsApp 7932",
+      "telefone_raw": "5431547932",
+      "telefone_norm": "555431547932",
+      "last10": "5431547932",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": true
+    },
+    {
+      "leadId": "6850347066",
+      "nome": "luciana",
+      "telefone_raw": "6850347066",
+      "telefone_norm": "556850347066",
+      "last10": "6850347066",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": true
+    },
+    {
+      "leadId": "7569776764",
+      "nome": "WhatsApp 6764",
+      "telefone_raw": "7569776764",
+      "telefone_norm": "557569776764",
+      "last10": "7569776764",
+      "convExistsAtNorm": false,
+      "convExistsAtLast10": true
+    }
+  ]
+}

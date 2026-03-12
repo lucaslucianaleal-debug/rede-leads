@@ -70,7 +70,7 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const set = (field: keyof Lead, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const [previousPhone, setPreviousPhone] = useState<string | null>(null);
+  // previousPhone já declarado acima, não redeclarar
 
   const NONE = "__none__";
 

@@ -293,7 +293,9 @@ function generateAudioFilename(phone, ext) {
 
 // Salvar mensagem na conversa correta
 async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }) {
-    // ...existing code...
+  // normalize input phone and prepare alias key for lookups
+  const normalizedPhone = String(telefone || "").replace(/\D/g, "");
+  let aliasKey = normalizedPhone || String(telefone || "").replace(/\D/g, "") || null;
   // Se telefone tem 10 dígitos, trata como adTrackingNumber
   const digits = String(telefone).replace(/\D/g, "");
   let telefoneReal = null;
@@ -334,10 +336,9 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     lastMessage: body,
     lastMessageAt: Timestamp.now()
   }, { merge: true });
-  // Salva mensagem
-  // msgRef já foi declarado anteriormente neste escopo, reutilize se necessário
-  await msgRef.set({ id: msgId, body, fromMe, timestamp: Timestamp.now(), read: fromMe });
-  console.log(`[SUCCESS] Mensagem salva na conversa ${conversationId}`);
+  // mensagem será salva mais abaixo após validações e normalizações
+  // aliasKey may still be null; ensure it's defined for later logic
+  if (!aliasKey) aliasKey = normalizedPhone || conversationId;
   // PRIORIDADE: 1) tentar match EXATO (numero completo salvo no CRM/conversations)
   // 2) tentar mapear pela conversa existente no Firestore
   // 3) por último recurso, fallback por sufixo (apenas se não houver correspondência melhor)
@@ -345,6 +346,8 @@ async function saveMessage({ telefone, body, fromMe, msgId, targetConversation }
     const crmSnap = await db.collection("crm_data").doc("shared").get();
     const leads = crmSnap.exists ? (crmSnap.data()?.leads || []) : [];
     let aliasCandidate = null;
+    // Inicializa aliasKey com conversationId
+    let aliasKey = conversationId;
 
     // 1) procura por match exato no array de leads
     for (const lead of leads) {
@@ -648,24 +651,35 @@ async function syncLead(telefone, pushName, firstMessage) {
     await leadRef2.set(newLead, { merge: true });
     console.log(`[syncLead] Lead criado/vinculado: ${nome}`);
     return telefoneReal || adTrackingNumber;
+  } catch (e) {
+    console.error("Erro ao sincronizar lead (phase2):", e && e.message ? e.message : e);
+    return null;
   }
 
-  // Registra também pelo campo 'telefone' dentro do documento
-  // (pode ter formato diferente do ID, ex: "5527..." vs "270...")
-  for (const doc of convSnaps.docs) {
-    const data = doc.data();
-    const docId = doc.id;
-    if (data.telefone) {
-      const telDigits = (data.telefone || "").replace(/\D/g, "");
-      const telAs10 = ensure10Digits(telDigits);
-      if (telAs10 && telAs10.length === 10 && !phoneAliasMap.has(telAs10)) {
-        phoneAliasMap.set(telAs10, docId);
-        count++;
+}
+
+// Preload: registra também pelo campo 'telefone' dentro do documento
+// (pode ter formato diferente do ID, ex: "5527..." vs "270...")
+async function preloadPhoneAliasMap() {
+  try {
+    const convSnaps = await db.collection("conversations").get();
+    let count = 0;
+    for (const doc of convSnaps.docs) {
+      const data = doc.data();
+      const docId = doc.id;
+      if (data && data.telefone) {
+        const telDigits = (data.telefone || "").replace(/\D/g, "");
+        const telAs10 = ensure10Digits(telDigits);
+        if (telAs10 && telAs10.length === 10 && !phoneAliasMap.has(telAs10)) {
+          phoneAliasMap.set(telAs10, docId);
+          count++;
+        }
       }
     }
+    console.log(`[preload] phoneAliasMap: ${count} entradas de ${convSnaps.size} conversas`);
+  } catch (e) {
+    console.error("[preload] erro ao pré-carregar alias map:", e && e.message ? e.message : e);
   }
-  console.log(`[preload] phoneAliasMap: ${count} entradas de ${convSnaps.size} conversas`);
-}
 }
 
 // Também percorre os leads no CRM e garante mapeamento forçado
