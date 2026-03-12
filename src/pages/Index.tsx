@@ -14,6 +14,7 @@ import { AllLeadsView } from "@/components/crm/AllLeadsView";
 import { AgendaDoDia } from "@/components/crm/AgendaDoDia";
 import { ChatView } from "@/components/crm/ChatView";
 import { PerformanceChart } from "@/components/crm/PerformanceChart";
+import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -106,6 +107,8 @@ const CRMDashboard = () => {
   const handleCreateLead = (lead: Omit<Lead, 'id'>) => {
     createLead(lead);
     toast.success(`Lead "${lead.nome}" criado com sucesso!`);
+    // Abrir diálogo de ligação pouco depois para garantir que o lead foi inserido no estado
+    setTimeout(() => handleOpenCall(lead.telefone), 120);
   };
 
   const handleOpenCall = (phone: string) => {
