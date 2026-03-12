@@ -120,8 +120,9 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar Ligação</DialogTitle>
           <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
@@ -148,7 +149,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
                 <button
                   key={o.value}
                   onClick={() => setOutcome(o.value)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors text-left ${
+                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors text-left whitespace-normal break-words ${
                     outcome === o.value
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-background border-border hover:bg-muted"
@@ -214,7 +215,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    
+
     <AgendamentoDialog
       lead={lead}
       open={agendamentoOpen}
@@ -228,5 +229,6 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
       onClose={() => setWhatsOpen(false)}
       suggestedMessage={suggestedMessage}
     />
+    </>
   );
 }
