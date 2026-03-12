@@ -83,6 +83,7 @@ export interface DashboardStats {
   agendados: number; // leads com dataAgendamento preenchida
   agendadosHoje?: number; // quantidade de leads com dataAgendamento hoje
   followUpsPendentes: number;
+  followUpsOverdue?: number;
   compareceram: number;
   lembretesPendentes: number;
 }

@@ -204,6 +204,25 @@ export function useLeads() {
       return dac.startsWith(todayFormatted);
     }).length;
     const followUpsPendentes = leads.filter((l) => l.etapaLead.startsWith("Follow-Up") && l.respostaLead !== "RESPONDEU").length;
+    // Overdue follow-ups: leads where lastFollowUpDone or dataCriacao is older than threshold
+    const OVERDUE_DAYS = 7; // configurable threshold (days)
+    const daysSince = (dateStr: string | undefined) => {
+      if (!dateStr) return Infinity;
+      const [day, month, year] = dateStr.split('/');
+      const d = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      d.setHours(0,0,0,0);
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const diff = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+      return diff;
+    };
+    const followUpsOverdue = leads.filter((l) => {
+      // only consider leads that are in follow-up relevant stages
+      if (!(l.etapaLead.startsWith("Follow-Up") || l.etapaLead === "Novo" || l.etapaLead === "Em contato")) return false;
+      const ref = l.lastFollowUpDone || l.dataCriacao || "";
+      const ds = daysSince(ref);
+      return ds !== Infinity && ds > OVERDUE_DAYS;
+    }).length;
     const compareceram = leads.filter((l) => l.comparecimento === "COMPARECEU").length;
     
     // Count reminders only for future appointments (tomorrow or later)
@@ -232,6 +251,7 @@ export function useLeads() {
       followUpsPendentes,
       compareceram,
       lembretesPendentes,
+      followUpsOverdue,
     };
   }, [leads]);
 
