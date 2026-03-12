@@ -44,12 +44,29 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
 
   const filteredLeads = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return leads;
-    return leads.filter(
-      (l) =>
-        l.nome.toLowerCase().includes(term) ||
-        l.telefone.replace(/\D/g, "").includes(term.replace(/\D/g, ""))
-    );
+    // start from a shallow copy to avoid mutating props
+    let list = leads.slice();
+    if (term) {
+      list = list.filter(
+        (l) =>
+          l.nome.toLowerCase().includes(term) ||
+          l.telefone.replace(/\D/g, "").includes(term.replace(/\D/g, ""))
+      );
+    }
+
+    // Prioritize overdue leads: those with daysSince > OVERDUE_DAYS
+    const OVERDUE_DAYS = 7;
+    list.sort((a, b) => {
+      const da = getDaysSince(a.lastFollowUpDone || a.dataFollowUp);
+      const db = getDaysSince(b.lastFollowUpDone || b.dataFollowUp);
+      const aOver = da > OVERDUE_DAYS ? 1 : 0;
+      const bOver = db > OVERDUE_DAYS ? 1 : 0;
+      if (aOver !== bOver) return bOver - aOver; // overdue first
+      if (da !== db) return db - da; // more days first
+      return a.nome.localeCompare(b.nome);
+    });
+
+    return list;
   }, [leads, search]);
   
   const handleConfirmFollowUp = (leadId: string, observacao: string) => {
