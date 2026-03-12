@@ -15,7 +15,7 @@ interface CreateLeadDialogProps {
   open: boolean;
   onClose: () => void;
   onSave: (lead: Omit<Lead, 'id'>) => void;
-  onOpenChat?: (phone: string, message?: string) => void;
+  onOpenCall?: (phone: string) => void;
 }
 
 const ETAPAS: LeadStage[] = [
@@ -36,7 +36,7 @@ const RESPOSTAS: LeadResposta[] = ["RESPONDEU", "NÃO RESPONDEU"];
 
 const COMPARECIMENTOS: LeadComparecimento[] = ["COMPARECEU", "NÃO COMPARECEU", "AGUARDANDO DATA"];
 
-export function CreateLeadDialog({ open, onClose, onSave, onOpenChat }: CreateLeadDialogProps) {
+export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLeadDialogProps) {
   const [form, setForm] = useState<Omit<Lead, 'id'>>({
     dataCriacao: format(new Date(), "dd/MM/yyyy"),
     dataContato: format(new Date(), "dd/MM/yyyy"),
@@ -83,9 +83,9 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenChat }: CreateLe
     onSave(form);
     toast.success(`Lead "${form.nome}" criado com sucesso!`);
     
-    // Abrir chat com o novo lead (após criar)
-    if (onOpenChat) {
-      onOpenChat(form.telefone, `⏳ Aguardando resposta`);
+    // Abrir diálogo de ligação com o novo lead (após criar)
+    if (onOpenCall) {
+      onOpenCall(form.telefone);
     }
     
     // Reset form

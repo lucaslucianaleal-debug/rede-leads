@@ -24,13 +24,14 @@ interface AllLeadsViewProps {
   onSendFollowUp?: (leadId: string, observacao?: string) => void;
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
   onOpenChat?: (phone: string, message?: string) => void;
+  onOpenCall?: (phone: string) => void;
 }
 
 type FilterCategory = {
   duplicados?: boolean;
 };
 
-export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat }: AllLeadsViewProps) {
+export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat, onOpenCall }: AllLeadsViewProps) {
   const [filters, setFilters] = useState<FilterCategory>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCreationDay, setSelectedCreationDay] = useState<string>("all");
@@ -503,7 +504,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
           onCreateLead?.(lead);
           setShowCreateDialog(false);
         }}
-        onOpenChat={onOpenChat}
+        onOpenCall={onOpenCall}
       />
     </div>
   );
