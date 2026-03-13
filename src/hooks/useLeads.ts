@@ -192,9 +192,12 @@ export function useLeads() {
   // Count follow-ups done today (sincronizado com PerformanceChart)
   const followUpsDoneToday = useMemo(() => {
     const today = format(new Date(), "dd/MM/yyyy");
+    // Count any lead that had a follow-up recorded today (based on lastFollowUpDone).
+    // This includes calls that marked the follow-up as done even when the lead
+    // is in another stage (e.g., 'Avaliação agendada').
     return leads.filter((l) => {
       const done = l.lastFollowUpDone || "";
-      return done.startsWith(today) && l.etapaLead.startsWith("Follow-Up");
+      return done.startsWith(today);
     }).length;
   }, [leads]);
 
