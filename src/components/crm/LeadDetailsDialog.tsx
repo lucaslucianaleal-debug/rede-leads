@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { formatPhoneNumber } from "@/lib/phone";
 
 interface LeadDetailsDialogProps {
@@ -35,6 +36,8 @@ const comparecimentoColor: Record<string, string> = {
 
 export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDialogProps) {
   if (!lead) return null;
+
+  const { isReceptionist } = useUserPermissions();
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -165,7 +168,7 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
         </div>
 
         <DialogFooter>
-          {onEdit && (
+          {onEdit && !isReceptionist && (
             <Button onClick={() => {
               onEdit(lead);
               onClose();

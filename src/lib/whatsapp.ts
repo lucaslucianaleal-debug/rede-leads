@@ -21,7 +21,7 @@ export function generateWhatsAppLink(
 }
 
 export function generateAppointmentConfirmationMessage(leadPhone: string, dataAgendamento: string): string {
-  const message = `Confirmação de Consulta na Odontocompany Olimpia💚\nSua consulta está agendada para\n📍 Endereço : R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079\n\nData e Horario: ${dataAgendamento}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+  const message = `Confirmação de Consulta na Odontocompany💚\n\nSua consulta está agendada para:\n\nData e Horario: ${dataAgendamento}\n\n📍 Endereço : R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
   const phone = leadPhone.replace(/[^0-9]/g, "");
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
@@ -45,7 +45,26 @@ export function generateReminderText(
 }
 
 export function generateAppointmentConfirmationText(dataAgendamento: string): string {
-  return `Confirmação de Consulta na Odontocompany Olimpia💚\nSua consulta está agendada para\n📍 Endereço : R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079\n\nData e Horario: ${dataAgendamento}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+  return `Confirmação de Consulta na Odontocompany💚\n\nSua consulta está agendada para:\n\nData e Horario: ${dataAgendamento}\n\n📍 Endereço : R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+}
+
+const CLINIC_ADDRESS_FALLBACK: Record<string, string> = {
+  "odontocompany-olimpia": "R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079",
+  "odontocompany-badybassit": "SP-355, 1160 - Distrito Urbano, Bady Bassitt - SP, 15115-000",
+  "odontocompany-novohorizonte": "Rua Coronel Carvalho Leme, 427 - Centro, Novo Horizonte - SP, 14960-000",
+};
+
+export function generateAppointmentConfirmationTextForClinic(clinicMeta: any | undefined, dataAgendamento: string): string {
+  const clinicName = clinicMeta?.name || "Odontocompany";
+  const clinicId = clinicMeta?.id;
+  const address = clinicMeta?.address || (clinicId ? CLINIC_ADDRESS_FALLBACK[clinicId] : undefined) || CLINIC_ADDRESS_FALLBACK["odontocompany-olimpia"];
+  return `Confirmação de Consulta na ${clinicName}💚\n\nSua consulta está agendada para:\n\nData e Horario: ${dataAgendamento}\n\n📍 Endereço : ${address}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+}
+
+export function generateAppointmentConfirmationLinkForClinic(leadPhone: string, clinicMeta: any | undefined, dataAgendamento: string): string {
+  const message = generateAppointmentConfirmationTextForClinic(clinicMeta, dataAgendamento);
+  const phone = leadPhone.replace(/[^0-9]/g, "");
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
 export function generateFollowUpWhatsAppLink(

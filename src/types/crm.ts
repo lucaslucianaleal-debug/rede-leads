@@ -52,6 +52,8 @@ export interface Lead {
   dataAgendamento: string;
   dataRetornoLigacao: string;
   observacao: string;
+  // Briefing específico para recepção, exibido na Agenda do Dia
+  briefingRecepcao?: string;
   followUpCount: number;
   lembretes: ReminderStatus;
 }

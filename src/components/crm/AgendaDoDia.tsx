@@ -15,11 +15,13 @@ import { CheckCircle2, XCircle, Clock, User, Stethoscope, CalendarCheck, Phone, 
 import { format, addDays, subDays, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 interface AgendaDoDiaProps {
   leads: Lead[];
   onMarkAttendance: (id: string, value: "COMPARECEU" | "NÃO COMPARECEU" | "") => void;
   onExportWeek?: (date?: Date) => void;
+  onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
 }
 
 export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek }: AgendaDoDiaProps) {
@@ -27,6 +29,11 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek }: AgendaDoD
   const [calendarOpen, setCalendarOpen] = useState(false);
   const dateStr = format(selectedDate, "dd/MM/yyyy");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editDate, setEditDate] = useState<string>(""); // yyyy-mm-dd
+  const [editTime, setEditTime] = useState<string>("09:00");
+  const [editBriefing, setEditBriefing] = useState<string>("");
+  const [appendToObs, setAppendToObs] = useState<boolean>(false);
 
   const leadsHoje = useMemo(() => {
     return leads.filter((lead) => {
@@ -39,6 +46,8 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek }: AgendaDoD
       return timeA.localeCompare(timeB);
     });
   }, [leads, dateStr]);
+
+  const { isReceptionist } = useUserPermissions();
 
   const compareceram = leadsHoje.filter((l) => l.comparecimento === "COMPARECEU").length;
   const naoCompareceram = leadsHoje.filter((l) => l.comparecimento === "NÃO COMPARECEU").length;
@@ -201,7 +210,7 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek }: AgendaDoD
 
       {/* Detail dialog */}
       <Dialog open={!!selectedLead} onOpenChange={(open) => !open && setSelectedLead(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-4 w-4 text-primary" />
@@ -210,6 +219,26 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek }: AgendaDoD
           </DialogHeader>
           {selectedLead && (
             <div className="space-y-4 pt-1">
+              {/* Edit button */}
+              <div className="flex justify-end">
+                {!isReceptionist && (
+                  <Button size="sm" variant="ghost" onClick={() => {
+                    if (!selectedLead) return;
+                    // initialize edit fields from selectedLead
+                    const [datePart, timePart] = (selectedLead.dataAgendamento || "").split(" ");
+                    // convert dd/MM/yyyy to yyyy-mm-dd for input[type=date]
+                    const isoDate = datePart ? datePart.split('/').reverse().join('-') : format(new Date(), 'yyyy-MM-dd');
+                    setEditDate(isoDate);
+                    setEditTime(timePart || '09:00');
+                    // open with blank briefing by default (user requested)
+                    setEditBriefing('');
+                    setAppendToObs(false);
+                    setEditing(true);
+                  }}>
+                    Editar
+                  </Button>
+                )}
+              </div>
               {/* Info rows */}
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
@@ -255,11 +284,82 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek }: AgendaDoD
                     </div>
                   </div>
                 )}
+
+                {/* Briefing (mostra) */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  <User className="h-4 w-4 text-primary shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Briefing (Recepção)</p>
+                    <p className="font-medium text-sm">{selectedLead.briefingRecepcao || '—'}</p>
+                  </div>
+                </div>
               </div>
 
-              <Button className="w-full" onClick={() => setSelectedLead(null)}>
-                Fechar
-              </Button>
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={() => setSelectedLead(null)}>
+                  Fechar
+                </Button>
+              </div>
+
+              {/* Edit modal inline */}
+              {editing && (
+                <div className="mt-4 p-4 border border-border rounded-lg bg-background max-w-full">
+                  <p className="text-sm font-medium mb-2">Editar Agendamento e Briefing</p>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="input input-bordered w-full"
+                    />
+                    <input
+                      type="time"
+                      value={editTime}
+                      onChange={(e) => setEditTime(e.target.value)}
+                      className="input input-bordered w-full"
+                    />
+                  </div>
+                  <textarea
+                    placeholder="Briefing para recepção"
+                    value={editBriefing}
+                    onChange={(e) => setEditBriefing(e.target.value)}
+                    className="w-full p-2 border border-gray-200 rounded resize-none mb-2"
+                    rows={4}
+                  />
+                  <label className="flex items-center gap-2 text-sm mb-2">
+                    <input type="checkbox" checked={appendToObs} onChange={(e) => setAppendToObs(e.target.checked)} />
+                    <span className="text-xs">Anexar ao histórico (observação)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditing(false)}
+                      className="flex-1"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (!selectedLead) return;
+                        // format date yyyy-mm-dd and time hh:mm -> dd/MM/yyyy HH:mm
+                        const [yyyy, mm, dd] = editDate.split('-');
+                        const formatted = `${dd}/${mm}/${yyyy} ${editTime}`;
+                        const now = new Date();
+                        const ts = format(now, "dd/MM/yyyy HH:mm");
+                        const obsEntry = editBriefing && appendToObs ? `[Briefing ${ts}] ${editBriefing}` : '';
+                        const newObs = obsEntry ? (selectedLead.observacao ? `${selectedLead.observacao} | ${obsEntry}` : obsEntry) : selectedLead.observacao;
+                        // call update handler
+                        onUpdateLead?.(selectedLead.id, { dataAgendamento: formatted, briefingRecepcao: editBriefing, observacao: newObs });
+                        setEditing(false);
+                        setSelectedLead(null);
+                      }}
+                      className="flex-1"
+                    >
+                      Salvar
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

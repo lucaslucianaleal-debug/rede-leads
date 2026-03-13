@@ -1,5 +1,6 @@
 import { useLeads } from "@/hooks/useLeads";
 import { useAuth } from "@/hooks/useAuth";
+import { ClinicChip } from "@/components/ClinicChip";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useConversations } from "@/hooks/useConversations";
 import { Lead } from "@/types/crm";
@@ -29,7 +30,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus } from "lucide-react";
+import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
 import { format } from "date-fns";
@@ -77,6 +79,7 @@ const CRMDashboard = () => {
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [reportDate, setReportDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   // ...chat logic removido...
 
   // Calcular quantidade de duplicatas
@@ -167,9 +170,12 @@ const CRMDashboard = () => {
             <div className="bg-primary rounded-lg p-2 shrink-0">
               <FunnelIcon className="h-5 w-5 text-primary-foreground" />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-xl font-heading font-bold text-foreground">Rede Leads</h1>
-              <p className="text-xs text-muted-foreground hidden sm:block">Central de Conversão de Leads • WhatsApp: (17) 99115-4763</p>
+            <div className="min-w-0 flex items-center gap-3">
+              <div className="flex flex-col">
+                <h1 className="text-xl font-heading font-bold text-foreground">Rede Leads</h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">Central de Conversão de Leads • WhatsApp: (17) 99115-4763</p>
+              </div>
+              <ClinicChip />
             </div>
           </div>
           <div className="flex gap-2 items-center">
@@ -178,14 +184,8 @@ const CRMDashboard = () => {
               <>
                 <input type="file" ref={fileRef} accept=".csv" onChange={handleImport} className="hidden" />
 
-                {/* Desktop buttons — hidden on mobile */}
+                {/* Desktop: compact actions menu (hidden on mobile) */}
                 <div className="hidden md:flex gap-2 items-center">
-                  {permissions?.canImport && (
-                    <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                      <Download className="h-4 w-4 mr-1" />
-                      Importar CSV
-                    </Button>
-                  )}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm">
@@ -202,26 +202,52 @@ const CRMDashboard = () => {
                       />
                     </PopoverContent>
                   </Popover>
-                  <Button variant="default" size="sm" onClick={() => exportDailyReport(reportDate)}>
-                    <FileText className="h-4 w-4 mr-1" />
-                    Relatório Diário
-                  </Button>
-                  <Button variant="default" size="sm" onClick={() => exportWeeklyReport(reportDate)}>
-                    <FileSpreadsheet className="h-4 w-4 mr-1" />
-                    Relatório Semanal
-                  </Button>
-                  {duplicatesInfo.has && permissions?.canDelete && (
-                    <Button variant="outline" size="sm" onClick={() => setShowClearDuplicatesDialog(true)} className="border-amber-500 text-amber-700 hover:bg-amber-50">
-                      <Copy className="h-4 w-4 mr-1" />
-                      Limpar Duplicatas ({duplicatesInfo.count})
-                    </Button>
-                  )}
-                  {permissions?.canDelete && (
-                    <Button variant="destructive" size="sm" onClick={() => setShowClearDialog(true)}>
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Limpar Base
-                    </Button>
-                  )}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreVertical className="h-4 w-4 mr-1" />
+                        Ações
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      {permissions?.canImport && (
+                        <DropdownMenuItem onClick={() => fileRef.current?.click()}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Importar CSV
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => exportDailyReport(reportDate)}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Relatório Diário
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => exportWeeklyReport(reportDate)}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        Relatório Semanal
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {duplicatesInfo.has && permissions?.canDelete && (
+                        <DropdownMenuItem onClick={() => setShowClearDuplicatesDialog(true)}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Limpar Duplicatas ({duplicatesInfo.count})
+                        </DropdownMenuItem>
+                      )}
+                      {permissions?.canDelete && (
+                        <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-destructive">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Limpar Base
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      {user && (
+                        <DropdownMenuItem onClick={() => { /* Admin entry - no-op here */ }}>
+                          <Activity className="h-4 w-4 mr-2" />
+                          Admin
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
                   {user && <AdminPanel />}
                 </div>
 
@@ -277,11 +303,13 @@ const CRMDashboard = () => {
           <AgendaDoDia
             leads={leads}
             onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
-              onExportWeek={exportWeeklyAppointmentsXlsx}
+            onExportWeek={exportWeeklyAppointmentsXlsx}
+            onUpdateLead={(id, updates) => updateLead(id, updates)}
           />
         ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full sm:max-w-[900px] grid-cols-5">
+          <div className="w-full">
+            <TabsList className="w-full sm:max-w-[900px] justify-start gap-2">
             <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
               <LayoutDashboard className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -294,8 +322,18 @@ const CRMDashboard = () => {
               <Database className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Todos os Leads</span>
             </TabsTrigger>
-            {/* Chat tab removido */}
-          </TabsList>
+              {permissions?.canEdit && (
+                <button
+                  onClick={() => setShowCreateDialog(true)}
+                  className="ml-auto inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
+                  aria-label="Novo Lead"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Novo Lead</span>
+                </button>
+              )}
+            </TabsList>
+          </div>
 
           <TabsContent value="dashboard" className="space-y-6 mt-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -331,6 +369,7 @@ const CRMDashboard = () => {
               leads={leads}
               onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
               onExportWeek={exportWeeklyAppointmentsXlsx}
+              onUpdateLead={(id, updates) => updateLead(id, updates)}
             />
           </TabsContent>
 
@@ -344,7 +383,7 @@ const CRMDashboard = () => {
               onSelectionChange={setSelectedLeads}
               onDeleteSelected={() => setShowDeleteDialog(true)}
               onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
-              onSendFollowUp={handleFollowUp}
+              
               onRegisterCall={handleRegisterCall}
               onOpenCall={handleOpenCall}
             />
@@ -379,6 +418,17 @@ const CRMDashboard = () => {
         open={!!callLead}
         onClose={() => setCallLead(null)}
         onConfirm={handleRegisterCall}
+      />
+
+      {/* Create Lead Dialog (dashboard shortcut) */}
+      <CreateLeadDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onSave={(lead) => {
+          handleCreateLead(lead);
+          setShowCreateDialog(false);
+        }}
+        onOpenCall={handleOpenCall}
       />
 
       {/* Delete Selected Dialog */}

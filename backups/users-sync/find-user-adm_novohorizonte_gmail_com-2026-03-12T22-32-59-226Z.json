@@ -1,0 +1,19 @@
+{
+  "email": "adm.novohorizonte@gmail.com",
+  "found": false,
+  "sources": [
+    {
+      "collection": "users",
+      "id": "sPRVo4z3aUdJm2fsG0CPxMEUAIG2",
+      "data": {
+        "createdAt": "2026-03-12T17:17:43.110Z",
+        "clinicId": "odontocompany-novohorizonte",
+        "role": "admin",
+        "clinics": [
+          "odontocompany-novohorizonte"
+        ],
+        "name": "adm.novohorizonte@gmail.com"
+      }
+    }
+  ]
+}
