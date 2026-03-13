@@ -24,7 +24,7 @@ interface AgendaDoDiaProps {
   onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
 }
 
-export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek }: AgendaDoDiaProps) {
+export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLead }: AgendaDoDiaProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const dateStr = format(selectedDate, "dd/MM/yyyy");
