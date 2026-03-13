@@ -53,8 +53,8 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       });
 
       const followUpsDone = leads.filter((l) => {
-        const done = l.lastFollowUpDone || l.dataFollowUp || "";
-        return done.startsWith(dayStr);
+        const df = l.dataFollowUp || "";
+        return df.startsWith(dayStr);
       });
 
       // Agendamentos: contar apenas agendamentos CRIADOS nesse dia (dataAgendamentoCriado)
@@ -95,7 +95,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
   // Métricas do dia de hoje para as barras de progresso
   const todayStr = format(new Date(), "dd/MM/yyyy");
   const newLeadsToday = leads.filter((l) => (l.dataContato || "").startsWith(todayStr));
-  const followUpsDoneToday = leads.filter((l) => ((l.lastFollowUpDone || l.dataFollowUp) || "").startsWith(todayStr));
+  const followUpsDoneToday = leads.filter((l) => (l.dataFollowUp || "").startsWith(todayStr));
   const appointmentsMadeToday = leads.filter((l) => (l.dataAgendamentoCriado || "").startsWith(todayStr));
   const seenToday = new Set<string>();
   const allToday: Lead[] = [] as any;
