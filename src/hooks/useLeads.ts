@@ -812,9 +812,14 @@ export function useLeads() {
       const dc = l.dataContato || "";
       return dc.startsWith(formatted);
     });
+    // Count follow-ups either by scheduled follow-up date (`dataFollowUp`) OR
+    // by the date the follow-up was actually done (`lastFollowUpDone`). This
+    // ensures registered calls that set `lastFollowUpDone` are included in
+    // the daily report.
     const followUpsDone = leads.filter(l => {
       const df = l.dataFollowUp || "";
-      return df.startsWith(formatted);
+      const last = l.lastFollowUpDone || "";
+      return df.startsWith(formatted) || last.startsWith(formatted);
     });
     // Agendamentos feitos: contar agendamentos CRIADOS na UI hoje (dataAgendamentoCriado)
     const appointmentsMade = leads.filter(l => {
