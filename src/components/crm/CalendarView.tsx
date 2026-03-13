@@ -33,8 +33,21 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   );
 
   // Separar por dia
-  const todayLeads = relevantLeads.filter((l) => l.dataAgendamento?.startsWith(todayStr));
-  const tomorrowLeads = relevantLeads.filter((l) => l.dataAgendamento?.startsWith(tomorrowStr));
+  const parseAppointmentTime = (dateStr?: string) => {
+    if (!dateStr) return 0;
+    const parts = dateStr.split(" ");
+    const time = parts[1] || "00:00";
+    const [h = "0", m = "0"] = time.split(":");
+    return parseInt(h || "0") * 60 + parseInt(m || "0");
+  };
+
+  const todayLeads = relevantLeads
+    .filter((l) => l.dataAgendamento?.startsWith(todayStr))
+    .sort((a, b) => parseAppointmentTime(a.dataAgendamento) - parseAppointmentTime(b.dataAgendamento));
+
+  const tomorrowLeads = relevantLeads
+    .filter((l) => l.dataAgendamento?.startsWith(tomorrowStr))
+    .sort((a, b) => parseAppointmentTime(a.dataAgendamento) - parseAppointmentTime(b.dataAgendamento));
 
   // Textos fixos dos lembretes
   const getReminder24h = (lead: Lead): string => {

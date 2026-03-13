@@ -133,12 +133,11 @@ export function useLeads() {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         }
       } else {
-        // If clinic document does not exist, DO NOT automatically clear local leads.
-        // Clearing here caused accidental data loss when listeners switched
-        // (e.g. during quick saves or auth state changes). Keep local state
-        // and let explicit actions (admin scripts / clear button) remove data.
+        // If clinic document does not exist, clear leads (new clinic)
         try {
-          console.log(`[useLeads] clinic doc not found -> keeping local leads for clinic=${effectiveClinic}`);
+          setLeads([]);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+          console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
         } catch {}
       }
     }, () => {
@@ -374,12 +373,19 @@ export function useLeads() {
         return agendamentoDate >= tomorrow;
       })
       .sort((a, b) => {
-        // Sort by appointment date, closest first
-        const [dayA, monthA, yearA] = a.dataAgendamento.split('/');
-        const [dayB, monthB, yearB] = b.dataAgendamento.split('/');
-        const dateA = new Date(parseInt(yearA), parseInt(monthA) - 1, parseInt(dayA));
-        const dateB = new Date(parseInt(yearB), parseInt(monthB) - 1, parseInt(dayB));
-        return dateA.getTime() - dateB.getTime();
+        const toMs = (s: string) => {
+          const parts = s.split(" ");
+          const [day, month, year] = parts[0].split("/");
+          const [hour, minute] = (parts[1] || "00:00").split(":");
+          return new Date(
+            parseInt(year),
+            parseInt(month) - 1,
+            parseInt(day),
+            parseInt(hour || "0"),
+            parseInt(minute || "0")
+          ).getTime();
+        };
+        return toMs(a.dataAgendamento) - toMs(b.dataAgendamento);
       });
   }, [leads]);
 
@@ -503,21 +509,7 @@ export function useLeads() {
         if ((updates.dataAgendamento === "" || updates.dataAgendamento === undefined) && l.dataAgendamentoCriado) {
           return { ...l, ...updates, dataAgendamentoCriado: undefined };
         }
-
-        // Merge updates first
-        const merged: Lead = { ...l, ...updates } as Lead;
-
-        // If user updated `dataFollowUp` but didn't set `lastFollowUpDone`, copy it so reports count the follow-up
-        if ((updates as any).dataFollowUp && !(merged as any).lastFollowUpDone) {
-          merged.lastFollowUpDone = (updates as any).dataFollowUp;
-        }
-
-        // If etapaLead moved to a Follow-Up stage and lastFollowUpDone is missing, mark it as today
-        if ((updates as any).etapaLead && String((updates as any).etapaLead).startsWith("Follow-Up") && !(merged as any).lastFollowUpDone) {
-          merged.lastFollowUpDone = todayFormatted;
-        }
-
-        return merged;
+        return { ...l, ...updates };
       });
       // Sincroniza `leadNome` na coleção `conversations` quando houver alteração de nome.
       // Prioridade de tentativas (novo padrão):
@@ -608,6 +600,11 @@ export function useLeads() {
     const now = new Date();
     const timestamp = `${now.getDate().toString().padStart(2, "0")}/${(now.getMonth() + 1).toString().padStart(2, "0")}/${now.getFullYear()} ${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
     const nota = obs ? `📞 ${outcome} (${timestamp}) — ${obs}` : `📞 ${outcome} (${timestamp})`;
+    const todayFormatted = format(now, "dd/MM/yyyy");
+
+    // Capture existing lead before mutating state to decide whether to mark follow-up
+    const existingLead = leads.find((l) => l.id === leadId);
+
     setLeads((prev) =>
       prev.map((l) => {
         if (l.id !== leadId) return l;
@@ -619,6 +616,20 @@ export function useLeads() {
         };
       })
     );
+
+    // If this lead hasn't had a follow-up marked today, treat this first call as a worked follow-up.
+    // We call `sendFollowUp` (which will increment followUpCount / set lastFollowUpDone / schedule next dataFollowUp)
+    // but only once per day to avoid duplicate increments when multiple calls are logged.
+    if (!existingLead || !(existingLead.lastFollowUpDone || "").startsWith(todayFormatted)) {
+      // small timeout to let the observacao update settle
+      setTimeout(() => {
+        try {
+          sendFollowUp(leadId, "");
+        } catch (e) {
+          console.error("[registerCall] erro ao disparar sendFollowUp:", e);
+        }
+      }, 80);
+    }
   };
 
   // return leads whose `dataAgendamento` matches the given date (formatted as dd/MM/yyyy)
@@ -1175,24 +1186,8 @@ export function useLeads() {
     setLeads((prev) => prev.filter((lead) => !leadIds.includes(lead.id)));
   };
 
-  const clearAllLeads = async () => {
-    try {
-      const timestamp = new Date().toISOString();
-      const backupId = `clear-${timestamp}`;
-      const target = currentClinic || selectedClinic || undefined;
-      const backupDocRef = doc(db, 'backups', backupId);
-      await setDoc(backupDocRef, {
-        createdAt: timestamp,
-        clinic: target || 'crm_data/shared',
-        leads,
-      }, { merge: true });
-      console.log(`[clearAllLeads] Backup criado: backups/${backupId} (clinic=${target})`);
-      // Do NOT clear local leads automatically to avoid accidental data loss.
-      return { backedUp: true, backupId };
-    } catch (e) {
-      console.error('[clearAllLeads] Falha ao criar backup antes de limpar:', e);
-      return { backedUp: false };
-    }
+  const clearAllLeads = () => {
+    setLeads([]);
   };
 
   const clearDuplicates = () => {

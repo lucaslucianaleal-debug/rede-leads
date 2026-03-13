@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Lead } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { FollowUpDialog } from "./FollowUpDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
+import { useAuth } from "@/hooks/useAuth";
+import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { ProgressWithLabel } from "@/components/ui/progress-with-label";
 
 interface FollowUpQueueProps {
@@ -40,18 +42,40 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const [whatsLead, setWhatsLead] = useState<Lead | null>(null);
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedService, setSelectedService] = useState<string | null>(null);
+  const [noShowOnly, setNoShowOnly] = useState(false);
+  const [suggestedMessage, setSuggestedMessage] = useState<string | null>(null);
+  const { clinicMeta } = useAuth();
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
 
+  // debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const filteredLeads = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = debouncedSearch;
     // start from a shallow copy to avoid mutating props
     let list = leads.slice();
     if (term) {
       list = list.filter(
         (l) =>
           l.nome.toLowerCase().includes(term) ||
-          l.telefone.replace(/\D/g, "").includes(term.replace(/\D/g, ""))
+          l.telefone.replace(/\D/g, "").includes(term.replace(/\D/g, "")) ||
+          (l.servicoProcurado || "").toLowerCase().includes(term)
       );
+    }
+
+    // filter by selected service
+    if (selectedService) {
+      list = list.filter((l) => (l.servicoProcurado || "") === selectedService);
+    }
+
+    // filter only not-showed
+    if (noShowOnly) {
+      list = list.filter((l) => l.dataAgendamento && l.comparecimento === "NÃO COMPARECEU");
     }
 
     // Prioritize overdue leads: those with daysSince > OVERDUE_DAYS
@@ -67,7 +91,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
     });
 
     return list;
-  }, [leads, search]);
+  }, [leads, search, debouncedSearch, selectedService, noShowOnly]);
   
   const handleConfirmFollowUp = (leadId: string, observacao: string) => {
     onSendFollowUp(leadId, observacao);
@@ -82,11 +106,15 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const handleWhatsAppClick = (lead: Lead) => {
     // Open local popup for editing message (prefill with template when available)
     setWhatsLead(lead);
+    // prefills with follow-up template
+    const template = getFollowUpMessage(lead.etapaLead);
+    if (template) setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado));
     setShowWhatsAppDialog(true);
   };
 
   const handleConfirmationClick = (lead: Lead) => {
-    const message = generateAppointmentConfirmationText(lead.dataAgendamento || "");
+    const message = generateAppointmentConfirmationTextForClinic(clinicMeta, lead.dataAgendamento || "");
+    setSuggestedMessage(message);
     setWhatsLead(lead);
     setShowWhatsAppDialog(true);
   };
@@ -116,6 +144,24 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
             <X className="h-4 w-4" />
           </button>
         )}
+      </div>
+      {/* Filters: service + no-show */}
+      <div className="flex gap-2 items-center mb-4">
+        <select
+          value={selectedService || ""}
+          onChange={(e) => setSelectedService(e.target.value || null)}
+          className="bg-slate-700 border-slate-600 text-white p-2 rounded"
+        >
+          <option value="">Filtrar por serviço (todos)</option>
+          {Array.from(new Set(leads.map(l => l.servicoProcurado).filter(Boolean))).map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+
+        <label className="text-sm flex items-center gap-2">
+          <input type="checkbox" checked={noShowOnly} onChange={(e) => setNoShowOnly(e.target.checked)} />
+          <span className="text-muted-foreground">Apenas não compareceram</span>
+        </label>
       </div>
       
       {/* Daily Goal Progress - Padronizado */}
@@ -234,12 +280,17 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         <WhatsAppMessageDialog
           lead={whatsLead}
           open={showWhatsAppDialog}
-          onClose={() => setShowWhatsAppDialog(false)}
-          suggestedMessage={(() => {
-            const template = getFollowUpMessage(whatsLead.etapaLead);
-            if (template) return formatFollowUpMessage(template, whatsLead.nome, whatsLead.servicoProcurado);
-            return "";
-          })()}
+          onClose={() => {
+            setShowWhatsAppDialog(false);
+            setSuggestedMessage(null);
+          }}
+          suggestedMessage={
+            suggestedMessage ?? (() => {
+              const template = getFollowUpMessage(whatsLead.etapaLead);
+              if (template) return formatFollowUpMessage(template, whatsLead.nome, whatsLead.servicoProcurado);
+              return "";
+            })()
+          }
         />
       )}
     </div>

@@ -9,6 +9,8 @@ import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { LeadDetailsDialog } from "./LeadDetailsDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
+import { useAuth } from "@/hooks/useAuth";
+import { generateAppointmentConfirmationTextForClinic, generateAppointmentConfirmationLinkForClinic } from "@/lib/whatsapp";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { format, addDays, parse } from "date-fns";
@@ -86,10 +88,8 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
   };
 
   const handleConfirmationClick = (lead: Lead) => {
-    const message = generateAppointmentConfirmationText(lead.dataAgendamento || "");
-    const digits = String(lead.telefone).replace(/[^0-9]/g, "");
-    let url = `https://wa.me/${digits}`;
-    if (message) url += `?text=${encodeURIComponent(message)}`;
+    const { clinicMeta } = useAuth();
+    const url = generateAppointmentConfirmationLinkForClinic(lead.telefone, clinicMeta, lead.dataAgendamento || "");
     window.open(url, "_blank");
   };
   
@@ -339,7 +339,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs">{lead.dataFollowUp || "—"}</TableCell>
+                  <TableCell className="text-xs">{lead.lastFollowUpDone || lead.dataFollowUp || "—"}</TableCell>
                   <TableCell className={`text-xs font-medium ${lead.comparecimento === "COMPARECEU" ? "text-success" : "text-primary"}`}>{getNextFollowUpDate(lead)}</TableCell>
                   <TableCell className="text-xs">{lead.dataAgendamento || "—"}</TableCell>
                   <TableCell className="text-xs max-w-[200px] truncate" title={lead.observacao}>{lead.observacao || "—"}</TableCell>

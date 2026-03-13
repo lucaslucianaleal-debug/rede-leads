@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-03-12T22:31:28.720Z",
+  "target": "odontocompany-badybassit",
+  "count": 1,
+  "samples": [
+    {
+      "uid": "TNcworPqijYVKarXbaNV5zbkXVs2",
+      "email": "lucianalucasleal@gmail.com",
+      "clinicId": "odontocompany-badybassit",
+      "clinics": [
+        "odontocompany-badybassit"
+      ],
+      "profile": {
+        "createdAt": "2026-03-12T13:17:29.512Z",
+        "clinicId": "odontocompany-badybassit",
+        "role": "admin",
+        "clinics": [
+          "odontocompany-badybassit"
+        ],
+        "name": "lucianalucasleal@gmail.com"
+      }
+    }
+  ]
+}

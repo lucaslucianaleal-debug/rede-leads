@@ -17,3 +17,12 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+
+// Expose debug helpers in development so dev console can inspect auth/db
+if (import.meta.env.MODE === 'development') {
+  try {
+    (window as any).__REDE_LEADS__ = { auth, db };
+  } catch (e) {
+    // safe noop in non-browser environments
+  }
+}

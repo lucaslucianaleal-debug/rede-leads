@@ -21,7 +21,8 @@ import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/phone";
 import { AgendamentoDialog } from "./AgendamentoDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
-import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
+import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
+import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
 
 interface CallLogDialogProps {
@@ -40,6 +41,7 @@ const OUTCOMES = [
 
 export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogProps) {
   const { updateLead } = useLeads();
+  const { clinicMeta } = useAuth();
   const [outcome, setOutcome] = useState("Caixa de mensagem");
   const [obs, setObs] = useState("");
   const [agendarRetorno, setAgendarRetorno] = useState(false);
@@ -113,7 +115,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
       },
     });
     toast.success("Agendamento atualizado! Automação reativada.");
-    const text = generateAppointmentConfirmationText(dataAgendamento);
+    const text = generateAppointmentConfirmationTextForClinic(clinicMeta, dataAgendamento);
     setSuggestedMessage(text);
     setAgendamentoOpen(false);
     setWhatsOpen(true);

@@ -1,0 +1,546 @@
+{
+  "generatedAt": "2026-03-12T20-42-04-933Z",
+  "summary": {
+    "total": 61,
+    "matchedClinic": {
+      "odontocompany-badybassit": 17,
+      "odontocompany-olimpia": 25,
+      "odontocompany-novohorizonte": 1
+    },
+    "crm_data": 0,
+    "unknown": 18
+  },
+  "results": [
+    {
+      "docId": "1352553534",
+      "nome": "Dionatan Danilo Machado de Souza",
+      "telefone": "1352553534",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "1781041260",
+      "nome": "WhatsApp 1260",
+      "telefone": "1781041260",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "1781785946",
+      "nome": "Eveli Regina",
+      "telefone": "1781785946",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "1791154763",
+      "nome": "Lucas Leal",
+      "telefone": "5517991154763",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "1792127838",
+      "nome": "WhatsApp 7838",
+      "telefone": "5517992127838",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "1792688487",
+      "nome": "WhatsApp 8487",
+      "telefone": "1792688487",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "1792702010",
+      "nome": "WhatsApp 2010",
+      "telefone": "1792702010",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "1796287598",
+      "nome": "Francisco Clemente",
+      "telefone": "1796287598",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "1797791492",
+      "nome": "Celia",
+      "telefone": "1797791492",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "5431547932",
+      "nome": "WhatsApp 7932",
+      "telefone": "5431547932",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "5500",
+      "nome": "Ivone Maria Aparecida Moreira (Mãe Lais)",
+      "telefone": "00",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5500000000000",
+      "nome": "Gustavo Barufi",
+      "telefone": "00 000000000",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5511981394507",
+      "nome": "Kleber",
+      "telefone": "5511981394507",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "551268323384",
+      "nome": "Ana Silva",
+      "telefone": "1268323384",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5512982049457",
+      "nome": "Marcia",
+      "telefone": "5512982049457",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5513992058795",
+      "nome": "Maria (Filho)",
+      "telefone": "5513992058795",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5514998989146",
+      "nome": "Marcos",
+      "telefone": "14 99898-9146",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5516981577451",
+      "nome": "Roseli Milanez",
+      "telefone": "16981577451",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-novohorizonte"
+      }
+    },
+    {
+      "docId": "5516996404810",
+      "nome": "Rosenilda Honorato - Esposa Ademir",
+      "telefone": "5516996404810",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5516997661131",
+      "nome": "Antonio Luiz Zanirato Jr",
+      "telefone": "5516997661131",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5516997922633",
+      "nome": "Rosimeire da Silva",
+      "telefone": "16997922633",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "55172019285",
+      "nome": "Francisco Clemente",
+      "telefone": "55172019285",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "5517974000741",
+      "nome": "Janaina de Souza clemente",
+      "telefone": "5517974000741",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "5517981041260",
+      "nome": "Adriano",
+      "telefone": "17981041260",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517981604067",
+      "nome": "Erica Storto",
+      "telefone": "17981604067",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517988306335",
+      "nome": "Caioline💖",
+      "telefone": "5517988306335",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517988348171",
+      "nome": "Poliana da Silva Matias",
+      "telefone": "17 98834-8171",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517991269179",
+      "nome": "Maria",
+      "telefone": "17991269179",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517991642037",
+      "nome": "Merly",
+      "telefone": "17991642037",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517991719027",
+      "nome": "Richard Esmael Chaves",
+      "telefone": "17 99171-9027",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517991735278",
+      "nome": "Mi",
+      "telefone": "5517991735278",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517991776524",
+      "nome": "Amanda Eskildesen",
+      "telefone": "17 99177-6524",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517992012438",
+      "nome": "Ellyne",
+      "telefone": "17992012438",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517992145862",
+      "nome": "Odontocompany Novo Horizonte",
+      "telefone": "5517992145862",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517992292174",
+      "nome": "Vitoria - Indicação Karina (Irmã)",
+      "telefone": "17992292174",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517992702010",
+      "nome": "Tamires maia moizes",
+      "telefone": "17992702010",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517996008894",
+      "nome": "Henrique Zanini Bianqui De Lima",
+      "telefone": "17 99600-8894",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517996139207",
+      "nome": "Reginaldo fukuda",
+      "telefone": "1799613-9207",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517996287598",
+      "nome": "Francisco Clemente",
+      "telefone": "17996287598",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517996359166",
+      "nome": "Sueli Aparecida sfriso",
+      "telefone": "17 99635-9166",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517996451370",
+      "nome": "Fabiane Alves Shimada ",
+      "telefone": "17 99645-1370",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517996452260",
+      "nome": "Renata Cristina de Andrade Borges",
+      "telefone": "+5517996452260",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517996668353",
+      "nome": "Tatiana",
+      "telefone": "5517996668353",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517996683739",
+      "nome": "Junior",
+      "telefone": "17 99668-3739",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517996764685",
+      "nome": "Lais Aparecida Moreira da Silva",
+      "telefone": "17996764685",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "5517996827380",
+      "nome": "Cleonice",
+      "telefone": "17996827380",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "5517997010037",
+      "nome": "Letícia Souza Vieira",
+      "telefone": "17 99701-0037",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517997057635",
+      "nome": "Nayele",
+      "telefone": "5517997057635",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517997257311",
+      "nome": "Simone Evangelista",
+      "telefone": "17 99725-7311",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517997281425",
+      "nome": "Hozani Da Silva Cruz",
+      "telefone": "17 99728-1425",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517997322983",
+      "nome": "Fabiana Aparecida pinto",
+      "telefone": "+5517997322983",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517997359297",
+      "nome": "Silvia Regina Moisés de Carvalh",
+      "telefone": "17 99735-9297",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517997455817",
+      "nome": "Karinna Souza Martimiano",
+      "telefone": "17 99745-5817",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517997560498",
+      "nome": "Dionatan Danilo Machado de Souza",
+      "telefone": "17997560498",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517997628580",
+      "nome": "Antonia BERETTA",
+      "telefone": "17 99762-8580",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "5517997635602",
+      "nome": "Maria Eduarda",
+      "telefone": "5517997635602",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "5517997791492",
+      "nome": "Célia Silva de Lima zuin",
+      "telefone": "17997791492",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-olimpia"
+      }
+    },
+    {
+      "docId": "555431547932",
+      "nome": "Célia Silva de Lima zuin",
+      "telefone": "5431547932",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "559984685834",
+      "nome": "Marcio Silva",
+      "telefone": "99 8468-5834",
+      "mapped": {
+        "type": "clinic by phone",
+        "clinic": "odontocompany-badybassit"
+      }
+    },
+    {
+      "docId": "6850347066",
+      "nome": "luciana",
+      "telefone": "6850347066",
+      "mapped": {
+        "type": "unknown"
+      }
+    },
+    {
+      "docId": "7569776764",
+      "nome": "WhatsApp 6764",
+      "telefone": "7569776764",
+      "mapped": {
+        "type": "unknown"
+      }
+    }
+  ]
+}

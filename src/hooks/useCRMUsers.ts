@@ -64,18 +64,23 @@ export function useCRMUsers() {
         createdBy: auth.currentUser?.uid || "system",
       };
 
-      await setDoc(doc(db, "crm_users", user.uid), crmUser);
-      // Also write a lightweight entry into `users/` used by AuthProvider
-      try {
-        await setDoc(doc(db, "users", user.uid), {
-          role: role,
-          clinicId: clinicId || null,
-          clinics: clinicId ? [clinicId] : [],
-        }, { merge: true });
-      } catch (e) {
-        // ignore
-      }
-      
+      // Create user profile in 'users' collection
+      const userProfile = {
+        uid: user.uid,
+        username,
+        role,
+        clinicId: clinicId || null,
+        clinics: clinicId ? [clinicId] : [],
+        createdAt: new Date().toISOString(),
+        createdBy: auth.currentUser?.uid || "system",
+        email,
+      };
+
+      await Promise.all([
+        setDoc(doc(db, "crm_users", user.uid), crmUser),
+        setDoc(doc(db, "users", user.uid), userProfile, { merge: true })
+      ]);
+
       setUsers([...users, crmUser]);
       return crmUser;
     } catch (err: any) {

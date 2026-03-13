@@ -1,0 +1,40 @@
+{
+  "ref": "clinics/odontocompany-novohorizonte/shared/shared",
+  "data": {
+    "lastUpdated": "2026-03-12T21:01:41.519Z",
+    "leads": [
+      {
+        "followUpCount": 0,
+        "lembretes": {
+          "h24": false,
+          "disabled": false,
+          "sent": {
+            "12h": null,
+            "1h": null,
+            "24h": null,
+            "3h": null
+          },
+          "today": false
+        },
+        "comparecimento": "AGUARDANDO DATA",
+        "dataRetornoLigacao": "",
+        "dataCriacao": "12/03/2026",
+        "dataContato": "12/03/2026",
+        "status": "QUENTE",
+        "dataAgendamento": "13/03/2026 14:00",
+        "fonteLead": "Online",
+        "etapaLead": "Avaliação agendada",
+        "servicoProcurado": "Prótese",
+        "captador": "",
+        "dataAgendamentoCriado": "12/03/2026",
+        "observacao": "📞 Atendeu (12/03/2026 16:20) — Continuamos conversando pelo whats lead ja utiliza protese, ela perdeu 2 dentes",
+        "respostaLead": "RESPONDEU",
+        "telefone": "16981577451",
+        "dataFollowUp": "12/03/2026",
+        "id": "lead_1773342609728",
+        "nome": "Roseli Milanez",
+        "lastFollowUpDone": "12/03/2026"
+      }
+    ]
+  }
+}

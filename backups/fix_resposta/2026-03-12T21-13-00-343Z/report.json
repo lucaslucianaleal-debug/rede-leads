@@ -1,0 +1,155 @@
+{
+  "date": "12/03/2026",
+  "totalModified": 26,
+  "perClinic": {
+    "crm_data/shared": {
+      "modified": 12,
+      "samples": [
+        {
+          "id": "imported-1772622343800-78",
+          "nome": "Lucas",
+          "telefone": "+5517997515530"
+        },
+        {
+          "id": "imported-1772622348160-65",
+          "nome": "Sirley",
+          "telefone": "+5517982009353"
+        },
+        {
+          "id": "imported-1772622348160-80",
+          "nome": "Carlos Roberto Lopes Guevedo",
+          "telefone": "+5517991107862"
+        },
+        {
+          "id": "imported-1772622353669-2",
+          "nome": "Cássia",
+          "telefone": "+5517997188543"
+        },
+        {
+          "id": "imported-1772622353669-14",
+          "nome": "Emerson Oliveeira",
+          "telefone": "+5517992290854"
+        },
+        {
+          "id": "lead_1772674634197",
+          "nome": "Iris Alves",
+          "telefone": "(17) 99263-3297"
+        },
+        {
+          "id": "lead_1773148362758",
+          "nome": "Antonio Luiz Zanirato Jr",
+          "telefone": "5516997661131"
+        },
+        {
+          "id": "lead_1773150061136",
+          "nome": "Reginaldo fukuda",
+          "telefone": "1799613-9207"
+        },
+        {
+          "id": "lead_1773166388060",
+          "nome": "Caioline💖",
+          "telefone": "5517988306335"
+        },
+        {
+          "id": "lead_1773174958098",
+          "nome": "Ellyne",
+          "telefone": "17992012438"
+        },
+        {
+          "id": "lead_1773231434408",
+          "nome": "Adriano",
+          "telefone": "17981041260"
+        },
+        {
+          "id": "lead_1773270110584",
+          "nome": "Maria Eduarda",
+          "telefone": "5517997635602"
+        }
+      ]
+    },
+    "clinics/odontocompany-badybassit/shared/shared": {
+      "modified": 1,
+      "samples": [
+        {
+          "id": "imported-1773317147768-110",
+          "nome": "Rubens Cassimiro",
+          "telefone": "67 9930-0750"
+        }
+      ]
+    },
+    "clinics/odontocompany-novohorizonte/shared/shared": {
+      "modified": 0,
+      "samples": []
+    },
+    "clinics/odontocompany-olimpia/shared/shared": {
+      "modified": 13,
+      "samples": [
+        {
+          "id": "imported-1772622343800-78",
+          "nome": "Lucas",
+          "telefone": "+5517997515530"
+        },
+        {
+          "id": "imported-1772622348160-65",
+          "nome": "Sirley",
+          "telefone": "+5517982009353"
+        },
+        {
+          "id": "imported-1772622348160-80",
+          "nome": "Carlos Roberto Lopes Guevedo",
+          "telefone": "+5517991107862"
+        },
+        {
+          "id": "imported-1772622353669-2",
+          "nome": "Cássia",
+          "telefone": "+5517997188543"
+        },
+        {
+          "id": "imported-1772622353669-14",
+          "nome": "Emerson Oliveeira",
+          "telefone": "+5517992290854"
+        },
+        {
+          "id": "lead_1772674634197",
+          "nome": "Iris Alves",
+          "telefone": "(17) 99263-3297"
+        },
+        {
+          "id": "lead_1773148362758",
+          "nome": "Antonio Luiz Zanirato Jr",
+          "telefone": "5516997661131"
+        },
+        {
+          "id": "lead_1773150061136",
+          "nome": "Reginaldo fukuda",
+          "telefone": "1799613-9207"
+        },
+        {
+          "id": "lead_1773166388060",
+          "nome": "Caioline💖",
+          "telefone": "5517988306335"
+        },
+        {
+          "id": "lead_1773174958098",
+          "nome": "Ellyne",
+          "telefone": "17992012438"
+        },
+        {
+          "id": "lead_1773175007155",
+          "nome": "Lucineia",
+          "telefone": "5517992088250"
+        },
+        {
+          "id": "lead_1773231434408",
+          "nome": "Adriano",
+          "telefone": "17981041260"
+        },
+        {
+          "id": "lead_1773270110584",
+          "nome": "Maria Eduarda",
+          "telefone": "5517997635602"
+        }
+      ]
+    }
+  }
+}

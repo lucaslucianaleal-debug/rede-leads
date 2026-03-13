@@ -46,19 +46,19 @@ export function AdminPanel() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("viewer");
-  const [clinic, setClinic] = useState<string | null>("odontocompany-olimpia");
   const [open, setOpen] = useState(false);
+  const [clinicForUser, setClinicForUser] = useState<string | null>("odontocompany-olimpia");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createUser(username, password, role, clinic);
+      await createUser(username, password, role, clinicForUser);
       toast.success(`Usuário "${username}" criado com sucesso!`);
       setUsername("");
       setPassword("");
       setRole("viewer");
-      setClinic("odontocompany-olimpia");
+      setClinicForUser("odontocompany-olimpia");
       setOpen(false);
     } catch {
       toast.error(error || "Erro ao criar usuário");
@@ -112,7 +112,7 @@ export function AdminPanel() {
           Admin
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Gerenciar Usuários</DialogTitle>
           <DialogDescription>
@@ -148,19 +148,6 @@ export function AdminPanel() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="clinic-select">Clínica</Label>
-              <select
-                id="clinic-select"
-                value={clinic || "odontocompany-olimpia"}
-                onChange={(e) => setClinic(e.target.value)}
-                className="w-full bg-slate-700 border-slate-600 text-white p-2 rounded"
-              >
-                <option value="odontocompany-olimpia">Odontocompany Olimpia</option>
-                <option value="odontocompany-badybassit">Odontocompany Bady Bassit</option>
-                <option value="odontocompany-novohorizonte">Odontocompany Novo Horizonte</option>
-              </select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="role-select">Função</Label>
               <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
                 <SelectTrigger id="role-select">
@@ -182,6 +169,19 @@ export function AdminPanel() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="clinic-select">Clínica</Label>
+              <select
+                id="clinic-select"
+                value={clinicForUser || ''}
+                onChange={(e) => setClinicForUser(e.target.value || null)}
+                className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
+              >
+                <option value="odontocompany-olimpia">Odontocompany Olimpia</option>
+                <option value="odontocompany-badybassit">Odontocompany Bady Bassit</option>
+                <option value="odontocompany-novohorizonte">Odontocompany Novo Horizonte</option>
+              </select>
+            </div>
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? "Criando..." : "Criar Usuário"}
             </Button>
@@ -195,9 +195,8 @@ export function AdminPanel() {
             <Table>
               <TableHeader>
                 <TableRow>
-                    <TableHead>Usuário</TableHead>
-                    <TableHead>Função</TableHead>
-                    <TableHead>Clínica</TableHead>
+                  <TableHead>Usuário</TableHead>
+                  <TableHead>Função</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -233,17 +232,6 @@ export function AdminPanel() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                      </TableCell>
-                      <TableCell>
-                        {user.clinicId
-                          ? user.clinicId === 'odontocompany-olimpia'
-                            ? 'Olimpia'
-                            : user.clinicId === 'odontocompany-badybassit'
-                            ? 'Bady Bassit'
-                            : user.clinicId === 'odontocompany-novohorizonte'
-                            ? 'Novo Horizonte'
-                            : user.clinicId
-                          : '-'}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
