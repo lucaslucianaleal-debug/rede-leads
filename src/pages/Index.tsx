@@ -57,6 +57,7 @@ const CRMDashboard = () => {
     createLead,
     clearCallReturn,
     registerCall,
+    exportCSV,
     exportAppointments,
     exportDailyReport,
     exportWeeklyReport,
@@ -383,7 +384,7 @@ const CRMDashboard = () => {
               onSelectionChange={setSelectedLeads}
               onDeleteSelected={() => setShowDeleteDialog(true)}
               onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
-              
+                onExport={exportCSV}
               onRegisterCall={handleRegisterCall}
               onOpenCall={handleOpenCall}
             />

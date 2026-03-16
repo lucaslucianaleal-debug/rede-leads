@@ -8,7 +8,7 @@ import { LeadTable } from "./LeadTable";
 import { EditLeadDialog } from "./EditLeadDialog";
 import { CreateLeadDialog } from "./CreateLeadDialog";
 import { useState, useMemo } from "react";
-import { Search, AlertTriangle, Users, CalendarCheck, Clock, UserCheck, Trash2, Plus } from "lucide-react";
+import { Search, AlertTriangle, Users, CalendarCheck, Clock, UserCheck, Trash2, Plus, Download } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
 
@@ -25,19 +25,21 @@ interface AllLeadsViewProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
   onOpenChat?: (phone: string, message?: string) => void;
   onOpenCall?: (phone: string) => void;
+  onExport?: (leads: Lead[]) => void;
 }
 
 type FilterCategory = {
   duplicados?: boolean;
 };
 
-export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat, onOpenCall }: AllLeadsViewProps) {
+export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat, onOpenCall, onExport }: AllLeadsViewProps) {
   const [filters, setFilters] = useState<FilterCategory>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCreationDay, setSelectedCreationDay] = useState<string>("all");
   const [selectedContactMonth, setSelectedContactMonth] = useState<string>("all");
   const [selectedAppointmentMonth, setSelectedAppointmentMonth] = useState<string>("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");
+  const [selectedAttendance, setSelectedAttendance] = useState<string>("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -184,8 +186,15 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       });
     }
 
+    // Filter by appointment attendance/status
+    if (selectedAttendance !== "all") {
+      result = result.filter((lead) => {
+        return lead.comparecimento === selectedAttendance;
+      });
+    }
+
     return result;
-  }, [leads, selectedCreationDay, selectedContactMonth, selectedAppointmentMonth, selectedSource]);
+  }, [leads, selectedCreationDay, selectedContactMonth, selectedAppointmentMonth, selectedSource, selectedAttendance]);
 
   // Calculate stats based on month/source filters
   const stats = useMemo(() => {
@@ -340,6 +349,20 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
                   {source}
                 </Badge>
               ))}
+              <div className="ml-3 flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Comparecimento:</span>
+                <Select value={selectedAttendance} onValueChange={setSelectedAttendance}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="COMPARECEU">Compareceu</SelectItem>
+                    <SelectItem value="NÃO COMPARECEU">Não compareceu</SelectItem>
+                    <SelectItem value="AGUARDANDO DATA">Aguardando</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -441,12 +464,20 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
                 className="pl-9"
               />
             </div>
-            {onCreateLead && (
-              <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Novo Lead
-              </Button>
-            )}
+              <div className="flex gap-2">
+                {onExport && (
+                  <Button onClick={() => onExport(filteredLeads)} variant="outline" className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Exportar
+                  </Button>
+                )}
+                {onCreateLead && (
+                  <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Novo Lead
+                  </Button>
+                )}
+              </div>
           </div>
 
           {/* Clear Filters Button */}

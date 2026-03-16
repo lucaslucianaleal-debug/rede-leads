@@ -1112,32 +1112,58 @@ export function useLeads() {
     URL.revokeObjectURL(url);
   };
 
-  const exportCSV = () => {
-    const data = leads.map((l) => ({
-      "DATA DE CRIAÇÃO": l.dataCriacao,
-      "DATA DO CONTATO": l.dataContato,
+  const exportCSV = (leadsParam?: Lead[]) => {
+    const source = leadsParam || leads;
+    const formatPhoneBR = (raw: string) => {
+      if (!raw) return "";
+      const nums = String(raw).replace(/\D/g, "");
+      if (nums.length === 11) {
+        // (AA) 9XXXX-XXXX
+        return `(${nums.slice(0,2)}) ${nums.slice(2,7)}-${nums.slice(7)}`;
+      }
+      if (nums.length === 10) {
+        // (AA) XXXX-XXXX
+        return `(${nums.slice(0,2)}) ${nums.slice(2,6)}-${nums.slice(6)}`;
+      }
+      // fallback: try grouping last 4 digits
+      if (nums.length > 4) {
+        return `${nums.slice(0, nums.length-4)}-${nums.slice(-4)}`;
+      }
+      return nums;
+    };
+
+    const data = source.map((l) => ({
       "NOME DO LEAD": l.nome,
-      "TELEFONE": l.telefone,
+      "TELEFONE": formatPhoneBR(l.telefone),
       "SERVIÇO PROCURADO": l.servicoProcurado,
-      "CAPTADOR": l.captador,
       "FONTE DO LEAD": l.fonteLead,
       "ETAPA DO LEAD": l.etapaLead,
       "STATUS": l.status,
-      "RESPOSTA LEAD": l.respostaLead,
       "COMPARECIMENTO": l.comparecimento,
-      "DATA DE FOLLOW UP": l.dataFollowUp,
-      "ÚLTIMO FOLLOW UP REALIZADO": l.lastFollowUpDone || "",
       "DATA DE AGENDAMENTO": l.dataAgendamento,
-      "OBSERVAÇÃO": l.observacao,
-      "LEMBRETE 24H": l.lembretes.h24 ? "SIM" : "NÃO",
-      "LEMBRETE HOJE": l.lembretes.today ? "SIM" : "NÃO",
     }));
     const csv = Papa.unparse(data, { delimiter: ";" });
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Rede_Leads_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    // Build filename: <ClinicName>_Agendamentos_yyyy-mm-dd.csv
+    const sanitize = (s?: string | null) => {
+      if (!s) return "Clinic";
+      try {
+        return String(s)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/\s+/g, "_")
+          .replace(/[^\w\-]/g, "");
+      } catch {
+        return String(s).replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
+      }
+    };
+    const clinicNameRaw = (typeof clinicMeta !== 'undefined' && clinicMeta && clinicMeta.name) ? clinicMeta.name : (currentClinic || selectedClinic || 'Clinic');
+    const clinicLabel = sanitize(clinicNameRaw);
+    const filename = `${clinicLabel}_Agendamentos_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
