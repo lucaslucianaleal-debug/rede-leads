@@ -434,8 +434,8 @@ export function useLeads() {
 
         const nextStage = `Follow-Up ${nextCount}` as LeadStage;
 
-        // Calcular próximo follow-up: +1 dia para Follow-Up 1-4, +2 dias para 5+
-        const daysToAdd = nextCount < 5 ? 1 : 2;
+        // Calcular próximo follow-up: sempre +1 dia (próximo dia útil)
+        const daysToAdd = 1;
         let nextFollowUpDate = addDays(today, daysToAdd);
         nextFollowUpDate = getNextBusinessDay(nextFollowUpDate);
         const nextFollowUpFormatted = format(nextFollowUpDate, "dd/MM/yyyy");
