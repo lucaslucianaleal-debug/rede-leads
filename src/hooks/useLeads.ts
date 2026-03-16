@@ -617,92 +617,106 @@ export function useLeads() {
     const timestamp = `${now.getDate().toString().padStart(2, "0")}/${(now.getMonth() + 1).toString().padStart(2, "0")}/${now.getFullYear()} ${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
     const nota = obs ? `📞 ${outcome} (${timestamp}) — ${obs}` : `📞 ${outcome} (${timestamp})`;
     const todayFormatted = format(now, "dd/MM/yyyy");
+    // We'll perform updates inside setLeads so we can decide reliably whether to
+    // promote the lead to Follow-Up 1 or just mark the call as done for a newly
+    // created lead. If the lead does not exist yet, we insert a placeholder and
+    // then re-evaluate shortly after (to allow `createLead` to merge) before
+    // calling `sendFollowUp`.
 
-    // Capture existing lead before mutating state to decide whether to mark follow-up
-    const existingLead = leads.find((l) => l.id === leadId);
+    const nowAction = () => {
+      setLeads((prev) => {
+        const found = prev.find((l) => l.id === leadId);
+        if (found) {
+          const isNewToday = !!(
+            found.etapaLead === "Novo" &&
+            (found.followUpCount || 0) === 0 &&
+            found.dataCriacao &&
+            found.dataCriacao.startsWith(todayFormatted)
+          );
 
-    // If the lead exists and was created today and is still in 'Novo' with 0 followUps,
-    // we should mark the call as worked but NOT promote it to Follow-Up 1.
-    const isNewToday = !!(
-      existingLead &&
-      existingLead.etapaLead === "Novo" &&
-      (existingLead.followUpCount || 0) === 0 &&
-      existingLead.dataCriacao &&
-      existingLead.dataCriacao.startsWith(todayFormatted)
-    );
+          if (isNewToday) {
+            // mark worked but keep as Novo
+            return prev.map((l) => {
+              if (l.id !== leadId) return l;
+              return {
+                ...l,
+                observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
+                dataRetornoLigacao: returnDate ?? l.dataRetornoLigacao ?? "",
+                respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
+                lastFollowUpDone: todayFormatted,
+                dataFollowUp: todayFormatted,
+              };
+            });
+          }
 
-    if (isNewToday) {
-      // Update only notes/resposta/dataRetorno and mark lastFollowUpDone/dataFollowUp to today,
-      // but do NOT increment followUpCount or change etapaLead.
-      setLeads((prev) =>
-        prev.map((l) => {
-          if (l.id !== leadId) return l;
-          return {
-            ...l,
-            observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
-            dataRetornoLigacao: returnDate ?? l.dataRetornoLigacao ?? "",
-            respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
-            lastFollowUpDone: todayFormatted,
-            dataFollowUp: todayFormatted,
-          };
-        })
-      );
-      return;
-    }
+          // Normal path: update note and let sendFollowUp handle increment
+          // (we'll trigger sendFollowUp after this setLeads)
+          return prev.map((l) => {
+            if (l.id !== leadId) return l;
+            return {
+              ...l,
+              observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
+              dataRetornoLigacao: returnDate ?? l.dataRetornoLigacao ?? "",
+              respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
+            };
+          });
+        }
 
-    // Otherwise, update observacao/resposta if lead exists; otherwise insert a placeholder
-    setLeads((prev) => {
-      const found = prev.find((l) => l.id === leadId);
-      if (found) {
-        return prev.map((l) => {
-          if (l.id !== leadId) return l;
-          return {
-            ...l,
-            observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
-            dataRetornoLigacao: returnDate ?? l.dataRetornoLigacao ?? "",
-            respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
-          };
-        });
-      }
+        // Insert placeholder; we'll re-run decision after a short delay.
+        const placeholder: Lead = {
+          id: leadId,
+          dataCriacao: todayFormatted,
+          dataContato: todayFormatted,
+          nome: "",
+          telefone: "",
+          servicoProcurado: "",
+          captador: "",
+          fonteLead: "Outro",
+          etapaLead: "Novo",
+          status: "",
+          respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
+          comparecimento: "",
+          dataFollowUp: todayFormatted,
+          dataAgendamento: "",
+          dataRetornoLigacao: returnDate ?? "",
+          observacao: nota,
+          followUpCount: 0,
+          lembretes: { h24: false, today: false },
+        } as Lead;
+        return [...prev, placeholder];
+      });
+    };
 
-      // Insert minimal placeholder so subsequent sendFollowUp can operate on it.
-      const placeholder: Lead = {
-        id: leadId,
-        dataCriacao: todayFormatted,
-        dataContato: todayFormatted,
-        nome: "",
-        telefone: "",
-        servicoProcurado: "",
-        captador: "",
-        fonteLead: "Outro",
-        etapaLead: "Novo",
-        status: "",
-        respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
-        comparecimento: "",
-        dataFollowUp: todayFormatted,
-        dataAgendamento: "",
-        dataRetornoLigacao: returnDate ?? "",
-        observacao: nota,
-        followUpCount: 0,
-        lembretes: { h24: false, today: false },
-      } as Lead;
-      return [...prev, placeholder];
-    });
+    // Run now to update/insert placeholder
+    nowAction();
 
-    // If this lead hasn't had a follow-up marked today, treat this first call as a worked follow-up.
-    // We call `sendFollowUp` (which will increment followUpCount / set lastFollowUpDone / schedule next dataFollowUp)
-    // but only once per day to avoid duplicate increments when multiple calls are logged.
-    if (!existingLead || !(existingLead.lastFollowUpDone || "").startsWith(todayFormatted)) {
-      // small timeout to let the observacao/placeholder update settle
-      setTimeout(() => {
+    // After a short delay, decide whether to call sendFollowUp (if not already handled
+    // as new-today). This allows `createLead` to merge a created lead into state.
+    setTimeout(() => {
+      setLeads((prev) => {
+        const found = prev.find((l) => l.id === leadId);
+        if (!found) return prev;
+        const isNewToday = !!(
+          found.etapaLead === "Novo" &&
+          (found.followUpCount || 0) === 0 &&
+          found.dataCriacao &&
+          found.dataCriacao.startsWith(todayFormatted)
+        );
+
+        if (isNewToday) {
+          // ensure lastFollowUpDone/dataFollowUp are set to today (idempotent)
+          return prev.map((l) => (l.id === leadId ? { ...l, lastFollowUpDone: todayFormatted, dataFollowUp: todayFormatted } : l));
+        }
+
+        // Not new-today: trigger sendFollowUp to increment followUpCount and set next date
         try {
-          // For calls, we want the next follow-up to remain for today
           sendFollowUp(leadId, "", true);
         } catch (e) {
-          console.error("[registerCall] erro ao disparar sendFollowUp:", e);
+          console.error("[registerCall] erro ao disparar sendFollowUp (delayed):", e);
         }
-      }, 120);
-    }
+        return prev;
+      });
+    }, 160);
   };
 
   // return leads whose `dataAgendamento` matches the given date (formatted as dd/MM/yyyy)
