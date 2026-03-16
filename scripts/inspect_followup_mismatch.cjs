@@ -1,0 +1,41 @@
+const admin = require('firebase-admin');
+const fs = require('fs');
+const path = require('path');
+
+const svcPath = path.resolve(__dirname, '..', 'serviceAccountKey.json');
+if (!fs.existsSync(svcPath)) {
+  console.error('serviceAccountKey.json not found at', svcPath);
+  process.exit(1);
+}
+
+const svc = require(svcPath);
+admin.initializeApp({ credential: admin.credential.cert(svc) });
+const db = admin.firestore();
+
+const pad = (n) => String(n).padStart(2, '0');
+const today = new Date();
+const todayFormatted = `${pad(today.getDate())}/${pad(today.getMonth()+1)}/${today.getFullYear()}`;
+const tomorrow = new Date(today);
+tomorrow.setDate(tomorrow.getDate()+1);
+const tomorrowFormatted = `${pad(tomorrow.getDate())}/${pad(tomorrow.getMonth()+1)}/${tomorrow.getFullYear()}`;
+
+async function inspectDoc(docPath, label) {
+  const docRef = db.doc(docPath);
+  const snap = await docRef.get();
+  if (!snap.exists) {
+    console.log(`${label}: doc not found: ${docPath}`);
+    return;
+  }
+  const data = snap.data() || {};
+  const leads = Array.isArray(data.leads) ? data.leads : [];
+  const matched = leads.filter(l => (l.lastFollowUpDone || '').startsWith(todayFormatted) && (l.dataFollowUp || '') !== todayFormatted);
+  console.log(`${label}: found ${matched.length} leads with lastFollowUpDone=${todayFormatted} and dataFollowUp!=${todayFormatted} (doc: ${docPath})`);
+  matched.forEach(l => {
+    console.log(JSON.stringify({ id: l.id, followUpCount: l.followUpCount, lastFollowUpDone: l.lastFollowUpDone, dataFollowUp: l.dataFollowUp, observacao: l.observacao }, null, 2));
+  });
+}
+
+(async () => {
+  await inspectDoc('clinics/odontocompany-olimpia/shared/shared', 'odontocompany-olimpia');
+  await inspectDoc('crm_data/shared', 'crm_data/shared');
+})();

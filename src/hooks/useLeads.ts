@@ -621,7 +621,36 @@ export function useLeads() {
     // Capture existing lead before mutating state to decide whether to mark follow-up
     const existingLead = leads.find((l) => l.id === leadId);
 
-    // Update observacao/resposta if lead exists; otherwise insert a placeholder
+    // If the lead exists and was created today and is still in 'Novo' with 0 followUps,
+    // we should mark the call as worked but NOT promote it to Follow-Up 1.
+    const isNewToday = !!(
+      existingLead &&
+      existingLead.etapaLead === "Novo" &&
+      (existingLead.followUpCount || 0) === 0 &&
+      existingLead.dataCriacao &&
+      existingLead.dataCriacao.startsWith(todayFormatted)
+    );
+
+    if (isNewToday) {
+      // Update only notes/resposta/dataRetorno and mark lastFollowUpDone/dataFollowUp to today,
+      // but do NOT increment followUpCount or change etapaLead.
+      setLeads((prev) =>
+        prev.map((l) => {
+          if (l.id !== leadId) return l;
+          return {
+            ...l,
+            observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
+            dataRetornoLigacao: returnDate ?? l.dataRetornoLigacao ?? "",
+            respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
+            lastFollowUpDone: todayFormatted,
+            dataFollowUp: todayFormatted,
+          };
+        })
+      );
+      return;
+    }
+
+    // Otherwise, update observacao/resposta if lead exists; otherwise insert a placeholder
     setLeads((prev) => {
       const found = prev.find((l) => l.id === leadId);
       if (found) {
