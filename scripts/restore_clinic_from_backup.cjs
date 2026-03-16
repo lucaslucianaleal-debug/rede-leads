@@ -36,8 +36,20 @@ async function run() {
     process.exit(1);
   }
 
-  const backupData = parsed.data ? parsed.data : parsed;
-  const backupLeads = Array.isArray(backupData.leads) ? backupData.leads : [];
+  // Support several backup shapes:
+  // 1) { data: { leads: [...] } }
+  // 2) { leads: [...] }
+  // 3) [ ... ]  (raw localStorage export)
+  let backupLeads = [];
+  if (Array.isArray(parsed)) {
+    backupLeads = parsed;
+  } else if (parsed.data && Array.isArray(parsed.data.leads)) {
+    backupLeads = parsed.data.leads;
+  } else if (Array.isArray(parsed.leads)) {
+    backupLeads = parsed.leads;
+  } else {
+    console.warn('No leads array found in backup JSON; nothing to restore.');
+  }
 
   // Backup current doc first
   const snap = await docRef.get();
