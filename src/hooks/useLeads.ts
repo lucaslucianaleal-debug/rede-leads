@@ -36,6 +36,9 @@ const normalizeFonteLead = (fonte: string): string => {
     "cupom indicação": "Indicação",
     "cupom indicaçao": "Indicação",
     "online": "Online",
+    "influenciadora": "Influenciadora",
+    "influenciador": "Influenciadora",
+    "influencer": "Influenciadora",
   };
   
   // Se encontra no mapa, retorna
@@ -49,6 +52,7 @@ const normalizeFonteLead = (fonte: string): string => {
   }
   if (normalized.includes("google")) return "Google";
   if (normalized.includes("site")) return "Site";
+  if (normalized.includes("influenc") || normalized.includes("influencer") || normalized.includes("influenciador")) return "Influenciadora";
   if (normalized.includes("sorteio") || normalized.includes("radio")) return "Sorteio Radio";
   if (normalized.includes("indicação") || normalized.includes("indicaçao")) {
     return "Indicação";
