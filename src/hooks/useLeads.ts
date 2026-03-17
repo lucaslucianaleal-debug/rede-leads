@@ -121,7 +121,9 @@ export function useLeads() {
     isMounted.current = true;
     const effectiveClinic = currentClinic || selectedClinic || undefined;
     const targetDoc = resolveTargetDoc(effectiveClinic);
-    try { console.log(`[useLeads] subscribing to ${effectiveClinic ? `clinics/${effectiveClinic}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
+    // Sanitize clinic id for logging
+    const clinicLabel = typeof effectiveClinic === 'string' ? String(effectiveClinic).replace(/[^\w\-]/g, '') : effectiveClinic;
+    try { console.log(`[useLeads] subscribing to ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
     const unsubscribe = onSnapshot(targetDoc, (snapshot) => {
       if (!isMounted.current) return;
       if (snapshot.exists()) {
@@ -140,8 +142,10 @@ export function useLeads() {
           console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
         } catch {}
       }
-    }, () => {
-      // If Firebase fails, keep localStorage silently
+    }, (err) => {
+      // Log detailed error for diagnostics (CORS / network issues)
+      try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
+      // If Firebase fails, keep localStorage silently. We still return the unsubscribe function.
     });
     return () => {
       isMounted.current = false;
