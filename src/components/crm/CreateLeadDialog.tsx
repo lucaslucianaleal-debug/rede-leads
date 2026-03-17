@@ -28,7 +28,7 @@ const ETAPAS: LeadStage[] = [
 
 const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
 
-const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Outro"];
+const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Influenciador", "Outro"];
 
 const STATUSES: LeadStatus[] = ["QUENTE", "MORNO", "FRIO"];
 
