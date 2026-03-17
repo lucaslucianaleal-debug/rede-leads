@@ -107,7 +107,7 @@ export function useLeads() {
   // Use clinic-specific document when available. Prefer `currentClinic`,
   // but fall back to `selectedClinic` (chosen on login form) to avoid
   // race conditions while auth state resolves.
-  const { currentClinic, selectedClinic } = useAuth();
+  const { currentClinic, selectedClinic, user } = useAuth();
 
   useEffect(() => {
     isMounted.current = true;
@@ -124,15 +124,15 @@ export function useLeads() {
           data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
           isFromFirebase.current = true;
           setLeads(data);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
         }
       } else {
         // If clinic document does not exist, clear leads (new clinic)
-        try {
-          setLeads([]);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-          console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
-        } catch {}
+          try {
+            setLeads([]);
+            try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
+            console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
+          } catch {}
       }
     }, (err) => {
       // Log detailed error for diagnostics (CORS / network issues)
@@ -152,8 +152,8 @@ export function useLeads() {
       isFromFirebase.current = false;
       return;
     }
-    // Salva localmente imediatamente
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+    // Salva localmente imediatamente (por clínica)
+    try { localStorage.setItem(getStorageKey(currentClinic || selectedClinic), JSON.stringify(leads)); } catch {}
     // Salva no Firebase com debounce de 1,5s, normalizando fontes e garantindo dataCriacao
     const timer = setTimeout(async () => {
       try {
@@ -169,20 +169,22 @@ export function useLeads() {
   }, [leads]);
 
   const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
-      if (filters.etapa !== "Todas" && lead.etapaLead !== filters.etapa) return false;
-      if (filters.status !== "Todos" && lead.status !== filters.status) return false;
-      if (filters.resposta !== "Todas" && lead.respostaLead !== filters.resposta) return false;
-      if (filters.busca) {
-        const q = filters.busca.toLowerCase();
-        return (
-          lead.nome.toLowerCase().includes(q) ||
-          lead.telefone.includes(q) ||
-          lead.servicoProcurado.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
+    return leads
+      .filter((lead) => !(lead as any)._deleted)
+      .filter((lead) => {
+        if (filters.etapa !== "Todas" && lead.etapaLead !== filters.etapa) return false;
+        if (filters.status !== "Todos" && lead.status !== filters.status) return false;
+        if (filters.resposta !== "Todas" && lead.respostaLead !== filters.resposta) return false;
+        if (filters.busca) {
+          const q = filters.busca.toLowerCase();
+          return (
+            lead.nome.toLowerCase().includes(q) ||
+            lead.telefone.includes(q) ||
+            lead.servicoProcurado.toLowerCase().includes(q)
+          );
+        }
+        return true;
+      });
   }, [leads, filters]);
 
   // Count follow-ups done today (sincronizado com PerformanceChart)
@@ -1355,11 +1357,22 @@ export function useLeads() {
   };
 
   const deleteLeads = (leadIds: string[]) => {
-    setLeads((prev) => prev.filter((lead) => !leadIds.includes(lead.id)));
+    // Soft-delete: mark leads with `_deleted`, record metadata for auditing
+    const by = user?.email || user?.uid || 'unknown';
+    const at = new Date().toISOString();
+    setLeads((prev) => prev.map((lead) => {
+      if (leadIds.includes(lead.id)) {
+        return { ...lead, _deleted: true, deletedAt: at, deletedBy: by } as Lead & any;
+      }
+      return lead;
+    }));
   };
 
   const clearAllLeads = () => {
-    setLeads([]);
+    // Soft-delete all leads (keep data for audit/restore)
+    const by = user?.email || user?.uid || 'unknown';
+    const at = new Date().toISOString();
+    setLeads((prev) => prev.map((lead) => ({ ...lead, _deleted: true, deletedAt: at, deletedBy: by } as Lead & any)));
   };
 
   const clearDuplicates = () => {
