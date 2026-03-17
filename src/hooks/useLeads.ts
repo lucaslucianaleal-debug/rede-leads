@@ -115,33 +115,87 @@ export function useLeads() {
     const targetDoc = resolveTargetDoc(effectiveClinic);
     // Sanitize clinic id for logging
     const clinicLabel = typeof effectiveClinic === 'string' ? String(effectiveClinic).replace(/[^\w\-]/g, '') : effectiveClinic;
-    try { console.log(`[useLeads] subscribing to ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
-    const unsubscribe = onSnapshot(targetDoc, (snapshot) => {
-      if (!isMounted.current) return;
-      if (snapshot.exists()) {
-        let data = (snapshot.data() as any).leads as Lead[];
-        if (data && Array.isArray(data)) {
-          data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-          isFromFirebase.current = true;
-          setLeads(data);
-          try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
-        }
-      } else {
-        // If clinic document does not exist, clear leads (new clinic)
+    try { console.log(`[useLeads] resolving ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
+
+    let unsub: () => void = () => {};
+
+    const init = async () => {
+      try {
+        // First attempt a one-time read from Firestore to prefer remote state
+        const snap = await getDoc(targetDoc as any);
+        if (!isMounted.current) return;
+        if (snap && snap.exists()) {
+          let data = (snap.data() as any).leads as Lead[];
+          if (data && Array.isArray(data)) {
+            data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+            isFromFirebase.current = true;
+            setLeads(data);
+            try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
+          }
+        } else {
+          // If remote doc missing, fall back to localStorage (if available)
           try {
+            const cached = localStorage.getItem(getStorageKey(effectiveClinic));
+            if (cached) {
+              const parsed = JSON.parse(cached) as Lead[];
+              const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+              setLeads(normalized);
+              console.log(`[useLeads] used local cache for clinic=${String(effectiveClinic)}`);
+            } else {
+              setLeads([]);
+              try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
+              console.log(`[useLeads] clinic doc not found -> initialized empty for clinic=${effectiveClinic}`);
+            }
+          } catch (e) {
             setLeads([]);
-            try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
-            console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
-          } catch {}
+          }
+        }
+      } catch (err) {
+        // If getDoc fails (network), try local cache before giving up
+        try { console.error('[useLeads] getDoc error, falling back to local cache', { effectiveClinic, clinicLabel, err }); } catch {}
+        try {
+          const cached = localStorage.getItem(getStorageKey(effectiveClinic));
+          if (cached) {
+            const parsed = JSON.parse(cached) as Lead[];
+            const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+            setLeads(normalized);
+            console.log(`[useLeads] used local cache after getDoc failure for clinic=${String(effectiveClinic)}`);
+          }
+        } catch (e) {}
       }
-    }, (err) => {
-      // Log detailed error for diagnostics (CORS / network issues)
-      try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
-      // If Firebase fails, keep localStorage silently. We still return the unsubscribe function.
-    });
+
+      // After initial resolution, subscribe to realtime updates
+      try {
+        unsub = onSnapshot(targetDoc, (snapshot) => {
+          if (!isMounted.current) return;
+          if (snapshot.exists()) {
+            let data = (snapshot.data() as any).leads as Lead[];
+            if (data && Array.isArray(data)) {
+              data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+              isFromFirebase.current = true;
+              setLeads(data);
+              try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
+            }
+          } else {
+            try {
+              setLeads([]);
+              try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
+              console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
+            } catch {}
+          }
+        }, (err) => {
+          try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
+        });
+      } catch (e) {
+        try { console.error('[useLeads] failed to start onSnapshot', e); } catch {}
+      }
+    };
+
+    init();
+
     return () => {
       isMounted.current = false;
-      unsubscribe();
+      try { unsub(); } catch {}
     };
   }, [currentClinic, selectedClinic]);
 
