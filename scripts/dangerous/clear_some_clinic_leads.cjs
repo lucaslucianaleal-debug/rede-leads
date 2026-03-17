@@ -2,6 +2,11 @@ const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
 
+if (!process.argv.includes('--confirm')) {
+  console.error('DANGEROUS: This script removes leads. Re-run with --confirm to proceed.');
+  process.exit(1);
+}
+
 const svcPath = path.resolve(__dirname, '..', 'serviceAccountKey.json');
 if (!fs.existsSync(svcPath)) {
   console.error('serviceAccountKey.json not found at', svcPath);

@@ -8,7 +8,8 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection } from "firebase/firestore";
 import { useAuth } from "./useAuth";
 
-const STORAGE_KEY = "rede_leads_data";
+// Use per-clinic localStorage key to avoid mixing caches between clinics
+const getStorageKey = (clinicId?: string | null) => clinicId ? `rede_leads_${clinicId}` : `rede_leads_default`;
 // FIREBASE_DOC will be resolved per-clinic inside the hook when available
 let DEFAULT_FIREBASE_DOC = doc(db, "crm_data", "shared");
 
@@ -94,17 +95,8 @@ export function useLeads() {
   const isFromFirebase = useRef(false);
   const isMounted = useRef(true);
 
-  // Carregar dados do localStorage na inicialização (enquanto Firebase carrega)
-  const [leads, setLeads] = useState<Lead[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      const data = saved ? JSON.parse(saved) : mockLeads;
-      // Normalizar fontes e garantir dataCriacao ao carregar
-      return data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-    } catch {
-      return mockLeads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-    }
-  });
+  // Inicializa com dados mock enquanto resolvemos o remoto; não ler diretamente do localStorage aqui
+  const [leads, setLeads] = useState<Lead[]>(() => mockLeads.map((l: Lead) => ensureDateCriacao(normalizeLead(l))));
   const [filters, setFilters] = useState<ClinicFilter>({
     etapa: "Todas",
     status: "Todos",
@@ -115,13 +107,15 @@ export function useLeads() {
   // Use clinic-specific document when available. Prefer `currentClinic`,
   // but fall back to `selectedClinic` (chosen on login form) to avoid
   // race conditions while auth state resolves.
-  const { currentClinic, selectedClinic } = useAuth();
+  const { currentClinic, selectedClinic, user } = useAuth();
 
   useEffect(() => {
     isMounted.current = true;
     const effectiveClinic = currentClinic || selectedClinic || undefined;
     const targetDoc = resolveTargetDoc(effectiveClinic);
-    try { console.log(`[useLeads] subscribing to ${effectiveClinic ? `clinics/${effectiveClinic}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
+    // Sanitize clinic id for logging
+    const clinicLabel = typeof effectiveClinic === 'string' ? String(effectiveClinic).replace(/[^\w\-]/g, '') : effectiveClinic;
+    try { console.log(`[useLeads] subscribing to ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
     const unsubscribe = onSnapshot(targetDoc, (snapshot) => {
       if (!isMounted.current) return;
       if (snapshot.exists()) {
@@ -130,18 +124,20 @@ export function useLeads() {
           data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
           isFromFirebase.current = true;
           setLeads(data);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
         }
       } else {
         // If clinic document does not exist, clear leads (new clinic)
-        try {
-          setLeads([]);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-          console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
-        } catch {}
+          try {
+            setLeads([]);
+            try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
+            console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
+          } catch {}
       }
-    }, () => {
-      // If Firebase fails, keep localStorage silently
+    }, (err) => {
+      // Log detailed error for diagnostics (CORS / network issues)
+      try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
+      // If Firebase fails, keep localStorage silently. We still return the unsubscribe function.
     });
     return () => {
       isMounted.current = false;
@@ -156,8 +152,8 @@ export function useLeads() {
       isFromFirebase.current = false;
       return;
     }
-    // Salva localmente imediatamente
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+    // Salva localmente imediatamente (por clínica)
+    try { localStorage.setItem(getStorageKey(currentClinic || selectedClinic), JSON.stringify(leads)); } catch {}
     // Salva no Firebase com debounce de 1,5s, normalizando fontes e garantindo dataCriacao
     const timer = setTimeout(async () => {
       try {
@@ -173,20 +169,22 @@ export function useLeads() {
   }, [leads]);
 
   const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
-      if (filters.etapa !== "Todas" && lead.etapaLead !== filters.etapa) return false;
-      if (filters.status !== "Todos" && lead.status !== filters.status) return false;
-      if (filters.resposta !== "Todas" && lead.respostaLead !== filters.resposta) return false;
-      if (filters.busca) {
-        const q = filters.busca.toLowerCase();
-        return (
-          lead.nome.toLowerCase().includes(q) ||
-          lead.telefone.includes(q) ||
-          lead.servicoProcurado.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
+    return leads
+      .filter((lead) => !(lead as any)._deleted)
+      .filter((lead) => {
+        if (filters.etapa !== "Todas" && lead.etapaLead !== filters.etapa) return false;
+        if (filters.status !== "Todos" && lead.status !== filters.status) return false;
+        if (filters.resposta !== "Todas" && lead.respostaLead !== filters.resposta) return false;
+        if (filters.busca) {
+          const q = filters.busca.toLowerCase();
+          return (
+            lead.nome.toLowerCase().includes(q) ||
+            lead.telefone.includes(q) ||
+            lead.servicoProcurado.toLowerCase().includes(q)
+          );
+        }
+        return true;
+      });
   }, [leads, filters]);
 
   // Count follow-ups done today (sincronizado com PerformanceChart)
@@ -397,39 +395,92 @@ export function useLeads() {
     const todayFormatted = format(today, "dd/MM/yyyy");
 
     // Use functional update to avoid races: compute newLeads from the latest state
-    setLeads((prev) => {
-      const newLeads = prev.map((l) => {
-        if (l.id !== leadId) return l;
+    useEffect(() => {
+      // When clinic changes, prefer the remote document: try getDoc() first, then subscribe.
+      let cancelled = false;
+      isMounted.current = true;
+      const effectiveClinic = currentClinic || selectedClinic || undefined;
+      const storageKey = getStorageKey(effectiveClinic);
+      const targetDoc = resolveTargetDoc(effectiveClinic);
+      const clinicLabel = typeof effectiveClinic === 'string' ? String(effectiveClinic).replace(/[^\w\-]/g, '') : effectiveClinic;
+      try { console.log(`[useLeads] initial getDoc for ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'}`); } catch {}
 
-        const newObservacao = observacao
-          ? (l.observacao ? `${l.observacao} | [${todayFormatted}] ${observacao}` : `[${todayFormatted}] ${observacao}`)
-          : l.observacao;
-
-        // Se lead tem agendamento, mover para Avaliação agendada
-        if (l.dataAgendamento) {
-          return {
-            ...l,
-            etapaLead: "Avaliação agendada" as LeadStage,
-            comparecimento: "AGUARDANDO DATA" as LeadComparecimento,
-            dataFollowUp: todayFormatted,
-            lastFollowUpDone: todayFormatted,
-            observacao: newObservacao,
-          };
+      (async () => {
+        try {
+          const snap = await getDoc(targetDoc as any);
+          if (cancelled) return;
+          if (snap.exists()) {
+            let data = (snap.data() as any).leads as Lead[];
+            if (data && Array.isArray(data)) {
+              data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+              isFromFirebase.current = true;
+              setLeads(data);
+              try { localStorage.setItem(storageKey, JSON.stringify(data)); } catch {}
+            }
+          } else {
+            // No remote doc: try local cache specific to this clinic
+            try {
+              const saved = localStorage.getItem(storageKey);
+              if (saved) {
+                const parsed = JSON.parse(saved) as Lead[];
+                setLeads(parsed.map((l: Lead) => ensureDateCriacao(normalizeLead(l))));
+              } else {
+                setLeads([]);
+              }
+              console.log(`[useLeads] clinic doc not found -> used local cache key=${storageKey}`);
+            } catch (e) {
+              setLeads([]);
+            }
+          }
+        } catch (err) {
+          // getDoc failed (network/CORS). Fallback to local cache for this clinic.
+          try { console.error('[useLeads] getDoc error', { effectiveClinic, err }); } catch {}
+          try {
+            const saved = localStorage.getItem(storageKey);
+            if (saved) {
+              const parsed = JSON.parse(saved) as Lead[];
+              setLeads(parsed.map((l: Lead) => ensureDateCriacao(normalizeLead(l))));
+            } else {
+              setLeads([]);
+            }
+          } catch (e) {
+            setLeads([]);
+          }
         }
 
-        const nextCount = l.followUpCount + 1;
+        // Now subscribe to realtime updates
+        try { console.log(`[useLeads] subscribing to ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'}`); } catch {}
+        const unsubscribe = onSnapshot(targetDoc, (snapshot) => {
+          if (!isMounted.current) return;
+          if (snapshot.exists()) {
+            let data = (snapshot.data() as any).leads as Lead[];
+            if (data && Array.isArray(data)) {
+              data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+              isFromFirebase.current = true;
+              setLeads(data);
+              try { localStorage.setItem(storageKey, JSON.stringify(data)); } catch {}
+            }
+          } else {
+            try {
+              setLeads([]);
+              try { localStorage.setItem(storageKey, JSON.stringify([])); } catch {}
+              console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
+            } catch {}
+          }
+        }, (err) => {
+          try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
+        });
 
-        // After Follow-Up 12, mark as Desistência
-        if (nextCount > 12) {
-          return {
-            ...l,
-            etapaLead: "Desistência" as LeadStage,
-            dataFollowUp: todayFormatted,
-            lastFollowUpDone: todayFormatted,
-            observacao: l.observacao
-              ? `${l.observacao} | Ciclo de follow-ups completo (12 tentativas)`
-              : "Ciclo de follow-ups completo (12 tentativas)",
-          };
+        // Cleanup
+        return () => {
+          cancelled = true;
+          isMounted.current = false;
+          try { unsubscribe(); } catch {}
+        };
+      })();
+
+      // no explicit return here because cleanup is handled inside the async IIFE
+    }, [currentClinic, selectedClinic]);
         }
 
         const nextStage = `Follow-Up ${nextCount}` as LeadStage;
@@ -692,27 +743,32 @@ export function useLeads() {
 
     // After a short delay, decide whether to call sendFollowUp (if not already handled
     // as new-today). This allows `createLead` to merge a created lead into state.
-    setTimeout(() => {
-      setLeads((prev) => {
-        const found = prev.find((l) => l.id === leadId);
-        if (!found) return prev;
-        const isNewToday = !!(
-          found.etapaLead === "Novo" &&
-          (found.followUpCount || 0) === 0 &&
-          found.dataCriacao &&
-          found.dataCriacao.startsWith(todayFormatted)
-        );
+    useEffect(() => {
+      // Se a mudança veio do Firebase, não salva de volta (evita loop)
+      if (isFromFirebase.current) {
+        isFromFirebase.current = false;
+        return;
+      }
+      // Salva localmente imediatamente (por clínica)
+      try {
+        const effectiveClinic = currentClinic || selectedClinic || undefined;
+        const storageKey = getStorageKey(effectiveClinic);
+        localStorage.setItem(storageKey, JSON.stringify(leads));
+      } catch {}
 
-        if (isNewToday) {
-          // ensure lastFollowUpDone/dataFollowUp are set to today (idempotent)
-          return prev.map((l) => (l.id === leadId ? { ...l, lastFollowUpDone: todayFormatted, dataFollowUp: todayFormatted } : l));
-        }
-
-        // Not new-today: trigger sendFollowUp to increment followUpCount and set next date
+      // Salva no Firebase com debounce de 1,5s, normalizando fontes e garantindo dataCriacao
+      const timer = setTimeout(async () => {
         try {
-          sendFollowUp(leadId, "", true);
-        } catch (e) {
-          console.error("[registerCall] erro ao disparar sendFollowUp (delayed):", e);
+          const normalizedLeads = leads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+          const effectiveClinic = currentClinic || selectedClinic || undefined;
+          const targetDoc = resolveTargetDoc(effectiveClinic);
+          await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
+        } catch {
+          // Falha silenciosa — dados ainda estão no localStorage
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    }, [leads, currentClinic, selectedClinic]);
         }
         return prev;
       });
@@ -1301,11 +1357,22 @@ export function useLeads() {
   };
 
   const deleteLeads = (leadIds: string[]) => {
-    setLeads((prev) => prev.filter((lead) => !leadIds.includes(lead.id)));
+    // Soft-delete: mark leads with `_deleted`, record metadata for auditing
+    const by = user?.email || user?.uid || 'unknown';
+    const at = new Date().toISOString();
+    setLeads((prev) => prev.map((lead) => {
+      if (leadIds.includes(lead.id)) {
+        return { ...lead, _deleted: true, deletedAt: at, deletedBy: by } as Lead & any;
+      }
+      return lead;
+    }));
   };
 
   const clearAllLeads = () => {
-    setLeads([]);
+    // Soft-delete all leads (keep data for audit/restore)
+    const by = user?.email || user?.uid || 'unknown';
+    const at = new Date().toISOString();
+    setLeads((prev) => prev.map((lead) => ({ ...lead, _deleted: true, deletedAt: at, deletedBy: by } as Lead & any)));
   };
 
   const clearDuplicates = () => {
