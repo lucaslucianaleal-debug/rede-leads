@@ -1022,10 +1022,26 @@ export function useLeads() {
     });
 
     // Deduplicar: cada lead aparece uma vez; prioridade = agendamento > followup > novo
+    const appointmentIds = new Set(appointmentsMade.map(l => l.id));
+    const followUpIds = new Set(followUpsDone.map(l => l.id));
+    const newLeadIds = new Set(newLeads.map(l => l.id));
+
     const seen = new Set<string>();
     const allDetails: Lead[] = [];
+    // Counters with deduplication by priority
+    let dedupAppointments = 0;
+    let dedupFollowUps = 0;
+    let dedupNewLeads = 0;
+
     for (const l of [...appointmentsMade, ...followUpsDone, ...newLeads]) {
-      if (!seen.has(l.id)) { seen.add(l.id); allDetails.push(l); }
+      const id = l.id || '';
+      if (!seen.has(id)) {
+        seen.add(id);
+        allDetails.push(l);
+        if (appointmentIds.has(id)) dedupAppointments++;
+        else if (followUpIds.has(id)) dedupFollowUps++;
+        else dedupNewLeads++;
+      }
     }
 
     const now = new Date();
@@ -1063,9 +1079,10 @@ export function useLeads() {
     ws.addRow(["=========================================="]);
     ws.addRow([]);
     addInfoRow("RESUMO");
-    addInfoRow("ENTRADA DE LEADS", newLeads.length);
-    addInfoRow("FOLLOW-UPS REALIZADOS", followUpsDone.length);
-    addInfoRow("AGENDAMENTOS FEITOS", appointmentsMade.length);
+    // Use deduplicated counts so each lead is counted once according to priority
+    addInfoRow("ENTRADA DE LEADS", dedupNewLeads);
+    addInfoRow("FOLLOW-UPS REALIZADOS", dedupFollowUps);
+    addInfoRow("AGENDAMENTOS FEITOS", dedupAppointments);
     ws.addRow([]);
     addInfoRow("===== DETALHAMENTO =====");
     ws.addRow([]);
