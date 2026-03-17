@@ -1023,24 +1023,24 @@ export function useLeads() {
 
     // Deduplicar: cada lead aparece uma vez; prioridade = agendamento > followup > novo
     const appointmentIds = new Set(appointmentsMade.map(l => l.id));
-    const followUpIds = new Set(followUpsDone.map(l => l.id));
     const newLeadIds = new Set(newLeads.map(l => l.id));
+    const followUpIds = new Set(followUpsDone.map(l => l.id));
 
     const seen = new Set<string>();
     const allDetails: Lead[] = [];
-    // Counters with deduplication by priority
+    // Counters with deduplication by priority (appointment > new > follow-up)
     let dedupAppointments = 0;
-    let dedupFollowUps = 0;
     let dedupNewLeads = 0;
+    let dedupFollowUps = 0;
 
-    for (const l of [...appointmentsMade, ...followUpsDone, ...newLeads]) {
+    for (const l of [...appointmentsMade, ...newLeads, ...followUpsDone]) {
       const id = l.id || '';
       if (!seen.has(id)) {
         seen.add(id);
         allDetails.push(l);
         if (appointmentIds.has(id)) dedupAppointments++;
+        else if (newLeadIds.has(id)) dedupNewLeads++;
         else if (followUpIds.has(id)) dedupFollowUps++;
-        else dedupNewLeads++;
       }
     }
 
