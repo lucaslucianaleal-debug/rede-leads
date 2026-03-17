@@ -3,6 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const serviceAccount = require('../serviceAccountKey.json');
 
+if (!process.argv.includes('--confirm')) {
+  console.error('DANGEROUS: This script removes specific leads. Re-run with --confirm to proceed.');
+  process.exit(1);
+}
+
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
 

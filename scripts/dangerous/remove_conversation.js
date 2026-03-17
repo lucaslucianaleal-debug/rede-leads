@@ -2,6 +2,11 @@ import { readFileSync } from 'fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
+if (!process.argv.includes('--confirm')) {
+  console.error('DANGEROUS: This script permanently removes conversations. Re-run with --confirm to proceed.');
+  process.exit(1);
+}
+
 // Load Firebase service account
 const svcPath = new URL('../whatsapp-server/serviceAccountKey.json', import.meta.url);
 const serviceAccount = JSON.parse(readFileSync(svcPath, 'utf8'));
@@ -43,7 +48,7 @@ async function removeConversation(conversationId) {
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error('Usage: node scripts/remove_conversation.js <conversationId>');
+    console.error('Usage: node scripts/remove_conversation.js <conversationId> --confirm');
     process.exit(1);
   }
   const [convId] = args;
