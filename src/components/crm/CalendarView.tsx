@@ -53,12 +53,24 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   const getReminder24h = (lead: Lead): string => {
     const data = lead.dataAgendamento?.split(" ")[0] || "[Data]";
     const hora = lead.dataAgendamento?.split(" ")[1] || "[Horário]";
-    return `Olá, ${lead.nome}! Tudo bem? Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${data}, às ${hora}. Já deixamos tudo reservado para o seu atendimento. Até amanhã! 🦷💚`;
+    const firstName = (lead.nome || "").split(" ")[0] || "!";
+    return (
+      `Olá, ${firstName}! Tudo bem?\n\n` +
+      `Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${data}, às ${hora}.\n\n` +
+      `Já deixamos tudo reservado para o seu atendimento.\n\n` +
+      `Até amanhã! 🦷💚`
+    );
   };
 
   const getReminder1h = (lead: Lead): string => {
     const hora = lead.dataAgendamento?.split(" ")[1] || "[Horário]";
-    return `Bom dia, ${lead.nome}! Tudo certo para o seu horário hoje às ${hora} aqui na OdontoCompany? Já estamos com sua sala preparada e te aguardando. Até logo! 💚✨`;
+    const firstName = (lead.nome || "").split(" ")[0] || "!";
+    return (
+      `Bom dia, ${firstName}!\n\n` +
+      `Tudo certo para o seu horário hoje às ${hora} aqui na OdontoCompany?\n\n` +
+      `Já estamos com sua sala preparada e te aguardando.\n\n` +
+      `Até logo! 💚✨`
+    );
   };
 
   const [whatsLead, setWhatsLead] = React.useState<Lead | null>(null);

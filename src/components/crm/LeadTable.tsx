@@ -8,6 +8,7 @@ import { useState } from "react";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { LeadDetailsDialog } from "./LeadDetailsDialog";
+import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 import { useAuth } from "@/hooks/useAuth";
 import { generateAppointmentConfirmationTextForClinic, generateAppointmentConfirmationLinkForClinic } from "@/lib/whatsapp";
@@ -87,10 +88,16 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
     window.open(url, "_blank");
   };
 
+  const [whatsLead, setWhatsLead] = useState<Lead | null>(null);
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
+  const [suggestedMessage, setSuggestedMessage] = useState<string | null>(null);
+  const { clinicMeta } = useAuth();
+
   const handleConfirmationClick = (lead: Lead) => {
-    const { clinicMeta } = useAuth();
-    const url = generateAppointmentConfirmationLinkForClinic(lead.telefone, clinicMeta, lead.dataAgendamento || "");
-    window.open(url, "_blank");
+    const message = generateAppointmentConfirmationTextForClinic(clinicMeta, lead.dataAgendamento || "");
+    setSuggestedMessage(message);
+    setWhatsLead(lead);
+    setShowWhatsAppDialog(true);
   };
   
   const allSelected = leads.length > 0 && selectedLeads.length === leads.length;
@@ -430,6 +437,18 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
         onClose={() => setDetailsLead(null)}
         onEdit={onEditLead}
       />
+
+      {whatsLead && showWhatsAppDialog && (
+        <WhatsAppMessageDialog
+          lead={whatsLead}
+          open={showWhatsAppDialog}
+          onClose={() => {
+            setShowWhatsAppDialog(false);
+            setSuggestedMessage(null);
+          }}
+          suggestedMessage={suggestedMessage ?? ""}
+        />
+      )}
     </>
   );
 }

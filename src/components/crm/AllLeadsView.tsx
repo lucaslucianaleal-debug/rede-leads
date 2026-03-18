@@ -1,4 +1,4 @@
-import { Lead } from "@/types/crm";
+import { Lead, LeadStage } from "@/types/crm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,13 @@ import { LeadTable } from "./LeadTable";
 import { EditLeadDialog } from "./EditLeadDialog";
 import { CreateLeadDialog } from "./CreateLeadDialog";
 import { useState, useMemo } from "react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Search, AlertTriangle, Users, CalendarCheck, Clock, UserCheck, Trash2, Plus, Download } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
 
@@ -26,13 +32,18 @@ interface AllLeadsViewProps {
   onOpenChat?: (phone: string, message?: string) => void;
   onOpenCall?: (phone: string) => void;
   onExport?: (leads: Lead[]) => void;
+  onExportRange?: (start: Date, end: Date, leads?: Lead[]) => void;
 }
 
 type FilterCategory = {
   duplicados?: boolean;
 };
 
-export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat, onOpenCall, onExport }: AllLeadsViewProps) {
+export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat, onOpenCall, onExport, onExportRange }: AllLeadsViewProps) {
+  const [reportStart, setReportStart] = useState<Date>(new Date());
+  const [reportEnd, setReportEnd] = useState<Date>(new Date());
+  const [exporting, setExporting] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterCategory>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCreationDay, setSelectedCreationDay] = useState<string>("all");
@@ -40,6 +51,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
   const [selectedAppointmentMonth, setSelectedAppointmentMonth] = useState<string>("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedAttendance, setSelectedAttendance] = useState<string>("all");
+  const [selectedStage, setSelectedStage] = useState<string>("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -140,6 +152,28 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     return Array.from(sources).sort();
   }, [leads]);
 
+  // Lista fixa de etapas igual ao tipo LeadStage
+  const STAGES: LeadStage[] = [
+    "Novo",
+    "Em contato",
+    "Follow-Up 1",
+    "Follow-Up 2",
+    "Follow-Up 3",
+    "Follow-Up 4",
+    "Follow-Up 5",
+    "Follow-Up 6",
+    "Follow-Up 7",
+    "Follow-Up 8",
+    "Follow-Up 9",
+    "Follow-Up 10",
+    "Follow-Up 11",
+    "Follow-Up 12",
+    "Avaliação agendada",
+    "Fora da região",
+    "Desistência",
+    "Finalizado",
+  ];
+
   // First filter by creation day, contact month, appointment month, and source
   const leadsFilteredByMonthSource = useMemo(() => {
     let result = leads;
@@ -186,6 +220,11 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       });
     }
 
+    // Filtro direto igual aos outros
+    if (selectedStage !== "all") {
+      result = result.filter((lead) => lead.etapaLead === selectedStage);
+    }
+
     // Filter by appointment attendance/status
     if (selectedAttendance !== "all") {
       result = result.filter((lead) => {
@@ -194,20 +233,29 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     }
 
     return result;
-  }, [leads, selectedCreationDay, selectedContactMonth, selectedAppointmentMonth, selectedSource, selectedAttendance]);
+  }, [leads, selectedCreationDay, selectedContactMonth, selectedAppointmentMonth, selectedSource, selectedStage, selectedAttendance]);
 
   // Calculate stats based on month/source filters
   const stats = useMemo(() => {
-    const totalLeads = leadsFilteredByMonthSource.length;
-    const agendados = leadsFilteredByMonthSource.filter((l) => l.dataAgendamento && l.dataAgendamento !== "").length;
-    const followUpsPendentes = leadsFilteredByMonthSource.filter((l) => l.etapaLead.startsWith("Follow-Up")).length;
-    const compareceram = leadsFilteredByMonthSource.filter((l) => l.comparecimento === "COMPARECEU").length;
-    
+    // Cards refletem os filtros ativos (como antes)
+    // Total filtrado (igual ao badge/tabela)
+    const entradaLeads = leadsFilteredByMonthSource.length;
+    const followUpsRealizados = leadsFilteredByMonthSource.filter((l) => String(l.etapaLead).toLowerCase().includes("follow-up")).length;
+    // Excluir leads marcados como 'Fora da região' dos contáveis de agendamentos/comparecimentos
+    const agendamentosFeitos = leadsFilteredByMonthSource.filter((l) => l.etapaLead !== "Fora da região" && l.dataAgendamentoCriado && l.dataAgendamentoCriado !== "").length;
+    const compareceram = leadsFilteredByMonthSource.filter((l) => l.etapaLead !== "Fora da região" && l.comparecimento === "COMPARECEU").length;
+
+    // Porcentagens
+    const pctAgendamentos = entradaLeads > 0 ? ((agendamentosFeitos / entradaLeads) * 100).toFixed(1) : null;
+    const pctCompareceram = agendamentosFeitos > 0 ? ((compareceram / agendamentosFeitos) * 100).toFixed(1) : null;
+
     return {
-      totalLeads,
-      agendados,
-      followUpsPendentes,
+      entradaLeads,
+      followUpsRealizados,
+      agendamentosFeitos,
       compareceram,
+      pctAgendamentos,
+      pctCompareceram,
     };
   }, [leadsFilteredByMonthSource]);
 
@@ -248,9 +296,10 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     setSelectedContactMonth("all");
     setSelectedAppointmentMonth("all");
     setSelectedSource("all");
+    setSelectedStage("all");
   };
 
-  const hasActiveFilters = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all";
+  const hasActiveFilters = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all" || selectedStage !== "all";
 
   const colorMap: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
@@ -260,101 +309,83 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
   };
 
   const statsCards = [
-    { key: "totalLeads" as const, label: "Total de Leads", icon: Users, color: "primary" },
-    { key: "agendados" as const, label: "Agendados", icon: CalendarCheck, color: "success" },
-    { key: "followUpsPendentes" as const, label: "Follow-ups Pend.", icon: Clock, color: "accent" },
-    { key: "compareceram" as const, label: "Compareceram", icon: UserCheck, color: "success" },
+    { key: "entradaLeads" as const, label: "Entrada de Leads", icon: Users, color: "primary" },
+    { key: "followUpsRealizados" as const, label: "Follow-ups Realizados", icon: Clock, color: "accent" },
+    { key: "agendamentosFeitos" as const, label: "Agendamentos Feitos", icon: CalendarCheck, color: "success", pct: stats.pctAgendamentos },
+    { key: "compareceram" as const, label: "Compareceram", icon: UserCheck, color: "success", pct: stats.pctCompareceram },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Stats and Filters Section */}
+      {/* Painel único de filtros, busca e ações */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Visão Geral dos Leads
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Month and Source Filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Mês Contato:</span>
-              <Select value={selectedContactMonth} onValueChange={setSelectedContactMonth}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {availableContactMonths.map((month) => (
-                    <SelectItem key={month} value={month}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Dia Criação:</span>
-              <Select value={selectedCreationDay} onValueChange={setSelectedCreationDay}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {availableCreationDays.map((day) => (
-                    <SelectItem key={day} value={day}>
-                      {day}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Mês Agenda:</span>
-              <Select value={selectedAppointmentMonth} onValueChange={setSelectedAppointmentMonth}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {availableAppointmentMonths.map((month) => (
-                    <SelectItem key={month} value={month}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-muted-foreground">Fonte:</span>
-              <Badge
-                variant={selectedSource === "all" ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => setSelectedSource("all")}
-              >
-                Todas
-              </Badge>
-              {availableSources.map((source) => (
-                <Badge
-                  key={source}
-                  variant={selectedSource === source ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedSource(source)}
-                >
-                  {source}
-                </Badge>
-              ))}
-              <div className="ml-3 flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Comparecimento:</span>
+          <CardTitle>
+            <div className="flex flex-wrap gap-4 items-end">
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground mb-1">Mês Contato</span>
+                <Select value={selectedContactMonth} onValueChange={setSelectedContactMonth}>
+                  <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {availableContactMonths.map((month) => (
+                      <SelectItem key={month} value={month}>{month}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground mb-1">Dia Criação</span>
+                <Select value={selectedCreationDay} onValueChange={setSelectedCreationDay}>
+                  <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {availableCreationDays.map((day) => (
+                      <SelectItem key={day} value={day}>{day}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground mb-1">Mês Agenda</span>
+                <Select value={selectedAppointmentMonth} onValueChange={setSelectedAppointmentMonth}>
+                  <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {availableAppointmentMonths.map((month) => (
+                      <SelectItem key={month} value={month}>{month}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground mb-1">Fonte</span>
+                <Select value={selectedSource} onValueChange={setSelectedSource}>
+                  <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {availableSources.map((source) => (
+                      <SelectItem key={source} value={source}>{source}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground mb-1">Etapa</span>
+                <Select value={selectedStage} onValueChange={setSelectedStage}>
+                  <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {STAGES.map((st) => (
+                      <SelectItem key={st} value={st}>{st}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground mb-1">Comparecimento</span>
                 <Select value={selectedAttendance} onValueChange={setSelectedAttendance}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="COMPARECEU">Compareceu</SelectItem>
@@ -363,51 +394,132 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
                   </SelectContent>
                 </Select>
               </div>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="self-end text-xs">Limpar filtros</Button>
+              )}
             </div>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {statsCards.map((card, i) => {
-              const Icon = card.icon;
-              
-              // Calcular porcentagens
-              const getPercentage = () => {
-                if (card.key === "agendados" && stats.totalLeads > 0) {
-                  return `${((stats.agendados / stats.totalLeads) * 100).toFixed(1)}%`;
-                }
-                if (card.key === "compareceram" && stats.agendados > 0) {
-                  return `${((stats.compareceram / stats.agendados) * 100).toFixed(1)}%`;
-                }
-                return null;
-              };
-              
-              const percentage = getPercentage();
-              
-              return (
-                <motion.div
-                  key={card.key}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.04 }}
-                  className="stat-card"
-                >
-                  <div className={`inline-flex p-2 rounded-lg mb-2 ${colorMap[card.color]}`}>
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-2xl font-heading font-bold text-foreground">{stats[card.key]}</p>
-                    {percentage && (
-                      <span className="text-sm font-semibold text-muted-foreground">({percentage})</span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-1">{card.label}</p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </CardContent>
+            {/* Busca */}
+            <div className="mt-4">
+              <Input
+                placeholder="Buscar por nome, telefone ou serviço..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            {/* Barra de ações */}
+            <div className="flex flex-wrap gap-2 items-center mt-4">
+              {onExport && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button onClick={() => onExport(filteredLeads)} variant="outline" className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Exportar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Exporta apenas os leads exibidos na tabela</TooltipContent>
+                </Tooltip>
+              )}
+              {onExportRange && (
+                <>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" aria-label="Data início">
+                        <CalendarCheck className="h-4 w-4 mr-1" />
+                        {format(reportStart, "dd/MM")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar mode="single" selected={reportStart} onSelect={(d) => d && setReportStart(d)} locale={ptBR} />
+                    </PopoverContent>
+                  </Popover>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" aria-label="Data fim">
+                        <CalendarCheck className="h-4 w-4 mr-1" />
+                        {format(reportEnd, "dd/MM")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar mode="single" selected={reportEnd} onSelect={(d) => d && setReportEnd(d)} locale={ptBR} />
+                    </PopoverContent>
+                  </Popover>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          setReportError(null);
+                          if (reportStart > reportEnd) {
+                            setReportError('Data inicial deve ser anterior ou igual à data final');
+                            return;
+                          }
+                          if (!onExportRange) return;
+                          try {
+                            setExporting(true);
+                            await onExportRange(reportStart, reportEnd, filteredLeads as Lead[]);
+                            toast.success('Exportação iniciada — verifique seus downloads');
+                          } catch (e) {
+                            console.error('Export Range failed', e);
+                            toast.error('Falha ao gerar relatório');
+                          } finally {
+                            setExporting(false);
+                          }
+                        }}
+                        className="gap-2"
+                        disabled={exporting}
+                      >
+                        <CalendarCheck className={`h-4 w-4 ${exporting ? 'animate-spin' : ''}`} />
+                        Relatório Período
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Exporta relatório do período selecionado</TooltipContent>
+                  </Tooltip>
+                </>
+              )}
+              {onCreateLead && (
+                <Button onClick={() => setShowCreateDialog(true)} className="gap-2" variant="default">
+                  <Plus className="h-4 w-4" />
+                  Novo Lead
+                </Button>
+              )}
+              <Badge variant="secondary" className="ml-2">Exibindo {filteredLeads.length} de {leadsFilteredByMonthSource.length} leads</Badge>
+            </div>
+          </CardTitle>
+        </CardHeader>
       </Card>
+
+      {/* Cards de estatísticas */}
+      <Card>
+        <CardContent className="py-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 justify-center items-center">
+            {statsCards.map((card, i) => {
+                  const Icon = card.icon;
+                  return (
+                    <motion.div
+                      key={card.key}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      className="stat-card"
+                    >
+                      <div className={`inline-flex p-2 rounded-lg mb-2 ${colorMap[card.color]}`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-2xl font-heading font-bold text-foreground">{stats[card.key]}</p>
+                        {card.pct && (
+                          <span className="text-sm font-semibold text-muted-foreground">({card.pct}%)</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">{card.label}</p>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
 
       {/* Duplicate Alert */}
       {duplicatePhones.size > 0 && (
@@ -438,73 +550,8 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
         </Alert>
       )}
 
-      {/* Search and Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Search className="h-5 w-5" />
-              Buscar Leads
-            </div>
-            <div className="text-sm font-normal text-muted-foreground">
-              Exibindo <span className="font-bold text-foreground">{filteredLeads.length}</span> de{" "}
-              <span className="font-bold text-foreground">{leadsFilteredByMonthSource.length}</span> leads
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Search Bar + New Lead Button */}
-          <div className="flex gap-2 items-end">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome, telefone ou serviço..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-              <div className="flex gap-2">
-                {onExport && (
-                  <Button onClick={() => onExport(filteredLeads)} variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Exportar
-                  </Button>
-                )}
-                {onCreateLead && (
-                  <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Novo Lead
-                  </Button>
-                )}
-              </div>
-          </div>
 
-          {/* Clear Filters Button */}
-          {hasActiveFilters && (
-            <div className="flex justify-end">
-              <button
-                onClick={clearFilters}
-                className="text-sm text-muted-foreground hover:text-foreground underline"
-              >
-                Limpar filtros
-              </button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Delete Selected Button */}
-      {selectedLeads && selectedLeads.length > 0 && onDeleteSelected && (
-        <div className="flex justify-end">
-          <Button variant="destructive" onClick={onDeleteSelected}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Excluir {selectedLeads.length} selecionado{selectedLeads.length > 1 ? 's' : ''}
-          </Button>
-        </div>
-      )}
-
-      {/* Lead Table */}
+      {/* Lead Table e Dialogs */}
       <LeadTable 
         leads={filteredLeads} 
         onMarkAttendance={onMarkAttendance}

@@ -164,7 +164,8 @@ export function ReminderQueue({ leads, onMarkReminder, onOpenChat }: ReminderQue
                               : ""
                           }`}
                             onClick={() => {
-                            const msg = generateReminderText(lead.dataAgendamento || "", rt.key, lead.nome);
+                            const firstName = (lead.nome || "").split(" ")[0];
+                            const msg = generateReminderText(lead.dataAgendamento || "", rt.key, firstName);
                             onOpenChat?.(lead.telefone, msg);
                           }}
                         >

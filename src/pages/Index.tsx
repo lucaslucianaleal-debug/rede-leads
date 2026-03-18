@@ -61,6 +61,7 @@ const CRMDashboard = () => {
     exportAppointments,
     exportDailyReport,
     exportWeeklyReport,
+    exportRangeReport,
     exportWeeklyAppointments,
     exportWeeklyAppointmentsXlsx,
     importCSV,
@@ -204,6 +205,8 @@ const CRMDashboard = () => {
                     </PopoverContent>
                   </Popover>
 
+                  {/* date-range controls moved to 'Todos os Leads' view */}
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm">
@@ -226,6 +229,7 @@ const CRMDashboard = () => {
                         <FileSpreadsheet className="h-4 w-4 mr-2" />
                         Relatório Semanal
                       </DropdownMenuItem>
+                      {/* Range report moved to 'Todos os Leads' tab */}
                       <DropdownMenuSeparator />
                       {duplicatesInfo.has && permissions?.canDelete && (
                         <DropdownMenuItem onClick={() => setShowClearDuplicatesDialog(true)}>
@@ -385,6 +389,7 @@ const CRMDashboard = () => {
               onDeleteSelected={() => setShowDeleteDialog(true)}
               onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
                 onExport={exportCSV}
+                onExportRange={exportRangeReport}
               onRegisterCall={handleRegisterCall}
               onOpenCall={handleOpenCall}
             />
