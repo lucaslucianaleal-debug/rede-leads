@@ -284,6 +284,10 @@ export function useLeads() {
       const dac = l.dataAgendamentoCriado || "";
       return dac.startsWith(todayFormatted);
     }).length;
+    const reagendamentosHoje = leads.filter((l) => {
+      const daa = l.dataAgendamentoAlterado || "";
+      return daa.startsWith(todayFormatted);
+    }).length;
     const followUpsPendentes = leads.filter((l) => l.etapaLead.startsWith("Follow-Up") && l.respostaLead !== "RESPONDEU").length;
     // Overdue follow-ups: leads where lastFollowUpDone or dataCriacao is older than threshold
     const OVERDUE_DAYS = 7; // configurable threshold (days)
@@ -329,6 +333,7 @@ export function useLeads() {
       frios,
       agendados,
       agendadosHoje,
+      reagendamentosHoje,
       followUpsPendentes,
       compareceram,
       lembretesPendentes,
@@ -539,15 +544,35 @@ export function useLeads() {
       const todayFormatted = format(new Date(), "dd/MM/yyyy");
       const updated = prev.map((l) => {
         if (l.id !== leadId) return l;
+        // Prepare base merged object
+        const merged = { ...l, ...updates } as Lead;
+
         // If dataAgendamento is being set now (and previously empty), record the creation date
         if (updates.dataAgendamento && (!l.dataAgendamento || l.dataAgendamento.trim() === "")) {
-          return { ...l, ...updates, dataAgendamentoCriado: todayFormatted };
+          merged.dataAgendamentoCriado = todayFormatted;
+          // Clear any previous "alterado" marker when creating
+          merged.dataAgendamentoAlterado = undefined;
+          return merged;
         }
-        // If dataAgendamento cleared, also clear the created date
+
+        // If dataAgendamento is being changed (reagendamento), record the alteration date
+        if (
+          updates.dataAgendamento &&
+          l.dataAgendamento &&
+          updates.dataAgendamento !== l.dataAgendamento
+        ) {
+          merged.dataAgendamentoAlterado = todayFormatted;
+          return merged;
+        }
+
+        // If dataAgendamento cleared, also clear the created/altered dates
         if ((updates.dataAgendamento === "" || updates.dataAgendamento === undefined) && l.dataAgendamentoCriado) {
-          return { ...l, ...updates, dataAgendamentoCriado: undefined };
+          merged.dataAgendamentoCriado = undefined;
+          merged.dataAgendamentoAlterado = undefined;
+          return merged;
         }
-        return { ...l, ...updates };
+
+        return merged;
       });
       // Sincroniza `leadNome` na coleção `conversations` quando houver alteração de nome.
       // Prioridade de tentativas (novo padrão):

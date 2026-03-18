@@ -63,20 +63,28 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         return dac.startsWith(dayStr);
       });
 
+      // Reagendamentos: contar alterações de agendamento feitas nesse dia
+      const reschedulesMade = leads.filter((l) => {
+        const daa = l.dataAgendamentoAlterado || "";
+        return daa.startsWith(dayStr);
+      });
+
       // Deduplicar com prioridade: agendamento > followup > novo
       const seen = new Set<string>();
       const allDetails: Lead[] = [] as any;
-      for (const l of [...appointmentsMade, ...followUpsDone, ...newLeads]) {
+      for (const l of [...appointmentsMade, ...reschedulesMade, ...followUpsDone, ...newLeads]) {
         if (!seen.has(l.id)) { seen.add(l.id); allDetails.push(l); }
       }
 
       const atendimentos = allDetails.length;
       const agendamentos = appointmentsMade.length;
+      const reagendamentos = reschedulesMade.length;
 
       return {
         dia: format(day, days === 1 ? "'Hoje'" : days === 7 ? "EEE dd/MM" : "dd/MM", { locale: ptBR }),
         Atendimentos: atendimentos,
         Agendamentos: agendamentos,
+        Reagendamentos: reagendamentos,
       };
     });
 
@@ -97,13 +105,15 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
   const newLeadsToday = leads.filter((l) => (l.dataContato || "").startsWith(todayStr));
   const followUpsDoneToday = leads.filter((l) => (l.dataFollowUp || "").startsWith(todayStr));
   const appointmentsMadeToday = leads.filter((l) => (l.dataAgendamentoCriado || "").startsWith(todayStr));
+  const reschedulesToday = leads.filter((l) => (l.dataAgendamentoAlterado || "").startsWith(todayStr));
   const seenToday = new Set<string>();
   const allToday: Lead[] = [] as any;
-  for (const l of [...appointmentsMadeToday, ...followUpsDoneToday, ...newLeadsToday]) {
+  for (const l of [...appointmentsMadeToday, ...reschedulesToday, ...followUpsDoneToday, ...newLeadsToday]) {
     if (!seenToday.has(l.id)) { seenToday.add(l.id); allToday.push(l); }
   }
   const atendimentosHoje = allToday.length;
   const agendamentosHoje = appointmentsMadeToday.length;
+  const reagendamentosHoje = reschedulesToday.length;
   const taxaHoje =
     atendimentosHoje > 0
       ? ((agendamentosHoje / atendimentosHoje) * 100).toFixed(1)
@@ -173,6 +183,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
             variant="info"
             showTrophy={true}
           />
+          <p className="text-[11px] text-muted-foreground mt-2">Reagendamentos hoje: {reagendamentosHoje}</p>
         </div>
 
         {/* Taxa de conversão do dia */}
@@ -252,6 +263,16 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
                 dot={{ r: 3, fill: "hsl(var(--success))" }}
                 activeDot={{ r: 5 }}
               />
+
+                  {/* Linha 3: Reagendamentos */}
+                  <Line
+                    type="monotone"
+                    dataKey="Reagendamentos"
+                    stroke="hsl(var(--warning))"
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: "hsl(var(--warning))" }}
+                    activeDot={{ r: 5 }}
+                  />
             </LineChart>
           </ResponsiveContainer>
 

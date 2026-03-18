@@ -50,6 +50,8 @@ export interface Lead {
   lastFollowUpDone?: string;
   // Data em que o agendamento foi CRIADO/registrado no sistema (dd/MM/yyyy)
   dataAgendamentoCriado?: string;
+  // Data em que o agendamento foi ALTERADO (reagendamento) pela última vez
+  dataAgendamentoAlterado?: string;
   dataAgendamento: string;
   dataRetornoLigacao: string;
   observacao: string;
@@ -85,6 +87,7 @@ export interface DashboardStats {
   frios: number;
   agendados: number; // leads com dataAgendamento preenchida
   agendadosHoje?: number; // quantidade de leads com dataAgendamento hoje
+  reagendamentosHoje?: number; // quantidade de reagendamentos registrados hoje
   followUpsPendentes: number;
   followUpsOverdue?: number;
   compareceram: number;
