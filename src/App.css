@@ -40,3 +40,65 @@
 .read-the-docs {
   color: #888;
 }
+
+@media print {
+  html, body {
+    width: 100vw !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  body > *:not(.print-followup-list) {
+    display: none !important;
+  }
+  .print-followup-list {
+    display: block !important;
+    position: static !important;
+    width: 100vw !important;
+    min-width: 0 !important;
+    margin: 0 auto !important;
+    background: white !important;
+    color: black !important;
+    padding: 32px 24px !important;
+    box-shadow: none !important;
+  }
+  .print-header {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .print-header h2 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.25em;
+  }
+  .print-header .print-total {
+    font-size: 1.1rem;
+    margin-bottom: 0.5em;
+    font-weight: 500;
+  }
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-top: 12px;
+  }
+  .print-table th, .print-table td {
+    border: 1px solid #bbb;
+    padding: 8px 10px;
+    text-align: left;
+  }
+  .print-table th {
+    background: #f3f3f3;
+    font-weight: bold;
+  }
+  .print-table tr:nth-child(even) {
+    background: #fafafa;
+  }
+  .print\:hidden, .print\:hidden * {
+    display: none !important;
+  }
+  .print-only\:block {
+    display: block !important;
+  }
+}

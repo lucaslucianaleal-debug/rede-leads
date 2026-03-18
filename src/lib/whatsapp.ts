@@ -34,13 +34,25 @@ export function generateReminderText(
   const [datePart, timePart] = (dataAgendamento || "").split(" ");
   const date = datePart || "[Data]";
   const time = timePart || "[Horário]";
+  // Garante só o primeiro nome
+  const firstName = (name || "").split(" ")[0] || "!";
 
   if (type === "h24") {
     // Amanhã
-    return `Olá, ${name || "!"} Tudo bem? Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${date}, às ${time}. Já deixamos tudo reservado para o seu atendimento. Até amanhã! 🦷💚`;
+    return (
+      `Olá, ${firstName}! Tudo bem?\n\n` +
+      `Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${date}, às ${time}.\n\n` +
+      `Já deixamos tudo reservado para o seu atendimento.\n\n` +
+      `Até amanhã! 🦷💚`
+    );
   } else {
     // Hoje
-    return `Bom dia, ${name || "!"} Tudo certo para o seu horário hoje às ${time} aqui na OdontoCompany? Já estamos com sua sala preparada e te aguardando. Até logo! 💚✨`;
+    return (
+      `Bom dia, ${firstName}!\n\n` +
+      `Tudo certo para o seu horário hoje às ${time} aqui na OdontoCompany?\n\n` +
+      `Já estamos com sua sala preparada e te aguardando.\n\n` +
+      `Até logo! 💚✨`
+    );
   }
 }
 

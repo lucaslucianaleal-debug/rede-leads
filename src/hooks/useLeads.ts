@@ -36,6 +36,9 @@ const normalizeFonteLead = (fonte: string): string => {
     "cupom indicação": "Indicação",
     "cupom indicaçao": "Indicação",
     "online": "Online",
+    "influenciadora": "Influenciadora",
+    "influenciador": "Influenciadora",
+    "influencer": "Influenciadora",
   };
   
   // Se encontra no mapa, retorna
@@ -49,6 +52,7 @@ const normalizeFonteLead = (fonte: string): string => {
   }
   if (normalized.includes("google")) return "Google";
   if (normalized.includes("site")) return "Site";
+  if (normalized.includes("influenc") || normalized.includes("influencer") || normalized.includes("influenciador")) return "Influenciadora";
   if (normalized.includes("sorteio") || normalized.includes("radio")) return "Sorteio Radio";
   if (normalized.includes("indicação") || normalized.includes("indicaçao")) {
     return "Indicação";
@@ -115,33 +119,87 @@ export function useLeads() {
     const targetDoc = resolveTargetDoc(effectiveClinic);
     // Sanitize clinic id for logging
     const clinicLabel = typeof effectiveClinic === 'string' ? String(effectiveClinic).replace(/[^\w\-]/g, '') : effectiveClinic;
-    try { console.log(`[useLeads] subscribing to ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
-    const unsubscribe = onSnapshot(targetDoc, (snapshot) => {
-      if (!isMounted.current) return;
-      if (snapshot.exists()) {
-        let data = (snapshot.data() as any).leads as Lead[];
-        if (data && Array.isArray(data)) {
-          data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-          isFromFirebase.current = true;
-          setLeads(data);
-          try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
-        }
-      } else {
-        // If clinic document does not exist, clear leads (new clinic)
+    try { console.log(`[useLeads] resolving ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
+
+    let unsub: () => void = () => {};
+
+    const init = async () => {
+      try {
+        // First attempt a one-time read from Firestore to prefer remote state
+        const snap = await getDoc(targetDoc as any);
+        if (!isMounted.current) return;
+        if (snap && snap.exists()) {
+          let data = (snap.data() as any).leads as Lead[];
+          if (data && Array.isArray(data)) {
+            data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+            isFromFirebase.current = true;
+            setLeads(data);
+            try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
+          }
+        } else {
+          // If remote doc missing, fall back to localStorage (if available)
           try {
+            const cached = localStorage.getItem(getStorageKey(effectiveClinic));
+            if (cached) {
+              const parsed = JSON.parse(cached) as Lead[];
+              const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+              setLeads(normalized);
+              console.log(`[useLeads] used local cache for clinic=${String(effectiveClinic)}`);
+            } else {
+              setLeads([]);
+              try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
+              console.log(`[useLeads] clinic doc not found -> initialized empty for clinic=${effectiveClinic}`);
+            }
+          } catch (e) {
             setLeads([]);
-            try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
-            console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
-          } catch {}
+          }
+        }
+      } catch (err) {
+        // If getDoc fails (network), try local cache before giving up
+        try { console.error('[useLeads] getDoc error, falling back to local cache', { effectiveClinic, clinicLabel, err }); } catch {}
+        try {
+          const cached = localStorage.getItem(getStorageKey(effectiveClinic));
+          if (cached) {
+            const parsed = JSON.parse(cached) as Lead[];
+            const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+            setLeads(normalized);
+            console.log(`[useLeads] used local cache after getDoc failure for clinic=${String(effectiveClinic)}`);
+          }
+        } catch (e) {}
       }
-    }, (err) => {
-      // Log detailed error for diagnostics (CORS / network issues)
-      try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
-      // If Firebase fails, keep localStorage silently. We still return the unsubscribe function.
-    });
+
+      // After initial resolution, subscribe to realtime updates
+      try {
+        unsub = onSnapshot(targetDoc, (snapshot) => {
+          if (!isMounted.current) return;
+          if (snapshot.exists()) {
+            let data = (snapshot.data() as any).leads as Lead[];
+            if (data && Array.isArray(data)) {
+              data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+              isFromFirebase.current = true;
+              setLeads(data);
+              try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
+            }
+          } else {
+            try {
+              setLeads([]);
+              try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
+              console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
+            } catch {}
+          }
+        }, (err) => {
+          try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
+        });
+      } catch (e) {
+        try { console.error('[useLeads] failed to start onSnapshot', e); } catch {}
+      }
+    };
+
+    init();
+
     return () => {
       isMounted.current = false;
-      unsubscribe();
+      try { unsub(); } catch {}
     };
   }, [currentClinic, selectedClinic]);
 
@@ -297,6 +355,8 @@ export function useLeads() {
           l.etapaLead.startsWith("Follow-Up")
         ) &&
         l.etapaLead !== "Desistência" &&
+        l.etapaLead !== "Finalizado" &&
+        l.etapaLead !== "Fora da região" &&
         l.comparecimento !== "COMPARECEU" &&
         // Filtro: leads com dataFollowUp hoje/antes OU leads novos sem dataFollowUp (criados hoje/antes)
         (
@@ -394,99 +454,15 @@ export function useLeads() {
     const today = new Date();
     const todayFormatted = format(today, "dd/MM/yyyy");
 
-    // Use functional update to avoid races: compute newLeads from the latest state
-    useEffect(() => {
-      // When clinic changes, prefer the remote document: try getDoc() first, then subscribe.
-      let cancelled = false;
-      isMounted.current = true;
-      const effectiveClinic = currentClinic || selectedClinic || undefined;
-      const storageKey = getStorageKey(effectiveClinic);
-      const targetDoc = resolveTargetDoc(effectiveClinic);
-      const clinicLabel = typeof effectiveClinic === 'string' ? String(effectiveClinic).replace(/[^\w\-]/g, '') : effectiveClinic;
-      try { console.log(`[useLeads] initial getDoc for ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'}`); } catch {}
-
-      (async () => {
-        try {
-          const snap = await getDoc(targetDoc as any);
-          if (cancelled) return;
-          if (snap.exists()) {
-            let data = (snap.data() as any).leads as Lead[];
-            if (data && Array.isArray(data)) {
-              data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-              isFromFirebase.current = true;
-              setLeads(data);
-              try { localStorage.setItem(storageKey, JSON.stringify(data)); } catch {}
-            }
-          } else {
-            // No remote doc: try local cache specific to this clinic
-            try {
-              const saved = localStorage.getItem(storageKey);
-              if (saved) {
-                const parsed = JSON.parse(saved) as Lead[];
-                setLeads(parsed.map((l: Lead) => ensureDateCriacao(normalizeLead(l))));
-              } else {
-                setLeads([]);
-              }
-              console.log(`[useLeads] clinic doc not found -> used local cache key=${storageKey}`);
-            } catch (e) {
-              setLeads([]);
-            }
-          }
-        } catch (err) {
-          // getDoc failed (network/CORS). Fallback to local cache for this clinic.
-          try { console.error('[useLeads] getDoc error', { effectiveClinic, err }); } catch {}
-          try {
-            const saved = localStorage.getItem(storageKey);
-            if (saved) {
-              const parsed = JSON.parse(saved) as Lead[];
-              setLeads(parsed.map((l: Lead) => ensureDateCriacao(normalizeLead(l))));
-            } else {
-              setLeads([]);
-            }
-          } catch (e) {
-            setLeads([]);
-          }
-        }
-
-        // Now subscribe to realtime updates
-        try { console.log(`[useLeads] subscribing to ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'}`); } catch {}
-        const unsubscribe = onSnapshot(targetDoc, (snapshot) => {
-          if (!isMounted.current) return;
-          if (snapshot.exists()) {
-            let data = (snapshot.data() as any).leads as Lead[];
-            if (data && Array.isArray(data)) {
-              data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-              isFromFirebase.current = true;
-              setLeads(data);
-              try { localStorage.setItem(storageKey, JSON.stringify(data)); } catch {}
-            }
-          } else {
-            try {
-              setLeads([]);
-              try { localStorage.setItem(storageKey, JSON.stringify([])); } catch {}
-              console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
-            } catch {}
-          }
-        }, (err) => {
-          try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
-        });
-
-        // Cleanup
-        return () => {
-          cancelled = true;
-          isMounted.current = false;
-          try { unsubscribe(); } catch {}
-        };
-      })();
-
-      // no explicit return here because cleanup is handled inside the async IIFE
-    }, [currentClinic, selectedClinic]);
-        }
-
+    setLeads((prev) => {
+      let found = false;
+      const newLeads = prev.map((l) => {
+        if (l.id !== leadId) return l;
+        found = true;
+        const nextCount = (l.followUpCount || 0) + 1;
+        const newObservacao = observacao ? (l.observacao ? `${l.observacao} | ${observacao}` : observacao) : l.observacao;
         const nextStage = `Follow-Up ${nextCount}` as LeadStage;
 
-        // Calcular próximo follow-up: por padrão +1 dia (próximo dia útil).
-        // Se `nextFollowUpIsToday` for true, manter para hoje.
         let nextFollowUpFormatted = todayFormatted;
         if (!nextFollowUpIsToday) {
           const daysToAdd = 1;
@@ -505,6 +481,8 @@ export function useLeads() {
         };
       });
 
+      if (!found) return prev;
+
       // Save to Firebase (non-blocking) using the computed newLeads to avoid overwrites
       setTimeout(async () => {
         try {
@@ -513,7 +491,7 @@ export function useLeads() {
           const targetDoc = resolveTargetDoc(effectiveClinic);
           await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
           console.log(`[sendFollowUp] Lead ${leadId} salvo no Firebase (clinic=${effectiveClinic || 'shared'})`);
-          // Ensure listener does not re-save immediately
+          // Prevent immediate re-save loop
           isFromFirebase.current = false;
         } catch (e) {
           console.error("[sendFollowUp] Erro ao salvar no Firebase:", e);
@@ -743,32 +721,19 @@ export function useLeads() {
 
     // After a short delay, decide whether to call sendFollowUp (if not already handled
     // as new-today). This allows `createLead` to merge a created lead into state.
-    useEffect(() => {
-      // Se a mudança veio do Firebase, não salva de volta (evita loop)
-      if (isFromFirebase.current) {
-        isFromFirebase.current = false;
-        return;
-      }
-      // Salva localmente imediatamente (por clínica)
-      try {
-        const effectiveClinic = currentClinic || selectedClinic || undefined;
-        const storageKey = getStorageKey(effectiveClinic);
-        localStorage.setItem(storageKey, JSON.stringify(leads));
-      } catch {}
-
-      // Salva no Firebase com debounce de 1,5s, normalizando fontes e garantindo dataCriacao
-      const timer = setTimeout(async () => {
-        try {
-          const normalizedLeads = leads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-          const effectiveClinic = currentClinic || selectedClinic || undefined;
-          const targetDoc = resolveTargetDoc(effectiveClinic);
-          await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
-        } catch {
-          // Falha silenciosa — dados ainda estão no localStorage
-        }
-      }, 1500);
-      return () => clearTimeout(timer);
-    }, [leads, currentClinic, selectedClinic]);
+    setTimeout(() => {
+      setLeads((prev) => {
+        const found = prev.find((l) => l.id === leadId);
+        if (!found) return prev;
+        const isNewToday = !!(
+          found.etapaLead === "Novo" &&
+          (found.followUpCount || 0) === 0 &&
+          found.dataCriacao &&
+          found.dataCriacao.startsWith(todayFormatted)
+        );
+        if (!isNewToday) {
+          // Defer to sendFollowUp to increment follow-up count
+          setTimeout(() => sendFollowUp(leadId, "", false), 0);
         }
         return prev;
       });
@@ -792,6 +757,7 @@ export function useLeads() {
       COMPARECIMENTO: l.comparecimento,
       OBSERVAÇÃO: l.observacao,
     }));
+
     const csv = Papa.unparse(data, { delimiter: ";" });
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -949,6 +915,7 @@ export function useLeads() {
     const formatted = format(date, "dd/MM/yyyy");
 
     const newLeads = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
       const dc = l.dataContato || "";
       return dc.startsWith(formatted);
     });
@@ -957,21 +924,39 @@ export function useLeads() {
     // ensures registered calls that set `lastFollowUpDone` are included in
     // the daily report.
     const followUpsDone = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
       const df = l.dataFollowUp || "";
       const last = l.lastFollowUpDone || "";
       return df.startsWith(formatted) || last.startsWith(formatted);
     });
     // Agendamentos feitos: contar agendamentos CRIADOS na UI hoje (dataAgendamentoCriado)
     const appointmentsMade = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
       const dac = l.dataAgendamentoCriado || "";
       return dac.startsWith(formatted);
     });
 
     // Deduplicar: cada lead aparece uma vez; prioridade = agendamento > followup > novo
+    const appointmentIds = new Set(appointmentsMade.map(l => l.id));
+    const newLeadIds = new Set(newLeads.map(l => l.id));
+    const followUpIds = new Set(followUpsDone.map(l => l.id));
+
     const seen = new Set<string>();
     const allDetails: Lead[] = [];
-    for (const l of [...appointmentsMade, ...followUpsDone, ...newLeads]) {
-      if (!seen.has(l.id)) { seen.add(l.id); allDetails.push(l); }
+    // Counters with deduplication by priority (appointment > new > follow-up)
+    let dedupAppointments = 0;
+    let dedupNewLeads = 0;
+    let dedupFollowUps = 0;
+
+    for (const l of [...appointmentsMade, ...newLeads, ...followUpsDone]) {
+      const id = l.id || '';
+      if (!seen.has(id)) {
+        seen.add(id);
+        allDetails.push(l);
+        if (appointmentIds.has(id)) dedupAppointments++;
+        else if (newLeadIds.has(id)) dedupNewLeads++;
+        else if (followUpIds.has(id)) dedupFollowUps++;
+      }
     }
 
     const now = new Date();
@@ -1009,14 +994,15 @@ export function useLeads() {
     ws.addRow(["=========================================="]);
     ws.addRow([]);
     addInfoRow("RESUMO");
-    addInfoRow("ENTRADA DE LEADS", newLeads.length);
-    addInfoRow("FOLLOW-UPS REALIZADOS", followUpsDone.length);
-    addInfoRow("AGENDAMENTOS FEITOS", appointmentsMade.length);
+    // Use deduplicated counts so each lead is counted once according to priority
+    addInfoRow("ENTRADA DE LEADS", dedupNewLeads);
+    addInfoRow("FOLLOW-UPS REALIZADOS", dedupFollowUps);
+    addInfoRow("AGENDAMENTOS FEITOS", dedupAppointments);
     ws.addRow([]);
     addInfoRow("===== DETALHAMENTO =====");
     ws.addRow([]);
 
-    const appointmentIds = new Set(appointmentsMade.map(l => l.id));
+    const appointmentIdsDetail = new Set(appointmentsMade.map(l => l.id));
 
     const headerRow = ws.addRow(["NOME", "TELEFONE", "SERVIÇO", "ETAPA", "RESPOSTA", "DATA AGENDAMENTO", "FONTE", "STATUS"]);
     headerRow.eachCell(cell => {
@@ -1035,7 +1021,7 @@ export function useLeads() {
         l.fonteLead,
         l.status,
       ]);
-      if (appointmentIds.has(l.id)) {
+      if (appointmentIdsDetail.has(l.id)) {
         row.eachCell(cell => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC6EFCE" } };
         });
@@ -1065,6 +1051,7 @@ export function useLeads() {
     
     // Filtrar comparecimentos da semana
     const comparecimentos = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
       if (l.comparecimento !== "COMPARECEU" || !l.dataAgendamento) return false;
       
       const [day, month, year] = l.dataAgendamento.split('/');
@@ -1075,6 +1062,7 @@ export function useLeads() {
     
     // Contar agendados da semana
     const agendadosSemana = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
       if (!l.dataAgendamento) return false;
       
       const [day, month, year] = l.dataAgendamento.split('/');
@@ -1085,6 +1073,7 @@ export function useLeads() {
 
     // Contar leads criados na semana (baseado em `dataCriacao` no formato dd/MM/yyyy)
     const leadsCriadosSemana = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
       if (!l.dataCriacao) return false;
       const parts = l.dataCriacao.split('/');
       if (parts.length !== 3) return false;
@@ -1168,8 +1157,133 @@ export function useLeads() {
     URL.revokeObjectURL(url);
   };
 
+  const exportRangeReport = async (startDate: Date, endDate: Date, leadsParam?: Lead[]) => {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    // Use provided leads array when given (e.g., filtered view), otherwise use full leads
+    const source = (leadsParam || leads).filter((l) => !(l as any)._deleted && l.etapaLead !== "Fora da região");
+
+    // Filtrar agendamentos no período (inclusivo)
+    const appts = source.filter(l => {
+      if (!l.dataAgendamento) return false;
+      const parts = l.dataAgendamento.split('/');
+      if (parts.length < 3) return false;
+      const [day, month, yearAndRest] = parts;
+      const year = yearAndRest.split(' ')[0];
+      const agDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return agDate >= start && agDate <= end;
+    });
+
+    const comparecimentos = appts.filter(l => l.comparecimento === "COMPARECEU");
+    const agendadosPeriodo = appts.length;
+
+    const leadsCriadosPeriodo = source.filter(l => {
+      if (!l.dataCriacao) return false;
+      const parts = l.dataCriacao.split('/');
+      if (parts.length !== 3) return false;
+      const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      return d >= start && d <= end;
+    }).length;
+
+    const taxaComparecimento = agendadosPeriodo > 0
+      ? ((comparecimentos.length / agendadosPeriodo) * 100).toFixed(1)
+      : "0.0";
+    const pctAgendamentos = leadsCriadosPeriodo > 0
+      ? ((agendadosPeriodo / leadsCriadosPeriodo) * 100).toFixed(1)
+      : "0.0";
+
+    const now = new Date();
+    const generatedAt = `${format(now, "dd/MM/yyyy")} ${format(now, "HH:mm")}`;
+
+    const ExcelJS = (await import("exceljs")).default;
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Relatório Período");
+
+    ws.columns = [
+      { width: 32 },
+      { width: 18 },
+      { width: 18 },
+      { width: 20 },
+      { width: 14 },
+      { width: 30 },
+    ];
+
+    const addInfoRow = (label: string, value?: string | number) => {
+      const row = ws.addRow(value !== undefined ? [label, value] : [label]);
+      row.getCell(1).font = { bold: !value };
+      return row;
+    };
+
+    addInfoRow("REDE LEADS");
+    ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 14 };
+    addInfoRow("Central de Conversão de Leads");
+    addInfoRow("WhatsApp: (17) 99115-4763");
+    ws.addRow([]);
+    addInfoRow("AGENDAMENTOS - RELATÓRIO POR PERÍODO");
+    ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 12 };
+    addInfoRow("Período", `${format(start, "dd/MM/yyyy")} a ${format(end, "dd/MM/yyyy")}`);
+    addInfoRow("Gerado em", generatedAt);
+    ws.addRow(["=========================================="]);
+    ws.addRow([]);
+    addInfoRow("RESUMO");
+    addInfoRow("LEADS CRIADOS", leadsCriadosPeriodo);
+    addInfoRow("AGENDADOS NO PERÍODO", `${agendadosPeriodo} (${pctAgendamentos}%)`);
+    addInfoRow("COMPARECIMENTOS", `${comparecimentos.length} (${taxaComparecimento}%)`);
+    ws.addRow([]);
+    addInfoRow("===== DETALHAMENTO DOS AGENDAMENTOS =====");
+    ws.addRow([]);
+
+    const headerRow = ws.addRow(["NOME", "TELEFONE", "SERVIÇO", "DATA AGENDAMENTO", "FONTE", "OBSERVAÇÃO"]);
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB8B8B8" } };
+    });
+
+    appts.forEach(l => {
+      const row = ws.addRow([
+        l.nome,
+        l.telefone,
+        l.servicoProcurado,
+        l.dataAgendamento,
+        l.fonteLead,
+        l.observacao || "",
+      ]);
+      if (l.comparecimento === "COMPARECEU") {
+        row.eachCell(cell => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC6EFCE" } };
+        });
+      }
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    // Build clinic label similar to CSV export
+    const sanitize = (s?: string | null) => {
+      if (!s) return "Clinic";
+      try {
+        return String(s)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/\s+/g, "_")
+          .replace(/[^\w\-]/g, "");
+      } catch {
+        return String(s).replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
+      }
+    };
+    const clinicNameRaw = (currentClinic || selectedClinic || 'Clinic');
+    const clinicLabel = sanitize(clinicNameRaw as any);
+    a.download = `${clinicLabel}_Agendamentos_Periodo_${format(start, "yyyy-MM-dd")}_to_${format(end, "yyyy-MM-dd")}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportCSV = (leadsParam?: Lead[]) => {
-    const source = leadsParam || leads;
+    const source = (leadsParam || leads).filter(l => l.etapaLead !== "Fora da região");
     const formatPhoneBR = (raw: string) => {
       if (!raw) return "";
       const nums = String(raw).replace(/\D/g, "");
@@ -1447,6 +1561,7 @@ export function useLeads() {
     exportAppointments,
     exportDailyReport,
     exportWeeklyReport,
+    exportRangeReport,
     exportWeeklyAppointments,
     exportWeeklyAppointmentsXlsx,
     deleteLeads,

@@ -23,12 +23,12 @@ const ETAPAS: LeadStage[] = [
   "Follow-Up 1", "Follow-Up 2", "Follow-Up 3", "Follow-Up 4",
   "Follow-Up 5", "Follow-Up 6", "Follow-Up 7", "Follow-Up 8",
   "Follow-Up 9", "Follow-Up 10", "Follow-Up 11", "Follow-Up 12",
-  "Avaliação agendada", "Desistência", "Finalizado",
+  "Avaliação agendada", "Fora da região", "Desistência", "Finalizado",
 ];
 
 const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
 
-const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Outro"];
+const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Influenciador", "Outro"];
 
 const STATUSES: LeadStatus[] = ["QUENTE", "MORNO", "FRIO"];
 

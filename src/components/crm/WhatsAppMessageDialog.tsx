@@ -67,51 +67,37 @@ export function WhatsAppMessageDialog({
       return;
     }
 
-    // Try to open native WhatsApp app first (protocol), then fallback to wa.me
+    // Tenta abrir o WhatsApp, mas NÃO fecha o diálogo automaticamente
     const phone = lead.telefone.replace(/[^0-9]/g, "");
     const appLink = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
     const webLink = generateFollowUpWhatsAppLink(lead.telefone, lead.nome, message);
 
-    // Open native link (may prompt the browser). Set a fallback timer to open web link.
     let fallbackFired = false;
     const fallbackTimer = window.setTimeout(() => {
       fallbackFired = true;
       window.open(webLink, "_blank");
       toast.success(`Abrindo WhatsApp Web para ${lead.nome}`);
-      onDone?.();
-      onClose();
+      // NÃO fecha o diálogo aqui
     }, 900);
 
     try {
       const opened = window.open(appLink);
-      // If window.open returned null (blocked), immediately open web link
       if (!opened) {
         clearTimeout(fallbackTimer);
         window.open(webLink, "_blank");
         toast.success(`Abrindo WhatsApp Web para ${lead.nome}`);
-        onDone?.();
-        onClose();
+        // NÃO fecha o diálogo aqui
         return;
       }
     } catch (e) {
       clearTimeout(fallbackTimer);
       window.open(webLink, "_blank");
       toast.success(`Abrindo WhatsApp Web para ${lead.nome}`);
-      onDone?.();
-      onClose();
+      // NÃO fecha o diálogo aqui
       return;
     }
 
-    // If fallback already executed, nothing else to do. Otherwise keep dialog open briefly
-    // Close dialog after a short grace period if app link likely worked
-    setTimeout(() => {
-      if (!fallbackFired) {
-        clearTimeout(fallbackTimer);
-        toast.success(`Tentativa de abrir WhatsApp nativo para ${lead.nome}`);
-        onDone?.();
-        onClose();
-      }
-    }, 1200);
+    // NÃO fecha o diálogo automaticamente
   };
 
   const handleDone = () => {
@@ -127,7 +113,7 @@ export function WhatsAppMessageDialog({
         <DialogHeader className="pb-2">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <DialogTitle className="text-lg">{lead.nome}</DialogTitle>
+              <DialogTitle className="text-lg">{(lead.nome || "").split(" ")[0]}</DialogTitle>
               <div className="text-sm text-muted-foreground mt-1">{lead.telefone}</div>
             </div>
             {onSend && (
@@ -158,7 +144,7 @@ export function WhatsAppMessageDialog({
             />
           ) : (
             <div
-              className="p-3 rounded-lg bg-muted/50 border border-border text-sm whitespace-pre-wrap cursor-pointer hover:bg-muted/80 transition-colors min-h-[120px] flex items-center"
+              className="p-3 rounded-lg bg-muted/50 border border-border text-sm whitespace-pre-line cursor-pointer hover:bg-muted/80 transition-colors min-h-[120px] flex items-center"
               onClick={() => setIsEditing(true)}
             >
               {message || <span className="text-muted-foreground italic">Clique para editar...</span>}

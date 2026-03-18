@@ -10,7 +10,7 @@ interface LeadFiltersProps {
 
 const stages: (LeadStage | "Todas")[] = [
   "Todas", "Novo", "Em contato", "Follow-Up 1", "Follow-Up 2", "Follow-Up 3", "Follow-Up 4",
-  "Follow-Up 5", "Follow-Up 6", "Follow-Up 7", "Follow-Up 8", "Avaliação agendada", "Desistência", "Finalizado",
+  "Follow-Up 5", "Follow-Up 6", "Follow-Up 7", "Follow-Up 8", "Avaliação agendada", "Fora da região", "Desistência", "Finalizado",
 ];
 
 const statuses: (LeadStatus | "Todos")[] = ["Todos", "QUENTE", "MORNO", "FRIO"];

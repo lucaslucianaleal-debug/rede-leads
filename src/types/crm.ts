@@ -14,6 +14,7 @@ export type LeadStage =
   | "Follow-Up 11"
   | "Follow-Up 12"
   | "Avaliação agendada"
+  | "Fora da região"
   | "Desistência"
   | "Finalizado";
 

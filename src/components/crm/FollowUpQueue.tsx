@@ -9,6 +9,7 @@ import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { CallLogDialog } from "./CallLogDialog";
+import ExcelJS from 'exceljs';
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
 import { useAuth } from "@/hooks/useAuth";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
@@ -36,6 +37,41 @@ const getDaysSince = (dateString: string): number => {
   return diffDays;
 };
 
+const formatDateForDisplay = (v: any) => {
+  if (!v) return "";
+  try {
+    const d = typeof v === "number" ? new Date(v) : new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.toLocaleDateString();
+  } catch (e) {
+    return String(v);
+  }
+};
+  
+const parseToDate = (v: any): Date | null => {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === 'number') {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof v === 'string') {
+    // Try ISO first
+    const iso = new Date(v);
+    if (!isNaN(iso.getTime())) return iso;
+    // Try DD/MM/YYYY
+    const m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) {
+      const dd = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10) - 1;
+      const yyyy = parseInt(m[3], 10);
+      const d = new Date(yyyy, mm, dd);
+      return isNaN(d.getTime()) ? null : d;
+    }
+  }
+  return null;
+};
+
 export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
@@ -49,22 +85,94 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const { clinicMeta } = useAuth();
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
 
-  // debounce search input
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 250);
-    return () => clearTimeout(t);
-  }, [search]);
+  
+
+  const handleExportExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = clinicMeta?.name || 'Clínica';
+      const sheet = workbook.addWorksheet('FollowUp');
+
+      sheet.columns = [
+        { header: 'Nome', key: 'nome', width: 30 },
+        { header: 'Data Criação', key: 'created', width: 14 },
+        { header: 'Telefone', key: 'telefone', width: 18 },
+        { header: 'Serviço', key: 'servico', width: 24 },
+        { header: 'Etapa', key: 'etapa', width: 18 },
+        { header: 'Status', key: 'status', width: 12 },
+        { header: 'Observação', key: 'observacao', width: 40 },
+        { header: 'Último Follow-up', key: 'lastFollowUp', width: 14 },
+        { header: 'Próx. Follow-up', key: 'dataFollowUp', width: 14 },
+      ];
+
+      filteredLeads.forEach((l) => {
+        const createdRaw = l.createdAt || l.dataCriacao || l.dataCadastro || l.created || l.created_at || '';
+        const lastRaw = l.lastFollowUpDone || '';
+        const nextRaw = l.dataFollowUp || '';
+        const createdDate = parseToDate(createdRaw);
+        const lastDate = parseToDate(lastRaw);
+        const nextDate = parseToDate(nextRaw);
+        sheet.addRow([
+          l.nome || '',
+          createdDate,
+          l.telefone || '',
+          l.servicoProcurado || '',
+          l.etapaLead || '',
+          l.status || '',
+          l.observacao || '',
+          lastDate,
+          nextDate,
+        ]);
+      });
+      // Ensure date columns are formatted as dates in Excel
+      try {
+        sheet.getColumn(2).numFmt = 'dd/mm/yyyy'; // Data Criação
+        sheet.getColumn(8).numFmt = 'dd/mm/yyyy'; // Último Follow-up
+        sheet.getColumn(9).numFmt = 'dd/mm/yyyy'; // Próx. Follow-up
+      } catch (e) {
+        // ignore if column indices are not available yet
+      }
+
+      // Make header bold and add thin borders to all cells
+      sheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+        });
+        if (rowNumber === 1) row.font = { bold: true };
+      });
+
+      const buf = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const clinicNameSafe = (clinicMeta?.name || 'clinic').replace(/[^a-z0-9\-]/gi, '_');
+      a.download = `followup_${clinicNameSafe}_${new Date().toISOString().slice(0,10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Erro ao gerar Excel: ' + (err as any)?.message || String(err));
+    }
+  };
+
+
 
   const filteredLeads = useMemo(() => {
-    const term = debouncedSearch;
+    const term = search.trim().toLowerCase();
     // start from a shallow copy to avoid mutating props
     let list = leads.slice();
     if (term) {
       list = list.filter(
         (l) =>
-          l.nome.toLowerCase().includes(term) ||
-          l.telefone.replace(/\D/g, "").includes(term.replace(/\D/g, "")) ||
-          (l.servicoProcurado || "").toLowerCase().includes(term)
+          l.nome.includes(term) ||
+          l.telefone.includes(term)
       );
     }
 
@@ -293,6 +401,44 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
           }
         />
       )}
+      {/* Botão de imprimir - só aparece na tela */}
+      <div className="flex items-center gap-2 mb-4">
+        <Button onClick={handleExportExcel} className="print:hidden">
+          Exportar Excel
+        </Button>
+      </div>
+      {/* Cabeçalho para impressão */}
+      <div className="print-header print-only:block hidden text-center mb-4">
+        <h2 className="text-xl font-bold">{clinicMeta?.name || "Clínica"}</h2>
+        <div className="font-semibold">Fila de Follow-up</div>
+        <div className="print-total">Total de leads na fila: {filteredLeads.length}</div>
+        <div className="text-sm">Data: {new Date().toLocaleDateString()}</div>
+      </div>
+      {/* Tabela de impressão - só aparece na impressão */}
+      <table className="print-table w-full border border-slate-300 text-xs mt-4 hidden print:table">
+        <thead>
+          <tr>
+            <th className="border border-slate-300 p-2">Nome</th>
+            <th className="border border-slate-300 p-2">Telefone</th>
+            <th className="border border-slate-300 p-2">Serviço</th>
+            <th className="border border-slate-300 p-2">Observação</th>
+            <th className="border border-slate-300 p-2">Último Follow-up</th>
+            <th className="border border-slate-300 p-2">Próx. Follow-up</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredLeads.map(lead => (
+            <tr key={lead.id}>
+              <td className="border border-slate-300 p-2">{lead.nome}</td>
+              <td className="border border-slate-300 p-2">{lead.telefone}</td>
+              <td className="border border-slate-300 p-2">{lead.servicoProcurado}</td>
+              <td className="border border-slate-300 p-2">{lead.observacao}</td>
+              <td className="border border-slate-300 p-2">{lead.lastFollowUpDone || lead.dataFollowUp}</td>
+              <td className="border border-slate-300 p-2">{lead.dataFollowUp}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
