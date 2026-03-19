@@ -15,6 +15,7 @@ import { generateAppointmentConfirmationTextForClinic, generateAppointmentConfir
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { format, addDays, parse } from "date-fns";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
 const getNextBusinessDay = (date: Date): Date => {
   const dayOfWeek = date.getDay();
@@ -431,12 +432,14 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
         />
       )}
 
-      <LeadDetailsDialog
-        lead={detailsLead}
-        open={!!detailsLead}
-        onClose={() => setDetailsLead(null)}
-        onEdit={onEditLead}
-      />
+      <ErrorBoundary>
+        <LeadDetailsDialog
+          lead={detailsLead}
+          open={!!detailsLead}
+          onClose={() => setDetailsLead(null)}
+          onEdit={onEditLead}
+        />
+      </ErrorBoundary>
 
       {whatsLead && showWhatsAppDialog && (
         <WhatsAppMessageDialog

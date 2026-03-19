@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -12,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { formatPhoneNumber } from "@/lib/phone";
+import React from "react";
 
 interface LeadDetailsDialogProps {
   lead: Lead | null;
@@ -37,6 +39,13 @@ const comparecimentoColor: Record<string, string> = {
 export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDialogProps) {
   if (!lead) return null;
 
+  // Debug: log props on mount to inspect shapes when error occurs
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost') {
+      console.log('LeadDetailsDialog props:', { lead, open });
+    }
+  }, [lead, open]);
+
   const { isReceptionist } = useUserPermissions();
 
   return (
@@ -44,6 +53,7 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">{lead.nome}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">Informações completas do lead</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
