@@ -39,7 +39,10 @@ export async function saveLeadWithSync(
 
   // Update lead document in 'leads'
   const leadRef = doc(db, 'leads', normalized);
-  await setDoc(leadRef, { ...lead, telefone_norm: normalized }, { merge: true });
+  // Sanitize lead object: remove any `undefined` fields (Firestore rejects them)
+  const rawLead = { ...lead, telefone_norm: normalized };
+  const sanitizedLead = JSON.parse(JSON.stringify(rawLead));
+  await setDoc(leadRef, sanitizedLead, { merge: true });
 
   const convNewRef = doc(db, 'conversations', normalized);
 

@@ -1,5 +1,10 @@
+import { ptBR } from "date-fns/locale";
+import { subDays, eachDayOfInterval, format } from "date-fns";
 import { useMemo, useState } from "react";
+import { Activity, TrendingUp } from "lucide-react";
 import { Lead } from "@/types/crm";
+import { ProgressWithLabel } from "@/components/ui/progress-with-label";
+
 import {
   LineChart,
   Line,
@@ -9,12 +14,8 @@ import {
   Tooltip,
   Legend,
   ReferenceLine,
-  ResponsiveContainer,
+  ResponsiveContainer
 } from "recharts";
-import { format, subDays, eachDayOfInterval } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Activity, CalendarCheck, TrendingUp } from "lucide-react";
-import { ProgressWithLabel } from "@/components/ui/progress-with-label";
 
 interface PerformanceChartProps {
   leads: Lead[];
@@ -23,7 +24,8 @@ interface PerformanceChartProps {
 type PeriodKey = "today" | "7d" | "30d";
 
 const META_ATENDIMENTOS = 40;
-const META_AGENDAMENTOS = 15;
+const META_AGENDAMENTOS = 10;
+const META_REAGENDAMENTOS = 5;
 
 export function PerformanceChart({ leads }: PerformanceChartProps) {
   const [period, setPeriod] = useState<PeriodKey>("today");
@@ -32,7 +34,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
 
   // Gera os dados por dia para o período selecionado
   // Se for "hoje", mostra apenas barras de progresso; se for período, mostra gráfico
-  const { chartData, totalAtendimentos, totalAgendamentos } = useMemo(() => {
+  const { chartData, totalAtendimentos, totalAgendamentos, totalReagendamentos } = useMemo(() => {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
     const start = subDays(today, days - 1);
@@ -53,7 +55,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       });
 
       const followUpsDone = leads.filter((l) => {
-        const df = l.dataFollowUp || "";
+        const df = l.lastFollowUpDone || "";
         return df.startsWith(dayStr);
       });
 
@@ -90,8 +92,9 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
 
     const totalAt = data.reduce((acc, d) => acc + d.Atendimentos, 0);
     const totalAg = data.reduce((acc, d) => acc + d.Agendamentos, 0);
+    const totalRes = data.reduce((acc, d) => acc + d.Reagendamentos, 0);
 
-    return { chartData: data, totalAtendimentos: totalAt, totalAgendamentos: totalAg };
+    return { chartData: data, totalAtendimentos: totalAt, totalAgendamentos: totalAg, totalReagendamentos: totalRes };
   }, [leads, days]);
 
   // Taxa de conversão do período
@@ -103,9 +106,14 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
   // Métricas do dia de hoje para as barras de progresso
   const todayStr = format(new Date(), "dd/MM/yyyy");
   const newLeadsToday = leads.filter((l) => (l.dataContato || "").startsWith(todayStr));
-  const followUpsDoneToday = leads.filter((l) => (l.dataFollowUp || "").startsWith(todayStr));
+  const followUpsDoneToday = leads.filter((l) => (l.lastFollowUpDone || "").startsWith(todayStr));
   const appointmentsMadeToday = leads.filter((l) => (l.dataAgendamentoCriado || "").startsWith(todayStr));
   const reschedulesToday = leads.filter((l) => (l.dataAgendamentoAlterado || "").startsWith(todayStr));
+  // IDs for debugging
+  const newLeadsTodayIds = newLeadsToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
+  const followUpsDoneTodayIds = followUpsDoneToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
+  const appointmentsMadeTodayIds = appointmentsMadeToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
+  const reschedulesTodayIds = reschedulesToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
   const seenToday = new Set<string>();
   const allToday: Lead[] = [] as any;
   for (const l of [...appointmentsMadeToday, ...reschedulesToday, ...followUpsDoneToday, ...newLeadsToday]) {
@@ -148,8 +156,20 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </div>
       </div>
 
+      {/* Debug: mostrar detalhamento apenas em localhost */}
+      {typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost' && (
+        <div className="mt-3 p-3 rounded-md bg-muted/40 text-xs">
+          <strong>DEBUG (localhost):</strong>
+          <div>newLeadsToday: {newLeadsToday.length} — ids: {newLeadsTodayIds.join(', ')}</div>
+          <div>followUpsDoneToday: {followUpsDoneToday.length} — ids: {followUpsDoneTodayIds.join(', ')}</div>
+          <div>appointmentsMadeToday: {appointmentsMadeToday.length} — ids: {appointmentsMadeTodayIds.join(', ')}</div>
+          <div>reschedulesToday: {reschedulesToday.length} — ids: {reschedulesTodayIds.join(', ')}</div>
+          <div className="mt-2">Atendimentos hoje (deduplicados): {atendimentosHoje} — exemplos: {allToday.slice(0,10).map(l=>l.id+':'+l.nome).join(', ')}</div>
+        </div>
+      )}
+
       {/* Cards de resumo com barras de progresso */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-4 gap-3 mb-5">
         {/* Atendimentos do período + Barra Hoje */}
         <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-50/50 border border-green-200/50">
           <div className="mb-3">
@@ -183,7 +203,23 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
             variant="info"
             showTrophy={true}
           />
-          <p className="text-[11px] text-muted-foreground mt-2">Reagendamentos hoje: {reagendamentosHoje}</p>
+        </div>
+
+        {/* Reagendamentos do período + Barra Hoje */}
+        <div className="p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
+          <div className="mb-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+              Reagendamentos
+            </p>
+            <p className="text-2xl font-bold text-amber-600">{totalReagendamentos}</p>
+            <p className="text-[10px] text-muted-foreground">Período: reagendamentos registrados</p>
+          </div>
+          <ProgressWithLabel
+            label="Hoje"
+            current={reagendamentosHoje}
+            goal={META_REAGENDAMENTOS}
+            variant="warning"
+          />
         </div>
 
         {/* Taxa de conversão do dia */}
@@ -238,10 +274,10 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
               />
               <ReferenceLine
                 y={META_AGENDAMENTOS}
-                stroke="hsl(var(--success))"
+                stroke="#2563eb"
                 strokeDasharray="4 4"
                 strokeOpacity={0.5}
-                label={{ value: `Meta ${META_AGENDAMENTOS}`, fontSize: 9, fill: "hsl(var(--success))", position: "insideTopRight" }}
+                label={{ value: `Meta ${META_AGENDAMENTOS}`, fontSize: 9, fill: "#2563eb", position: "insideTopRight" }}
               />
 
               {/* Linha 1: Atendimentos */}
@@ -258,9 +294,9 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
               <Line
                 type="monotone"
                 dataKey="Agendamentos"
-                stroke="hsl(var(--success))"
+                stroke="#2563eb"
                 strokeWidth={2.5}
-                dot={{ r: 3, fill: "hsl(var(--success))" }}
+                dot={{ r: 3, fill: "#2563eb" }}
                 activeDot={{ r: 5 }}
               />
 

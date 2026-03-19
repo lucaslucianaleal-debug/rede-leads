@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Lead, LeadStage, LeadStatus, LeadResposta, LeadComparecimento } from "@/types/crm";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +84,13 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
       : "";
     const updates = { ...safeUpdates, dataAgendamento: finalAgendamento };
 
+    // Validação básica do telefone antes de chamar o sync
+    const phoneDigits = String(updates.telefone || "").replace(/\D/g, "");
+    if (!phoneDigits) {
+      toast.error('Telefone é obrigatório');
+      return;
+    }
+
     try {
       const result = await saveLeadWithSync(db, updates, { previousPhone });
       // Notify and update parent state
@@ -99,12 +106,13 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar Lead — {lead.nome}</DialogTitle>
-          <div className="text-xs text-muted-foreground mt-1">
-            Lead criado em <strong>{form.dataCriacao}</strong>
-          </div>
-        </DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Editar Lead — {lead.nome}</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">Editar as informações do lead</DialogDescription>
+            <div className="text-xs text-muted-foreground mt-1">
+              Lead criado em <strong>{form.dataCriacao}</strong>
+            </div>
+          </DialogHeader>
 
         <div className="grid grid-cols-2 gap-4 py-2">
           {/* Nome */}

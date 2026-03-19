@@ -218,8 +218,11 @@ export function useLeads() {
         const normalizedLeads = leads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
         const effectiveClinic = currentClinic || selectedClinic || undefined;
         const targetDoc = resolveTargetDoc(effectiveClinic);
-        await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
-      } catch {
+        // Sanitize payload to remove undefined fields (Firestore rejects undefined)
+        const payload = { leads: normalizedLeads, lastUpdated: new Date().toISOString() };
+        const sanitized = JSON.parse(JSON.stringify(payload));
+        await setDoc(targetDoc, sanitized, { merge: true });
+      } catch (error) {
         // Falha silenciosa — dados ainda estão no localStorage
       }
     }, 1500);
@@ -494,12 +497,14 @@ export function useLeads() {
           const normalizedLeads = newLeads.map((ll: Lead) => ensureDateCriacao(normalizeLead(ll)));
           const effectiveClinic = currentClinic || selectedClinic || undefined;
           const targetDoc = resolveTargetDoc(effectiveClinic);
-          await setDoc(targetDoc, { leads: normalizedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
-          console.log(`[sendFollowUp] Lead ${leadId} salvo no Firebase (clinic=${effectiveClinic || 'shared'})`);
+          // Sanitize payload to remove undefined fields
+          const payload = { leads: normalizedLeads, lastUpdated: new Date().toISOString() };
+          const sanitized = JSON.parse(JSON.stringify(payload));
+          await setDoc(targetDoc, sanitized, { merge: true });
           // Prevent immediate re-save loop
           isFromFirebase.current = false;
         } catch (e) {
-          console.error("[sendFollowUp] Erro ao salvar no Firebase:", e);
+          // Silenciar erro — dados permanecem no localStorage
         }
       }, 50);
 
@@ -565,11 +570,16 @@ export function useLeads() {
           return merged;
         }
 
-        // If dataAgendamento cleared, also clear the created/altered dates
-        if ((updates.dataAgendamento === "" || updates.dataAgendamento === undefined) && l.dataAgendamentoCriado) {
+        // If dataAgendamento cleared explicitly, also clear the created/altered dates
+        // NOTE: only clear when `dataAgendamento` is present in `updates` (avoid clearing on unrelated updates)
+        if (Object.prototype.hasOwnProperty.call(updates, 'dataAgendamento') && (updates.dataAgendamento === "" || updates.dataAgendamento === undefined) && l.dataAgendamentoCriado) {
           merged.dataAgendamentoCriado = undefined;
           merged.dataAgendamentoAlterado = undefined;
-          return merged;
+        } else if (!Object.prototype.hasOwnProperty.call(updates, 'dataAgendamento')) {
+          // Caso `dataAgendamento` não esteja presente em `updates`, manter os valores existentes
+          merged.dataAgendamento = l.dataAgendamento;
+          merged.dataAgendamentoCriado = l.dataAgendamentoCriado;
+          merged.dataAgendamentoAlterado = l.dataAgendamentoAlterado;
         }
 
         return merged;
@@ -876,6 +886,16 @@ export function useLeads() {
     const now = new Date();
     const generatedAt = `${format(now, "dd/MM/yyyy")} ${format(now, "HH:mm")}`;
 
+    // DEBUG (localhost): mostrar contagens e exemplos para validar discrepâncias
+    if (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost') {
+      console.log(`exportDailyReport (${formatted}) debug:`);
+      console.log('  newLeads:', newLeads.length, 'ids:', newLeads.map(l=>l.id+':'+l.nome).slice(0,20).join(', '));
+      console.log('  followUpsDone:', followUpsDone.length, 'ids:', followUpsDone.map(l=>l.id+':'+l.nome).slice(0,20).join(', '));
+      console.log('  appointmentsMade:', appointmentsMade.length, 'ids:', appointmentsMade.map(l=>l.id+':'+l.nome).slice(0,20).join(', '));
+      console.log('  reschedulesMade:', (typeof reschedulesMade !== 'undefined' ? reschedulesMade.length : 0), 'ids:', (typeof reschedulesMade !== 'undefined' ? reschedulesMade.map(l=>l.id+':'+l.nome).slice(0,20).join(', ') : ''));
+      console.log('  dedup results -> atendimentos:', allDetails.length, 'agend:', dedupAppointments, 'reagend:', dedupReschedules, 'followups:', dedupFollowUps, 'novos:', dedupNewLeads);
+    }
+
     addInfoRow("REDE LEADS");
     ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 14 };
     addInfoRow("Central de Conversão de Leads");
@@ -961,26 +981,36 @@ export function useLeads() {
       return dac.startsWith(formatted);
     });
 
-    // Deduplicar: cada lead aparece uma vez; prioridade = agendamento > followup > novo
+    // Reagendamentos: contar alterações de agendamento feitas nesse dia (dataAgendamentoAlterado)
+    const reschedulesMade = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
+      const daa = l.dataAgendamentoAlterado || "";
+      return daa.startsWith(formatted);
+    });
+
+    // Deduplicar: cada lead aparece uma vez; prioridade = agendamento > reagendamento > followup > novo
     const appointmentIds = new Set(appointmentsMade.map(l => l.id));
+    const rescheduleIds = new Set(reschedulesMade.map(l => l.id));
     const newLeadIds = new Set(newLeads.map(l => l.id));
     const followUpIds = new Set(followUpsDone.map(l => l.id));
 
     const seen = new Set<string>();
     const allDetails: Lead[] = [];
-    // Counters with deduplication by priority (appointment > new > follow-up)
+    // Counters with deduplication by priority (appointment > reschedule > follow-up > new)
     let dedupAppointments = 0;
-    let dedupNewLeads = 0;
+    let dedupReschedules = 0;
     let dedupFollowUps = 0;
+    let dedupNewLeads = 0;
 
-    for (const l of [...appointmentsMade, ...newLeads, ...followUpsDone]) {
+    for (const l of [...appointmentsMade, ...reschedulesMade, ...followUpsDone, ...newLeads]) {
       const id = l.id || '';
       if (!seen.has(id)) {
         seen.add(id);
         allDetails.push(l);
         if (appointmentIds.has(id)) dedupAppointments++;
-        else if (newLeadIds.has(id)) dedupNewLeads++;
+        else if (rescheduleIds.has(id)) dedupReschedules++;
         else if (followUpIds.has(id)) dedupFollowUps++;
+        else if (newLeadIds.has(id)) dedupNewLeads++;
       }
     }
 
@@ -1020,9 +1050,11 @@ export function useLeads() {
     ws.addRow([]);
     addInfoRow("RESUMO");
     // Use deduplicated counts so each lead is counted once according to priority
-    addInfoRow("ENTRADA DE LEADS", dedupNewLeads);
-    addInfoRow("FOLLOW-UPS REALIZADOS", dedupFollowUps);
+    addInfoRow("ATENDIMENTOS", allDetails.length);
     addInfoRow("AGENDAMENTOS FEITOS", dedupAppointments);
+    addInfoRow("REAGENDAMENTOS", dedupReschedules);
+    addInfoRow("FOLLOW-UPS REALIZADOS", dedupFollowUps);
+    addInfoRow("ENTRADA DE LEADS", dedupNewLeads);
     ws.addRow([]);
     addInfoRow("===== DETALHAMENTO =====");
     ws.addRow([]);
