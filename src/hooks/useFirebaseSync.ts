@@ -41,15 +41,13 @@ export function useFirebaseSync(leads: Lead[], userId: string | null) {
     setSyncing(true);
     try {
       const docRef = doc(db, "crm_data", userId);
-      await setDoc(
-        docRef,
-        {
-          leads: leadsToSync,
-          lastUpdated: new Date().toISOString(),
-          ownerId: userId,
-        },
-        { merge: true }
-      );
+      const payload = {
+        leads: leadsToSync,
+        lastUpdated: new Date().toISOString(),
+        ownerId: userId,
+      };
+      const sanitized = JSON.parse(JSON.stringify(payload));
+      await setDoc(docRef, sanitized, { merge: true });
       console.log("✅ Dados sincronizados com Firestore");
     } catch (error) {
       console.error("❌ Erro ao sincronizar:", error);

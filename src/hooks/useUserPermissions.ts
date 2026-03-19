@@ -30,7 +30,8 @@ export function useUserPermissions() {
                 createdAt: new Date().toISOString(),
                 createdBy: "system",
               };
-              await setDoc(doc(db, "crm_users", user.uid), crmUser);
+              const sanitized = JSON.parse(JSON.stringify(crmUser));
+              await setDoc(doc(db, "crm_users", user.uid), sanitized);
             } catch {
               // Silencia erro do Firestore, ainda usa admin como padrão
             }

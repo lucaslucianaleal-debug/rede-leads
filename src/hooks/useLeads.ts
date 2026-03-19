@@ -663,7 +663,9 @@ export function useLeads() {
 
         const convRef = doc(db, "conversations", normalized10);
         // Merge so we don't overwrite existing conversation fields
-        await setDoc(convRef, { telefone: normalized10, leadNome: leadData.nome || "", leadId: newId }, { merge: true });
+        const convPayload = { telefone: normalized10, leadNome: leadData.nome || "", leadId: newId };
+        const sanitizedConvPayload = JSON.parse(JSON.stringify(convPayload));
+        await setDoc(convRef, sanitizedConvPayload, { merge: true });
         console.log(`[createLead] Conversa vinculada/atualizada: ${normalized10} -> lead ${newId}`);
       } catch (err) {
         console.error("[createLead] Falha ao vincular conversa no Firestore:", err);

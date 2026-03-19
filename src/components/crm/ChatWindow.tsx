@@ -424,7 +424,8 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                   }
                   // Atualiza conversa no Firestore
                   const convRef = doc(db, "conversations", conversation.telefone);
-                  await setDoc(convRef, { telefone: manualPhone }, { merge: true });
+                  const sanitizedPhone = JSON.parse(JSON.stringify({ telefone: manualPhone }));
+                  await setDoc(convRef, sanitizedPhone, { merge: true });
                   toast.success("Telefone vinculado com sucesso!");
                   setShowManualDialog(false);
                   setManualPhone("");
