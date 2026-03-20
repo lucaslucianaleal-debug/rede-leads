@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Send, Phone, User, ExternalLink, Check, Target, Search, X, CalendarCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from 'firebase/firestore';
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
@@ -84,6 +86,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const [suggestedMessage, setSuggestedMessage] = useState<string | null>(null);
   const { clinicMeta } = useAuth();
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
+  const [sharedLeadsMap, setSharedLeadsMap] = useState<Record<string, any>>({});
 
   
 
@@ -162,6 +165,33 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
     }
   };
 
+  // Load crm_data/shared once to detect voucher flags that might be present
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const sharedRef = doc(db, 'crm_data', 'shared');
+        const snap = await getDoc(sharedRef);
+        if (!mounted || !snap.exists()) return;
+        const data = snap.data() || {};
+        const arr = Array.isArray(data.leads) ? data.leads : [];
+        const map: Record<string, any> = {};
+        for (const l of arr) {
+          if (!l) continue;
+          if (l.id) map[`id:${l.id}`] = l;
+          if (l.telefone) {
+            const norm = (l.telefone || '').replace(/\D/g, '');
+            if (norm) map[`tel:${norm}`] = l;
+          }
+        }
+        setSharedLeadsMap(map);
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
 
 
   const filteredLeads = useMemo(() => {
@@ -212,11 +242,41 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   };
 
   const handleWhatsAppClick = (lead: Lead) => {
-    // Open local popup for editing message (prefill with template when available)
+    // Serviços elegíveis (com e sem acento, singular/plural, case-insensitive)
+    const allowed = [
+      "implante", "implantes",
+      "faceta", "facetas",
+      "protocolo", "protocolos",
+      "prótese", "próteses",
+      "protese", "proteses"
+    ];
+    const servico = (lead.servicoProcurado || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+    const isAllowed = allowed.some(s => {
+      const sNorm = s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+      return servico.includes(sNorm);
+    });
+    const days = getDaysSince(lead.lastFollowUpDone || lead.dataFollowUp);
+    let amount = 0;
+    if (days >= 90) amount = 500;
+    else if (days >= 60) amount = 300;
+    else if (days >= 30) amount = 200;
     setWhatsLead(lead);
-    // prefills with follow-up template
-    const template = getFollowUpMessage(lead.etapaLead);
-    if (template) setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado));
+    if (isAllowed && amount > 0) {
+      // Calcular validade: 7 dias a partir de hoje
+      const validade = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        return d.toLocaleDateString();
+      })();
+      // Modelo antigo + emojis + variantes + espaçamento
+          const msg = `Olá ${lead.nome}, tudo bem? 💚✨\n\n\nVocê ganhou um cupom de desconto de R$${amount} para seu tratamento de ${lead.servicoProcurado}. \n\nPara garantir, responda EUQUERO até ${validade}. \n\nAproveite essa oportunidade! 💚💚`;
+      setSuggestedMessage(msg);
+    } else {
+      // prefills with follow-up template
+      const template = getFollowUpMessage(lead.etapaLead);
+      if (template) setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado));
+      else setSuggestedMessage("");
+    }
     setShowWhatsAppDialog(true);
   };
 
@@ -311,6 +371,31 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                         lead.status === "MORNO" ? "bg-warning/15 text-warning" :
                         "bg-info/15 text-info"
                       }`}>{lead.status}</span>
+                      {(() => {
+                        // Serviços elegíveis (com e sem acento, singular/plural, case-insensitive)
+                        const allowed = [
+                          "implante", "implantes",
+                          "faceta", "facetas",
+                          "protocolo", "protocolos",
+                          "prótese", "próteses",
+                          "protese", "proteses"
+                        ];
+                        const servico = (lead.servicoProcurado || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+                        const isAllowed = allowed.some(s => {
+                          const sNorm = s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+                          return servico.includes(sNorm);
+                        });
+                        const days = getDaysSince(lead.lastFollowUpDone || lead.dataFollowUp);
+                        let amount = 0;
+                        if (days >= 90) amount = 500;
+                        else if (days >= 60) amount = 300;
+                        else if (days >= 30) amount = 200;
+                        const show = isAllowed && amount > 0;
+                        if (!show) return null;
+                        return (
+                          <span className={`text-[10px] ml-1 px-1.5 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-700`}>Voucher R${amount}</span>
+                        );
+                      })()}
                       {daysSince > 0 && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                           daysSince >= 7 ? "bg-destructive/15 text-destructive" :
