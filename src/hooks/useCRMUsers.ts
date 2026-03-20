@@ -76,9 +76,11 @@ export function useCRMUsers() {
         email,
       };
 
+      const sanitizedCrmUser = JSON.parse(JSON.stringify(crmUser));
+      const sanitizedUserProfile = JSON.parse(JSON.stringify(userProfile));
       await Promise.all([
-        setDoc(doc(db, "crm_users", user.uid), crmUser),
-        setDoc(doc(db, "users", user.uid), userProfile, { merge: true })
+        setDoc(doc(db, "crm_users", user.uid), sanitizedCrmUser),
+        setDoc(doc(db, "users", user.uid), sanitizedUserProfile, { merge: true })
       ]);
 
       setUsers([...users, crmUser]);
@@ -100,11 +102,8 @@ export function useCRMUsers() {
     setLoading(true);
     setError(null);
     try {
-      await setDoc(
-        doc(db, "crm_users", uid),
-        { role: newRole },
-        { merge: true }
-      );
+      const rolePayload = JSON.parse(JSON.stringify({ role: newRole }));
+      await setDoc(doc(db, "crm_users", uid), rolePayload, { merge: true });
       setUsers(
         users.map((u) => (u.uid === uid ? { ...u, role: newRole } : u))
       );

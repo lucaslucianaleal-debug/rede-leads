@@ -159,7 +159,8 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
           // armazenar o valor bruto do anúncio para analytics, sem poluir `telefone`
           payload.adTrackingNumber = rawDigits || preferredId;
         }
-        await setDoc(convRef, payload, { merge: true });
+        const sanitized = JSON.parse(JSON.stringify(payload));
+        await setDoc(convRef, sanitized, { merge: true });
         
         console.log(`[ChatView] ✓ Conversa criada no Firebase com ID: ${normalized10}`);
         

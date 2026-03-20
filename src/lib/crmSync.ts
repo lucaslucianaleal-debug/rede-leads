@@ -46,7 +46,7 @@ export async function saveLeadWithSync(
 
   const convNewRef = doc(db, 'conversations', normalized);
 
-  if (!previousNormalized || previousNormalized === normalized) {
+    if (!previousNormalized || previousNormalized === normalized) {
     // only update name on conversation if exists
     const convSnap = await getDoc(convNewRef);
     if (convSnap.exists()) {
@@ -62,7 +62,9 @@ export async function saveLeadWithSync(
   const convOldRef = doc(db, 'conversations', previousNormalized);
   const convOldSnap = await getDoc(convOldRef);
   if (!convOldSnap.exists()) {
-    await setDoc(convNewRef, { nome: lead.nome }, { merge: true });
+    const simple = { nome: lead.nome };
+    const sanitizedSimple = JSON.parse(JSON.stringify(simple));
+    await setDoc(convNewRef, sanitizedSimple, { merge: true });
     return { status: 'ok', action: 'lead-updated-no-old-conversation', id: normalized };
   }
 
@@ -70,7 +72,8 @@ export async function saveLeadWithSync(
   const newConvData = { ...oldData, nome: lead.nome };
 
   // set conversation meta on new doc
-  await setDoc(convNewRef, newConvData, { merge: true });
+  const sanitizedNewConv = JSON.parse(JSON.stringify(newConvData));
+  await setDoc(convNewRef, sanitizedNewConv, { merge: true });
 
   // copy messages
   const msgsSnap = await getDocs(collection(db, 'conversations', previousNormalized, 'messages'));
