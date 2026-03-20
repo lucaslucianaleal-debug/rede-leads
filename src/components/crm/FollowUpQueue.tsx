@@ -268,8 +268,15 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         d.setDate(d.getDate() + 7);
         return d.toLocaleDateString();
       })();
-      // Modelo antigo + emojis + variantes + espaçamento
-          const msg = `Olá ${lead.nome}, tudo bem? 💚✨\n\n\nVocê ganhou um cupom de desconto de R$${amount} para seu tratamento de ${lead.servicoProcurado}. \n\nPara garantir, responda EUQUERO até ${validade}. \n\nAproveite essa oportunidade! 💚💚`;
+      // Mensagem especial para prótese
+      const servicoNorm = (lead.servicoProcurado || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+      const isProtese = ["protese", "proteses", "prótese", "próteses"].some(s => servicoNorm.includes(s));
+      let msg = "";
+      if (isProtese && amount === 200) {
+        msg = `Olá ${lead.nome}, tudo bem? 💚✨\n\n\nVocê ganhou um cupom de desconto de R$200 para seu novo sorriso com prótese. \n\nPara garantir, responda EUQUERO até ${validade}. \n\nAproveite essa oportunidade! 💚💚`;
+      } else {
+        msg = `Olá ${lead.nome}, tudo bem? 💚✨\n\n\nVocê ganhou um cupom de desconto de R$${amount} para seu tratamento de ${lead.servicoProcurado}. \n\nPara garantir, responda EUQUERO até ${validade}. \n\nAproveite essa oportunidade! 💚💚`;
+      }
       setSuggestedMessage(msg);
     } else {
       // prefills with follow-up template
