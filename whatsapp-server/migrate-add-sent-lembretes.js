@@ -1,6 +1,7 @@
 import admin from 'firebase-admin';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { blockIfEmptyArray, attachLastWriter } from './lib/crmGuard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -67,7 +68,9 @@ try {
     console.log('[migrate-add-sent-lembretes] 🔒 DRY RUN: Nenhuma alteração no Firebase.');
     console.log(`[migrate-add-sent-lembretes] Se estiver satisfeito, execute com: node migrate-add-sent-lembretes.js --apply`);
   } else {
-    await docRef.set({ leads: migratedLeads, lastUpdated: new Date().toISOString() }, { merge: true });
+    // Use centralized guard + metadata
+    blockIfEmptyArray(migratedLeads, 'migrate-add-sent-lembretes.js');
+    await docRef.set(attachLastWriter({ leads: migratedLeads, lastUpdated: new Date().toISOString() }, 'migrate-add-sent-lembretes.js', 'migrate-add-sent-lembretes'), { merge: true });
     console.log('[migrate-add-sent-lembretes] ✅ Migração aplicada com sucesso!');
   }
 

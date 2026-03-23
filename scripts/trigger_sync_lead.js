@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { blockIfMissingDoc, blockIfEmptyArray, attachLastWriter } from '../whatsapp-server/lib/crmGuard.mjs';
 
 const phoneArg = process.argv[2];
 if (!phoneArg) {
@@ -22,10 +23,7 @@ const db = getFirestore();
   try {
     const crmRef = db.collection('crm_data').doc('shared');
     const snap = await crmRef.get();
-    if (!snap.exists) {
-      console.error('crm_data/shared not found');
-      process.exit(1);
-    }
+    blockIfMissingDoc(snap, 'trigger_sync_lead.js');
     const leads = snap.data()?.leads || [];
     const norm = phone.startsWith('55') ? phone : `55${phone}`;
     const last11 = norm.replace(/\D/g, '').slice(-10);
@@ -43,7 +41,8 @@ const db = getFirestore();
       console.error('Lead not found for', phone);
       process.exit(1);
     }
-    await crmRef.update({ leads: updated });
+    blockIfEmptyArray(updated, 'trigger_sync_lead.js');
+    await crmRef.update(attachLastWriter({ leads: updated }, 'trigger_sync_lead.js', 'trigger_sync_lead'));
     console.log('Triggered sync for lead with suffix', last11);
   } catch (e) {
     console.error('Error triggering sync:', e.message || e);

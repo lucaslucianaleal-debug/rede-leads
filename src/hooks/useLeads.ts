@@ -6,6 +6,7 @@ import { normalizePhoneTo10Digits } from "@/lib/phone";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection } from "firebase/firestore";
+import { attachLastWriter } from '@/lib/crmGuard';
 import { useAuth } from "./useAuth";
 
 // Use per-clinic and per-user localStorage key to avoid mixing caches between clinics and users
@@ -140,31 +141,40 @@ export function useLeads() {
             data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
             isFromFirebase.current = true;
             setLeads(data);
-            try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
+            try { localStorage.setItem(getStorageKey(effectiveClinic, userId), JSON.stringify(data)); } catch {}
           }
+          // Remote doc present -> allow writes
+          setCanWrite(true);
         } else {
-          // If remote doc missing, fall back to localStorage (if available)
+          // Remote doc missing: prefer Firestore as source-of-truth. Do NOT create/overwrite remote from empty local.
           try {
-            const cached = localStorage.getItem(getStorageKey(effectiveClinic));
+            const cached = localStorage.getItem(getStorageKey(effectiveClinic, userId));
             if (cached) {
               const parsed = JSON.parse(cached) as Lead[];
               const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-              setLeads(normalized);
-              console.log(`[useLeads] used local cache for clinic=${String(effectiveClinic)}`);
+              if (normalized.length > 0) {
+                // Restore non-empty local cache but DO NOT enable automatic writes to remote
+                setLeads(normalized);
+                console.log(`[useLeads] used local cache for clinic=${String(effectiveClinic)}`);
+              } else {
+                // empty cache: do not overwrite remote or localStorage
+                console.log(`[useLeads] clinic doc not found and local cache empty for clinic=${String(effectiveClinic)} — preserving current in-memory leads`);
+              }
             } else {
-              setLeads([]);
-              try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
-              console.log(`[useLeads] clinic doc not found -> initialized empty for clinic=${effectiveClinic}`);
+              // No cache: preserve current in-memory leads (do not initialize empty and do not write)
+              console.log(`[useLeads] clinic doc not found and no local cache for clinic=${String(effectiveClinic)} — preserving current in-memory leads`);
             }
           } catch (e) {
-            setLeads([]);
+            console.warn('[useLeads] failed to read local cache after missing remote', e);
           }
+          // Do not enable writes when remote doc is absent
+          setCanWrite(false);
         }
       } catch (err) {
         // If getDoc fails (network), try local cache before giving up
         try { console.error('[useLeads] getDoc error, falling back to local cache', { effectiveClinic, clinicLabel, err }); } catch {}
         try {
-          const cached = localStorage.getItem(getStorageKey(effectiveClinic));
+          const cached = localStorage.getItem(getStorageKey(effectiveClinic, userId));
           if (cached) {
             const parsed = JSON.parse(cached) as Lead[];
             const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
@@ -184,14 +194,17 @@ export function useLeads() {
               data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
               isFromFirebase.current = true;
               setLeads(data);
-              try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify(data)); } catch {}
+              try { localStorage.setItem(getStorageKey(effectiveClinic, userId), JSON.stringify(data)); } catch {}
             }
+            // Remote doc present -> allow writes
+            setCanWrite(true);
           } else {
             try {
-              setLeads([]);
-              try { localStorage.setItem(getStorageKey(effectiveClinic), JSON.stringify([])); } catch {}
-              console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
+              // Remote doc deleted/missing — DO NOT clear local in-memory leads automatically.
+              console.log(`[useLeads] clinic doc not found on snapshot -> leaving in-memory leads intact for clinic=${String(effectiveClinic)}`);
             } catch {}
+            // Block writes until a remote doc appears
+            setCanWrite(false);
           }
         }, (err) => {
           try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
@@ -229,9 +242,13 @@ export function useLeads() {
         const effectiveClinic = currentClinic || selectedClinic || undefined;
         const targetDoc = resolveTargetDoc(effectiveClinic);
         // Sanitize payload to remove undefined fields (Firestore rejects undefined)
-        const payload = { leads: normalizedLeads, lastUpdated: new Date().toISOString() };
+        const payload = {
+          leads: normalizedLeads,
+          lastUpdated: new Date().toISOString(),
+        };
         const sanitized = JSON.parse(JSON.stringify(payload));
-        await setDoc(targetDoc, sanitized, { merge: true });
+        const withWriter = attachLastWriter(sanitized, userId ?? null);
+        await setDoc(targetDoc, withWriter, { merge: true });
       } catch (error) {
         // Falha silenciosa — dados ainda estão no localStorage
       }
@@ -514,9 +531,13 @@ export function useLeads() {
           const effectiveClinic = currentClinic || selectedClinic || undefined;
           const targetDoc = resolveTargetDoc(effectiveClinic);
           // Sanitize payload to remove undefined fields
-          const payload = { leads: normalizedLeads, lastUpdated: new Date().toISOString() };
+          const payload = {
+            leads: normalizedLeads,
+            lastUpdated: new Date().toISOString(),
+          };
           const sanitized = JSON.parse(JSON.stringify(payload));
-          await setDoc(targetDoc, sanitized, { merge: true });
+          const withWriter = attachLastWriter(sanitized, userId ?? null);
+          await setDoc(targetDoc, withWriter, { merge: true });
           // Prevent immediate re-save loop
           isFromFirebase.current = false;
         } catch (e) {
@@ -637,7 +658,8 @@ export function useLeads() {
                 const convRef = doc(db, "conversations", candidate);
                 const snap = await getDoc(convRef);
                 if (snap.exists()) {
-                  await updateDoc(convRef, { leadNome: updates.nome });
+                  const upd = attachLastWriter({ leadNome: updates.nome }, userId ?? null);
+                  await updateDoc(convRef, upd);
                   console.log(`[syncLeadName] leadNome atualizado na conversa ${candidate} (Tentativa ${i + 1}): ${updates.nome}`);
                   return;
                 } else {
@@ -681,7 +703,8 @@ export function useLeads() {
         // Merge so we don't overwrite existing conversation fields
         const convPayload = { telefone: normalized10, leadNome: leadData.nome || "", leadId: newId };
         const sanitizedConvPayload = JSON.parse(JSON.stringify(convPayload));
-        await setDoc(convRef, sanitizedConvPayload, { merge: true });
+        const convWithWriter = attachLastWriter(sanitizedConvPayload, userId ?? null);
+        await setDoc(convRef, convWithWriter, { merge: true });
         console.log(`[createLead] Conversa vinculada/atualizada: ${normalized10} -> lead ${newId}`);
       } catch (err) {
         console.error("[createLead] Falha ao vincular conversa no Firestore:", err);

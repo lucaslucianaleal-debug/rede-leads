@@ -4,6 +4,7 @@ import { useCRMUsers } from "./useCRMUsers";
 import { UserRole, rolePermissions, UserPermissions, CRMUser } from "@/types/auth";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { attachLastWriter } from '@/lib/crmGuard';
 
 export function useUserPermissions() {
   const { user } = useAuth();
@@ -31,7 +32,7 @@ export function useUserPermissions() {
                 createdBy: "system",
               };
               const sanitized = JSON.parse(JSON.stringify(crmUser));
-              await setDoc(doc(db, "crm_users", user.uid), sanitized);
+              await setDoc(doc(db, "crm_users", user.uid), attachLastWriter(sanitized, user.uid));
             } catch {
               // Silencia erro do Firestore, ainda usa admin como padrão
             }

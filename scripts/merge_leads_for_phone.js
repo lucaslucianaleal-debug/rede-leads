@@ -1,6 +1,7 @@
 import admin from 'firebase-admin';
 import fs from 'fs';
 import path from 'path';
+import { blockIfMissingDoc, blockIfEmptyArray, attachLastWriter } from '../whatsapp-server/lib/crmGuard.mjs';
 
 function onlyDigits(s){ return String(s||'').replace(/\D/g,''); }
 
@@ -21,7 +22,7 @@ async function main(){
 
   const crmRef = db.collection('crm_data').doc('shared');
   const snap = await crmRef.get();
-  if(!snap.exists){ console.error('crm_data/shared not found'); process.exit(1); }
+  blockIfMissingDoc(snap, 'merge_leads_for_phone.js');
   const leads = snap.data().leads || [];
 
   // find leads matching fragment in phone
@@ -58,7 +59,8 @@ async function main(){
   }
 
   // write updated leads array
-  await crmRef.update({ leads: newLeads });
+  blockIfEmptyArray(newLeads, 'merge_leads_for_phone.js');
+  await crmRef.update(attachLastWriter({ leads: newLeads }, 'merge_leads_for_phone.js', 'merge_leads_for_phone'));
   console.log('Leads array updated: removed', others.length, 'leads');
 
   // done

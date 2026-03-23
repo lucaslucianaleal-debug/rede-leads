@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, setDoc } from "firebase/firestore";
+import { useAuth } from "@/hooks/useAuth";
+import { attachLastWriter } from "@/lib/crmGuard";
 import { db } from "@/lib/firebase";
 import { ChatMessage, Conversation } from "@/hooks/useConversations";
 import { Lead } from "@/types/crm";
@@ -39,6 +41,7 @@ interface ChatWindowProps {
 
 export function ChatWindow({ conversation, messages, onSend, onOpen, serverConnected, currentLead, onUpdateLead, onCreateLead, prefilledMessage, onPrefilledConsumed }: ChatWindowProps) {
   const leads = useLeads();
+  const { user } = useAuth();
 
   // Helper para buscar nome do lead
   function getLeadName(conv) {
@@ -425,7 +428,8 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
                   // Atualiza conversa no Firestore
                   const convRef = doc(db, "conversations", conversation.telefone);
                   const sanitizedPhone = JSON.parse(JSON.stringify({ telefone: manualPhone }));
-                  await setDoc(convRef, sanitizedPhone, { merge: true });
+                  const withWriter = attachLastWriter(sanitizedPhone, user?.uid ?? null);
+                  await setDoc(convRef, withWriter, { merge: true });
                   toast.success("Telefone vinculado com sucesso!");
                   setShowManualDialog(false);
                   setManualPhone("");

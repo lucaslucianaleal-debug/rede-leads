@@ -9,6 +9,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
+import { attachLastWriter } from '@/lib/crmGuard';
 import { Lead } from "@/types/crm";
 
 export function useFirebaseSync(leads: Lead[], userId: string | null) {
@@ -36,7 +37,11 @@ export function useFirebaseSync(leads: Lead[], userId: string | null) {
 
   // Save leads to Firestore
   const syncToFirebase = async (leadsToSync: Lead[]) => {
-    if (!userId || leadsToSync.length === 0) return;
+    if (!userId) return;
+    if (!Array.isArray(leadsToSync) || leadsToSync.length === 0) {
+      console.error('Blocked write to crm_data/' + String(userId) + ': empty leads array');
+      throw new Error('Blocked write to crm_data/' + String(userId) + ': empty leads array');
+    }
 
     setSyncing(true);
     try {
@@ -47,7 +52,8 @@ export function useFirebaseSync(leads: Lead[], userId: string | null) {
         ownerId: userId,
       };
       const sanitized = JSON.parse(JSON.stringify(payload));
-      await setDoc(docRef, sanitized, { merge: true });
+      const withWriter = attachLastWriter(sanitized, userId ?? null);
+      await setDoc(docRef, withWriter, { merge: true });
       console.log("✅ Dados sincronizados com Firestore");
     } catch (error) {
       console.error("❌ Erro ao sincronizar:", error);

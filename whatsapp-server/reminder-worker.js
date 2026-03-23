@@ -2,6 +2,7 @@ import admin from 'firebase-admin';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import fs from 'fs';
+import { blockIfMissingDoc, blockIfEmptyArray, attachLastWriter } from './lib/crmGuard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -250,6 +251,7 @@ async function markSent(leadId, slot, timestamp) {
   try {
     const docRef = db.collection('crm_data').doc('shared');
     const docSnap = await docRef.get();
+    blockIfMissingDoc(docSnap, 'reminder-worker.js');
     const data = docSnap.data();
     const leads = data?.leads || [];
 
@@ -269,10 +271,8 @@ async function markSent(leadId, slot, timestamp) {
       return l;
     });
 
-    await docRef.set({
-      leads: updatedLeads,
-      lastUpdated: new Date().toISOString()
-    }, { merge: true });
+    blockIfEmptyArray(updatedLeads, 'reminder-worker.js');
+    await docRef.set(attachLastWriter({ leads: updatedLeads, lastUpdated: new Date().toISOString() }, 'reminder-worker.js', 'reminder-worker'), { merge: true });
 
     console.log(`[reminder-worker] 💾 ${leadId}: lembretes.sent[${slot}] marcado como enviado`);
   } catch (e) {

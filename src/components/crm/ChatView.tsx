@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink, QrCode } from "lucide-react";
 import { Lead } from "@/types/crm";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
+import { attachLastWriter } from "@/lib/crmGuard";
 import { collection, doc, getDocs, writeBatch, deleteDoc, setDoc, Timestamp } from "firebase/firestore";
 import { toast } from "sonner";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
@@ -22,6 +24,7 @@ interface ChatViewProps {
 }
 
 export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled, onCreateLead }: ChatViewProps) {
+  const { user } = useAuth();
   const {
     conversations,
     serverConnected,
@@ -160,7 +163,8 @@ export function ChatView({ leads, onUpdateLead, openTarget, onOpenTargetHandled,
           payload.adTrackingNumber = rawDigits || preferredId;
         }
         const sanitized = JSON.parse(JSON.stringify(payload));
-        await setDoc(convRef, sanitized, { merge: true });
+        const withWriter = attachLastWriter(sanitized, user?.uid ?? null);
+        await setDoc(convRef, withWriter, { merge: true });
         
         console.log(`[ChatView] ✓ Conversa criada no Firebase com ID: ${normalized10}`);
         

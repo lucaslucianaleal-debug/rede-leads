@@ -13,6 +13,7 @@ import { EventEmitter } from "events";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
+import { blockIfMissingDoc, blockIfEmptyArray, attachLastWriter } from './lib/crmGuard.mjs';
 
 
 // Firebase Admin
@@ -1300,7 +1301,8 @@ app.get("/cleanup-invalid-leads", async (req, res) => {
   try {
     const crmRef = db.collection("crm_data").doc("shared");
     const doc = await crmRef.get();
-    const leads = doc.exists ? doc.data()?.leads || [] : [];
+    blockIfMissingDoc(doc, 'cleanup-invalid-leads');
+    const leads = doc.data()?.leads || [];
     
     const invalid = leads.filter((l) => {
       const digits = (l.telefone || "").replace(/\D/g, "");
@@ -1316,7 +1318,8 @@ app.get("/cleanup-invalid-leads", async (req, res) => {
       return digits.length >= 12;
     });
     
-    await crmRef.update({ leads: cleaned });
+    blockIfEmptyArray(cleaned, 'cleanup-invalid-leads');
+    await crmRef.update(attachLastWriter({ leads: cleaned }, 'cleanup-invalid-leads', 'index-cleanup'));
     console.log(`[cleanup] Removidos ${invalid.length} leads com telefone inválido`);
     
     res.json({
