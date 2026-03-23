@@ -4,7 +4,7 @@ import { useCRMUsers } from "./useCRMUsers";
 import { UserRole, rolePermissions, UserPermissions, CRMUser } from "@/types/auth";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { attachLastWriter } from '@/lib/crmGuard';
+import { attachLastWriter } from '../lib/crmGuard';
 
 export function useUserPermissions() {
   const { user } = useAuth();

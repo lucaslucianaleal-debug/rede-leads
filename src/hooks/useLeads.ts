@@ -6,7 +6,7 @@ import { normalizePhoneTo10Digits } from "@/lib/phone";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection } from "firebase/firestore";
-import { attachLastWriter } from '@/lib/crmGuard';
+import { attachLastWriter } from '../lib/crmGuard';
 import { useAuth } from "./useAuth";
 
 // Use per-clinic and per-user localStorage key to avoid mixing caches between clinics and users

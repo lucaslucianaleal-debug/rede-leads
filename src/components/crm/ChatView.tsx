@@ -10,7 +10,7 @@ import { ExternalLink, QrCode } from "lucide-react";
 import { Lead } from "@/types/crm";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
-import { attachLastWriter } from "@/lib/crmGuard";
+import { attachLastWriter } from "../../lib/crmGuard";
 import { collection, doc, getDocs, writeBatch, deleteDoc, setDoc, Timestamp } from "firebase/firestore";
 import { toast } from "sonner";
 import { normalizePhoneTo10Digits } from "@/lib/phone";

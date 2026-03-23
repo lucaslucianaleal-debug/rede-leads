@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, setDoc } from "firebase/firestore";
 import { useAuth } from "@/hooks/useAuth";
-import { attachLastWriter } from "@/lib/crmGuard";
+import { attachLastWriter } from "../../lib/crmGuard";
 import { db } from "@/lib/firebase";
 import { ChatMessage, Conversation } from "@/hooks/useConversations";
 import { Lead } from "@/types/crm";

@@ -9,7 +9,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { attachLastWriter } from '@/lib/crmGuard';
+import { attachLastWriter } from '../lib/crmGuard';
 import { Lead } from "@/types/crm";
 
 export function useFirebaseSync(leads: Lead[], userId: string | null) {

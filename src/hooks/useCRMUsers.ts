@@ -10,7 +10,7 @@ import {
   getDocs,
   deleteDoc,
 } from "firebase/firestore";
-import { attachLastWriter } from '@/lib/crmGuard';
+import { attachLastWriter } from '../lib/crmGuard';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { CRMUser, UserRole } from "@/types/auth";
 

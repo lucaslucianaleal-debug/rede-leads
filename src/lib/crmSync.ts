@@ -10,7 +10,7 @@ import {
   updateDoc,
   Firestore,
 } from 'firebase/firestore';
-import { attachLastWriter } from '@/lib/crmGuard';
+import { attachLastWriter } from './crmGuard';
 
 export function normalizePhone(raw: string) {
   if (!raw) throw new Error('Telefone vazio');
