@@ -1,4 +1,10 @@
 import { useState, useEffect } from "react";
+import { useLeads } from "@/hooks/useLeads";
+const STATUS_OPTIONS = [
+  { value: "QUENTE", label: "🔥 Quente" },
+  { value: "MORNO", label: "🟡 Morno" },
+  { value: "FRIO", label: "🧊 Frio" },
+];
 import { Lead } from "@/types/crm";
 import {
   Dialog,
@@ -12,6 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Check, Send, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, updateDoc, doc, runTransaction, serverTimestamp, getDoc } from 'firebase/firestore';
 
 interface WhatsAppMessageDialogProps {
   lead: Lead | null;
@@ -32,9 +40,15 @@ export function WhatsAppMessageDialog({
   onSend,
   serverConnected,
 }: WhatsAppMessageDialogProps) {
+  const { updateLead } = useLeads();
   const [message, setMessage] = useState("");
+    const [status, setStatus] = useState<string>(lead?.status || "MORNO");
   const [isEditing, setIsEditing] = useState(false);
   const [sending, setSending] = useState(false);
+  const [includeVoucher, setIncludeVoucher] = useState(false);
+  const [voucherPreviewUrl, setVoucherPreviewUrl] = useState<string | null>(null);
+  const [foundVoucherId, setFoundVoucherId] = useState<string | null>(null);
+  const [hasVoucherAvailable, setHasVoucherAvailable] = useState(false);
 
   useEffect(() => {
     if (suggestedMessage) {
@@ -44,11 +58,19 @@ export function WhatsAppMessageDialog({
       setMessage("");
       setIsEditing(true);
     }
-  }, [suggestedMessage, open]);
+    setIncludeVoucher(false);
+    setVoucherPreviewUrl(null);
+    setFoundVoucherId(null);
+    setStatus(lead?.status || "MORNO");
+  }, [suggestedMessage, open, lead?.status]);
 
   if (!lead) return null;
 
   const handleSend = async () => {
+    // Atualiza status do lead se mudou
+    if (updateLead && status && lead && lead.status !== status) {
+      updateLead(lead.id, { status });
+    }
     if (!message.trim()) {
       toast.error("Mensagem não pode estar vazia");
       return;
@@ -61,6 +83,37 @@ export function WhatsAppMessageDialog({
       setSending(false);
       if (ok) {
         toast.success(`Mensagem enviada para ${lead.nome} ✓`);
+        // If voucher was included, mark voucher as sent in Firestore and clear lead flag
+        if (includeVoucher && foundVoucherId) {
+          try {
+            // mark voucher doc as sent and update crm_data/shared lead entry
+            await runTransaction(db, async (tx) => {
+              const voucherRef = doc(db, 'vouchers', foundVoucherId);
+              tx.update(voucherRef, { status: 'sent', sentAt: serverTimestamp() });
+
+              const crmRef = doc(db, 'crm_data', 'shared');
+              const crmSnap = await tx.get(crmRef);
+              if (!crmSnap.exists()) {
+                console.error('Blocked write to crm_data/shared: document not found when marking voucher sent for lead', lead.id || lead.telefone);
+                throw new Error('Blocked write to crm_data/shared: document not found');
+              }
+              const curr = crmSnap.data() || {};
+              const currLeads = Array.isArray(curr.leads) ? curr.leads.slice() : [];
+              if (!Array.isArray(currLeads) || currLeads.length === 0) {
+                console.error('Blocked write to crm_data/shared: currLeads empty when marking voucher sent', { leadId: lead.id });
+                throw new Error('Blocked write to crm_data/shared: empty leads array');
+              }
+              const idx = currLeads.findIndex(l => (l.id && lead.id && l.id === lead.id) || (l.telefone && lead.telefone && l.telefone === lead.telefone));
+              if (idx >= 0) {
+                const updated = Object.assign({}, currLeads[idx], { voucherPending: false, voucherSentAt: new Date().toISOString(), voucherLabel: 'Enviado' });
+                currLeads[idx] = updated;
+                tx.update(crmRef, { leads: currLeads });
+              }
+            });
+          } catch (e) {
+            console.error('Failed to mark voucher as sent', e);
+          }
+        }
         onDone?.();
         onClose();
       }
@@ -100,6 +153,83 @@ export function WhatsAppMessageDialog({
     // NÃO fecha o diálogo automaticamente
   };
 
+  // If user toggles includeVoucher and lead has pending voucher, try find voucher doc
+  useEffect(() => {
+    let mounted = true;
+    async function findVoucher() {
+      setVoucherPreviewUrl(null);
+      setFoundVoucherId(null);
+      if (!lead || !includeVoucher) return;
+      try {
+        const q = query(collection(db, 'vouchers'), where('leadId', '==', lead.id || ''), where('status', '==', 'issued'));
+        const snap = await getDocs(q);
+        if (!mounted) return;
+        if (!snap.empty) {
+          const doc0 = snap.docs[0];
+          setFoundVoucherId(doc0.id);
+          const data = doc0.data() as any;
+          // prefer a hosted image URL if present, else try to build relative path
+          let img = data.imageUrl || data.imageLocalPath || '';
+          let fileName = '';
+          if (img) {
+            if (img.indexOf('C:\\') === 0 || img.indexOf('/') === -1) {
+              // Caminho local Windows ou só nome do arquivo
+              fileName = img.split('\\').pop() || img.split('/').pop() || '';
+              img = `/Voucher/${fileName}`;
+            } else if (img.startsWith('/Voucher/')) {
+              fileName = img.split('/').pop() || '';
+            }
+          }
+          setVoucherPreviewUrl(img || null);
+          // Log para depuração
+          console.log('Voucher doc:', data);
+          console.log('Voucher preview url:', img);
+          // Sempre prefill message com texto do voucher ao marcar
+          const amount = data.amount || (lead.voucherLastIssuedTier === 3 ? 500 : lead.voucherLastIssuedTier === 2 ? 300 : 200);
+          const expiry = data.expiresAt ? new Date(data.expiresAt).toLocaleDateString() : '';
+          setMessage(`Olá ${lead.nome}, temos um voucher de R$${amount} válido até ${expiry} para você agendar seu procedimento de ${lead.servicoProcurado || ''}. Responda "EUQUERO" para garantir.`);
+          setIsEditing(false);
+        }
+      } catch (e) {
+        console.error('Error finding voucher', e);
+      }
+    }
+    findVoucher();
+    return () => { mounted = false; };
+  }, [includeVoucher, lead]);
+
+  // If local lead doesn't have voucherPending, check crm_data/shared for a matching lead entry
+  useEffect(() => {
+    let mounted = true;
+    async function checkSharedDoc() {
+      setHasVoucherAvailable(false);
+      if (!lead) return;
+      try {
+        const sharedRef = doc(db, 'crm_data', 'shared');
+        const snap = await getDoc(sharedRef);
+        if (!mounted || !snap.exists()) return;
+        const data = snap.data() || {};
+        const leadsArr = Array.isArray(data.leads) ? data.leads : [];
+        const match = leadsArr.find((l: any) => {
+          try {
+            const a = (l.telefone || '').replace(/\D/g, '');
+            const b = (lead.telefone || '').replace(/\D/g, '');
+            return a && b && (a === b || a.endsWith(b) || b.endsWith(a));
+          } catch {
+            return false;
+          }
+        });
+        if (match && (match.voucherPending || match.voucherLastIssuedTier)) {
+          setHasVoucherAvailable(true);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    checkSharedDoc();
+    return () => { mounted = false; };
+  }, [lead]);
+
   const handleDone = () => {
     onDone?.();
     onClose();
@@ -133,6 +263,36 @@ export function WhatsAppMessageDialog({
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Status do lead */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Status do lead</label>
+            <div className="grid grid-cols-3 gap-2">
+              {STATUS_OPTIONS.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setStatus(s.value)}
+                  className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center whitespace-normal break-words ${
+                    status === s.value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-border hover:bg-muted"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {(lead.voucherPending || hasVoucherAvailable) && (
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={includeVoucher} onChange={(e) => setIncludeVoucher(e.target.checked)} />
+                <span className="text-sm">Incluir Voucher</span>
+              </label>
+              {voucherPreviewUrl && (
+                <img src={voucherPreviewUrl} alt="voucher" className="h-10 rounded shadow-sm" />
+              )}
+            </div>
+          )}
           {isEditing ? (
             <Textarea
               value={message}

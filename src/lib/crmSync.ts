@@ -10,6 +10,7 @@ import {
   updateDoc,
   Firestore,
 } from 'firebase/firestore';
+import { attachLastWriter } from './crmGuard';
 
 export function normalizePhone(raw: string) {
   if (!raw) throw new Error('Telefone vazio');
@@ -21,7 +22,7 @@ export function normalizePhone(raw: string) {
 export async function saveLeadWithSync(
   db: Firestore = defaultDb,
   lead: Record<string, any> = {},
-  opts: { previousPhone?: string | null } = {}
+  opts: { previousPhone?: string | null; actorUid?: string | null } = {}
 ) {
   if (!lead) throw new Error('Lead vazio');
   const rawPhone = lead.telefone || lead.telefone_raw || lead.phone;
@@ -42,7 +43,8 @@ export async function saveLeadWithSync(
   // Sanitize lead object: remove any `undefined` fields (Firestore rejects them)
   const rawLead = { ...lead, telefone_norm: normalized };
   const sanitizedLead = JSON.parse(JSON.stringify(rawLead));
-  await setDoc(leadRef, sanitizedLead, { merge: true });
+  const leadWithWriter = attachLastWriter(sanitizedLead, opts.actorUid ?? null);
+  await setDoc(leadRef, leadWithWriter, { merge: true });
 
   const convNewRef = doc(db, 'conversations', normalized);
 
@@ -52,7 +54,8 @@ export async function saveLeadWithSync(
     if (convSnap.exists()) {
       const conv = convSnap.data() as any;
       if (lead.nome && lead.nome !== conv.nome) {
-        await updateDoc(convNewRef, { nome: lead.nome });
+        const upd = attachLastWriter({ nome: lead.nome }, opts.actorUid ?? null);
+        await updateDoc(convNewRef, upd);
       }
     }
     return { status: 'ok', action: 'lead-updated-only', id: normalized };
@@ -64,16 +67,18 @@ export async function saveLeadWithSync(
   if (!convOldSnap.exists()) {
     const simple = { nome: lead.nome };
     const sanitizedSimple = JSON.parse(JSON.stringify(simple));
-    await setDoc(convNewRef, sanitizedSimple, { merge: true });
+    const simpleWithWriter = attachLastWriter(sanitizedSimple, opts.actorUid ?? null);
+    await setDoc(convNewRef, simpleWithWriter, { merge: true });
     return { status: 'ok', action: 'lead-updated-no-old-conversation', id: normalized };
   }
 
   const oldData = convOldSnap.data() as any;
   const newConvData = { ...oldData, nome: lead.nome };
 
-  // set conversation meta on new doc
+  // set conversation meta on new doc (attach lastWriter)
   const sanitizedNewConv = JSON.parse(JSON.stringify(newConvData));
-  await setDoc(convNewRef, sanitizedNewConv, { merge: true });
+  const newConvWithWriter = attachLastWriter(sanitizedNewConv, opts.actorUid ?? null);
+  await setDoc(convNewRef, newConvWithWriter, { merge: true });
 
   // copy messages
   const msgsSnap = await getDocs(collection(db, 'conversations', previousNormalized, 'messages'));

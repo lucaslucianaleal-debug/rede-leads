@@ -10,6 +10,7 @@ import {
   getDocs,
   deleteDoc,
 } from "firebase/firestore";
+import { attachLastWriter } from '../lib/crmGuard';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { CRMUser, UserRole } from "@/types/auth";
 
@@ -79,8 +80,8 @@ export function useCRMUsers() {
       const sanitizedCrmUser = JSON.parse(JSON.stringify(crmUser));
       const sanitizedUserProfile = JSON.parse(JSON.stringify(userProfile));
       await Promise.all([
-        setDoc(doc(db, "crm_users", user.uid), sanitizedCrmUser),
-        setDoc(doc(db, "users", user.uid), sanitizedUserProfile, { merge: true })
+        setDoc(doc(db, "crm_users", user.uid), attachLastWriter(sanitizedCrmUser, auth.currentUser?.uid ?? null)),
+        setDoc(doc(db, "users", user.uid), attachLastWriter(sanitizedUserProfile, auth.currentUser?.uid ?? null), { merge: true })
       ]);
 
       setUsers([...users, crmUser]);
@@ -103,7 +104,7 @@ export function useCRMUsers() {
     setError(null);
     try {
       const rolePayload = JSON.parse(JSON.stringify({ role: newRole }));
-      await setDoc(doc(db, "crm_users", uid), rolePayload, { merge: true });
+      await setDoc(doc(db, "crm_users", uid), attachLastWriter(rolePayload, auth.currentUser?.uid ?? null), { merge: true });
       setUsers(
         users.map((u) => (u.uid === uid ? { ...u, role: newRole } : u))
       );
