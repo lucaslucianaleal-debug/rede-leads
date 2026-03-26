@@ -162,7 +162,12 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
               {STATUS_OPTIONS.map((s) => (
                 <button
                   key={s.value}
-                  onClick={() => setStatus(s.value)}
+                  onClick={() => {
+                    setStatus(s.value);
+                    if (updateLead && lead && lead.status !== s.value) {
+                      updateLead(lead.id, { status: s.value });
+                    }
+                  }}
                   className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center whitespace-normal break-words ${
                     status === s.value
                       ? "bg-primary text-primary-foreground border-primary"
