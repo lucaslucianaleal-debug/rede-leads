@@ -1,4 +1,10 @@
 import { useState, useEffect } from "react";
+import { useLeads } from "@/hooks/useLeads";
+const STATUS_OPTIONS = [
+  { value: "QUENTE", label: "🔥 Quente" },
+  { value: "MORNO", label: "🟡 Morno" },
+  { value: "FRIO", label: "🧊 Frio" },
+];
 import { Lead } from "@/types/crm";
 import {
   Dialog,
@@ -34,7 +40,9 @@ export function WhatsAppMessageDialog({
   onSend,
   serverConnected,
 }: WhatsAppMessageDialogProps) {
+  const { updateLead } = useLeads();
   const [message, setMessage] = useState("");
+    const [status, setStatus] = useState<string>(lead?.status || "MORNO");
   const [isEditing, setIsEditing] = useState(false);
   const [sending, setSending] = useState(false);
   const [includeVoucher, setIncludeVoucher] = useState(false);
@@ -53,11 +61,16 @@ export function WhatsAppMessageDialog({
     setIncludeVoucher(false);
     setVoucherPreviewUrl(null);
     setFoundVoucherId(null);
-  }, [suggestedMessage, open]);
+    setStatus(lead?.status || "MORNO");
+  }, [suggestedMessage, open, lead?.status]);
 
   if (!lead) return null;
 
   const handleSend = async () => {
+    // Atualiza status do lead se mudou
+    if (updateLead && status && lead && lead.status !== status) {
+      updateLead(lead.id, { status });
+    }
     if (!message.trim()) {
       toast.error("Mensagem não pode estar vazia");
       return;
@@ -250,6 +263,25 @@ export function WhatsAppMessageDialog({
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* Status do lead */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Status do lead</label>
+            <div className="grid grid-cols-3 gap-2">
+              {STATUS_OPTIONS.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setStatus(s.value)}
+                  className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center whitespace-normal break-words ${
+                    status === s.value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-border hover:bg-muted"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {(lead.voucherPending || hasVoucherAvailable) && (
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-2">

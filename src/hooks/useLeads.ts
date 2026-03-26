@@ -300,122 +300,22 @@ export function useLeads() {
   // Helper: pular fins de semana (sábado +2 dias, domingo +1 dia)
   const getNextBusinessDay = (date: Date): Date => {
     const dayOfWeek = date.getDay();
-    const daysToSkip = dayOfWeek === 6 ? 2 : dayOfWeek === 0 ? 1 : 0;
-    const frios = leads.filter((l) => l.status === "FRIO").length;
-    useEffect(() => {
-      isMounted.current = true;
-      setCanWrite(false); // trava gravação até carregar doc
-      // Limpa leads da memória ao trocar de clínica/usuário
-      setLeads([]);
-      const effectiveClinic = currentClinic || selectedClinic || undefined;
-      const targetDoc = resolveTargetDoc(effectiveClinic);
-      const clinicLabel = typeof effectiveClinic === 'string' ? String(effectiveClinic).replace(/[^\w\-]/g, '') : effectiveClinic;
-      try { console.log(`[useLeads] resolving ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
+    const daysToAdd = dayOfWeek === 6 ? 2 : dayOfWeek === 0 ? 1 : 0;
+    const out = new Date(date);
+    out.setDate(out.getDate() + daysToAdd);
+    return out;
+  };
 
-      let unsub: () => void = () => {};
-
-      const init = async () => {
-        try {
-          // First attempt a one-time read from Firestore to prefer remote state
-          const snap = await getDoc(targetDoc as any);
-          if (!isMounted.current) return;
-          if (snap && snap.exists()) {
-            let data = (snap.data() as any).leads as Lead[];
-            if (data && Array.isArray(data)) {
-              data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-              isFromFirebase.current = true;
-              setLeads(data);
-              try { localStorage.setItem(getStorageKey(effectiveClinic, userId), JSON.stringify(data)); } catch {}
-            }
-          } else {
-            // If remote doc missing, fall back to localStorage (if available)
-            try {
-              const cached = localStorage.getItem(getStorageKey(effectiveClinic, userId));
-              if (cached) {
-                const parsed = JSON.parse(cached) as Lead[];
-                const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-                setLeads(normalized);
-                console.log(`[useLeads] used local cache for clinic=${String(effectiveClinic)}`);
-              } else {
-                setLeads([]);
-                // Não sobrescreve Firestore com [] automaticamente!
-                // try { localStorage.setItem(getStorageKey(effectiveClinic, userId), JSON.stringify([])); } catch {}
-                console.log(`[useLeads] clinic doc not found -> initialized empty for clinic=${effectiveClinic}`);
-              }
-            } catch (e) {
-              setLeads([]);
-            }
-          }
-          setCanWrite(true); // libera gravação após carregar doc
-        } catch (err) {
-          // If getDoc fails (network), try local cache before giving up
-          try { console.error('[useLeads] getDoc error, falling back to local cache', { effectiveClinic, clinicLabel, err }); } catch {}
-          try {
-            const cached = localStorage.getItem(getStorageKey(effectiveClinic, userId));
-            if (cached) {
-              const parsed = JSON.parse(cached) as Lead[];
-              const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-              setLeads(normalized);
-              console.log(`[useLeads] used local cache after getDoc failure for clinic=${String(effectiveClinic)}`);
-            }
-          } catch (e) {}
-          setCanWrite(false); // não libera gravação se falhou
-        }
-
-        // After initial resolution, subscribe to realtime updates
-        try {
-          unsub = onSnapshot(targetDoc, (snapshot) => {
-            if (!isMounted.current) return;
-            if (snapshot.exists()) {
-              let data = (snapshot.data() as any).leads as Lead[];
-              if (data && Array.isArray(data)) {
-                data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
-                isFromFirebase.current = true;
-                setLeads(data);
-                try { localStorage.setItem(getStorageKey(effectiveClinic, userId), JSON.stringify(data)); } catch {}
-              }
-            } else {
-              try {
-                setLeads([]);
-                // Não sobrescreve Firestore com [] automaticamente!
-                // try { localStorage.setItem(getStorageKey(effectiveClinic, userId), JSON.stringify([])); } catch {}
-                console.log(`[useLeads] clinic doc not found -> cleared local leads for clinic=${effectiveClinic}`);
-              } catch {}
-            }
-          }, (err) => {
-            try { console.error('[useLeads] onSnapshot error', { effectiveClinic, clinicLabel, err }); } catch (e) { console.error('[useLeads] onSnapshot error (fallback)', err); }
-          });
-        } catch (e) {
-          try { console.error('[useLeads] failed to start onSnapshot', e); } catch {}
-        }
-      };
-
-      init();
-
-      return () => {
-        isMounted.current = false;
-        try { unsub(); } catch {}
-      };
-    }, [currentClinic, selectedClinic, userId]);
-        l.etapaLead !== "Fora da região" &&
-        l.comparecimento !== "COMPARECEU" &&
-        // Filtro: leads com dataFollowUp hoje/antes OU leads novos sem dataFollowUp (criados hoje/antes)
-        (
-          (l.dataFollowUp && parseDate(l.dataFollowUp) <= parseDate(today)) ||
-          (!l.dataFollowUp && l.dataCriacao && parseDate(l.dataCriacao) <= parseDate(today))
-        ) &&
-        // Excluir se tiver agendamento com data >= hoje
-        !(l.dataAgendamento && l.dataAgendamento.trim() !== "" && parseDate(l.dataAgendamento) >= parseDate(today))
-    );
-
-    // Separar em leads novos vs. que não compareceram
-    const parseDateCriacao = (dateStr: string) => {
+  // Follow-up queue: separar em leads novos vs. que não compareceram
+  const followUpQueue = useMemo(() => {
+  // Separar em leads novos vs. que não compareceram
+  const parseDateCriacao = (dateStr: string) => {
       const datePart = dateStr.split(" ")[0]; // Extrai apenas dd/MM/yyyy
       const [day, month, year] = datePart.split('/');
       return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     };
 
-    const novos = filtered
+    const novos = filteredLeads
       .filter((l) => l.comparecimento !== "NÃO COMPARECEU")
       .sort((a, b) => {
         const dateA = parseDateCriacao(a.dataCriacao);
@@ -423,7 +323,7 @@ export function useLeads() {
         return dateB.getTime() - dateA.getTime(); // Mais recente primeiro
       });
 
-    const naoCompareceram = filtered
+    const naoCompareceram = filteredLeads
       .filter((l) => l.comparecimento === "NÃO COMPARECEU")
       .sort((a, b) => {
         const dateA = parseDateCriacao(a.dataCriacao);
@@ -587,7 +487,15 @@ export function useLeads() {
       const updated = prev.map((l) => {
         if (l.id !== leadId) return l;
         // Prepare base merged object
-        const merged = { ...l, ...updates } as Lead;
+        let merged = { ...l, ...updates } as Lead;
+
+        // --- NOVA REGRA: Atualizar respostaLead e comparecimento ao agendar ---
+        const agendamentoAlterado =
+          updates.dataAgendamento && updates.dataAgendamento !== l.dataAgendamento;
+        if (updates.dataAgendamento && updates.dataAgendamento.trim() !== "") {
+          merged.respostaLead = "RESPONDEU";
+          merged.comparecimento = "AGUARDANDO DATA";
+        }
 
         // If dataAgendamento is being set now (and previously empty), record the creation date
         if (updates.dataAgendamento && (!l.dataAgendamento || l.dataAgendamento.trim() === "")) {
@@ -1634,6 +1542,43 @@ export function useLeads() {
     setLeads(leadsToKeep);
     return removedCount;
   };
+
+  const stats: DashboardStats = useMemo(() => {
+    const activeLeads = leads.filter(l => !(l as any)._deleted);
+    const totalLeads = activeLeads.length;
+    const quentes = activeLeads.filter(l => l.status === 'QUENTE').length;
+    const mornos = activeLeads.filter(l => l.status === 'MORNO').length;
+    const frios = activeLeads.filter(l => l.status === 'FRIO').length;
+    const agendados = activeLeads.filter(l => l.dataAgendamento && l.dataAgendamento.trim() !== '').length;
+    const agendadosHoje = scheduledTodayCount || 0;
+    const reagendamentosHoje = activeLeads.filter(l => l.dataAgendamentoAlterado && l.dataAgendamentoAlterado.startsWith(format(new Date(), 'dd/MM/yyyy'))).length;
+    const followUpsPendentes = activeLeads.filter(l => l.dataFollowUp && l.dataFollowUp.trim() !== '').length;
+    const followUpsOverdue = activeLeads.filter(l => {
+      if (!l.dataFollowUp) return false;
+      const parts = l.dataFollowUp.split('/');
+      if (parts.length < 3) return false;
+      const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      d.setHours(0,0,0,0);
+      const today = new Date(); today.setHours(0,0,0,0);
+      return d < today;
+    }).length;
+    const compareceram = activeLeads.filter(l => l.comparecimento === 'COMPARECEU').length;
+    const lembretesPendentes = activeLeads.filter(l => l.lembretes && !(l.lembretes.h24 && l.lembretes.today)).length;
+
+    return {
+      totalLeads,
+      quentes,
+      mornos,
+      frios,
+      agendados,
+      agendadosHoje,
+      reagendamentosHoje,
+      followUpsPendentes,
+      followUpsOverdue,
+      compareceram,
+      lembretesPendentes,
+    };
+  }, [leads, scheduledTodayCount]);
 
   return {
     leads: filteredLeads,

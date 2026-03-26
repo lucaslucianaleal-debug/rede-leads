@@ -1,4 +1,9 @@
 import { useState, useEffect } from "react";
+const STATUS_OPTIONS = [
+  { value: "QUENTE", label: "🔥 Quente" },
+  { value: "MORNO", label: "🟡 Morno" },
+  { value: "FRIO", label: "🧊 Frio" },
+];
 import { Lead } from "@/types/crm";
 import {
   Dialog,
@@ -51,6 +56,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   const [agendamentoOpen, setAgendamentoOpen] = useState(false);
   const [whatsOpen, setWhatsOpen] = useState(false);
   const [suggestedMessage, setSuggestedMessage] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState<string>(lead?.status || "MORNO");
 
   // Pré-preencher se já tem retorno ligação agendado
   useEffect(() => {
@@ -79,7 +85,8 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     }
     setOutcome("Caixa de mensagem");
     setObs("");
-  }, [lead?.dataRetornoLigacao, open]);
+    setStatus(lead?.status || "MORNO");
+  }, [lead?.dataRetornoLigacao, open, lead?.status]);
 
   if (!lead) return null;
 
@@ -87,6 +94,10 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     let returnDateStr: string | undefined;
     if (agendarRetorno && returnDate) {
       returnDateStr = `${format(returnDate, "dd/MM/yyyy")} ${returnTime}`;
+    }
+    // Atualiza status do lead
+    if (updateLead && status && lead.status !== status) {
+      updateLead(lead.id, { status });
     }
     onConfirm(lead.id, outcome, obs, returnDateStr);
     toast.success(returnDateStr ? `Ligação registrada! Retorno agendado para ${returnDateStr}` : "Ligação registrada!");
@@ -103,7 +114,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   };
 
   const handleConfirmAgendamento = (leadId: string, dataAgendamento: string) => {
-    if (!updateLead) return;
+    if (!updateLead || !lead) return;
     updateLead(leadId, {
       dataAgendamento,
       etapaLead: "Avaliação agendada",
@@ -113,6 +124,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
         disabled: false,
         sent: { "24h": null, "12h": null, "3h": null, "1h": null },
       },
+      briefingRecepcao: lead.briefingRecepcao ?? ""
     });
     toast.success("Agendamento atualizado! Automação reativada.");
     const text = generateAppointmentConfirmationTextForClinic(clinicMeta, dataAgendamento);
@@ -143,6 +155,25 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Status do lead */}
+          <div className="space-y-2">
+            <Label>Status do lead</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {STATUS_OPTIONS.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setStatus(s.value)}
+                  className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center whitespace-normal break-words ${
+                    status === s.value
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-border hover:bg-muted"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {/* Outcome */}
           <div className="space-y-2">
             <Label>Resultado da ligação</Label>

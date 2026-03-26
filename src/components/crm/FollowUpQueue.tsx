@@ -16,6 +16,7 @@ import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessag
 import { useAuth } from "@/hooks/useAuth";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { ProgressWithLabel } from "@/components/ui/progress-with-label";
+import NewLeadsPanel from "./NewLeadsPanel";
 
 interface FollowUpQueueProps {
   leads: Lead[];
@@ -84,9 +85,10 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [noShowOnly, setNoShowOnly] = useState(false);
   const [suggestedMessage, setSuggestedMessage] = useState<string | null>(null);
-  const { clinicMeta } = useAuth();
+  const { clinicMeta, currentClinic } = useAuth();
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
   const [sharedLeadsMap, setSharedLeadsMap] = useState<Record<string, any>>({});
+  const [showNewLeads, setShowNewLeads] = useState(false);
 
   
 
@@ -198,6 +200,12 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
     const term = search.trim().toLowerCase();
     // start from a shallow copy to avoid mutating props
     let list = leads.slice();
+    // Oculta leads finalizados, desistentes e fora da região
+    const etapasOcultas = [
+      "FINALIZADO", "FINALIZADA", "DESISTÊNCIA", "DESISTENCIA", "FORA DA REGIÃO", "FORA DA REGIAO"
+    ];
+    list = list.filter(l => !etapasOcultas.includes((l.etapaLead || '').toUpperCase()));
+
     if (term) {
       list = list.filter(
         (l) =>
@@ -288,7 +296,15 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   };
 
   const handleConfirmationClick = (lead: Lead) => {
-    const message = generateAppointmentConfirmationTextForClinic(clinicMeta, lead.dataAgendamento || "");
+    // Debug: log clinicMeta and currentClinic for troubleshooting address fallback
+    // eslint-disable-next-line no-console
+    console.log('[CONFIRM][clinicMeta]', clinicMeta);
+    // eslint-disable-next-line no-console
+    console.log('[CONFIRM][currentClinic]', currentClinic);
+    const clinicForLookup = clinicMeta || (currentClinic ? { id: currentClinic, name: currentClinic } : undefined);
+    // eslint-disable-next-line no-console
+    console.log('[CONFIRM][clinicForLookup]', clinicForLookup);
+    const message = generateAppointmentConfirmationTextForClinic(clinicForLookup, lead.dataAgendamento || "");
     setSuggestedMessage(message);
     setWhatsLead(lead);
     setShowWhatsAppDialog(true);
@@ -300,6 +316,9 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
         <Send className="h-5 w-5 text-primary" />
         Fila de Follow-up
         <span className="ml-auto text-sm font-body text-muted-foreground">{leads.length} leads</span>
+        <Button size="sm" variant="ghost" className="ml-3" onClick={() => setShowNewLeads(true)}>
+          Novos leads
+        </Button>
       </h3>
 
       {/* Search */}
@@ -493,6 +512,10 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
           }
         />
       )}
+
+        {showNewLeads && (
+          <NewLeadsPanel open={showNewLeads} onClose={() => setShowNewLeads(false)} />
+        )}
       {/* Botão de imprimir - só aparece na tela */}
       <div className="flex items-center gap-2 mb-4">
         <Button onClick={handleExportExcel} className="print:hidden">

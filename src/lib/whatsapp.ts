@@ -64,12 +64,68 @@ const CLINIC_ADDRESS_FALLBACK: Record<string, string> = {
   "odontocompany-olimpia": "R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079",
   "odontocompany-badybassit": "SP-355, 1160 - Distrito Urbano, Bady Bassitt - SP, 15115-000",
   "odontocompany-novohorizonte": "Rua Coronel Carvalho Leme, 427 - Centro, Novo Horizonte - SP, 14960-000",
+  // also allow shorter keys if clinics use different ids
+  "olimpia": "R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079",
+  "badybassit": "SP-355, 1160 - Distrito Urbano, Bady Bassitt - SP, 15115-000",
+  "novohorizonte": "Rua Coronel Carvalho Leme, 427 - Centro, Novo Horizonte - SP, 14960-000",
 };
+
+function normalizeKey(s: string | undefined) {
+  if (!s) return "";
+  return String(s)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+// build a normalized lookup map to avoid mismatches like "novo-horizonte" vs "novohorizonte"
+const NORMALIZED_CLINIC_ADDRESS_FALLBACK: Record<string, string> = Object.keys(CLINIC_ADDRESS_FALLBACK).reduce((acc, k) => {
+  acc[normalizeKey(k)] = CLINIC_ADDRESS_FALLBACK[k];
+  return acc;
+}, {} as Record<string, string>);
+
+function slugify(s: string | undefined) {
+  if (!s) return "";
+  return String(s)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 export function generateAppointmentConfirmationTextForClinic(clinicMeta: any | undefined, dataAgendamento: string): string {
   const clinicName = clinicMeta?.name || "Odontocompany";
   const clinicId = clinicMeta?.id;
-  const address = clinicMeta?.address || (clinicId ? CLINIC_ADDRESS_FALLBACK[clinicId] : undefined) || CLINIC_ADDRESS_FALLBACK["odontocompany-olimpia"];
+  const clinicAddressFromMeta = clinicMeta?.address;
+
+  // If clinic has explicit address, use it
+  if (clinicAddressFromMeta) {
+    return `Confirmação de Consulta na ${clinicName}💚\n\nSua consulta está agendada para:\n\nData e Horario: ${dataAgendamento}\n\n📍 Endereço : ${clinicAddressFromMeta}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+  }
+
+  // Try multiple keys to find a fallback address (using normalized keys)
+  const candidates: string[] = [];
+  if (clinicId) candidates.push(String(clinicId));
+  if (clinicId) candidates.push(`odontocompany-${clinicId}`);
+  const nameSlug = slugify(clinicMeta?.name);
+  if (nameSlug) candidates.push(nameSlug);
+  if (nameSlug) candidates.push(`odontocompany-${nameSlug}`);
+
+  let address: string | undefined;
+  for (const c of candidates) {
+    if (!c) continue;
+    const nk = normalizeKey(c);
+    if (NORMALIZED_CLINIC_ADDRESS_FALLBACK[nk]) {
+      address = NORMALIZED_CLINIC_ADDRESS_FALLBACK[nk];
+      break;
+    }
+  }
+
+  // final fallback to olympia
+  if (!address) address = CLINIC_ADDRESS_FALLBACK["odontocompany-olimpia"];
+
   return `Confirmação de Consulta na ${clinicName}💚\n\nSua consulta está agendada para:\n\nData e Horario: ${dataAgendamento}\n\n📍 Endereço : ${address}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
 }
 
