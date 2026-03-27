@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/phone";
 import { AgendamentoDialog } from "./AgendamentoDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
+import { AgendaDoDia } from "./AgendaDoDia";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
@@ -45,7 +46,7 @@ const OUTCOMES = [
 ];
 
 export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogProps) {
-  const { updateLead } = useLeads();
+  const { leads, updateLead } = useLeads();
   const { clinicMeta } = useAuth();
   const [outcome, setOutcome] = useState("Caixa de mensagem");
   const [obs, setObs] = useState("");
@@ -57,6 +58,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   const [whatsOpen, setWhatsOpen] = useState(false);
   const [suggestedMessage, setSuggestedMessage] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<string>(lead?.status || "MORNO");
+    const [showAgenda, setShowAgenda] = useState(false);
 
   // Pré-preencher se já tem retorno ligação agendado
   useEffect(() => {
@@ -151,8 +153,39 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
             <div className="text-2xl font-mono font-bold tracking-widest text-foreground">
               {formatPhoneNumber(lead.telefone)}
             </div>
+              <div className="mt-2 flex justify-end">
+                <button
+                  className="text-xs px-2 py-1 rounded bg-primary/10 text-primary border border-primary hover:bg-primary/20 transition"
+                  onClick={() => setShowAgenda(true)}
+                >
+                  Ver Agenda
+                </button>
+              </div>
           </div>
         </DialogHeader>
+      {/* Painel lateral da agenda */}
+      {showAgenda && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+          <div className="bg-background rounded-lg shadow-lg w-full max-w-md h-[90vh] flex flex-col relative border border-border p-0 sm:p-0">
+            <button
+              className="absolute top-3 right-3 text-xs px-3 py-1 rounded bg-muted text-foreground border border-border hover:bg-muted/70 transition z-10"
+              onClick={() => setShowAgenda(false)}
+            >
+              Fechar Agenda
+            </button>
+            <div className="flex-1 flex flex-col justify-start items-center p-0 overflow-y-auto w-full">
+              <div className="w-full px-2 sm:px-4 pt-4 pb-2">
+                <AgendaDoDia
+                  leads={leads}
+                  onMarkAttendance={() => {}}
+                  onUpdateLead={() => {}}
+                  variant="sidepanel"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
         <div className="space-y-4 py-2">
           {/* Status do lead */}
@@ -162,7 +195,12 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
               {STATUS_OPTIONS.map((s) => (
                 <button
                   key={s.value}
-                  onClick={() => setStatus(s.value)}
+                  onClick={() => {
+                    setStatus(s.value);
+                    if (updateLead && lead && lead.status !== s.value) {
+                      updateLead(lead.id, { status: s.value });
+                    }
+                  }}
                   className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center whitespace-normal break-words ${
                     status === s.value
                       ? "bg-primary text-primary-foreground border-primary"

@@ -22,9 +22,10 @@ interface AgendaDoDiaProps {
   onMarkAttendance: (id: string, value: "COMPARECEU" | "NÃO COMPARECEU" | "") => void;
   onExportWeek?: (date?: Date) => void;
   onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
+  variant?: "default" | "sidepanel";
 }
 
-export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLead }: AgendaDoDiaProps) {
+export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLead, variant = "default" }: AgendaDoDiaProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const dateStr = format(selectedDate, "dd/MM/yyyy");
@@ -53,135 +54,168 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
   const naoCompareceram = leadsHoje.filter((l) => l.comparecimento === "NÃO COMPARECEU").length;
   const pendentes = leadsHoje.filter((l) => !l.comparecimento).length;
 
-  return (
-    <div className="space-y-6">
-      {/* Header do dia */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setSelectedDate(d => subDays(d, 1))}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="h-8 px-3 gap-2 font-normal min-w-0 flex-1 sm:flex-none justify-start">
-                <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="font-semibold truncate">
-                  {isToday(selectedDate) ? "Hoje — " : ""}{format(selectedDate, "EEE, d MMM yyyy", { locale: ptBR })}
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(d) => { if (d) { setSelectedDate(d); setCalendarOpen(false); } }}
-                locale={ptBR}
-              />
-            </PopoverContent>
-          </Popover>
-          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setSelectedDate(d => addDays(d, 1))}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          {!isToday(selectedDate) && (
-            <Button variant="ghost" size="sm" className="h-8 text-xs shrink-0" onClick={() => setSelectedDate(new Date())}>
-              Hoje
-            </Button>
-          )}
-        </div>
 
-        {/* Resumo */}
-        <div className="flex gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-muted rounded-lg px-3 py-2">
-            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{leadsHoje.length} agendados</span>
+  return (
+    <div className={variant === "sidepanel" ? "space-y-4 w-full max-w-full overflow-x-hidden" : "space-y-6 w-full max-w-full overflow-x-hidden"} style={{overflowX:'hidden'}}>
+      {variant === "sidepanel" ? (
+        <div className="flex flex-col items-center gap-3 pb-2 w-full">
+          {/* Botão combinado: Hoje - data (centralizado) */}
+          <div className="w-full flex justify-center mb-1">
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="text-sm px-4 py-2 rounded bg-primary/10 text-primary border border-primary hover:bg-primary/20 transition font-semibold flex items-center gap-3"
+                >
+                  <span>Hoje -</span>
+                  <span className="text-sm font-bold text-foreground bg-muted rounded px-2 py-0.5">
+                    {format(selectedDate, "dd MMM yyyy", { locale: ptBR })}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="center">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(d) => { if (d) { setSelectedDate(d); setCalendarOpen(false); } }}
+                  locale={ptBR}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
-          <div className="flex items-center gap-1.5 bg-green-100 text-green-800 rounded-lg px-3 py-2">
-            <CheckCircle2 className="h-4 w-4" />
-            <span className="text-sm font-medium">{compareceram} compareceram</span>
-          </div>
-          <div className="flex items-center gap-1.5 bg-red-100 text-red-800 rounded-lg px-3 py-2">
-            <XCircle className="h-4 w-4" />
-            <span className="text-sm font-medium">{naoCompareceram} faltaram</span>
-          </div>
-          {pendentes > 0 && (
-            <div className="flex items-center gap-1.5 bg-amber-100 text-amber-800 rounded-lg px-3 py-2">
-              <Clock className="h-4 w-4" />
-              <span className="text-sm font-medium">{pendentes} pendentes</span>
+          {/* Cards resumo, centralizados em linha */}
+          {variant === "sidepanel" ? (
+            <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2 items-center" style={{width:'100%'}}>
+              <div className="flex flex-col items-center gap-1 bg-green-100 text-green-800 rounded-lg px-2 py-2 min-w-0 w-full">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="text-xs font-medium">{compareceram}</span>
+                <span className="text-[11px] text-muted-foreground">compareceram</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 bg-muted rounded-lg px-2 py-2 min-w-0 w-full">
+                <CalendarCheck className="h-5 w-5 text-muted-foreground" />
+                <span className="text-xs font-medium">{leadsHoje.length}</span>
+                <span className="text-[11px] text-muted-foreground">agendados</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 bg-red-100 text-red-800 rounded-lg px-2 py-2 min-w-0 w-full">
+                <XCircle className="h-5 w-5" />
+                <span className="text-xs font-medium">{naoCompareceram}</span>
+                <span className="text-[11px] text-muted-foreground">faltaram</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 bg-amber-100 text-amber-800 rounded-lg px-2 py-2 min-w-0 w-full">
+                <Clock className="h-5 w-5" />
+                <span className="text-xs font-medium">{pendentes}</span>
+                <span className="text-[11px] text-muted-foreground">pendentes</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-3 flex-wrap w-full">
+              <div className="flex flex-col items-center gap-1 bg-green-100 text-green-800 rounded-lg px-3 py-2 min-w-[110px]">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="text-sm font-medium">{compareceram} compareceram</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 bg-muted rounded-lg px-3 py-2 min-w-[110px]">
+                <CalendarCheck className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm font-medium">{leadsHoje.length} agendados</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 bg-red-100 text-red-800 rounded-lg px-3 py-2 min-w-[110px]">
+                <XCircle className="h-5 w-5" />
+                <span className="text-sm font-medium">{naoCompareceram} faltaram</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 bg-amber-100 text-amber-800 rounded-lg px-3 py-2 min-w-[110px]">
+                <Clock className="h-5 w-5" />
+                <span className="text-sm font-medium">{pendentes} pendentes</span>
+              </div>
             </div>
           )}
-          <div>
-            <Button size="sm" variant="outline" onClick={() => onExportWeek?.(selectedDate)}>
-              Exportar Semana
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setSelectedDate(d => subDays(d, 1))}>
+              <ChevronLeft className="h-4 w-4" />
             </Button>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="h-8 px-3 gap-2 font-normal min-w-0 flex-1 sm:flex-none justify-start">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-semibold truncate">
+                    {isToday(selectedDate) ? "Hoje — " : ""}{format(selectedDate, "EEE, d MMM yyyy", { locale: ptBR })}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(d) => { if (d) { setSelectedDate(d); setCalendarOpen(false); } }}
+                  locale={ptBR}
+                />
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setSelectedDate(d => addDays(d, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {!isToday(selectedDate) && (
+              <Button variant="ghost" size="sm" className="h-8 text-xs shrink-0" onClick={() => setSelectedDate(new Date())}>
+                Hoje
+              </Button>
+            )}
+          </div>
+          {/* Resumo */}
+          <div className="flex gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5 bg-muted rounded-lg px-3 py-2">
+              <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">{leadsHoje.length} agendados</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-green-100 text-green-800 rounded-lg px-3 py-2">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="text-sm font-medium">{compareceram} compareceram</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-red-100 text-red-800 rounded-lg px-3 py-2">
+              <XCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">{naoCompareceram} faltaram</span>
+            </div>
+            {pendentes > 0 && (
+              <div className="flex items-center gap-1.5 bg-amber-100 text-amber-800 rounded-lg px-3 py-2">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm font-medium">{pendentes} pendentes</span>
+              </div>
+            )}
+            <div>
+              <Button size="sm" variant="outline" onClick={() => onExportWeek?.(selectedDate)}>
+                Exportar Semana
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Lista de leads */}
-      {leadsHoje.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <CalendarCheck className="h-12 w-12 text-muted-foreground mb-4 opacity-40" />
-            <p className="text-lg font-medium text-muted-foreground">Nenhum paciente agendado para {isToday(selectedDate) ? "hoje" : dateStr}</p>
-            <p className="text-sm text-muted-foreground mt-1">Os agendamentos do dia aparecerão aqui</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {leadsHoje.map((lead, index) => {
-            const horario = lead.dataAgendamento.split(" ")[1];
-
-            return (
-              <motion.div
-                key={lead.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04 }}
-              >
-                <Card className={`border-2 transition-colors ${
-                  lead.comparecimento === "COMPARECEU"
-                    ? "border-green-400 bg-green-50/50"
-                    : lead.comparecimento === "NÃO COMPARECEU"
-                    ? "border-red-300 bg-red-50/50"
-                    : "border-border hover:border-primary/40"
-                }`}>
-                  <CardHeader className="pb-2 pt-4 px-4">
-                    <div
-                      className="flex items-start justify-between gap-2 cursor-pointer group"
-                      onClick={() => setSelectedLead(lead)}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <User className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                        <CardTitle className="text-base leading-tight truncate group-hover:text-primary transition-colors">{lead.nome}</CardTitle>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {horario && (
-                          <Badge variant="outline" className="text-xs gap-1">
-                            <Clock className="h-3 w-3" />
-                            {horario}
-                          </Badge>
-                        )}
-                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </div>
+      {/* Lista de agendamentos do dia */}
+      {variant === "sidepanel" ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {leadsHoje.length === 0 ? (
+            <div className="text-sm text-muted-foreground col-span-full">Nenhum agendamento para esta data.</div>
+          ) : (
+            leadsHoje.map((lead) => (
+              <motion.div key={lead.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <Card className="h-full flex flex-col justify-between">
+                  <CardHeader className="pb-2 flex flex-row items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-base leading-tight break-words">{lead.nome}</div>
+                      <div className="text-xs text-muted-foreground break-words">{lead.servicoProcurado}</div>
+                    </div>
+                    <div className="flex flex-col items-end min-w-[70px]">
+                      <span className="text-sm font-bold text-primary bg-muted rounded px-2 py-0.5 mt-1">{lead.dataAgendamento.split(' ')[1] || ''}</span>
+                      <span className="text-[11px] text-muted-foreground">{lead.dataAgendamento.split(' ')[0]}</span>
                     </div>
                   </CardHeader>
-                  <CardContent className="px-4 pb-4 space-y-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Stethoscope className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{lead.servicoProcurado || "Não informado"}</span>
-                    </div>
-
-                    {/* Botões sempre visíveis, clicar no ativo desfaz a seleção */}
-                    <div className="grid grid-cols-2 gap-2">
+                  <CardContent className="pt-0">
+                    <div className="flex flex-row flex-wrap gap-2 mt-2">
                       <Button
                         size="sm"
                         onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "COMPARECEU" ? "" : "COMPARECEU")}
-                        className={`h-10 text-xs font-semibold transition-all ${
-                          lead.comparecimento === "COMPARECEU"
-                            ? "bg-green-600 hover:bg-green-700 text-white ring-2 ring-green-400"
-                            : "bg-white border border-gray-300 text-gray-500 hover:bg-green-50 hover:border-green-400 hover:text-green-700"
-                        }`}
-                        variant="outline"
+                        variant={lead.comparecimento === "COMPARECEU" ? "default" : "outline"}
+                        className={lead.comparecimento === "COMPARECEU" ? "bg-green-600 text-white" : ""}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-1" />
                         Compareceu
@@ -189,22 +223,69 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
                       <Button
                         size="sm"
                         onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "NÃO COMPARECEU" ? "" : "NÃO COMPARECEU")}
-                        className={`h-10 text-xs font-semibold transition-all ${
-                          lead.comparecimento === "NÃO COMPARECEU"
-                            ? "bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-400"
-                            : "bg-white border border-gray-300 text-gray-500 hover:bg-red-50 hover:border-red-400 hover:text-red-700"
-                        }`}
-                        variant="outline"
+                        variant={lead.comparecimento === "NÃO COMPARECEU" ? "default" : "outline"}
+                        className={lead.comparecimento === "NÃO COMPARECEU" ? "bg-red-600 text-white" : ""}
                       >
                         <XCircle className="h-4 w-4 mr-1" />
                         Não Veio
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedLead(lead)}>
+                        Detalhes
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
               </motion.div>
-            );
-          })}
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {leadsHoje.length === 0 ? (
+            <div className="text-sm text-muted-foreground col-span-full">Nenhum agendamento para esta data.</div>
+          ) : (
+            leadsHoje.map((lead) => (
+              <motion.div key={lead.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <Card className="h-full flex flex-col justify-between">
+                  <CardHeader className="pb-2 flex flex-row items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-base leading-tight break-words">{lead.nome}</div>
+                      <div className="text-xs text-muted-foreground break-words">{lead.servicoProcurado}</div>
+                    </div>
+                    <div className="flex flex-col items-end min-w-[70px]">
+                      <span className="text-sm font-bold text-primary bg-muted rounded px-2 py-0.5 mt-1">{lead.dataAgendamento.split(' ')[1] || ''}</span>
+                      <span className="text-[11px] text-muted-foreground">{lead.dataAgendamento.split(' ')[0]}</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex flex-row flex-wrap gap-2 mt-2">
+                      <Button
+                        size="sm"
+                        onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "COMPARECEU" ? "" : "COMPARECEU")}
+                        variant={lead.comparecimento === "COMPARECEU" ? "default" : "outline"}
+                        className={lead.comparecimento === "COMPARECEU" ? "bg-green-600 text-white" : ""}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Compareceu
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "NÃO COMPARECEU" ? "" : "NÃO COMPARECEU")}
+                        variant={lead.comparecimento === "NÃO COMPARECEU" ? "default" : "outline"}
+                        className={lead.comparecimento === "NÃO COMPARECEU" ? "bg-red-600 text-white" : ""}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Não Veio
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedLead(lead)}>
+                        Detalhes
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))
+          )}
         </div>
       )}
 
