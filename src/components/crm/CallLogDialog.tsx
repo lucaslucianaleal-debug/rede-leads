@@ -46,6 +46,25 @@ const OUTCOMES = [
 ];
 
 export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogProps) {
+    // Permite abrir modal de agendamento ao clicar no slot vazio
+    const [agendamentoInitialDate, setAgendamentoInitialDate] = useState<Date | undefined>(undefined);
+    const [agendamentoInitialTime, setAgendamentoInitialTime] = useState<string | undefined>(undefined);
+    useEffect(() => {
+      function handleAbrirAgendamentoDoDia(e: any) {
+        if (e?.detail?.date) {
+          setAgendamentoInitialDate(e.detail.date);
+          setAgendamentoInitialTime(undefined);
+        } else {
+          setAgendamentoInitialDate(undefined);
+          setAgendamentoInitialTime(undefined);
+        }
+        setAgendamentoOpen(true);
+      }
+      window.addEventListener('abrirAgendamentoDoDia', handleAbrirAgendamentoDoDia);
+      return () => {
+        window.removeEventListener('abrirAgendamentoDoDia', handleAbrirAgendamentoDoDia);
+      };
+    }, []);
   const { leads, updateLead } = useLeads();
   const { clinicMeta } = useAuth();
   const [outcome, setOutcome] = useState("Caixa de mensagem");
@@ -290,8 +309,14 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     <AgendamentoDialog
       lead={lead}
       open={agendamentoOpen}
-      onClose={() => setAgendamentoOpen(false)}
+      onClose={() => {
+        setAgendamentoOpen(false);
+        setAgendamentoInitialDate(undefined);
+        setAgendamentoInitialTime(undefined);
+      }}
       onConfirm={handleConfirmAgendamento}
+      initialDate={agendamentoInitialDate}
+      initialTime={agendamentoInitialTime}
     />
 
     <WhatsAppMessageDialog
