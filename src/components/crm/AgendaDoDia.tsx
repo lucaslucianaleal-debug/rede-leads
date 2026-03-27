@@ -48,6 +48,10 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
     });
   }, [leads, dateStr]);
 
+  // Para slots extras na agenda lateral
+  const totalSlots = 10;
+  const slotsToFill = variant === "sidepanel" ? Math.max(0, totalSlots - leadsHoje.length) : 0;
+
   const { isReceptionist } = useUserPermissions();
 
   const compareceram = leadsHoje.filter((l) => l.comparecimento === "COMPARECEU").length;
@@ -193,51 +197,74 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
       {/* Lista de agendamentos do dia */}
       {variant === "sidepanel" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {leadsHoje.length === 0 ? (
+          {/* Render cards de agendamento reais */}
+          {leadsHoje.length === 0 && slotsToFill === 0 && (
             <div className="text-sm text-muted-foreground col-span-full">Nenhum agendamento para esta data.</div>
-          ) : (
-            leadsHoje.map((lead) => (
-              <motion.div key={lead.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <Card className="h-full flex flex-col justify-between">
-                  <CardHeader className="pb-2 flex flex-row items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-base leading-tight break-words">{lead.nome}</div>
-                      <div className="text-xs text-muted-foreground break-words">{lead.servicoProcurado}</div>
-                    </div>
-                    <div className="flex flex-col items-end min-w-[70px]">
-                      <span className="text-sm font-bold text-primary bg-muted rounded px-2 py-0.5 mt-1">{lead.dataAgendamento.split(' ')[1] || ''}</span>
-                      <span className="text-[11px] text-muted-foreground">{lead.dataAgendamento.split(' ')[0]}</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex flex-row flex-wrap gap-2 mt-2">
-                      <Button
-                        size="sm"
-                        onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "COMPARECEU" ? "" : "COMPARECEU")}
-                        variant={lead.comparecimento === "COMPARECEU" ? "default" : "outline"}
-                        className={lead.comparecimento === "COMPARECEU" ? "bg-green-600 text-white" : ""}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-1" />
-                        Compareceu
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "NÃO COMPARECEU" ? "" : "NÃO COMPARECEU")}
-                        variant={lead.comparecimento === "NÃO COMPARECEU" ? "default" : "outline"}
-                        className={lead.comparecimento === "NÃO COMPARECEU" ? "bg-red-600 text-white" : ""}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Não Veio
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setSelectedLead(lead)}>
-                        Detalhes
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))
           )}
+          {leadsHoje.map((lead) => (
+            <motion.div key={lead.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <Card className={`h-full flex flex-col justify-between border-2 transition-colors ${lead.comparecimento === 'COMPARECEU' ? 'bg-green-50 border-green-400' : ''} ${lead.comparecimento === 'NÃO COMPARECEU' ? 'bg-red-50 border-red-400' : ''}`}>
+                <CardHeader className="pb-2 flex flex-row items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-base leading-tight break-words">{lead.nome}</div>
+                    <div className="text-xs text-muted-foreground break-words">{lead.servicoProcurado}</div>
+                  </div>
+                  <div className="flex flex-col items-end min-w-[70px]">
+                    <span className="text-sm font-bold text-primary bg-muted rounded px-2 py-0.5 mt-1">{lead.dataAgendamento.split(' ')[1] || ''}</span>
+                    <span className="text-[11px] text-muted-foreground">{lead.dataAgendamento.split(' ')[0]}</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex flex-row flex-wrap gap-2 mt-2">
+                    <Button
+                      size="sm"
+                      onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "COMPARECEU" ? "" : "COMPARECEU")}
+                      variant={lead.comparecimento === "COMPARECEU" ? "default" : "outline"}
+                      className={lead.comparecimento === "COMPARECEU" ? "bg-green-600 text-white" : ""}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      Compareceu
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "NÃO COMPARECEU" ? "" : "NÃO COMPARECEU")}
+                      variant={lead.comparecimento === "NÃO COMPARECEU" ? "default" : "outline"}
+                      className={lead.comparecimento === "NÃO COMPARECEU" ? "bg-red-600 text-white" : ""}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Não Veio
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedLead(lead)}>
+                      Detalhes
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+          {/* Render slots vazios clicáveis */}
+          {Array.from({ length: slotsToFill }).map((_, idx) => (
+            <motion.div key={`slot-vazio-${idx}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <Card className="h-full flex flex-col justify-center items-center border-2 border-dashed border-primary/40 bg-muted/40 text-primary/80 min-h-[120px]">
+                <CardContent className="flex flex-col items-center justify-center gap-2 py-6">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="rounded-full border-primary/60 text-primary/80 hover:bg-primary/10"
+                    title="Agendar Atendimento"
+                    onClick={() => {
+                      // Dispara evento customizado para abrir modal de agendamento
+                      const event = new CustomEvent('abrirAgendamentoDoDia', { detail: { date: selectedDate } });
+                      window.dispatchEvent(event);
+                    }}
+                  >
+                    <CalendarCheck className="h-6 w-6" />
+                  </Button>
+                  <span className="text-xs mt-1">Agendar Atendimento</span>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -246,7 +273,7 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
           ) : (
             leadsHoje.map((lead) => (
               <motion.div key={lead.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <Card className="h-full flex flex-col justify-between">
+                <Card className={`h-full flex flex-col justify-between border-2 transition-colors ${lead.comparecimento === 'COMPARECEU' ? 'bg-green-50 border-green-400' : ''} ${lead.comparecimento === 'NÃO COMPARECEU' ? 'bg-red-50 border-red-400' : ''}`}>
                   <CardHeader className="pb-2 flex flex-row items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-base leading-tight break-words">{lead.nome}</div>

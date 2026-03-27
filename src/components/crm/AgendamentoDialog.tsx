@@ -23,16 +23,26 @@ interface AgendamentoDialogProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (leadId: string, dataAgendamento: string) => void;
+  initialDate?: Date;
+  initialTime?: string;
 }
 
-export function AgendamentoDialog({ lead, open, onClose, onConfirm }: AgendamentoDialogProps) {
+export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate, initialTime }: AgendamentoDialogProps) {
   const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(new Date());
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  // Pré-preencher se já tem agendamento
+  // Pré-preencher se já tem agendamento ou vaga sugerida
   useEffect(() => {
-    if (lead?.dataAgendamento && open) {
+    if (!open) return;
+
+    if (initialDate) {
+      setAgendamentoDate(initialDate);
+      setAgendamentoTime(initialTime ?? "09:00");
+      return;
+    }
+
+    if (lead?.dataAgendamento) {
       const parts = lead.dataAgendamento.split(" ");
       if (parts.length >= 2) {
         const dateStr = parts[0]; // dd/MM/yyyy
@@ -41,17 +51,16 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm }: Agendament
           const parsedDate = parse(dateStr, "dd/MM/yyyy", new Date());
           setAgendamentoDate(parsedDate);
           setAgendamentoTime(timeStr);
+          return;
         } catch (e) {
           // Fallback se parsing falhar
-          setAgendamentoDate(new Date());
-          setAgendamentoTime("09:00");
         }
       }
-    } else {
-      // Reset quando modal abre sem agendamento
-      setAgendamentoDate(new Date());
-      setAgendamentoTime("09:00");
     }
+
+    // Reset quando modal abre sem agendamento
+    setAgendamentoDate(new Date());
+    setAgendamentoTime("09:00");
   }, [lead?.dataAgendamento, open]);
 
   if (!lead) return null;
