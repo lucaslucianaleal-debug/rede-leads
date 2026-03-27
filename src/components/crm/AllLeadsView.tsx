@@ -195,21 +195,11 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     // Filter by appointment month
     if (selectedAppointmentMonth !== "all") {
       result = result.filter((lead) => {
-        // Match if appointment date is in the selected month OR the appointment was CREATED in that month
-        let match = false;
-        if (lead.dataAgendamento) {
-          const parts = lead.dataAgendamento.split("/");
-          const month = parts[1];
-          const year = parts[2]?.split(" ")[0];
-          if (month && year && `${month}/${year}` === selectedAppointmentMonth) match = true;
-        }
-        if (!match && lead.dataAgendamentoCriado) {
-          const parts = lead.dataAgendamentoCriado.split("/");
-          const month = parts[1];
-          const year = parts[2];
-          if (month && year && `${month}/${year}` === selectedAppointmentMonth) match = true;
-        }
-        return match;
+        if (!lead.dataAgendamento) return false;
+        const parts = lead.dataAgendamento.split("/");
+        const month = parts[1];
+        const year = parts[2]?.split(" ")[0];
+        return month && year && `${month}/${year}` === selectedAppointmentMonth;
       });
     }
 
