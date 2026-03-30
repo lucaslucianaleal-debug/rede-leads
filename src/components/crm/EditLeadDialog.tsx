@@ -32,7 +32,7 @@ const ETAPAS: LeadStage[] = [
   "Avaliação agendada", "Fora da região", "Desistência", "Finalizado",
 ];
 
-const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Influenciador", "Outro"];
+const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Influenciador", "Hotleads", "Outro"];
 
 export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogProps) {
   const [form, setForm] = useState<Partial<Lead>>({});
