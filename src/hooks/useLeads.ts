@@ -256,473 +256,7 @@ export function useLeads() {
     return () => clearTimeout(timer);
   }, [leads, canWrite, currentClinic, selectedClinic, userId]);
 
-  const filteredLeads = useMemo(() => {
-    return leads
-      .filter((lead) => !(lead as any)._deleted)
-      .filter((lead) => {
-        if (filters.etapa !== "Todas" && lead.etapaLead !== filters.etapa) return false;
-        if (filters.status !== "Todos" && lead.status !== filters.status) return false;
-        if (filters.resposta !== "Todas" && lead.respostaLead !== filters.resposta) return false;
-        if (filters.busca) {
-          const q = filters.busca.toLowerCase();
-          return (
-            lead.nome.toLowerCase().includes(q) ||
-            lead.telefone.includes(q) ||
-            lead.servicoProcurado.toLowerCase().includes(q)
-          );
-        }
-        return true;
-      });
-  }, [leads, filters]);
-
-  // Count follow-ups done today (sincronizado com PerformanceChart)
-  const followUpsDoneToday = useMemo(() => {
-    const today = format(new Date(), "dd/MM/yyyy");
-    // Count any lead that had a follow-up recorded today (based on lastFollowUpDone).
-    // This includes calls that marked the follow-up as done even when the lead
-    // is in another stage (e.g., 'Avaliação agendada').
-    return leads.filter((l) => {
-      const done = l.lastFollowUpDone || "";
-      return done.startsWith(today);
-    }).length;
-  }, [leads]);
-
-  // Contar agendamentos criados/atualizados HOJE
-  const scheduledTodayCount = useMemo(() => {
-    const today = format(new Date(), "dd/MM/yyyy");
-    return leads.filter((l) => {
-      // Count appointments CREATED today (dataAgendamentoCriado)
-      const dac = l.dataAgendamentoCriado || "";
-      return dac.startsWith(today);
-    }).length;
-  }, [leads]);
-
-  // Helper: pular fins de semana (sábado +2 dias, domingo +1 dia)
-  const getNextBusinessDay = (date: Date): Date => {
-    const dayOfWeek = date.getDay();
-    const daysToAdd = dayOfWeek === 6 ? 2 : dayOfWeek === 0 ? 1 : 0;
-    const out = new Date(date);
-    out.setDate(out.getDate() + daysToAdd);
-    return out;
-  };
-
-  // Follow-up queue: separar em leads novos vs. que não compareceram
-  const followUpQueue = useMemo(() => {
-  // Separar em leads novos vs. que não compareceram
-  const parseDateCriacao = (dateStr: string) => {
-      const datePart = dateStr.split(" ")[0]; // Extrai apenas dd/MM/yyyy
-      const [day, month, year] = datePart.split('/');
-      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    };
-
-    const novos = filteredLeads
-      .filter((l) => l.comparecimento !== "NÃO COMPARECEU")
-      .sort((a, b) => {
-        const dateA = parseDateCriacao(a.dataCriacao);
-        const dateB = parseDateCriacao(b.dataCriacao);
-        return dateB.getTime() - dateA.getTime(); // Mais recente primeiro
-      });
-
-    const naoCompareceram = filteredLeads
-      .filter((l) => l.comparecimento === "NÃO COMPARECEU")
-      .sort((a, b) => {
-        const dateA = parseDateCriacao(a.dataCriacao);
-        const dateB = parseDateCriacao(b.dataCriacao);
-        return dateA.getTime() - dateB.getTime(); // Mais antigo primeiro
-      });
-
-    // Intercalar: 1 novo, 1 que não compareceu, 1 novo, etc
-    const resultado: Lead[] = [];
-    let iNovo = 0,
-      iNaoCompareceram = 0;
-    while (iNovo < novos.length || iNaoCompareceram < naoCompareceram.length) {
-      if (iNovo < novos.length) resultado.push(novos[iNovo++]);
-      if (iNaoCompareceram < naoCompareceram.length) resultado.push(naoCompareceram[iNaoCompareceram++]);
-    }
-    return resultado;
-  }, [leads]);
-
-  // Leads com retorno de ligação agendado (futuros e vencidos)
-  const callReturnQueue = useMemo(() => {
-    return leads
-      .filter((l) => !!l.dataRetornoLigacao)
-      .sort((a, b) => {
-        const toMs = (s: string) => {
-          const parts = s.split(" ");
-          const [day, month, year] = parts[0].split("/");
-          const [hour, minute] = (parts[1] || "00:00").split(":");
-          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute)).getTime();
-        };
-        return toMs(a.dataRetornoLigacao) - toMs(b.dataRetornoLigacao);
-      });
-  }, [leads]);
-
-  const reminderQueue = useMemo(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    
-    return leads
-      .filter((l) => {
-        if (!l.dataAgendamento) return false;
-        
-        // Parse dd/MM/yyyy to Date
-        const [day, month, year] = l.dataAgendamento.split('/');
-        const agendamentoDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        agendamentoDate.setHours(0, 0, 0, 0);
-        
-        // Show only if appointment is tomorrow or later
-        return agendamentoDate >= tomorrow;
-      })
-      .sort((a, b) => {
-        const toMs = (s: string) => {
-          const parts = s.split(" ");
-          const [day, month, year] = parts[0].split("/");
-          const [hour, minute] = (parts[1] || "00:00").split(":");
-          return new Date(
-            parseInt(year),
-            parseInt(month) - 1,
-            parseInt(day),
-            parseInt(hour || "0"),
-            parseInt(minute || "0")
-          ).getTime();
-        };
-        return toMs(a.dataAgendamento) - toMs(b.dataAgendamento);
-      });
-  }, [leads]);
-
-  const sendFollowUp = (leadId: string, observacao: string = "", nextFollowUpIsToday: boolean = false) => {
-    const today = new Date();
-    const todayFormatted = format(today, "dd/MM/yyyy");
-
-    setLeads((prev) => {
-      let found = false;
-      const newLeads = prev.map((l) => {
-        if (l.id !== leadId) return l;
-        found = true;
-        const nextCount = (l.followUpCount || 0) + 1;
-        const newObservacao = observacao ? (l.observacao ? `${l.observacao} | ${observacao}` : observacao) : l.observacao;
-        const nextStage = `Follow-Up ${nextCount}` as LeadStage;
-
-        let nextFollowUpFormatted = todayFormatted;
-        if (!nextFollowUpIsToday) {
-          const daysToAdd = 1;
-          let nextFollowUpDate = addDays(today, daysToAdd);
-          nextFollowUpDate = getNextBusinessDay(nextFollowUpDate);
-          nextFollowUpFormatted = format(nextFollowUpDate, "dd/MM/yyyy");
-        }
-
-        return {
-          ...l,
-          followUpCount: nextCount,
-          etapaLead: nextStage,
-          dataFollowUp: nextFollowUpFormatted,
-          lastFollowUpDone: todayFormatted,
-          observacao: newObservacao,
-        };
-      });
-
-      if (!found) return prev;
-
-      // Save to Firebase (non-blocking) using the computed newLeads to avoid overwrites
-      setTimeout(async () => {
-        try {
-          const normalizedLeads = newLeads.map((ll: Lead) => ensureDateCriacao(normalizeLead(ll)));
-          const effectiveClinic = currentClinic || selectedClinic || undefined;
-          const targetDoc = resolveTargetDoc(effectiveClinic);
-          // Sanitize payload to remove undefined fields
-          const payload = {
-            leads: normalizedLeads,
-            lastUpdated: new Date().toISOString(),
-          };
-          const sanitized = JSON.parse(JSON.stringify(payload));
-          const withWriter = attachLastWriter(sanitized, userId ?? null);
-          await setDoc(targetDoc, withWriter, { merge: true });
-          // Prevent immediate re-save loop
-          isFromFirebase.current = false;
-        } catch (e) {
-          // Silenciar erro — dados permanecem no localStorage
-        }
-      }, 50);
-
-      return newLeads;
-    });
-  };
-
-  const markReminder = (leadId: string, type: "h24" | "today") => {
-    setLeads((prev) =>
-      prev.map((l) => {
-        if (l.id !== leadId) return l;
-        // Map boolean slot to sent key (h24 -> '24h', today -> 'today')
-        const slotKey = type === 'h24' ? '24h' : 'today';
-        const nowIso = new Date().toISOString();
-        // Garante todos campos sent definidos
-        const sent = {
-          "24h": String(l.lembretes?.sent?.["24h"] ?? ""),
-          "12h": String(l.lembretes?.sent?.["12h"] ?? ""),
-          "3h": String(l.lembretes?.sent?.["3h"] ?? ""),
-          "1h": String(l.lembretes?.sent?.["1h"] ?? ""),
-        };
-        sent[slotKey] = nowIso;
-        return {
-          ...l,
-          lembretes: {
-            ...l.lembretes,
-            [type]: true,
-            sent
-          },
-          dataFollowUp: format(new Date(), "dd/MM/yyyy"),
-          observacao: l.observacao ? `${l.observacao} | Lembrete ${type} enviado` : `Lembrete ${type} enviado`,
-        };
-      })
-    );
-  };
-
-  const updateLead = (leadId: string, updates: Partial<Lead>) => {
-    // Antes de atualizar o estado local, capturamos o telefone atual do lead
-    const existingLead = leads.find((l) => l.id === leadId);
-
-    setLeads((prev) => {
-      const todayFormatted = format(new Date(), "dd/MM/yyyy");
-      const updated = prev.map((l) => {
-        if (l.id !== leadId) return l;
-        // Prepare base merged object
-        let merged = { ...l, ...updates } as Lead;
-
-        // --- NOVA REGRA: Atualizar respostaLead e comparecimento ao agendar ---
-        const agendamentoAlterado =
-          updates.dataAgendamento && updates.dataAgendamento !== l.dataAgendamento;
-        if (updates.dataAgendamento && updates.dataAgendamento.trim() !== "") {
-          merged.respostaLead = "RESPONDEU";
-          merged.comparecimento = "AGUARDANDO DATA";
-        }
-
-        // If dataAgendamento is being set now (and previously empty), record the creation date
-        if (updates.dataAgendamento && (!l.dataAgendamento || l.dataAgendamento.trim() === "")) {
-          merged.dataAgendamentoCriado = todayFormatted;
-          // Clear any previous "alterado" marker when creating
-          merged.dataAgendamentoAlterado = undefined;
-          return merged;
-        }
-
-        // If dataAgendamento is being changed (reagendamento), record the alteration date
-        if (
-          updates.dataAgendamento &&
-          l.dataAgendamento &&
-          updates.dataAgendamento !== l.dataAgendamento
-        ) {
-          merged.dataAgendamentoAlterado = todayFormatted;
-          return merged;
-        }
-
-        // If dataAgendamento cleared explicitly, also clear the created/altered dates
-        // NOTE: only clear when `dataAgendamento` is present in `updates` (avoid clearing on unrelated updates)
-        if (Object.prototype.hasOwnProperty.call(updates, 'dataAgendamento') && (updates.dataAgendamento === "" || updates.dataAgendamento === undefined) && l.dataAgendamentoCriado) {
-          merged.dataAgendamentoCriado = undefined;
-          merged.dataAgendamentoAlterado = undefined;
-        } else if (!Object.prototype.hasOwnProperty.call(updates, 'dataAgendamento')) {
-          // Caso `dataAgendamento` não esteja presente em `updates`, manter os valores existentes
-          merged.dataAgendamento = l.dataAgendamento;
-          merged.dataAgendamentoCriado = l.dataAgendamentoCriado;
-          merged.dataAgendamentoAlterado = l.dataAgendamentoAlterado;
-        }
-
-        return merged;
-      });
-      // Sincroniza `leadNome` na coleção `conversations` quando houver alteração de nome.
-      // Prioridade de tentativas (novo padrão):
-      // 1) ID canônico de 10 dígitos (DDD + número sem o 9 extra)
-      // 2) número bruto extraído do lead
-      // 3) com prefixo `55` + canônico de 10 dígitos
-      // 4) tentar remover o "9" extra (caso exista) e usar esse 10 dígitos
-      // Paramos na primeira conversa encontrada e atualizamos `leadNome` imediatamente.
-      if (updates.nome !== undefined && existingLead && existingLead.telefone) {
-        (async () => {
-          try {
-            const raw = (existingLead.telefone || "").replace(/\D/g, "");
-            const normalized10 = normalizePhoneTo10Digits(existingLead.telefone || "");
-
-            const candidates: string[] = [];
-            if (normalized10) candidates.push(normalized10);
-            if (raw && raw !== normalized10) candidates.push(raw);
-            if (normalized10) candidates.push(`55${normalized10}`);
-            // Tentativa extra: se raw tem 11 dígitos e o terceiro dígito é '9', remover esse '9'
-            if (raw && raw.length === 11 && raw[2] === "9") {
-              const without9 = raw.slice(0, 2) + raw.slice(3);
-              if (without9 !== normalized10 && without9 !== raw) candidates.push(without9);
-            }
-
-            // Deduplicar mantendo ordem
-            const seen = new Set();
-            const ordered = candidates.filter((c) => {
-              if (!c) return false;
-              if (seen.has(c)) return false;
-              seen.add(c);
-              return true;
-            });
-
-            for (const [i, candidate] of ordered.entries()) {
-              try {
-                const convRef = doc(db, "conversations", candidate);
-                const snap = await getDoc(convRef);
-                if (snap.exists()) {
-                  const upd = attachLastWriter({ leadNome: updates.nome }, userId ?? null);
-                  await updateDoc(convRef, upd);
-                  console.log(`[syncLeadName] leadNome atualizado na conversa ${candidate} (Tentativa ${i + 1}): ${updates.nome}`);
-                  return;
-                } else {
-                  console.log(`[syncLeadName] Tentativa ${i + 1} (${candidate}): conversa não existe`);
-                }
-              } catch (err) {
-                console.warn(`[syncLeadName] Erro na tentativa ${i + 1} (${candidate}):`, err);
-              }
-            }
-            console.log("[syncLeadName] Nenhuma conversa existente encontrada para atualizar leadNome");
-          } catch (err) {
-            console.error("[syncLeadName] Falha ao sincronizar leadNome:", err);
-          }
-        })();
-      }
-      return updated;
-    });
-  };
-
-  const createLead = (leadData: Omit<Lead, 'id'>) => {
-    const newId = `lead_${Date.now()}`;
-    const raw: Lead = { ...leadData, id: newId } as Lead;
-    const newLead = ensureDateCriacao(normalizeLead(raw));
-    setLeads((prev) => {
-      const exists = prev.find((l) => l.id === newId);
-      if (exists) {
-        // Merge placeholder (if any) with the new lead data
-        return prev.map((l) => (l.id === newId ? { ...l, ...newLead } : l));
-      }
-      return [...prev, newLead];
-    });
-
-    // Try to link the new lead to an existing conversation in Firestore
-    (async () => {
-      try {
-        const telefone = leadData.telefone || "";
-        const normalized10 = normalizePhoneTo10Digits(telefone);
-        if (!normalized10) return;
-
-        const convRef = doc(db, "conversations", normalized10);
-        // Merge so we don't overwrite existing conversation fields
-        const convPayload = { telefone: normalized10, leadNome: leadData.nome || "", leadId: newId };
-        const sanitizedConvPayload = JSON.parse(JSON.stringify(convPayload));
-        const convWithWriter = attachLastWriter(sanitizedConvPayload, userId ?? null);
-        await setDoc(convRef, convWithWriter, { merge: true });
-        console.log(`[createLead] Conversa vinculada/atualizada: ${normalized10} -> lead ${newId}`);
-      } catch (err) {
-        console.error("[createLead] Falha ao vincular conversa no Firestore:", err);
-      }
-    })();
-    return newLead;
-  };
-
-  const clearCallReturn = (leadId: string) => {
-    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, dataRetornoLigacao: "" } : l));
-  };
-
-  const registerCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
-    const now = new Date();
-    const timestamp = `${now.getDate().toString().padStart(2, "0")}/${(now.getMonth() + 1).toString().padStart(2, "0")}/${now.getFullYear()} ${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-    const nota = obs ? `📞 ${outcome} (${timestamp}) — ${obs}` : `📞 ${outcome} (${timestamp})`;
-    const todayFormatted = format(now, "dd/MM/yyyy");
-    // We'll perform updates inside setLeads so we can decide reliably whether to
-    // promote the lead to Follow-Up 1 or just mark the call as done for a newly
-    // created lead. If the lead does not exist yet, we insert a placeholder and
-    // then re-evaluate shortly after (to allow `createLead` to merge) before
-    // calling `sendFollowUp`.
-
-    const nowAction = () => {
-      setLeads((prev) => {
-        const found = prev.find((l) => l.id === leadId);
-        if (found) {
-          const isNewToday = !!(
-            found.etapaLead === "Novo" &&
-            (found.followUpCount || 0) === 0 &&
-            found.dataCriacao &&
-            found.dataCriacao.startsWith(todayFormatted)
-          );
-
-          if (isNewToday) {
-            // mark worked but keep as Novo
-            return prev.map((l) => {
-              if (l.id !== leadId) return l;
-              return {
-                ...l,
-                observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
-                dataRetornoLigacao: returnDate ?? l.dataRetornoLigacao ?? "",
-                respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
-                lastFollowUpDone: todayFormatted,
-                dataFollowUp: todayFormatted,
-              };
-            });
-          }
-
-          // Normal path: update note and let sendFollowUp handle increment
-          // (we'll trigger sendFollowUp after this setLeads)
-          return prev.map((l) => {
-            if (l.id !== leadId) return l;
-            return {
-              ...l,
-              observacao: l.observacao ? `${l.observacao} | ${nota}` : nota,
-              dataRetornoLigacao: returnDate ?? l.dataRetornoLigacao ?? "",
-              respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
-            };
-          });
-        }
-
-        // Insert placeholder; we'll re-run decision after a short delay.
-        const placeholder: Lead = {
-          id: leadId,
-          dataCriacao: todayFormatted,
-          dataContato: todayFormatted,
-          nome: "",
-          telefone: "",
-          servicoProcurado: "",
-          captador: "",
-          fonteLead: "Outro",
-          etapaLead: "Novo",
-          status: "",
-          respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
-          comparecimento: "",
-          dataFollowUp: todayFormatted,
-          dataAgendamento: "",
-          dataRetornoLigacao: returnDate ?? "",
-          observacao: nota,
-          followUpCount: 0,
-          lembretes: { h24: false, today: false },
-        } as Lead;
-        return [...prev, placeholder];
-      });
-    };
-
-    // Run now to update/insert placeholder
-    nowAction();
-
-    // After a short delay, decide whether to call sendFollowUp (if not already handled
-    // as new-today). This allows `createLead` to merge a created lead into state.
-    setTimeout(() => {
-      setLeads((prev) => {
-        const found = prev.find((l) => l.id === leadId);
-        if (!found) return prev;
-        const isNewToday = !!(
-          found.etapaLead === "Novo" &&
-          (found.followUpCount || 0) === 0 &&
-          found.dataCriacao &&
-          found.dataCriacao.startsWith(todayFormatted)
-        );
-        if (!isNewToday) {
-          // Defer to sendFollowUp to increment follow-up count
-          setTimeout(() => sendFollowUp(leadId, "", false), 0);
-        }
-        return prev;
-      });
-    }, 160);
-  };
+  const filteredLeads = useMemo(() => { return leads; }, [leads, filters]);
 
   // return leads whose `dataAgendamento` matches the given date (formatted as dd/MM/yyyy)
   const getAppointmentsFor = (date: Date = new Date()) => {
@@ -803,19 +337,45 @@ export function useLeads() {
     endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    const appts = leads.filter((l) => {
-      if (!l.dataAgendamento) return false;
-      const parts = l.dataAgendamento.split('/');
-      if (parts.length < 3) return false;
-      const [day, month, yearAndRest] = parts;
-      const year = yearAndRest.split(' ')[0];
-      const agDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      return agDate >= startOfWeek && agDate <= endOfWeek;
+    // Leads criados na semana
+    const leadsCriadosSemana = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
+      if (!l.dataCriacao) return false;
+      const parts = l.dataCriacao.split('/');
+      if (parts.length !== 3) return false;
+      const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      return d >= startOfWeek && d <= endOfWeek;
     });
+
+    // Agendamentos realizados na semana (dataAgendamentoCriado)
+    const agendamentosSemana = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
+      if (!l.dataAgendamentoCriado) return false;
+      const parts = l.dataAgendamentoCriado.split('/');
+      if (parts.length !== 3) return false;
+      const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      return d >= startOfWeek && d <= endOfWeek;
+    });
+
+    // Agendados Novos/Recuperados
+    let agendadosNovos = 0;
+    let agendadosRecuperados = 0;
+    agendamentosSemana.forEach(l => {
+      if (l.dataCriacao === l.dataAgendamentoCriado) agendadosNovos++;
+      else agendadosRecuperados++;
+    });
+
+    // Comparecimentos dos agendamentos da semana
+    const comparecimentos = agendamentosSemana.filter(l => l.comparecimento === "COMPARECEU");
+
+    // Porcentagem de agendamentos: (Total Agendamentos / Leads Criados na semana) × 100
+    const totalAgendamentos = agendamentosSemana.length;
+    const taxaAgendamentos = leadsCriadosSemana.length > 0 ? ((totalAgendamentos / leadsCriadosSemana.length) * 100).toFixed(1) : "0.0";
+    const taxaComparecimento = totalAgendamentos > 0 ? ((comparecimentos.length / totalAgendamentos) * 100).toFixed(1) : "0.0";
 
     const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
-    const ws = workbook.addWorksheet("Agendamentos Semana");
+    const ws = workbook.addWorksheet("Relatório Semanal");
 
     ws.columns = [
       { width: 32 },
@@ -835,63 +395,45 @@ export function useLeads() {
     const now = new Date();
     const generatedAt = `${format(now, "dd/MM/yyyy")} ${format(now, "HH:mm")}`;
 
-    // DEBUG (localhost): mostrar contagens e exemplos para validar discrepâncias
-    if (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost') {
-      console.log(`exportDailyReport (${formatted}) debug:`);
-      console.log('  newLeads:', newLeads.length, 'ids:', newLeads.map(l=>l.id+':'+l.nome).slice(0,20).join(', '));
-      console.log('  followUpsDone:', followUpsDone.length, 'ids:', followUpsDone.map(l=>l.id+':'+l.nome).slice(0,20).join(', '));
-      console.log('  appointmentsMade:', appointmentsMade.length, 'ids:', appointmentsMade.map(l=>l.id+':'+l.nome).slice(0,20).join(', '));
-      console.log('  reschedulesMade:', (typeof reschedulesMade !== 'undefined' ? reschedulesMade.length : 0), 'ids:', (typeof reschedulesMade !== 'undefined' ? reschedulesMade.map(l=>l.id+':'+l.nome).slice(0,20).join(', ') : ''));
-      console.log('  dedup results -> atendimentos:', allDetails.length, 'agend:', dedupAppointments, 'reagend:', dedupReschedules, 'followups:', dedupFollowUps, 'novos:', dedupNewLeads);
-    }
-
     addInfoRow("REDE LEADS");
     ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 14 };
     addInfoRow("Central de Conversão de Leads");
     addInfoRow("WhatsApp: (17) 99115-4763");
     ws.addRow([]);
-    addInfoRow("AGENDA - RELATÓRIO SEMANAL");
+    addInfoRow("RELATÓRIO SEMANAL");
     ws.getRow(ws.rowCount).getCell(1).font = { bold: true, size: 12 };
     addInfoRow("Período", `${format(startOfWeek, "dd/MM/yyyy")} a ${format(endOfWeek, "dd/MM/yyyy")}`);
     addInfoRow("Gerado em", generatedAt);
     ws.addRow(["=========================================="]);
     ws.addRow([]);
     addInfoRow("RESUMO");
-
-    const comparecimentos = appts.filter(l => l.comparecimento === "COMPARECEU").length;
-    const agendadosSemana = appts.length;
-
-    // Número de novos leads na semana (dataCriacao)
-    const leadsCriadosSemana = leads.filter(l => {
-      if (!l.dataCriacao) return false;
-      const parts = l.dataCriacao.split('/');
-      if (parts.length !== 3) return false;
-      const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-      return d >= startOfWeek && d <= endOfWeek;
-    }).length;
-
-    addInfoRow("AGENDADOS NA SEMANA", agendadosSemana);
-    addInfoRow("COMPARECIMENTOS", comparecimentos);
-    addInfoRow("Nº DE NOVOS LEADS", leadsCriadosSemana);
+    addInfoRow("LEADS CRIADOS", leadsCriadosSemana.length);
+    addInfoRow("TOTAL AGENDAMENTOS", `${totalAgendamentos} (${taxaAgendamentos}%)`);
+    addInfoRow("AGENDADOS NOVOS", agendadosNovos);
+    addInfoRow("AGENDADOS RECUPERADOS", agendadosRecuperados);
+    addInfoRow("COMPARECIMENTOS", `${comparecimentos.length} (${taxaComparecimento}%)`);
     ws.addRow([]);
-    addInfoRow("===== DETALHAMENTO =====");
+    addInfoRow("===== DETALHAMENTO DOS COMPARECIMENTOS =====");
     ws.addRow([]);
 
-    const headerRow = ws.addRow(["NOME", "TELEFONE", "SERVIÇO", "DATA AGENDAMENTO", "FONTE", "COMPARECIMENTO"]);
+    const headerRow = ws.addRow(["NOME", "TELEFONE", "SERVIÇO", "DATA AGENDAMENTO", "FONTE", "OBSERVAÇÃO"]);
     headerRow.eachCell(cell => {
       cell.font = { bold: true };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB8B8B8" } };
     });
 
-    appts.forEach(l => {
-      ws.addRow([
+    comparecimentos.forEach(l => {
+      const row = ws.addRow([
         l.nome,
         l.telefone,
-        l.servicoProcurado || "",
-        l.dataAgendamento || "",
-        l.fonteLead || "",
-        l.comparecimento || "",
+        l.servicoProcurado,
+        l.dataAgendamento,
+        l.fonteLead,
+        l.observacao || "",
       ]);
+      row.eachCell(cell => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC6EFCE" } };
+      });
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -899,7 +441,7 @@ export function useLeads() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Rede_Leads_Agendamentos_Semana_${format(startOfWeek, "yyyy-MM-dd")}.xlsx`;
+    a.download = `Rede_Leads_Relatorio_Semanal_${format(date, "yyyy-MM-dd")}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1050,34 +592,11 @@ export function useLeads() {
     const startOfWeek = new Date(date);
     startOfWeek.setDate(date.getDate() - dayOfWeek);
     startOfWeek.setHours(0, 0, 0, 0);
-    
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
-    
-    // Filtrar comparecimentos da semana
-    const comparecimentos = leads.filter(l => {
-      if (l.etapaLead === "Fora da região") return false;
-      if (l.comparecimento !== "COMPARECEU" || !l.dataAgendamento) return false;
-      
-      const [day, month, year] = l.dataAgendamento.split('/');
-      const agendDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      
-      return agendDate >= startOfWeek && agendDate <= endOfWeek;
-    });
-    
-    // Contar agendados da semana
-    const agendadosSemana = leads.filter(l => {
-      if (l.etapaLead === "Fora da região") return false;
-      if (!l.dataAgendamento) return false;
-      
-      const [day, month, year] = l.dataAgendamento.split('/');
-      const agendDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      
-      return agendDate >= startOfWeek && agendDate <= endOfWeek;
-    }).length;
 
-    // Contar leads criados na semana (baseado em `dataCriacao` no formato dd/MM/yyyy)
+    // Leads criados na semana
     const leadsCriadosSemana = leads.filter(l => {
       if (l.etapaLead === "Fora da região") return false;
       if (!l.dataCriacao) return false;
@@ -1085,12 +604,34 @@ export function useLeads() {
       if (parts.length !== 3) return false;
       const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
       return d >= startOfWeek && d <= endOfWeek;
-    }).length;
-    
-    const taxaComparecimento = agendadosSemana > 0 
-      ? ((comparecimentos.length / agendadosSemana) * 100).toFixed(1)
-      : "0.0";
-    
+    });
+
+    // Agendamentos realizados na semana (dataAgendamentoCriado)
+    const agendamentosSemana = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
+      if (!l.dataAgendamentoCriado) return false;
+      const parts = l.dataAgendamentoCriado.split('/');
+      if (parts.length !== 3) return false;
+      const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      return d >= startOfWeek && d <= endOfWeek;
+    });
+
+    // Agendados Novos/Recuperados
+    let agendadosNovos = 0;
+    let agendadosRecuperados = 0;
+    agendamentosSemana.forEach(l => {
+      if (l.dataCriacao === l.dataAgendamentoCriado) agendadosNovos++;
+      else agendadosRecuperados++;
+    });
+
+    // Comparecimentos dos agendamentos da semana
+    const comparecimentos = agendamentosSemana.filter(l => l.comparecimento === "COMPARECEU");
+
+    // Porcentagem de agendamentos: (Total Agendamentos / Leads Criados na semana) × 100
+    const totalAgendamentos = agendamentosSemana.length;
+    const taxaAgendamentos = leadsCriadosSemana.length > 0 ? ((totalAgendamentos / leadsCriadosSemana.length) * 100).toFixed(1) : "0.0";
+    const taxaComparecimento = totalAgendamentos > 0 ? ((comparecimentos.length / totalAgendamentos) * 100).toFixed(1) : "0.0";
+
     const now = new Date();
     const generatedAt = `${format(now, "dd/MM/yyyy")} ${format(now, "HH:mm")}`;
 
@@ -1125,10 +666,11 @@ export function useLeads() {
     ws.addRow(["=========================================="]);
     ws.addRow([]);
     addInfoRow("RESUMO");
-    addInfoRow("COMPARECIMENTOS", comparecimentos.length);
-    addInfoRow("LEADS CRIADOS", leadsCriadosSemana);
-    addInfoRow("AGENDADOS NA SEMANA", agendadosSemana);
-    addInfoRow("TAXA DE COMPARECIMENTO", `${taxaComparecimento}%`);
+    addInfoRow("LEADS CRIADOS", leadsCriadosSemana.length);
+    addInfoRow("TOTAL AGENDAMENTOS", `${totalAgendamentos} (${taxaAgendamentos}%)`);
+    addInfoRow("AGENDADOS NOVOS", agendadosNovos);
+    addInfoRow("AGENDADOS RECUPERADOS", agendadosRecuperados);
+    addInfoRow("COMPARECIMENTOS", `${comparecimentos.length} (${taxaComparecimento}%)`);
     ws.addRow([]);
     addInfoRow("===== DETALHAMENTO DOS COMPARECIMENTOS =====");
     ws.addRow([]);
@@ -1336,7 +878,7 @@ export function useLeads() {
         return String(s).replace(/\s+/g, "_").replace(/[^\w\-]/g, "");
       }
     };
-    const clinicNameRaw = (typeof clinicMeta !== 'undefined' && clinicMeta && clinicMeta.name) ? clinicMeta.name : (currentClinic || selectedClinic || 'Clinic');
+    const clinicNameRaw = (currentClinic || selectedClinic || 'Clinic');
     const clinicLabel = sanitize(clinicNameRaw);
     const filename = `${clinicLabel}_Agendamentos_${format(new Date(), "yyyy-MM-dd")}.csv`;
     a.download = filename;
@@ -1550,7 +1092,6 @@ export function useLeads() {
     const mornos = activeLeads.filter(l => l.status === 'MORNO').length;
     const frios = activeLeads.filter(l => l.status === 'FRIO').length;
     const agendados = activeLeads.filter(l => l.dataAgendamento && l.dataAgendamento.trim() !== '').length;
-    const agendadosHoje = scheduledTodayCount || 0;
     const reagendamentosHoje = activeLeads.filter(l => l.dataAgendamentoAlterado && l.dataAgendamentoAlterado.startsWith(format(new Date(), 'dd/MM/yyyy'))).length;
     const followUpsPendentes = activeLeads.filter(l => l.dataFollowUp && l.dataFollowUp.trim() !== '').length;
     const followUpsOverdue = activeLeads.filter(l => {
@@ -1571,14 +1112,81 @@ export function useLeads() {
       mornos,
       frios,
       agendados,
-      agendadosHoje,
       reagendamentosHoje,
       followUpsPendentes,
       followUpsOverdue,
       compareceram,
       lembretesPendentes,
     };
-  }, [leads, scheduledTodayCount]);
+  }, [leads]);
+
+  // Fila de retornos de ligação: leads com dataRetornoLigacao definida e não deletados
+  const callReturnQueue = useMemo(
+    () => leads.filter(l => l.dataRetornoLigacao && !(l as any)._deleted),
+    [leads]
+  );
+
+  // Fila de follow-ups pendentes: leads com dataFollowUp futura ou pendente
+  const followUpQueue = useMemo(
+    () => leads.filter(l => l.dataFollowUp && !l._deleted),
+    [leads]
+  );
+
+  // Fila de lembretes pendentes: leads com lembretes não enviados
+  const reminderQueue = useMemo(
+    () => leads.filter(l => l.lembretes && (!l.lembretes.h24 || !l.lembretes.today) && !l._deleted),
+    [leads]
+  );
+
+  // Quantidade de follow-ups feitos hoje
+  const followUpsDoneToday = useMemo(() => {
+    const today = format(new Date(), "dd/MM/yyyy");
+    return leads.filter(l => l.lastFollowUpDone === today && !l._deleted).length;
+  }, [leads]);
+
+  // Função para registrar follow-up
+  const sendFollowUp = (leadId: string, observacao: string = "") => {
+    setLeads(prev => prev.map(l =>
+      l.id === leadId ? { ...l, lastFollowUpDone: format(new Date(), "dd/MM/yyyy"), observacao } : l
+    ));
+  };
+
+  // Função para marcar lembrete
+  const markReminder = (leadId: string, type: "h24" | "today") => {
+    setLeads(prev => prev.map(l =>
+      l.id === leadId ? { ...l, lembretes: { ...l.lembretes, [type]: true } } : l
+    ));
+  };
+
+  // Função para atualizar lead
+  const updateLead = (leadId: string, updates: Partial<Lead>) => {
+    setLeads(prev => prev.map(l =>
+      l.id === leadId ? { ...l, ...updates } : l
+    ));
+  };
+
+  // Função para criar lead
+  const createLead = (lead: Omit<Lead, 'id'>) => {
+    const newLead: Lead = { ...lead, id: `lead_${Date.now()}` };
+    setLeads(prev => [newLead, ...prev]);
+    return newLead;
+  };
+
+  // Função para limpar retorno de ligação
+  const clearCallReturn = (leadId: string) => {
+    setLeads(prev => prev.map(l =>
+      l.id === leadId ? { ...l, dataRetornoLigacao: "" } : l
+    ));
+  };
+
+  // Função para registrar ligação
+  const registerCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
+    setLeads(prev => prev.map(l =>
+      l.id === leadId
+        ? { ...l, status: outcome, observacao: obs, dataRetornoLigacao: returnDate || "" }
+        : l
+    ));
+  };
 
   return {
     leads: filteredLeads,
@@ -1586,18 +1194,7 @@ export function useLeads() {
     filters,
     setFilters,
     stats,
-    followUpQueue,
-    followUpsDoneToday,
-    scheduledTodayCount,
     followUpGoal: 20, // Meta diária
-    callReturnQueue,
-    reminderQueue,
-    sendFollowUp,
-    markReminder,
-    updateLead,
-    createLead,
-    clearCallReturn,
-    registerCall,
     exportCSV,
     importCSV,
     getAppointmentsFor,
@@ -1610,5 +1207,17 @@ export function useLeads() {
     deleteLeads,
     clearAllLeads,
     clearDuplicates,
+    callReturnQueue,
+    followUpQueue,
+    reminderQueue,
+    followUpsDoneToday,
+    sendFollowUp,
+    markReminder,
+    updateLead,
+    createLead,
+    clearCallReturn,
+    registerCall,
   };
-}
+
+  }
+
