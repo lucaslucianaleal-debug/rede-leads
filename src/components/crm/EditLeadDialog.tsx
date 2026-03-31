@@ -78,11 +78,23 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const fromSelect = (v: string) => v === NONE ? "" : v;
 
   const handleSave = async () => {
+
     const { followUpCount, ...safeUpdates } = form as Lead;
     const finalAgendamento = agendamentoDate
       ? `${format(agendamentoDate, "dd/MM/yyyy")} ${agendamentoTime}`
       : "";
-    const updates = { ...safeUpdates, dataAgendamento: finalAgendamento };
+    let updates: any = { ...safeUpdates, dataAgendamento: finalAgendamento };
+
+    // Se está criando ou alterando agendamento, sempre setar dataAgendamentoCriado se não existe
+    if (finalAgendamento) {
+      const hoje = format(new Date(), "dd/MM/yyyy");
+      if (!form.dataAgendamentoCriado) {
+        updates.dataAgendamentoCriado = hoje;
+      }
+    } else {
+      // Se removeu o agendamento, limpa o campo criado
+      updates.dataAgendamentoCriado = "";
+    }
 
     // Validação básica do telefone antes de chamar o sync
     const phoneDigits = String(updates.telefone || "").replace(/\D/g, "");
