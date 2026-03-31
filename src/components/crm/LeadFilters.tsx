@@ -18,7 +18,7 @@ const respostas: (LeadResposta | "Todas")[] = ["Todas", "RESPONDEU", "NÃO RESPO
 
 export function LeadFilters({ filters, onFilterChange }: LeadFiltersProps) {
   return (
-    <div className="flex flex-wrap gap-3 items-center">
+    <div className="flex flex-wrap gap-6 items-center">
       <div className="relative flex-1 min-w-[200px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -29,7 +29,7 @@ export function LeadFilters({ filters, onFilterChange }: LeadFiltersProps) {
         />
       </div>
       <Select value={filters.etapa} onValueChange={(v) => onFilterChange({ ...filters, etapa: v as any })}>
-        <SelectTrigger className="w-[180px] bg-card">
+        <SelectTrigger className="min-w-[180px] bg-card">
           <SelectValue placeholder="Etapa" />
         </SelectTrigger>
         <SelectContent>
@@ -39,7 +39,7 @@ export function LeadFilters({ filters, onFilterChange }: LeadFiltersProps) {
         </SelectContent>
       </Select>
       <Select value={filters.status} onValueChange={(v) => onFilterChange({ ...filters, status: v as any })}>
-        <SelectTrigger className="w-[140px] bg-card">
+        <SelectTrigger className="min-w-[140px] bg-card">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
@@ -49,7 +49,7 @@ export function LeadFilters({ filters, onFilterChange }: LeadFiltersProps) {
         </SelectContent>
       </Select>
       <Select value={filters.resposta} onValueChange={(v) => onFilterChange({ ...filters, resposta: v as any })}>
-        <SelectTrigger className="w-[180px] bg-card">
+        <SelectTrigger className="min-w-[180px] bg-card">
           <SelectValue placeholder="Resposta" />
         </SelectTrigger>
         <SelectContent>
