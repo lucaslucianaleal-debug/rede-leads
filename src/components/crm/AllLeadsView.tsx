@@ -40,6 +40,10 @@ type FilterCategory = {
 };
 
 export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat, onOpenCall, onExport, onExportRange }: AllLeadsViewProps) {
+    // Filtro unificado de datas
+    const [dateFilterType, setDateFilterType] = useState<'mes' | 'dia' | 'periodo'>('mes');
+    const [selectedDateMonth, setSelectedDateMonth] = useState<string>('all');
+    const [selectedDateDay, setSelectedDateDay] = useState<string>('all');
   const [reportStart, setReportStart] = useState<Date>(new Date());
   const [reportEnd, setReportEnd] = useState<Date>(new Date());
   const [exporting, setExporting] = useState(false);
@@ -177,18 +181,21 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
   // First filter by creation day, contact month, appointment month, and source
   const leadsFilteredByMonthSource = useMemo(() => {
     let result = leads;
-
-    // Filter by creation day
-    if (selectedCreationDay !== "all") {
-      result = result.filter((lead) => lead.dataCriacao === selectedCreationDay);
-    }
-
-    // Filter by contact month
-    if (selectedContactMonth !== "all") {
+    // Filtro unificado de datas
+    if (dateFilterType === 'mes' && selectedDateMonth !== 'all') {
       result = result.filter((lead) => {
         if (!lead.dataContato) return false;
         const [, month, year] = lead.dataContato.split("/");
-        return `${month}/${year}` === selectedContactMonth;
+        return `${month}/${year}` === selectedDateMonth;
+      });
+    } else if (dateFilterType === 'dia' && selectedDateDay !== 'all') {
+      result = result.filter((lead) => lead.dataCriacao === selectedDateDay);
+    } else if (dateFilterType === 'periodo') {
+      result = result.filter((lead) => {
+        if (!lead.dataCriacao) return false;
+        const [d, m, y] = lead.dataCriacao.split("/");
+        const leadDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+        return leadDate >= reportStart && leadDate <= reportEnd;
       });
     }
 
@@ -223,7 +230,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     }
 
     return result;
-  }, [leads, selectedCreationDay, selectedContactMonth, selectedAppointmentMonth, selectedSource, selectedStage, selectedAttendance]);
+  }, [leads, dateFilterType, selectedDateMonth, selectedDateDay, reportStart, reportEnd, selectedAppointmentMonth, selectedSource, selectedStage, selectedAttendance]);
 
   // Relatório filtrado: todos os cards refletem SEMPRE os filtros ativos
   const stats = useMemo(() => {
@@ -355,28 +362,63 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
           <CardTitle>
             <div className="flex flex-wrap gap-4 items-end">
               <div className="flex flex-col">
-                <span className="text-xs font-medium text-muted-foreground mb-1">Mês Contato</span>
-                <Select value={selectedContactMonth} onValueChange={setSelectedContactMonth}>
-                  <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {availableContactMonths.map((month) => (
-                      <SelectItem key={month} value={month}>{month}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-medium text-muted-foreground mb-1">Dia Criação</span>
-                <Select value={selectedCreationDay} onValueChange={setSelectedCreationDay}>
-                  <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {availableCreationDays.map((day) => (
-                      <SelectItem key={day} value={day}>{day}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <span className="text-xs font-medium text-muted-foreground mb-1">Datas</span>
+                <div className="flex gap-2">
+                  <Select value={dateFilterType} onValueChange={v => setDateFilterType(v as 'mes' | 'dia' | 'periodo')}>
+                    <SelectTrigger className="w-[120px]"><SelectValue />
+                      {dateFilterType === 'mes' && selectedDateMonth !== 'all' ? `Mês: ${selectedDateMonth}` : ''}
+                      {dateFilterType === 'dia' && selectedDateDay !== 'all' ? `Dia: ${selectedDateDay}` : ''}
+                      {dateFilterType === 'periodo' ? `Período` : ''}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mes">Por mês</SelectItem>
+                      <SelectItem value="dia">Por dia</SelectItem>
+                      <SelectItem value="periodo">Por período</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {dateFilterType === 'mes' && (
+                    <Select value={selectedDateMonth} onValueChange={setSelectedDateMonth}>
+                      <SelectTrigger className="w-[120px]"><SelectValue placeholder="Selecione o mês" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {availableContactMonths.map((month) => (
+                          <SelectItem key={month} value={month}>{month}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {dateFilterType === 'dia' && (
+                    <Select value={selectedDateDay} onValueChange={setSelectedDateDay}>
+                      <SelectTrigger className="w-[120px]"><SelectValue placeholder="Selecione o dia" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {availableCreationDays.map((day) => (
+                          <SelectItem key={day} value={day}>{day}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {dateFilterType === 'periodo' && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" aria-label="Data início">
+                            <CalendarCheck className="h-4 w-4 mr-1" />
+                            {format(reportStart, "dd/MM")}
+                          </Button>
+                          <Button variant="outline" size="sm" aria-label="Data fim">
+                            <CalendarCheck className="h-4 w-4 mr-1" />
+                            {format(reportEnd, "dd/MM")}
+                          </Button>
+                        </div>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 flex gap-2">
+                        <Calendar mode="single" selected={reportStart} onSelect={(d) => d && setReportStart(d)} locale={ptBR} />
+                        <Calendar mode="single" selected={reportEnd} onSelect={(d) => d && setReportEnd(d)} locale={ptBR} />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
               </div>
               {/* Filtro de Mês Agenda removido */}
               <div className="flex flex-col">
