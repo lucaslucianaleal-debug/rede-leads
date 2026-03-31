@@ -136,8 +136,10 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
   const handleConfirmAgendamento = (leadId: string, dataAgendamento: string) => {
     if (!onUpdateLead) return;
     // Reagendar: reativar automação e limpar envios anteriores
+    const hoje = format(new Date(), "dd/MM/yyyy");
     onUpdateLead(leadId, {
       dataAgendamento,
+      dataAgendamentoCriado: hoje,
       etapaLead: "Avaliação agendada",
       lembretes: {
         h24: false,

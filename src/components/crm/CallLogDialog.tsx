@@ -118,7 +118,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     }
     // Atualiza status do lead
     if (updateLead && status && lead.status !== status) {
-      updateLead(lead.id, { status });
+      updateLead(lead.id, { status: status as any });
     }
     onConfirm(lead.id, outcome, obs, returnDateStr);
     toast.success(returnDateStr ? `Ligação registrada! Retorno agendado para ${returnDateStr}` : "Ligação registrada!");
@@ -136,8 +136,10 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
 
   const handleConfirmAgendamento = (leadId: string, dataAgendamento: string) => {
     if (!updateLead || !lead) return;
+    const hoje = format(new Date(), "dd/MM/yyyy");
     updateLead(leadId, {
       dataAgendamento,
+      dataAgendamentoCriado: hoje,
       etapaLead: "Avaliação agendada",
       lembretes: {
         h24: false,
@@ -217,7 +219,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
                   onClick={() => {
                     setStatus(s.value);
                     if (updateLead && lead && lead.status !== s.value) {
-                      updateLead(lead.id, { status: s.value });
+                      updateLead(lead.id, { status: s.value as any });
                     }
                   }}
                   className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center whitespace-normal break-words ${
