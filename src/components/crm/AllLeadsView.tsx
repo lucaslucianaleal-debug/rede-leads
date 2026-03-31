@@ -40,6 +40,10 @@ type FilterCategory = {
 };
 
 export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLead, selectedLeads, onSelectionChange, onDeleteSelected, onClearDuplicates, onSendFollowUp, onRegisterCall, onOpenChat, onOpenCall, onExport, onExportRange }: AllLeadsViewProps) {
+    // Filtro unificado de datas
+    const [dateFilterType, setDateFilterType] = useState<'mes' | 'dia' | 'periodo'>('mes');
+    const [selectedDateMonth, setSelectedDateMonth] = useState<string>('all');
+    const [selectedDateDay, setSelectedDateDay] = useState<string>('all');
   const [reportStart, setReportStart] = useState<Date>(new Date());
   const [reportEnd, setReportEnd] = useState<Date>(new Date());
   const [exporting, setExporting] = useState(false);
@@ -177,18 +181,21 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
   // First filter by creation day, contact month, appointment month, and source
   const leadsFilteredByMonthSource = useMemo(() => {
     let result = leads;
-
-    // Filter by creation day
-    if (selectedCreationDay !== "all") {
-      result = result.filter((lead) => lead.dataCriacao === selectedCreationDay);
-    }
-
-    // Filter by contact month
-    if (selectedContactMonth !== "all") {
+    // Filtro unificado de datas
+    if (dateFilterType === 'mes' && selectedDateMonth !== 'all') {
       result = result.filter((lead) => {
         if (!lead.dataContato) return false;
         const [, month, year] = lead.dataContato.split("/");
-        return `${month}/${year}` === selectedContactMonth;
+        return `${month}/${year}` === selectedDateMonth;
+      });
+    } else if (dateFilterType === 'dia' && selectedDateDay !== 'all') {
+      result = result.filter((lead) => lead.dataCriacao === selectedDateDay);
+    } else if (dateFilterType === 'periodo') {
+      result = result.filter((lead) => {
+        if (!lead.dataCriacao) return false;
+        const [d, m, y] = lead.dataCriacao.split("/");
+        const leadDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+        return leadDate >= reportStart && leadDate <= reportEnd;
       });
     }
 
@@ -223,31 +230,71 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     }
 
     return result;
-  }, [leads, selectedCreationDay, selectedContactMonth, selectedAppointmentMonth, selectedSource, selectedStage, selectedAttendance]);
+  }, [leads, dateFilterType, selectedDateMonth, selectedDateDay, reportStart, reportEnd, selectedAppointmentMonth, selectedSource, selectedStage, selectedAttendance]);
 
-  // Calculate stats based on month/source filters
+  // Relatório filtrado: todos os cards refletem SEMPRE os filtros ativos
   const stats = useMemo(() => {
-    // Cards refletem os filtros ativos (como antes)
-    // Total filtrado (igual ao badge/tabela)
-    const entradaLeads = leadsFilteredByMonthSource.length;
-    const followUpsRealizados = leadsFilteredByMonthSource.filter((l) => String(l.etapaLead).toLowerCase().includes("follow-up")).length;
-    // Excluir leads marcados como 'Fora da região' dos contáveis de agendamentos/comparecimentos
-    const agendamentosFeitos = leadsFilteredByMonthSource.filter((l) => l.etapaLead !== "Fora da região" && l.dataAgendamentoCriado && l.dataAgendamentoCriado !== "").length;
-    const compareceram = leadsFilteredByMonthSource.filter((l) => l.etapaLead !== "Fora da região" && l.comparecimento === "COMPARECEU").length;
+    // Base: leads filtrados pelos filtros ativos (fonte, etapa, etc.)
+    const leadsFiltrados = leadsFilteredByMonthSource;
 
-    // Porcentagens
-    const pctAgendamentos = entradaLeads > 0 ? ((agendamentosFeitos / entradaLeads) * 100).toFixed(1) : null;
-    const pctCompareceram = agendamentosFeitos > 0 ? ((compareceram / agendamentosFeitos) * 100).toFixed(1) : null;
+    // Determinar mês/ano do filtro de agendamento (para manter compatibilidade com filtro mensal)
+    let month = null, year = null;
+    if (selectedAppointmentMonth && selectedAppointmentMonth !== "all") {
+      [month, year] = selectedAppointmentMonth.split("/");
+    }
+
+    // Leads criados (base dos cards):
+    // Se filtro de mês agendado estiver ativo, mostrar todos os leads criados naquele mês (mesmo sem agendamento)
+    let leadsCriados = leadsFiltrados;
+    if (selectedAppointmentMonth && selectedAppointmentMonth !== "all") {
+      const [monthAg, yearAg] = selectedAppointmentMonth.split("/");
+      leadsCriados = leadsFiltrados.filter(l => {
+        if (!l.dataCriacao) return false;
+        const [d, m, y] = l.dataCriacao.split("/");
+        return m === monthAg && y === yearAg;
+      });
+    } else {
+      // Se não, mantém filtro padrão (outros filtros já aplicados)
+      leadsCriados = leadsFiltrados;
+    }
+
+    // Agendamentos realizados no período (dataAgendamentoCriado)
+    const agendamentosNoPeriodo = leadsFiltrados.filter(l => {
+      if (!l.dataAgendamentoCriado) return false;
+      if (!month || !year) return true;
+      const [d, m, y] = l.dataAgendamentoCriado.split("/");
+      return m === month && y === year;
+    });
+
+    // Agendados Novos/Recuperados
+    let agendadosNovos = 0;
+    let agendadosRecuperados = 0;
+    agendamentosNoPeriodo.forEach(l => {
+      if (l.dataCriacao === l.dataAgendamentoCriado) agendadosNovos++;
+      else agendadosRecuperados++;
+    });
+
+    // Comparecimentos dos agendamentos do período
+    const compareceram = agendamentosNoPeriodo.filter(l => l.comparecimento === "COMPARECEU").length;
+
+    // Conversão: % de leads criados que agendaram (novos + recuperados) e % de agendamentos que compareceram
+    const taxaConversaoTotal = leadsCriados.length > 0 ? (((agendadosNovos + agendadosRecuperados) / leadsCriados.length) * 100).toFixed(1) : null;
+    const taxaComparecimento = agendamentosNoPeriodo.length > 0 ? ((compareceram / agendamentosNoPeriodo.length) * 100).toFixed(1) : null;
+
+    // Follow-ups realizados (mantém lógica anterior, mas pode ser ajustado)
+    const followUpsRealizados = leadsCriados.filter((l) => String(l.etapaLead).toLowerCase().includes("follow-up")).length;
 
     return {
-      entradaLeads,
+      entradaLeads: leadsCriados.length,
       followUpsRealizados,
-      agendamentosFeitos,
+      agendadosNovos,
+      agendadosRecuperados,
+      agendamentosTotais: agendamentosNoPeriodo.length,
       compareceram,
-      pctAgendamentos,
-      pctCompareceram,
+      taxaConversaoTotal,
+      taxaComparecimento,
     };
-  }, [leadsFilteredByMonthSource]);
+  }, [leadsFilteredByMonthSource, selectedAppointmentMonth]);
 
   // Filter leads (apply duplicados and search filters on top of month/source)
   const filteredLeads = useMemo(() => {
@@ -298,11 +345,13 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     accent: "bg-accent/10 text-accent",
   };
 
+  // Cards de funil detalhado
   const statsCards = [
-    { key: "entradaLeads" as const, label: "Entrada de Leads", icon: Users, color: "primary" },
-    { key: "followUpsRealizados" as const, label: "Follow-ups Realizados", icon: Clock, color: "accent" },
-    { key: "agendamentosFeitos" as const, label: "Agendamentos Feitos", icon: CalendarCheck, color: "success", pct: stats.pctAgendamentos },
-    { key: "compareceram" as const, label: "Compareceram", icon: UserCheck, color: "success", pct: stats.pctCompareceram },
+    { key: "entradaLeads" as const, label: "Leads Criados", icon: Users, color: "primary" },
+    { key: "agendamentosTotais" as const, label: "Total Agendamentos", icon: CalendarCheck, color: "success", pct: stats.taxaConversaoTotal },
+    { key: "agendadosNovos" as const, label: "Agendados Novos", icon: CalendarCheck, color: "success" },
+    { key: "agendadosRecuperados" as const, label: "Agendados Recuperados", icon: CalendarCheck, color: "accent" },
+    { key: "compareceram" as const, label: "Comparecimentos", icon: UserCheck, color: "success", pct: stats.taxaComparecimento },
   ];
 
   return (
@@ -313,41 +362,65 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
           <CardTitle>
             <div className="flex flex-wrap gap-4 items-end">
               <div className="flex flex-col">
-                <span className="text-xs font-medium text-muted-foreground mb-1">Mês Contato</span>
-                <Select value={selectedContactMonth} onValueChange={setSelectedContactMonth}>
-                  <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {availableContactMonths.map((month) => (
-                      <SelectItem key={month} value={month}>{month}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <span className="text-xs font-medium text-muted-foreground mb-1">Datas</span>
+                <div className="flex gap-2">
+                  <Select value={dateFilterType} onValueChange={v => setDateFilterType(v as 'mes' | 'dia' | 'periodo')}>
+                    <SelectTrigger className="w-[120px]"><SelectValue />
+                      {dateFilterType === 'mes' && selectedDateMonth !== 'all' ? `Mês: ${selectedDateMonth}` : ''}
+                      {dateFilterType === 'dia' && selectedDateDay !== 'all' ? `Dia: ${selectedDateDay}` : ''}
+                      {dateFilterType === 'periodo' ? `Período` : ''}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mes">Por mês</SelectItem>
+                      <SelectItem value="dia">Por dia</SelectItem>
+                      <SelectItem value="periodo">Por período</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {dateFilterType === 'mes' && (
+                    <Select value={selectedDateMonth} onValueChange={setSelectedDateMonth}>
+                      <SelectTrigger className="w-[120px]"><SelectValue placeholder="Selecione o mês" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {availableContactMonths.map((month) => (
+                          <SelectItem key={month} value={month}>{month}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {dateFilterType === 'dia' && (
+                    <Select value={selectedDateDay} onValueChange={setSelectedDateDay}>
+                      <SelectTrigger className="w-[120px]"><SelectValue placeholder="Selecione o dia" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {availableCreationDays.map((day) => (
+                          <SelectItem key={day} value={day}>{day}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {dateFilterType === 'periodo' && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" aria-label="Data início">
+                            <CalendarCheck className="h-4 w-4 mr-1" />
+                            {format(reportStart, "dd/MM")}
+                          </Button>
+                          <Button variant="outline" size="sm" aria-label="Data fim">
+                            <CalendarCheck className="h-4 w-4 mr-1" />
+                            {format(reportEnd, "dd/MM")}
+                          </Button>
+                        </div>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 flex gap-2">
+                        <Calendar mode="single" selected={reportStart} onSelect={(d) => d && setReportStart(d)} locale={ptBR} />
+                        <Calendar mode="single" selected={reportEnd} onSelect={(d) => d && setReportEnd(d)} locale={ptBR} />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-medium text-muted-foreground mb-1">Dia Criação</span>
-                <Select value={selectedCreationDay} onValueChange={setSelectedCreationDay}>
-                  <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {availableCreationDays.map((day) => (
-                      <SelectItem key={day} value={day}>{day}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-medium text-muted-foreground mb-1">Mês Agenda</span>
-                <Select value={selectedAppointmentMonth} onValueChange={setSelectedAppointmentMonth}>
-                  <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {availableAppointmentMonths.map((month) => (
-                      <SelectItem key={month} value={month}>{month}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Filtro de Mês Agenda removido */}
               <div className="flex flex-col">
                 <span className="text-xs font-medium text-muted-foreground mb-1">Fonte</span>
                 <Select value={selectedSource} onValueChange={setSelectedSource}>
@@ -483,33 +556,33 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       {/* Cards de estatísticas */}
       <Card>
         <CardContent className="py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 justify-center items-center">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 justify-center items-center">
             {statsCards.map((card, i) => {
-                  const Icon = card.icon;
-                  return (
-                    <motion.div
-                      key={card.key}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.04 }}
-                      className="stat-card"
-                    >
-                      <div className={`inline-flex p-2 rounded-lg mb-2 ${colorMap[card.color]}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-2xl font-heading font-bold text-foreground">{stats[card.key]}</p>
-                        {card.pct && (
-                          <span className="text-sm font-semibold text-muted-foreground">({card.pct}%)</span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">{card.label}</p>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+              const Icon = card.icon;
+              return (
+                <motion.div
+                  key={card.key}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="stat-card"
+                >
+                  <div className={`inline-flex p-2 rounded-lg mb-2 ${colorMap[card.color]}`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-2xl font-heading font-bold text-foreground">{stats[card.key]}</p>
+                    {card.pct && (
+                      <span className="text-sm font-semibold text-muted-foreground">({card.pct}%)</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">{card.label}</p>
+                </motion.div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Duplicate Alert */}
       {duplicatePhones.size > 0 && (
