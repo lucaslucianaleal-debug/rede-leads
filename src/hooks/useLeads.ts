@@ -1183,7 +1183,7 @@ export function useLeads() {
   const registerCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
     setLeads(prev => prev.map(l =>
       l.id === leadId
-        ? { ...l, status: outcome, observacao: obs, dataRetornoLigacao: returnDate || "" }
+        ? { ...l, respostaLead: outcome as any, observacao: obs, dataRetornoLigacao: returnDate || "" }
         : l
     ));
   };
