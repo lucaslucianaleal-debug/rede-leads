@@ -8,45 +8,39 @@ import { getFirestore } from "firebase-admin/firestore";
 // Inicializa Firebase Admin (uma vez)
 if (!getApps().length) {
   try {
-    let serviceAccount;
-    const envValue = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
     
-    console.log("[Firebase] Env var exists:", !!envValue);
-    console.log("[Firebase] Env var length:", envValue?.length);
-    console.log("[Firebase] First 100 chars:", envValue?.substring(0, 100));
+    console.log("[Firebase] projectId exists:", !!projectId);
+    console.log("[Firebase] clientEmail exists:", !!clientEmail);
+    console.log("[Firebase] privateKey exists:", !!privateKey);
+    console.log("[Firebase] privateKey length:", privateKey?.length);
     
-    if (!envValue) {
-      throw new Error("FIREBASE_SERVICE_ACCOUNT not set");
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error(
+        `Missing credentials: projectId=${!!projectId}, clientEmail=${!!clientEmail}, privateKey=${!!privateKey}`
+      );
     }
     
-    // Tentar parsear como JSON
-    try {
-      serviceAccount = JSON.parse(envValue);
-    } catch (parseErr) {
-      console.error("[Firebase] JSON parse failed, trying alternative...", parseErr.message);
-      // Se falhar, tentar remover caracteres escapados extras
-      const cleaned = envValue
-        .replace(/\\n/g, "\n")
-        .replace(/\\\"/g, '"')
-        .trim();
-      serviceAccount = JSON.parse(cleaned);
-    }
+    // Converter literal \n para newlines reais
+    privateKey = privateKey.replace(/\\n/g, "\n");
     
-    console.log("[Firebase] Parsed service account keys:", Object.keys(serviceAccount || {}));
+    console.log("[Firebase] After replace, privateKey starts with:", privateKey.substring(0, 50));
     
-    if (!serviceAccount || !serviceAccount.project_id) {
-      console.error("[Firebase] Service account:", JSON.stringify(serviceAccount || {}, null, 2));
-      throw new Error("Service account missing or invalid structure");
-    }
-    
-    initializeApp({
-      credential: cert(serviceAccount),
+    const credential = cert({
+      projectId,
+      clientEmail,
+      privateKey,
     });
     
-    console.log(`[Firebase] ✓ Inicializado com projeto: ${serviceAccount.project_id}`);
+    initializeApp({
+      credential,
+    });
+    
+    console.log(`[Firebase] ✓ Inicializado: ${projectId}`);
   } catch (err) {
-    console.error("[Firebase] ✗ Erro ao inicializar:", err.message);
-    console.error("[Firebase] Stack:", err.stack);
+    console.error("[Firebase] ✗ Erro:", err.message);
     throw err;
   }
 }
