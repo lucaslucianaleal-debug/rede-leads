@@ -72,7 +72,7 @@ async function sendMessageWithDelay(phone, message, delayMs = 0) {
   }
   
   try {
-    const zApiUrl = `https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-message`;
+    const zApiUrl = `https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`;
     const response = await fetch(zApiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -82,11 +82,13 @@ async function sendMessageWithDelay(phone, message, delayMs = 0) {
       })
     });
     
+    const data = await response.json().catch(() => ({}));
+    
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
     }
     
-    console.log(`[z-api] ✓ Msg enviada: ${phone}`);
+    console.log(`[z-api] ✓ Msg enviada: ${phone}`, JSON.stringify(data));
   } catch (err) {
     console.error(`[z-api] ✗ Erro ao enviar msg para ${phone}:`, err.message);
   }
