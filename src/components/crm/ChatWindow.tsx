@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { useLeads } from "@/hooks/useLeads";
 
 const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
-const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Outro"];
+const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Influenciador", "Hotleads", "Outro"];
 const STATUSES = ["QUENTE", "MORNO", "FRIO"];
 
 interface ChatWindowProps {
