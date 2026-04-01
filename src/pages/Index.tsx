@@ -353,6 +353,7 @@ const CRMDashboard = () => {
                   onRegisterCall={handleRegisterCall}
                   followUpsDoneToday={followUpsDoneToday}
                   followUpGoal={followUpGoal}
+                  onCreateLead={handleCreateLead}
                 />
                 {callReturnQueue.length > 0 && (
                   <CallReturnQueue

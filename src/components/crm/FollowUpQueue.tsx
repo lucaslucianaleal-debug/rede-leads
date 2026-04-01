@@ -25,6 +25,7 @@ interface FollowUpQueueProps {
   followUpsDoneToday?: number;
   followUpGoal?: number;
   onOpenChat?: (phone: string, message?: string) => void;
+  onCreateLead?: (lead: Omit<Lead, 'id'>) => void;
 }
 
 // Helper function to calculate days since last follow-up
@@ -75,7 +76,7 @@ const parseToDate = (v: any): Date | null => {
   return null;
 };
 
-export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat }: FollowUpQueueProps) {
+export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat, onCreateLead }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [whatsLead, setWhatsLead] = useState<Lead | null>(null);
@@ -514,7 +515,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
       )}
 
         {showNewLeads && (
-          <NewLeadsPanel open={showNewLeads} onClose={() => setShowNewLeads(false)} />
+          <NewLeadsPanel open={showNewLeads} onClose={() => setShowNewLeads(false)} onCreateLead={onCreateLead} />
         )}
       {/* Botão de imprimir - só aparece na tela */}
       <div className="flex items-center gap-2 mb-4">
