@@ -59,6 +59,10 @@ export default async function handler(req, res) {
   res.status(200).json({ ok: true });
 
   try {
+    // LOG TEMPORÁRIO: ver payload completo
+    console.log("[webhook] clinicId:", clinicId);
+    console.log("[webhook] payload:", JSON.stringify(payload, null, 2));
+
     // Ignorar mensagens enviadas por nós
     const fromMe = payload?.data?.isFromMe || payload?.isFromMe || false;
     if (fromMe) return;
