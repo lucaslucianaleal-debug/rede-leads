@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Lead } from "@/types/crm";
+import { Lead, LeadStage } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Phone, User, ExternalLink, Check, Target, Search, X, CalendarCheck } from "lucide-react";
@@ -20,7 +20,7 @@ import NewLeadsPanel from "./NewLeadsPanel";
 
 interface FollowUpQueueProps {
   leads: Lead[];
-  onSendFollowUp: (leadId: string, observacao?: string) => void;
+  onSendFollowUp: (leadId: string, observacao?: string, etapa?: LeadStage) => void;
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
   followUpsDoneToday?: number;
   followUpGoal?: number;
@@ -240,8 +240,8 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
     return list;
   }, [leads, search, debouncedSearch, selectedService, noShowOnly]);
   
-  const handleConfirmFollowUp = (leadId: string, observacao: string) => {
-    onSendFollowUp(leadId, observacao);
+  const handleConfirmFollowUp = (leadId: string, observacao: string, etapa?: LeadStage) => {
+    onSendFollowUp(leadId, observacao, etapa);
     setSelectedLead(null);
   };
 

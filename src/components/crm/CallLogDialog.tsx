@@ -4,7 +4,29 @@ const STATUS_OPTIONS = [
   { value: "MORNO", label: "🟡 Morno" },
   { value: "FRIO", label: "🧊 Frio" },
 ];
-import { Lead } from "@/types/crm";
+
+const ETAPA_OPTIONS = [
+  "Novo",
+  "Em contato",
+  "Follow-Up 1",
+  "Follow-Up 2",
+  "Follow-Up 3",
+  "Follow-Up 4",
+  "Follow-Up 5",
+  "Follow-Up 6",
+  "Follow-Up 7",
+  "Follow-Up 8",
+  "Follow-Up 9",
+  "Follow-Up 10",
+  "Follow-Up 11",
+  "Follow-Up 12",
+  "Avaliação agendada",
+  "Fora da região",
+  "Desistência",
+  "Finalizado",
+];
+
+import { Lead, LeadStage } from "@/types/crm";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -77,6 +100,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   const [whatsOpen, setWhatsOpen] = useState(false);
   const [suggestedMessage, setSuggestedMessage] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<string>(lead?.status || "MORNO");
+  const [etapa, setEtapa] = useState<LeadStage>(lead?.etapaLead || "Novo");
     const [showAgenda, setShowAgenda] = useState(false);
 
   // Pré-preencher se já tem retorno ligação agendado
@@ -107,7 +131,8 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     setOutcome("Caixa de mensagem");
     setObs("");
     setStatus(lead?.status || "MORNO");
-  }, [lead?.dataRetornoLigacao, open, lead?.status]);
+    setEtapa(lead?.etapaLead || "Novo");
+  }, [lead?.dataRetornoLigacao, open, lead?.status, lead?.etapaLead]);
 
   if (!lead) return null;
 
@@ -116,9 +141,14 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     if (agendarRetorno && returnDate) {
       returnDateStr = `${format(returnDate, "dd/MM/yyyy")} ${returnTime}`;
     }
-    // Atualiza status do lead
-    if (updateLead && status && lead.status !== status) {
-      updateLead(lead.id, { status: status as any });
+    // Atualiza status e etapa do lead
+    if (updateLead) {
+      const updates: any = {};
+      if (status && lead.status !== status) updates.status = status as any;
+      if (etapa && lead.etapaLead !== etapa) updates.etapaLead = etapa;
+      if (Object.keys(updates).length > 0) {
+        updateLead(lead.id, updates);
+      }
     }
     onConfirm(lead.id, outcome, obs, returnDateStr);
     toast.success(returnDateStr ? `Ligação registrada! Retorno agendado para ${returnDateStr}` : "Ligação registrada!");
@@ -233,6 +263,34 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
               ))}
             </div>
           </div>
+
+          {/* Etapa */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Etapa do lead</Label>
+              <button
+                type="button"
+                onClick={() => {
+                  setEtapa("Desistência");
+                  setStatus("FRIO");
+                }}
+                className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition font-medium"
+              >
+                Desistiu
+              </button>
+            </div>
+            <Select value={etapa} onValueChange={(value) => setEtapa(value as LeadStage)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a etapa" />
+              </SelectTrigger>
+              <SelectContent>
+                {ETAPA_OPTIONS.map((e) => (
+                  <SelectItem key={e} value={e}>{e}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Outcome */}
           <div className="space-y-2">
             <Label>Resultado da ligação</Label>

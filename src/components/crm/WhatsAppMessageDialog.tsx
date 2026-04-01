@@ -5,7 +5,29 @@ const STATUS_OPTIONS = [
   { value: "MORNO", label: "🟡 Morno" },
   { value: "FRIO", label: "🧊 Frio" },
 ];
-import { Lead } from "@/types/crm";
+
+const ETAPA_OPTIONS = [
+  "Novo",
+  "Em contato",
+  "Follow-Up 1",
+  "Follow-Up 2",
+  "Follow-Up 3",
+  "Follow-Up 4",
+  "Follow-Up 5",
+  "Follow-Up 6",
+  "Follow-Up 7",
+  "Follow-Up 8",
+  "Follow-Up 9",
+  "Follow-Up 10",
+  "Follow-Up 11",
+  "Follow-Up 12",
+  "Avaliação agendada",
+  "Fora da região",
+  "Desistência",
+  "Finalizado",
+];
+
+import { Lead, LeadStage } from "@/types/crm";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, Send, Wifi, WifiOff } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
@@ -42,7 +65,8 @@ export function WhatsAppMessageDialog({
 }: WhatsAppMessageDialogProps) {
   const { updateLead } = useLeads();
   const [message, setMessage] = useState("");
-    const [status, setStatus] = useState<string>(lead?.status || "MORNO");
+  const [status, setStatus] = useState<string>(lead?.status || "MORNO");
+  const [etapa, setEtapa] = useState<LeadStage>(lead?.etapaLead || "Novo");
   const [isEditing, setIsEditing] = useState(false);
   const [sending, setSending] = useState(false);
   const [includeVoucher, setIncludeVoucher] = useState(false);
@@ -62,14 +86,20 @@ export function WhatsAppMessageDialog({
     setVoucherPreviewUrl(null);
     setFoundVoucherId(null);
     setStatus(lead?.status || "MORNO");
+    setEtapa(lead?.etapaLead || "Novo");
   }, [suggestedMessage, open, lead?.status]);
 
   if (!lead) return null;
 
   const handleSend = async () => {
-    // Atualiza status do lead se mudou
-    if (updateLead && status && lead && lead.status !== status) {
-      updateLead(lead.id, { status });
+    // Atualiza status e etapa do lead se mudou
+    if (updateLead && lead) {
+      const updates: any = {};
+      if (status && lead.status !== status) updates.status = status as any;
+      if (etapa && lead.etapaLead !== etapa) updates.etapaLead = etapa;
+      if (Object.keys(updates).length > 0) {
+        updateLead(lead.id, updates);
+      }
     }
     if (!message.trim()) {
       toast.error("Mensagem não pode estar vazia");
@@ -282,6 +312,34 @@ export function WhatsAppMessageDialog({
               ))}
             </div>
           </div>
+
+          {/* Etapa */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Etapa do lead</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setEtapa("Desistência");
+                  setStatus("FRIO");
+                }}
+                className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition font-medium"
+              >
+                Desistiu
+              </button>
+            </div>
+            <Select value={etapa} onValueChange={(value) => setEtapa(value as LeadStage)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a etapa" />
+              </SelectTrigger>
+              <SelectContent>
+                {ETAPA_OPTIONS.map((e) => (
+                  <SelectItem key={e} value={e}>{e}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {(lead.voucherPending || hasVoucherAvailable) && (
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-2">

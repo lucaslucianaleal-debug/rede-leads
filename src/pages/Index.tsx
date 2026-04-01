@@ -103,8 +103,17 @@ const CRMDashboard = () => {
     return { count: duplicateCount, has: hasDuplicates };
   }, [allLeads]);
 
-  const handleFollowUp = (id: string, observacao?: string) => {
+  const handleFollowUp = (id: string, observacao?: string, etapa?: any) => {
+    const updates: any = { observacao: observacao || "" };
+    if (etapa) updates.etapaLead = etapa;
     sendFollowUp(id, observacao || "");
+    if (etapa) {
+      // Also update the lead's etapa if provided
+      const lead = leads.find(l => l.id === id);
+      if (lead) {
+        updateLead(id, { etapaLead: etapa });
+      }
+    }
   };
 
   const handleRegisterCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
