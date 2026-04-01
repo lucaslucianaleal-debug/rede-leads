@@ -16,6 +16,7 @@ import { AgendaDoDia } from "@/components/crm/AgendaDoDia";
 import { ChatView } from "@/components/crm/ChatView";
 import { PerformanceChart } from "@/components/crm/PerformanceChart";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
+import { NewLeadsTab } from "@/components/crm/NewLeadsTab";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -30,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox } from "lucide-react";
 import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
@@ -327,6 +328,10 @@ const CRMDashboard = () => {
               <Database className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Todos os Leads</span>
             </TabsTrigger>
+            <TabsTrigger value="novos-leads" className="flex items-center gap-1.5">
+              <Inbox className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Novos Leads</span>
+            </TabsTrigger>
               {permissions?.canEdit && (
                 <button
                   onClick={() => setShowCreateDialog(true)}
@@ -394,6 +399,10 @@ const CRMDashboard = () => {
               onRegisterCall={handleRegisterCall}
               onOpenCall={handleOpenCall}
             />
+          </TabsContent>
+
+          <TabsContent value="novos-leads" className="mt-6">
+            <NewLeadsTab onCreateLead={handleCreateLead} />
           </TabsContent>
 
           {/* Chat content removido */}
