@@ -1,3 +1,3 @@
-2026/03/10-17:21:43.336 62c8 Reusing MANIFEST C:\CRM ODC - REDE NT\auth_info\session\Default\Local Storage\leveldb/MANIFEST-000001
-2026/03/10-17:21:43.340 62c8 Recovering log #8
-2026/03/10-17:21:43.342 62c8 Reusing old log C:\CRM ODC - REDE NT\auth_info\session\Default\Local Storage\leveldb/000008.log 
+2026/03/31-21:46:04.506 5178 Reusing MANIFEST C:\CRM ODC - REDE NT\auth_info\session\Default\Local Storage\leveldb/MANIFEST-000001
+2026/03/31-21:46:04.509 5178 Recovering log #8
+2026/03/31-21:46:04.511 5178 Reusing old log C:\CRM ODC - REDE NT\auth_info\session\Default\Local Storage\leveldb/000008.log 

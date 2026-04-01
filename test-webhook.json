@@ -1,0 +1,9 @@
+{
+  "event": "on-message-received",
+  "data": {
+    "phone": "5515999887766",
+    "text": {
+      "message": "Teste de triagem automática - sistema Z-API"
+    }
+  }
+}
