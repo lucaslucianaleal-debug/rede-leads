@@ -73,9 +73,12 @@ async function sendMessageWithDelay(phone, message, instance, token, delayMs = 0
   
   try {
     const zApiUrl = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
+    const clientToken = (process.env.Z_API_CLIENT_TOKEN || "").trim();
+    const headers = { 'Content-Type': 'application/json' };
+    if (clientToken) headers['Client-Token'] = clientToken;
     const response = await fetch(zApiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         phone: phone,
         message: message
@@ -160,7 +163,12 @@ export default async function handler(req, res) {
       });
       console.log(`[triagem] ✓ Salvo: ${phoneNorm} → ${clinicId}`);
 
-      // ENVIAR MENSAGENS AUTOMÁTICAS EM SEQUÊNCIA
+      // ENVIAR MENSAGENS AUTOMÁTICAS: apenas se for mensagem de interesse (da plataforma)
+      const isInterestMessage = message.startsWith("Olá! Gostaria de mais informações");
+      if (!isInterestMessage) {
+        console.log(`[triagem] Mensagem não é de interesse, não envia auto-resposta: "${message.substring(0, 50)}"`);
+      }
+
       const rawInstance = process.env.Z_API_INSTANCE || "";
       const rawToken = process.env.Z_API_TOKEN || "";
       // Remover espaços/newlines que possam ter sido colados no Vercel
@@ -168,7 +176,7 @@ export default async function handler(req, res) {
       const cleanToken = rawToken.trim();
       console.log(`[z-api] instance(${cleanInstance.length}): "${cleanInstance.substring(0, 8)}..." token(${cleanToken.length}): "${cleanToken.substring(0, 8)}..."`);
 
-      if (cleanInstance && cleanToken) {
+      if (cleanInstance && cleanToken && isInterestMessage) {
         const greeting = getGreeting();
         const clinicName = CLINIC_NAMES[clinicId] || clinicId;
         
