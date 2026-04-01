@@ -148,6 +148,12 @@ export default async function handler(req, res) {
     }
 
     const phoneNorm = phone.replace(/\D/g, "");
+
+    // Validar: telefone brasileiro deve ter 12 ou 13 dígitos (55 + DDD + número)
+    if (phoneNorm.length < 12 || phoneNorm.length > 13 || !phoneNorm.startsWith("55")) {
+      console.log(`[webhook] Telefone inválido ignorado: "${phoneNorm}" (${phoneNorm.length} dígitos)`);
+      return res.status(200).json({ ok: true, skipped: true });
+    }
     const ref = db.collection("clinics").doc(clinicId).collection("triagem").doc(phoneNorm);
     const existing = await ref.get();
 
