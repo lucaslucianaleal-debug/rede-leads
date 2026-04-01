@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,9 +39,9 @@ export function NewLeadsTab({ onCreateLead, onCountChange }: NewLeadsTabProps) {
     e.stopPropagation();
     if (!currentClinic) return;
     try {
-      await deleteDoc(doc(db, 'clinics', currentClinic, 'triagem', id));
+      await setDoc(doc(db, 'clinics', currentClinic, 'triagem', id), { convertido: true }, { merge: true });
     } catch (err) {
-      console.error('Erro ao deletar lead de triagem:', err);
+      console.error('Erro ao descartar lead de triagem:', err);
     }
   };
 
