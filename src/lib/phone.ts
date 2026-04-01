@@ -65,3 +65,23 @@ export function formatPhoneNumber(phone: string): string {
   // Return as-is if doesn't match expected format
   return phone;
 }
+
+/**
+ * Aplica máscara ao digitar telefone: (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
+ * Usar no onChange do input: setValue(maskPhone(e.target.value))
+ */
+export function maskPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits.length ? `(${digits}` : "";
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+/**
+ * Valida se o telefone tem dígitos suficientes para ser válido (10 ou 11 dígitos).
+ */
+export function isValidPhone(value: string): boolean {
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 10 || digits.length === 11;
+}

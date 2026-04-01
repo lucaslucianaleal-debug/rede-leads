@@ -10,6 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { maskPhone, isValidPhone } from "@/lib/phone";
+import { useLeads } from "@/hooks/useLeads";
+import { normalizePhoneTo10Digits } from "@/lib/phone";
+import { AlertTriangle } from "lucide-react";
 
 interface CreateLeadDialogProps {
   open: boolean;
@@ -37,6 +41,8 @@ const RESPOSTAS: LeadResposta[] = ["RESPONDEU", "NÃO RESPONDEU"];
 const COMPARECIMENTOS: LeadComparecimento[] = ["COMPARECEU", "NÃO COMPARECEU", "AGUARDANDO DATA"];
 
 export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLeadDialogProps) {
+  const { allLeads } = useLeads();
+  const [duplicateWarning, setDuplicateWarning] = useState<{ nome: string; etapa: string } | null>(null);
   const [form, setForm] = useState<Omit<Lead, 'id'>>({
     dataCriacao: format(new Date(), "dd/MM/yyyy"),
     dataContato: format(new Date(), "dd/MM/yyyy"),
@@ -63,6 +69,13 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
     setForm((f) => ({ ...f, [key]: value }));
   };
 
+  const checkDuplicate = (phone: string) => {
+    const norm = normalizePhoneTo10Digits(phone);
+    if (!norm) { setDuplicateWarning(null); return; }
+    const found = allLeads.find(l => normalizePhoneTo10Digits(l.telefone) === norm);
+    setDuplicateWarning(found ? { nome: found.nome, etapa: found.etapaLead } : null);
+  };
+
   const handleSave = () => {
     if (!form.nome.trim()) {
       toast.error("Nome é obrigatório");
@@ -72,11 +85,8 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
       toast.error("Telefone é obrigatório");
       return;
     }
-
-    // Validar formato do telefone (apenas dígitos)
-    const cleanPhone = form.telefone.replace(/\D/g, "");
-    if (cleanPhone.length < 10) {
-      toast.error("Telefone inválido (mínimo 10 dígitos)");
+    if (!isValidPhone(form.telefone)) {
+      toast.error("Telefone inválido — use o formato (XX) XXXXX-XXXX");
       return;
     }
 
@@ -144,10 +154,21 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
             <Label>Telefone *</Label>
             <Input
               value={form.telefone || ""}
-              onChange={(e) => set("telefone", e.target.value)}
+              onChange={(e) => {
+                const masked = maskPhone(e.target.value);
+                set("telefone", masked);
+                checkDuplicate(masked);
+              }}
               onKeyDown={handleKeyDown}
               placeholder="(17) 99999-9999"
+              className={duplicateWarning ? "border-yellow-400 focus-visible:ring-yellow-400" : ""}
             />
+            {duplicateWarning && (
+              <div className="flex items-center gap-1.5 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5 mt-1">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <span>Telefone já cadastrado: <strong>{duplicateWarning.nome}</strong> ({duplicateWarning.etapa})</span>
+              </div>
+            )}
           </div>
 
           {/* Data de Criação */}

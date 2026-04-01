@@ -10,12 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, AlertTriangle } from "lucide-react";
 import { format, parse, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { saveLeadWithSync } from "@/lib/crmSync";
 import { db } from "@/lib/firebase";
+import { maskPhone, isValidPhone } from "@/lib/phone";
+import { normalizePhoneTo10Digits } from "@/lib/phone";
+import { useLeads } from "@/hooks/useLeads";
 
 interface EditLeadDialogProps {
   lead: Lead | null;
@@ -35,6 +38,8 @@ const ETAPAS: LeadStage[] = [
 const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Influenciador", "Hotleads", "Outro"];
 
 export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogProps) {
+  const { allLeads } = useLeads();
+  const [duplicateWarning, setDuplicateWarning] = useState<{ nome: string; etapa: string } | null>(null);
   const [form, setForm] = useState<Partial<Lead>>({});
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
   const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(undefined);
@@ -102,6 +107,10 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
       toast.error('Telefone é obrigatório');
       return;
     }
+    if (!isValidPhone(String(updates.telefone || ""))) {
+      toast.error('Telefone inválido — use o formato (XX) XXXXX-XXXX');
+      return;
+    }
 
     try {
       const result = await saveLeadWithSync(db, updates, { previousPhone });
@@ -136,7 +145,27 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           {/* Telefone */}
           <div className="space-y-1">
             <Label>Telefone</Label>
-            <Input value={form.telefone || ""} onChange={(e) => set("telefone", e.target.value)} />
+            <Input
+              value={form.telefone || ""}
+              onChange={(e) => {
+                const masked = maskPhone(e.target.value);
+                set("telefone", masked);
+                const norm = normalizePhoneTo10Digits(masked);
+                if (norm) {
+                  const found = allLeads.find(l => l.id !== lead.id && normalizePhoneTo10Digits(l.telefone) === norm);
+                  setDuplicateWarning(found ? { nome: found.nome, etapa: found.etapaLead } : null);
+                } else {
+                  setDuplicateWarning(null);
+                }
+              }}
+              className={duplicateWarning ? "border-yellow-400 focus-visible:ring-yellow-400" : ""}
+            />
+            {duplicateWarning && (
+              <div className="flex items-center gap-1.5 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5 mt-1">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <span>Telefone já cadastrado: <strong>{duplicateWarning.nome}</strong> ({duplicateWarning.etapa})</span>
+              </div>
+            )}
           </div>
 
           {/* Serviço */}

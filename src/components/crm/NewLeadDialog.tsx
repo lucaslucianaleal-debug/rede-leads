@@ -3,6 +3,7 @@ import { deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { maskPhone } from '@/lib/phone';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -113,7 +114,7 @@ export function NewLeadDialog({
           {/* Telefone */}
           <div className="space-y-1">
             <Label>Telefone *</Label>
-            <Input value={form.telefone || ''} onChange={(e) => set('telefone', e.target.value)} placeholder="(17) 99999-9999" />
+            <Input value={form.telefone || ''} onChange={(e) => set('telefone', maskPhone(e.target.value))} placeholder="(17) 99999-9999" />
           </div>
 
           {/* Data de Criação */}
