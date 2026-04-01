@@ -7,10 +7,28 @@ import { getFirestore } from "firebase-admin/firestore";
 
 // Inicializa Firebase Admin (uma vez)
 if (!getApps().length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
-  initializeApp({
-    credential: cert(serviceAccount),
-  });
+  try {
+    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    
+    if (!serviceAccountJson) {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT environment variable not found");
+    }
+    
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    
+    if (!serviceAccount.project_id) {
+      throw new Error("Service account missing project_id");
+    }
+    
+    initializeApp({
+      credential: cert(serviceAccount),
+    });
+    
+    console.log(`[Firebase] Inicializado com projeto: ${serviceAccount.project_id}`);
+  } catch (err) {
+    console.error("[Firebase] Erro ao inicializar:", err.message);
+    throw err;
+  }
 }
 
 const db = getFirestore();
