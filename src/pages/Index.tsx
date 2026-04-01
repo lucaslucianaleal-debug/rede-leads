@@ -83,6 +83,7 @@ const CRMDashboard = () => {
   const [reportDate, setReportDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newLeadsCount, setNewLeadsCount] = useState(0);
   // ...chat logic removido...
 
   // Calcular quantidade de duplicatas
@@ -331,6 +332,11 @@ const CRMDashboard = () => {
             <TabsTrigger value="novos-leads" className="flex items-center gap-1.5">
               <Inbox className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Novos Leads</span>
+              {newLeadsCount > 0 && (
+                <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white leading-none">
+                  {newLeadsCount}
+                </span>
+              )}
             </TabsTrigger>
               {permissions?.canEdit && (
                 <button
@@ -402,7 +408,7 @@ const CRMDashboard = () => {
           </TabsContent>
 
           <TabsContent value="novos-leads" className="mt-6">
-            <NewLeadsTab onCreateLead={handleCreateLead} />
+            <NewLeadsTab onCreateLead={handleCreateLead} onCountChange={setNewLeadsCount} />
           </TabsContent>
 
           {/* Chat content removido */}

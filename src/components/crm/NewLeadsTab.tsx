@@ -11,9 +11,10 @@ import { motion } from 'framer-motion';
 
 interface NewLeadsTabProps {
   onCreateLead?: (lead: Omit<Lead, 'id'>) => void;
+  onCountChange?: (count: number) => void;
 }
 
-export function NewLeadsTab({ onCreateLead }: NewLeadsTabProps) {
+export function NewLeadsTab({ onCreateLead, onCountChange }: NewLeadsTabProps) {
   const { currentClinic } = useAuth();
   const [leads, setLeads] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
@@ -26,6 +27,7 @@ export function NewLeadsTab({ onCreateLead }: NewLeadsTabProps) {
       snap.forEach((d) => arr.push({ id: d.id, ...d.data() }));
       arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setLeads(arr);
+      onCountChange?.(arr.length);
     });
     return () => unsub();
   }, [currentClinic]);

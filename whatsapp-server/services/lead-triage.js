@@ -11,20 +11,25 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { normalizePhoneInternational, formatDateTimeBrasilia, formatDateBrasilia } from "../config/clinic-config.js";
 
-const db = getFirestore();
+/**
+ * Retorna a instância Firestore (lazy - só obtém quando necessário)
+ */
+function getDb() {
+  return getFirestore();
+}
 
 /**
  * Resolve o documento Firestore da clínica (clinics/{clinicId}/shared/shared)
  */
 function getClinicLeadsDoc(clinicId) {
-  return db.collection("clinics").doc(clinicId).collection("shared").doc("shared");
+  return getDb().collection("clinics").doc(clinicId).collection("shared").doc("shared");
 }
 
 /**
  * Resolve o documento de configuração Z-API da clínica (clinics/{clinicId}/config/whatsapp)
  */
 export function getClinicConfigDoc(clinicId) {
-  return db.collection("clinics").doc(clinicId).collection("config").doc("whatsapp");
+  return getDb().collection("clinics").doc(clinicId).collection("config").doc("whatsapp");
 }
 
 /**
@@ -188,6 +193,7 @@ export async function saveIncomingMessage(phoneNorm, body, msgId) {
   const agora = formatDateTimeBrasilia();
 
   try {
+    const db = getDb();
     const msgRef = db
       .collection("conversations")
       .doc(phoneNorm)
