@@ -55,15 +55,12 @@ export default async function handler(req, res) {
   const { clinicId } = req.query;
   const payload = req.body;
 
-  // Responder 200 imediatamente para a Z-API não retentar
-  res.status(200).json({ ok: true });
-
   try {
     console.log("[webhook] Recebido em:", clinicId);
     console.log("[webhook] payload:", JSON.stringify(payload, null, 2));
 
     // Extrair phone - tentar múltiplos caminhos
-    let phone = 
+    let phone =
       payload?.data?.phone ||
       payload?.phone ||
       payload?.from ||
@@ -71,7 +68,7 @@ export default async function handler(req, res) {
       "";
 
     // Extrair message - tentar múltiplos caminhos
-    let message = 
+    let message =
       payload?.data?.text?.message ||
       payload?.data?.message ||
       payload?.text?.message ||
@@ -79,28 +76,20 @@ export default async function handler(req, res) {
       payload?.body ||
       "";
 
-    console.log("[webhook] Extracted phone:", phone);
-    console.log("[webhook] Extracted message:", message);
+    console.log("[webhook] phone:", phone, "| message:", message);
 
-    // Se ambos vazios, logar e retornar
     if (!phone || !message) {
       console.log("[webhook] Phone ou message vazio - ignorando");
-      return;
+      return res.status(200).json({ ok: true, skipped: true });
     }
 
-    // Ignorar se for mensagem enviada por nós (fromMe)
     const fromMe = payload?.data?.isFromMe || payload?.isFromMe || false;
     if (fromMe) {
-      console.log("[webhook] Mensagem enviada por nós (fromMe=true) - ignorando");
-      return;
+      console.log("[webhook] fromMe=true - ignorando");
+      return res.status(200).json({ ok: true, skipped: true });
     }
 
     const phoneNorm = phone.replace(/\D/g, "");
-
-    console.log("[webhook] Phone normalizado:", phoneNorm);
-    console.log("[webhook] Salvando em: clinics/${clinicId}/triagem/${phoneNorm}");
-
-    // Salvar em triagem
     const ref = db.collection("clinics").doc(clinicId).collection("triagem").doc(phoneNorm);
     const existing = await ref.get();
 
@@ -119,6 +108,7 @@ export default async function handler(req, res) {
     }
   } catch (err) {
     console.error(`[triagem] ✗ Erro:`, err.message);
-    console.error(`[triagem] Stack:`, err.stack);
   }
+
+  return res.status(200).json({ ok: true });
 }
