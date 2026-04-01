@@ -47,6 +47,51 @@ if (!getApps().length) {
 
 const db = getFirestore();
 
+// Mapa de clinicId para nomes das clínicas
+const CLINIC_NAMES = {
+  "olimpia": "Odontocompany Olímpia",
+  "odontcompany-olimpia": "Odontocompany Olímpia",
+  "odontocompany-olimpia": "Odontocompany Olímpia",
+  "novo-horizonte": "Novo Horizonte",
+};
+
+// Função para obter saudação baseada na hora
+function getGreeting() {
+  const now = new Date(new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }));
+  const hour = now.getHours();
+  
+  if (hour >= 5 && hour < 12) return "Bom dia";
+  if (hour >= 12 && hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+// Função para enviar mensagem com pausa
+async function sendMessageWithDelay(phone, message, delayMs = 0) {
+  if (delayMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+  
+  try {
+    const zApiUrl = `https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-message`;
+    const response = await fetch(zApiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: phone,
+        message: message
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    console.log(`[z-api] ✓ Msg enviada: ${phone}`);
+  } catch (err) {
+    console.error(`[z-api] ✗ Erro ao enviar msg para ${phone}:`, err.message);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -76,7 +121,15 @@ export default async function handler(req, res) {
       payload?.body ||
       "";
 
-    console.log("[webhook] phone:", phone, "| message:", message);
+    // Extrair nome do contato (nome salvo no WhatsApp)
+    let nome =
+      payload?.data?.pushName ||
+      payload?.data?.senderName ||
+      payload?.pushName ||
+      payload?.senderName ||
+      "";
+
+    console.log("[webhook] phone:", phone, "| nome:", nome, "| message:", message);
 
     if (!phone || !message) {
       console.log("[webhook] Phone ou message vazio - ignorando");
@@ -97,12 +150,30 @@ export default async function handler(req, res) {
       const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
       await ref.set({
         telefone: phoneNorm,
+        nome: nome,
         mensagem: message,
         dataRecebimento: agora,
         createdAt: Date.now(),
         lida: false,
       });
       console.log(`[triagem] ✓ Salvo: ${phoneNorm} → ${clinicId}`);
+
+      // ENVIAR MENSAGENS AUTOMÁTICAS EM SEQUÊNCIA
+      if (process.env.Z_API_INSTANCE && process.env.Z_API_TOKEN) {
+        const greeting = getGreeting();
+        const clinicName = CLINIC_NAMES[clinicId] || clinicId;
+        
+        const msg1 = `${greeting}, como você está? 😊`;
+        const msg2 = `Meu nome é Lucas e sou da ${clinicName}`;
+        const msg3 = `Me conta um pouquinho mais... o que vem te incomodando no seu sorriso? 😁`;
+        
+        // Aguardar cada mensagem antes de enviar a próxima
+        await sendMessageWithDelay(phoneNorm, msg1, 0);
+        await sendMessageWithDelay(phoneNorm, msg2, 3000);
+        await sendMessageWithDelay(phoneNorm, msg3, 3000);
+        
+        console.log(`[triagem] ✓ Msgs automáticas enviadas: ${phoneNorm}`);
+      }
     } else {
       console.log(`[triagem] Lead já existe: ${phoneNorm}`);
     }
