@@ -101,7 +101,6 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm }: FollowUpDialo
             />
           </div>
         </div>
-        </div>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>
