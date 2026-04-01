@@ -59,29 +59,48 @@ export default async function handler(req, res) {
   res.status(200).json({ ok: true });
 
   try {
-    // LOG TEMPORÁRIO: ver payload completo
-    console.log("[webhook] clinicId:", clinicId);
+    console.log("[webhook] Recebido em:", clinicId);
     console.log("[webhook] payload:", JSON.stringify(payload, null, 2));
 
-    // Ignorar mensagens enviadas por nós
+    // Extrair phone - tentar múltiplos caminhos
+    let phone = 
+      payload?.data?.phone ||
+      payload?.phone ||
+      payload?.from ||
+      payload?.sender ||
+      "";
+
+    // Extrair message - tentar múltiplos caminhos
+    let message = 
+      payload?.data?.text?.message ||
+      payload?.data?.message ||
+      payload?.text?.message ||
+      payload?.message ||
+      payload?.body ||
+      "";
+
+    console.log("[webhook] Extracted phone:", phone);
+    console.log("[webhook] Extracted message:", message);
+
+    // Se ambos vazios, logar e retornar
+    if (!phone || !message) {
+      console.log("[webhook] Phone ou message vazio - ignorando");
+      return;
+    }
+
+    // Ignorar se for mensagem enviada por nós (fromMe)
     const fromMe = payload?.data?.isFromMe || payload?.isFromMe || false;
-    if (fromMe) return;
-
-    // Extrair telefone e mensagem
-    const phone = payload?.data?.phone || payload?.phone || "";
-    const message = payload?.data?.text?.message || payload?.text?.message || "";
-    const event = payload?.event || payload?.type || "";
-
-    const isMessage =
-      event === "on-message-received" ||
-      event === "MESSAGE_RECEIVED" ||
-      (phone && message);
-
-    if (!isMessage || !phone) return;
+    if (fromMe) {
+      console.log("[webhook] Mensagem enviada por nós (fromMe=true) - ignorando");
+      return;
+    }
 
     const phoneNorm = phone.replace(/\D/g, "");
 
-    // Salvar em triagem apenas se for lead novo
+    console.log("[webhook] Phone normalizado:", phoneNorm);
+    console.log("[webhook] Salvando em: clinics/${clinicId}/triagem/${phoneNorm}");
+
+    // Salvar em triagem
     const ref = db.collection("clinics").doc(clinicId).collection("triagem").doc(phoneNorm);
     const existing = await ref.get();
 
@@ -94,9 +113,12 @@ export default async function handler(req, res) {
         createdAt: Date.now(),
         lida: false,
       });
-      console.log(`[triagem] Novo lead: ${phoneNorm} → clínica ${clinicId}`);
+      console.log(`[triagem] ✓ Salvo: ${phoneNorm} → ${clinicId}`);
+    } else {
+      console.log(`[triagem] Lead já existe: ${phoneNorm}`);
     }
   } catch (err) {
-    console.error(`[triagem] Erro:`, err);
+    console.error(`[triagem] ✗ Erro:`, err.message);
+    console.error(`[triagem] Stack:`, err.stack);
   }
 }
