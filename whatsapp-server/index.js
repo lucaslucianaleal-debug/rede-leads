@@ -14,6 +14,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
 import { blockIfMissingDoc, blockIfEmptyArray, attachLastWriter } from './lib/crmGuard.mjs';
+import zapiWebhookRouter from './webhooks/z-api-webhook.js';
 
 
 // Firebase Admin
@@ -54,6 +55,10 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json());
+
+// Rotas de webhook Z-API (triagem automática de leads)
+app.use('/webhook/z-api', zapiWebhookRouter);
+
 const PORT = process.env.PORT || 3001;
 
 // Estado do QR Code (para exibir no CRM)

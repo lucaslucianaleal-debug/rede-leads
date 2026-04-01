@@ -234,6 +234,9 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
 
   // Relatório filtrado: todos os cards refletem SEMPRE os filtros ativos
   const stats = useMemo(() => {
+    // Verificar se há filtros ativos
+    const hasFiltersActive = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all" || selectedStage !== "all";
+    
     // Base: leads filtrados pelos filtros ativos (fonte, etapa, etc.)
     const leadsFiltrados = leadsFilteredByMonthSource;
 
@@ -259,12 +262,33 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     }
 
     // Agendamentos realizados no período (dataAgendamentoCriado)
-    const agendamentosNoPeriodo = leadsFiltrados.filter(l => {
-      if (!l.dataAgendamentoCriado) return false;
-      if (!month || !year) return true;
-      const [d, m, y] = l.dataAgendamentoCriado.split("/");
-      return m === month && y === year;
-    });
+    // Se há filtros ativos (fonte, etapa, etc.), usa leads filtrados; caso contrário, usa todos
+    const baseForAppointments = hasFiltersActive ? leadsFiltrados : leads;
+    
+    let agendamentosNoPeriodo: Lead[] = [];
+    if (dateFilterType === 'dia' && selectedDateDay !== 'all') {
+      // Filtro por dia exato
+      agendamentosNoPeriodo = baseForAppointments.filter(l => l.dataAgendamentoCriado === selectedDateDay);
+    } else if (dateFilterType === 'periodo') {
+      // Filtro por intervalo de datas
+      agendamentosNoPeriodo = baseForAppointments.filter(l => {
+        if (!l.dataAgendamentoCriado) return false;
+        const [d, m, y] = l.dataAgendamentoCriado.split("/");
+        const agDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+        return agDate >= reportStart && agDate <= reportEnd;
+      });
+    } else if (dateFilterType === 'mes' && selectedDateMonth !== 'all') {
+      // Filtro por mês/ano
+      const [monthAg, yearAg] = selectedDateMonth.split("/");
+      agendamentosNoPeriodo = baseForAppointments.filter(l => {
+        if (!l.dataAgendamentoCriado) return false;
+        const [d, m, y] = l.dataAgendamentoCriado.split("/");
+        return m === monthAg && y === yearAg;
+      });
+    } else {
+      // Sem filtro de data, pega todos do base
+      agendamentosNoPeriodo = baseForAppointments.filter(l => !!l.dataAgendamentoCriado);
+    }
 
     // Agendados Novos/Recuperados
     let agendadosNovos = 0;
@@ -294,7 +318,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       taxaConversaoTotal,
       taxaComparecimento,
     };
-  }, [leadsFilteredByMonthSource, selectedAppointmentMonth]);
+  }, [leadsFilteredByMonthSource, selectedAppointmentMonth, searchTerm, selectedCreationDay, selectedContactMonth, selectedSource, selectedStage, leads]);
 
   // Filter leads (apply duplicados and search filters on top of month/source)
   const filteredLeads = useMemo(() => {
