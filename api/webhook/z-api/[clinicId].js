@@ -8,25 +8,45 @@ import { getFirestore } from "firebase-admin/firestore";
 // Inicializa Firebase Admin (uma vez)
 if (!getApps().length) {
   try {
-    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    let serviceAccount;
+    const envValue = process.env.FIREBASE_SERVICE_ACCOUNT;
     
-    if (!serviceAccountJson) {
-      throw new Error("FIREBASE_SERVICE_ACCOUNT environment variable not found");
+    console.log("[Firebase] Env var exists:", !!envValue);
+    console.log("[Firebase] Env var length:", envValue?.length);
+    console.log("[Firebase] First 100 chars:", envValue?.substring(0, 100));
+    
+    if (!envValue) {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT not set");
     }
     
-    const serviceAccount = JSON.parse(serviceAccountJson);
+    // Tentar parsear como JSON
+    try {
+      serviceAccount = JSON.parse(envValue);
+    } catch (parseErr) {
+      console.error("[Firebase] JSON parse failed, trying alternative...", parseErr.message);
+      // Se falhar, tentar remover caracteres escapados extras
+      const cleaned = envValue
+        .replace(/\\n/g, "\n")
+        .replace(/\\\"/g, '"')
+        .trim();
+      serviceAccount = JSON.parse(cleaned);
+    }
     
-    if (!serviceAccount.project_id) {
-      throw new Error("Service account missing project_id");
+    console.log("[Firebase] Parsed service account keys:", Object.keys(serviceAccount || {}));
+    
+    if (!serviceAccount || !serviceAccount.project_id) {
+      console.error("[Firebase] Service account:", JSON.stringify(serviceAccount || {}, null, 2));
+      throw new Error("Service account missing or invalid structure");
     }
     
     initializeApp({
       credential: cert(serviceAccount),
     });
     
-    console.log(`[Firebase] Inicializado com projeto: ${serviceAccount.project_id}`);
+    console.log(`[Firebase] ✓ Inicializado com projeto: ${serviceAccount.project_id}`);
   } catch (err) {
-    console.error("[Firebase] Erro ao inicializar:", err.message);
+    console.error("[Firebase] ✗ Erro ao inicializar:", err.message);
+    console.error("[Firebase] Stack:", err.stack);
     throw err;
   }
 }
