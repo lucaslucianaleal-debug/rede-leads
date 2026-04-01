@@ -7,19 +7,9 @@ import { getFirestore } from "firebase-admin/firestore";
 
 // Inicializa Firebase Admin (uma vez)
 if (!getApps().length) {
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY || "";
-  
-  // Se ainda tem \\n escapado, converter
-  if (privateKey.includes("\\n")) {
-    privateKey = privateKey.replace(/\\n/g, "\n");
-  }
-  
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
   initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: privateKey,
-    }),
+    credential: cert(serviceAccount),
   });
 }
 
