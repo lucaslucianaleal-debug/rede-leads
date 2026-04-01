@@ -66,13 +66,13 @@ function getGreeting() {
 }
 
 // Função para enviar mensagem com pausa
-async function sendMessageWithDelay(phone, message, delayMs = 0) {
+async function sendMessageWithDelay(phone, message, instance, token, delayMs = 0) {
   if (delayMs > 0) {
     await new Promise(resolve => setTimeout(resolve, delayMs));
   }
   
   try {
-    const zApiUrl = `https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`;
+    const zApiUrl = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
     const response = await fetch(zApiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -161,7 +161,14 @@ export default async function handler(req, res) {
       console.log(`[triagem] ✓ Salvo: ${phoneNorm} → ${clinicId}`);
 
       // ENVIAR MENSAGENS AUTOMÁTICAS EM SEQUÊNCIA
-      if (process.env.Z_API_INSTANCE && process.env.Z_API_TOKEN) {
+      const rawInstance = process.env.Z_API_INSTANCE || "";
+      const rawToken = process.env.Z_API_TOKEN || "";
+      // Remover espaços/newlines que possam ter sido colados no Vercel
+      const cleanInstance = rawInstance.trim();
+      const cleanToken = rawToken.trim();
+      console.log(`[z-api] instance(${cleanInstance.length}): "${cleanInstance.substring(0, 8)}..." token(${cleanToken.length}): "${cleanToken.substring(0, 8)}..."`);
+
+      if (cleanInstance && cleanToken) {
         const greeting = getGreeting();
         const clinicName = CLINIC_NAMES[clinicId] || clinicId;
         
@@ -170,9 +177,9 @@ export default async function handler(req, res) {
         const msg3 = `Me conta um pouquinho mais... o que vem te incomodando no seu sorriso? 😁`;
         
         // Aguardar cada mensagem antes de enviar a próxima
-        await sendMessageWithDelay(phoneNorm, msg1, 0);
-        await sendMessageWithDelay(phoneNorm, msg2, 3000);
-        await sendMessageWithDelay(phoneNorm, msg3, 3000);
+        await sendMessageWithDelay(phoneNorm, msg1, cleanInstance, cleanToken, 0);
+        await sendMessageWithDelay(phoneNorm, msg2, cleanInstance, cleanToken, 3000);
+        await sendMessageWithDelay(phoneNorm, msg3, cleanInstance, cleanToken, 3000);
         
         console.log(`[triagem] ✓ Msgs automáticas enviadas: ${phoneNorm}`);
       }
