@@ -24,7 +24,10 @@ export function NewLeadsTab({ onCreateLead, onCountChange }: NewLeadsTabProps) {
     const q = collection(db, 'clinics', currentClinic, 'triagem');
     const unsub = onSnapshot(q, (snap) => {
       const arr: any[] = [];
-      snap.forEach((d) => arr.push({ id: d.id, ...d.data() }));
+      snap.forEach((d) => {
+        const data = d.data();
+        if (!data.convertido) arr.push({ id: d.id, ...data });
+      });
       arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setLeads(arr);
       onCountChange?.(arr.length);

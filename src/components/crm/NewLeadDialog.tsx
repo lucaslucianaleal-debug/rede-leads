@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { deleteDoc, doc } from 'firebase/firestore';
+import { deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,7 +85,7 @@ export function NewLeadDialog({
     setSaving(true);
     try {
       onCreateLead?.(form);
-      await deleteDoc(doc(db, 'clinics', clinicId, 'triagem', lead.id));
+      await setDoc(doc(db, 'clinics', clinicId, 'triagem', lead.id), { convertido: true }, { merge: true });
       onClose();
     } catch (e) {
       console.error(e);
