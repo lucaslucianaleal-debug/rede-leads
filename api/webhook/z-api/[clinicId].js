@@ -157,21 +157,29 @@ export default async function handler(req, res) {
     const ref = db.collection("clinics").doc(clinicId).collection("triagem").doc(phoneNorm);
     const existing = await ref.get();
 
-    // Trata como novo se: doc não existe OU se já foi convertido (convertido: true)
-    const isNew = !existing.exists || existing.data()?.convertido === true;
+    // Se já existe (na triagem ou já convertido), ignora completamente
+    if (existing.exists) {
+      const data = existing.data();
+      if (data?.convertido === true) {
+        console.log(`[triagem] Lead já cadastrado no CRM (convertido): ${phoneNorm} - ignorando`);
+      } else {
+        console.log(`[triagem] Lead já está na triagem aguardando cadastro: ${phoneNorm} - ignorando`);
+      }
+      return res.status(200).json({ ok: true, skipped: true });
+    }
 
-    if (isNew) {
-      const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-      await ref.set({
-        telefone: phoneNorm,
-        nome: nome,
-        mensagem: message,
-        dataRecebimento: agora,
-        createdAt: Date.now(),
-        lida: false,
-        convertido: false,
-      });
-      console.log(`[triagem] ✓ Salvo: ${phoneNorm} → ${clinicId}`);
+    // Apenas leads 100% novos chegam aqui
+    const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+    await ref.set({
+      telefone: phoneNorm,
+      nome: nome,
+      mensagem: message,
+      dataRecebimento: agora,
+      createdAt: Date.now(),
+      lida: false,
+      convertido: false,
+    });
+    console.log(`[triagem] ✓ Salvo: ${phoneNorm} → ${clinicId}`);
 
       // ENVIAR MENSAGENS AUTOMÁTICAS: apenas se for mensagem de interesse (da plataforma)
       const isInterestMessage = message.startsWith("Olá! Gostaria de mais informações");
@@ -193,16 +201,13 @@ export default async function handler(req, res) {
         const msg2 = `Meu nome é Lucas e sou da ${clinicName}`;
         const msg3 = `Me conta um pouquinho mais... o que vem te incomodando no seu sorriso? 😁`;
         
-        // Delays reduzidos para 1s — total ~2s, seguro dentro do limite de 10s do Vercel
+        // Delays de 1s — total ~2s, seguro dentro do limite de 10s do Vercel
         await sendMessageWithDelay(phoneNorm, msg1, cleanInstance, cleanToken, 0);
         await sendMessageWithDelay(phoneNorm, msg2, cleanInstance, cleanToken, 1000);
         await sendMessageWithDelay(phoneNorm, msg3, cleanInstance, cleanToken, 1000);
         
         console.log(`[triagem] ✓ Msgs automáticas enviadas: ${phoneNorm}`);
       }
-    } else {
-      console.log(`[triagem] Lead já existe e não convertido: ${phoneNorm}`);
-    }
   } catch (err) {
     console.error(`[triagem] ✗ Erro:`, err.message);
   }
