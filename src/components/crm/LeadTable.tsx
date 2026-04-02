@@ -236,9 +236,10 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
               </TableHead>
               <TableHead className="font-heading font-semibold">
                 <button onClick={() => handleSort('respostaLead')} className="flex items-center hover:text-primary transition-colors">
-                  Resposta <SortIcon field="respostaLead" />
+                  Resposta WA <SortIcon field="respostaLead" />
                 </button>
               </TableHead>
+              <TableHead className="font-heading font-semibold">Ligação</TableHead>
               <TableHead className="font-heading font-semibold">
                 <button onClick={() => handleSort('comparecimento')} className="flex items-center hover:text-primary transition-colors">
                   Comparecimento <SortIcon field="comparecimento" />
@@ -316,6 +317,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs">{lead.respostaLead || "—"}</TableCell>
+                  <TableCell className="text-xs">{(lead as any).resultadoLigacao || "—"}</TableCell>
                   <TableCell className="text-xs flex items-center gap-2">
                     {lead.comparecimento === "COMPARECEU" && <span className="text-success font-medium">✓ Compareceu</span>}
                     {lead.comparecimento === "NÃO COMPARECEU" && <span className="text-destructive font-medium">✗ Não compareceu</span>}
