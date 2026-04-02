@@ -1132,7 +1132,10 @@ export function useLeads() {
     const [td, tm, ty] = todayStr.split('/').map(Number);
     const todayMs = new Date(ty, tm - 1, td).setHours(0, 0, 0, 0);
     return leads.filter(l => {
-      if (!l.dataFollowUp || (l as any)._deleted) return false;
+      if ((l as any)._deleted) return false;
+      // Sempre inclui se foi feito hoje (para aparecer na aba "Feitos Hoje")
+      if (l.lastFollowUpDone === todayStr) return true;
+      if (!l.dataFollowUp) return false;
       const parts = l.dataFollowUp.split('/');
       if (parts.length < 3) return false;
       const dueDateMs = new Date(+parts[2], +parts[1] - 1, +parts[0]).setHours(0, 0, 0, 0);
