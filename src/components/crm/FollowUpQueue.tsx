@@ -20,6 +20,7 @@ import NewLeadsPanel from "./NewLeadsPanel";
 
 interface FollowUpQueueProps {
   leads: Lead[];
+  allLeads?: Lead[];
   onSendFollowUp: (leadId: string, observacao?: string, etapa?: LeadStage) => void;
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
   followUpsDoneToday?: number;
@@ -76,7 +77,7 @@ const parseToDate = (v: any): Date | null => {
   return null;
 };
 
-export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat, onCreateLead }: FollowUpQueueProps) {
+export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat, onCreateLead }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [whatsLead, setWhatsLead] = useState<Lead | null>(null);
@@ -271,10 +272,14 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const pendentesVisiveis = useMemo(() => pendentes.slice(0, visibleCount), [pendentes, visibleCount]);
 
   const feitosHoje = useMemo(() => {
-    return filteredLeadsSemEtapa
+    // Usa allLeads (todos os leads) para não perder leads fora da followUpQueue
+    const base = allLeads || leads;
+    const term = search.trim().toLowerCase();
+    return base
       .filter(l => l.lastFollowUpDone === today)
+      .filter(l => !term || l.nome.toLowerCase().includes(term) || l.telefone.includes(term))
       .sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [filteredLeadsSemEtapa, today]);
+  }, [allLeads, leads, today, search]);
   
   const handleConfirmFollowUp = (leadId: string, observacao: string, etapa?: LeadStage) => {
     onSendFollowUp(leadId, observacao, etapa);

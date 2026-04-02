@@ -393,7 +393,8 @@ const CRMDashboard = () => {
             <div className="grid lg:grid-cols-2 gap-4 items-start">
               <div className="space-y-4">
                 <FollowUpQueue 
-                  leads={followUpQueue} 
+                  leads={followUpQueue}
+                  allLeads={allLeads}
                   onSendFollowUp={handleFollowUp}
                   onRegisterCall={handleRegisterCall}
                   followUpsDoneToday={followUpsDoneToday}
