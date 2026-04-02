@@ -1126,11 +1126,19 @@ export function useLeads() {
     [leads]
   );
 
-  // Fila de follow-ups pendentes: leads com dataFollowUp futura ou pendente
-  const followUpQueue = useMemo(
-    () => leads.filter(l => l.dataFollowUp && !l._deleted),
-    [leads]
-  );
+  // Fila de follow-ups pendentes: só leads com dataFollowUp <= hoje (vencidos ou no prazo)
+  const followUpQueue = useMemo(() => {
+    const todayStr = format(new Date(), "dd/MM/yyyy");
+    const [td, tm, ty] = todayStr.split('/').map(Number);
+    const todayMs = new Date(ty, tm - 1, td).setHours(0, 0, 0, 0);
+    return leads.filter(l => {
+      if (!l.dataFollowUp || (l as any)._deleted) return false;
+      const parts = l.dataFollowUp.split('/');
+      if (parts.length < 3) return false;
+      const dueDateMs = new Date(+parts[2], +parts[1] - 1, +parts[0]).setHours(0, 0, 0, 0);
+      return dueDateMs <= todayMs;
+    });
+  }, [leads]);
 
   // Fila de lembretes pendentes: leads com lembretes não enviados
   const reminderQueue = useMemo(
@@ -1144,11 +1152,29 @@ export function useLeads() {
     return leads.filter(l => l.lastFollowUpDone === today && !l._deleted).length;
   }, [leads]);
 
+  // Calcula próximo dia útil (pula sábado e domingo)
+  const calcNextFollowUpDate = (followUpCount: number): string => {
+    const daysToAdd = followUpCount >= 5 ? 2 : 1;
+    let next = addDays(new Date(), daysToAdd);
+    const dow = next.getDay();
+    if (dow === 6) next = addDays(next, 2);
+    else if (dow === 0) next = addDays(next, 1);
+    return format(next, "dd/MM/yyyy");
+  };
+
   // Função para registrar follow-up
   const sendFollowUp = (leadId: string, observacao: string = "") => {
-    setLeads(prev => prev.map(l =>
-      l.id === leadId ? { ...l, lastFollowUpDone: format(new Date(), "dd/MM/yyyy"), observacao } : l
-    ));
+    setLeads(prev => prev.map(l => {
+      if (l.id !== leadId) return l;
+      const newCount = (l.followUpCount || 0) + 1;
+      return {
+        ...l,
+        lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
+        observacao,
+        followUpCount: newCount,
+        dataFollowUp: calcNextFollowUpDate(newCount),
+      };
+    }));
   };
 
   // Função para marcar lembrete

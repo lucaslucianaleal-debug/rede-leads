@@ -347,8 +347,8 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs">{lead.lastFollowUpDone || lead.dataFollowUp || "—"}</TableCell>
-                  <TableCell className={`text-xs font-medium ${lead.comparecimento === "COMPARECEU" ? "text-success" : "text-primary"}`}>{getNextFollowUpDate(lead)}</TableCell>
+                  <TableCell className="text-xs">{lead.lastFollowUpDone || "—"}</TableCell>
+                  <TableCell className={`text-xs font-medium ${lead.comparecimento === "COMPARECEU" ? "text-success" : "text-primary"}`}>{lead.comparecimento === "COMPARECEU" ? "✓ Finalizado" : (lead.dataFollowUp || "—")}</TableCell>
                   <TableCell className="text-xs">{lead.dataAgendamento || "—"}</TableCell>
                   <TableCell className="text-xs max-w-[200px] truncate" title={lead.observacao}>{lead.observacao || "—"}</TableCell>
                   {(onSendFollowUp || onRegisterCall) && (
