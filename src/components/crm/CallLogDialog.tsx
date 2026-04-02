@@ -229,7 +229,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
                 <AgendaDoDia
                   leads={leads}
                   onMarkAttendance={() => {}}
-                  onUpdateLead={() => {}}
+                  onUpdateLead={(id, updates) => updateLead?.(id, updates as any)}
                   variant="sidepanel"
                 />
               </div>
