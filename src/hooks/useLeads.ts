@@ -1131,15 +1131,20 @@ export function useLeads() {
     const todayStr = format(new Date(), "dd/MM/yyyy");
     const [td, tm, ty] = todayStr.split('/').map(Number);
     const todayMs = new Date(ty, tm - 1, td).setHours(0, 0, 0, 0);
+    const finalStages = ["FINALIZADO", "FINALIZADA", "DESISTÊNCIA", "DESISTENCIA", "FORA DA REGIÃO", "FORA DA REGIAO"];
+    
     return leads.filter(l => {
       if ((l as any)._deleted) return false;
       // Sempre inclui se foi feito hoje (para aparecer na aba "Feitos Hoje")
       if (l.lastFollowUpDone === todayStr) return true;
       // Leads com agendamento mas sem comparecimento marcado devem aparecer na fila
       if (l.dataAgendamento && !l.comparecimento) return true;
-      if (!l.dataFollowUp) return false;
+      // Se está finalizado/desistência/fora região → não aparece
+      if (finalStages.includes((l.etapaLead || '').toUpperCase())) return false;
+      // Se não tem dataFollowUp mas tbm não está finalizado → aparece (assegura que novos leads apareçam)
+      if (!l.dataFollowUp) return true;
       const parts = l.dataFollowUp.split('/');
-      if (parts.length < 3) return false;
+      if (parts.length < 3) return true; // Se formato inválido, inclui para segurança
       const dueDateMs = new Date(+parts[2], +parts[1] - 1, +parts[0]).setHours(0, 0, 0, 0);
       return dueDateMs <= todayMs;
     });
