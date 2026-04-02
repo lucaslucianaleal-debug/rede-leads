@@ -428,6 +428,7 @@ const CRMDashboard = () => {
             <AllLeadsView 
               leads={leads} 
               onMarkAttendance={handleMarkAttendance}
+              onUpdateLead={(id, updates) => updateLead(id, updates)}
               onCreateLead={handleCreateLead}
               selectedLeads={selectedLeads}
               onSelectionChange={setSelectedLeads}

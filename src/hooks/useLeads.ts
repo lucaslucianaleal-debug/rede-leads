@@ -1205,13 +1205,15 @@ export function useLeads() {
     ));
   };
 
-  // Função para registrar ligação
+  // Função para registrar ligação — appends to observacao
   const registerCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
-    setLeads(prev => prev.map(l =>
-      l.id === leadId
-        ? { ...l, resultadoLigacao: outcome, observacao: obs, dataRetornoLigacao: returnDate || "" }
-        : l
-    ));
+    setLeads(prev => prev.map(l => {
+      if (l.id !== leadId) return l;
+      const timestamp = format(new Date(), "dd/MM/yyyy HH:mm");
+      const entry = `[${timestamp}] ${outcome}${obs ? ` — ${obs}` : ""}`;
+      const newObs = l.observacao ? `${l.observacao} | ${entry}` : entry;
+      return { ...l, observacao: newObs, dataRetornoLigacao: returnDate || "" };
+    }));
   };
 
   return {
