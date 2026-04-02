@@ -116,6 +116,31 @@ const CRMDashboard = () => {
     }
   };
 
+  const handleMarkAttendance = (id: string, value: "COMPARECEU" | "NÃO COMPARECEU" | "") => {
+    const today = format(new Date(), "dd/MM/yyyy");
+    if (value === "COMPARECEU") {
+      updateLead(id, {
+        comparecimento: "COMPARECEU",
+        etapaLead: "Finalizado",
+      });
+    } else if (value === "NÃO COMPARECEU") {
+      const lead = allLeads.find(l => l.id === id);
+      // Determina próxima etapa de follow-up
+      const etapaAtual = lead?.etapaLead || "";
+      const match = etapaAtual.match(/(\d+)$/);
+      const numAtual = match ? parseInt(match[1], 10) : 0;
+      const proxEtapa: any = numAtual >= 1 ? `Follow-Up ${numAtual + 1}` : "Follow-Up 1";
+      updateLead(id, {
+        comparecimento: "NÃO COMPARECEU",
+        etapaLead: proxEtapa,
+        dataFollowUp: today,
+      });
+    } else {
+      // Limpar — só remove o comparecimento
+      updateLead(id, { comparecimento: value });
+    }
+  };
+
   const handleRegisterCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
     registerCall(leadId, outcome, obs, returnDate);
   };
@@ -318,7 +343,7 @@ const CRMDashboard = () => {
         {isReceptionist ? (
           <AgendaDoDia
             leads={leads}
-            onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
+            onMarkAttendance={handleMarkAttendance}
             onExportWeek={exportWeeklyAppointmentsXlsx}
             onUpdateLead={(id, updates) => updateLead(id, updates)}
           />
@@ -393,7 +418,7 @@ const CRMDashboard = () => {
           <TabsContent value="agenda" className="mt-6">
             <AgendaDoDia
               leads={leads}
-              onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
+              onMarkAttendance={handleMarkAttendance}
               onExportWeek={exportWeeklyAppointmentsXlsx}
               onUpdateLead={(id, updates) => updateLead(id, updates)}
             />
@@ -402,8 +427,7 @@ const CRMDashboard = () => {
           <TabsContent value="all-leads" className="mt-6">
             <AllLeadsView 
               leads={leads} 
-              onMarkAttendance={(id, value) => updateLead(id, { comparecimento: value })}
-              onUpdateLead={updateLead}
+              onMarkAttendance={handleMarkAttendance}
               onCreateLead={handleCreateLead}
               selectedLeads={selectedLeads}
               onSelectionChange={setSelectedLeads}
