@@ -207,7 +207,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
     const term = search.trim().toLowerCase();
     // start from a shallow copy to avoid mutating props
     let list = leads.slice();
-    // Oculta leads finalizados, desistentes e fora da região
+    // Oculta leads finalizados, desistentes e fora da região (apenas para aba Pendentes)
     const etapasOcultas = [
       "FINALIZADO", "FINALIZADA", "DESISTÊNCIA", "DESISTENCIA", "FORA DA REGIÃO", "FORA DA REGIAO"
     ];
@@ -234,6 +234,23 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
     return list;
   }, [leads, search, debouncedSearch, selectedService, noShowOnly]);
 
+  // Lista para "Feitos Hoje" — sem filtro de etapa, pois o lead pode ter sido finalizado durante o follow-up
+  const filteredLeadsSemEtapa = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    let list = leads.slice();
+    if (term) {
+      list = list.filter(
+        (l) =>
+          l.nome.toLowerCase().includes(term) ||
+          l.telefone.includes(term)
+      );
+    }
+    if (selectedService) {
+      list = list.filter((l) => (l.servicoProcurado || "") === selectedService);
+    }
+    return list;
+  }, [leads, search, debouncedSearch, selectedService]);
+
   // Separa pendentes (não feitos hoje) de feitos hoje
   const pendentes = useMemo(() => {
     const OVERDUE_DAYS = 7;
@@ -254,10 +271,10 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const pendentesVisiveis = useMemo(() => pendentes.slice(0, visibleCount), [pendentes, visibleCount]);
 
   const feitosHoje = useMemo(() => {
-    return filteredLeads
+    return filteredLeadsSemEtapa
       .filter(l => l.lastFollowUpDone === today)
       .sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [filteredLeads, today]);
+  }, [filteredLeadsSemEtapa, today]);
   
   const handleConfirmFollowUp = (leadId: string, observacao: string, etapa?: LeadStage) => {
     onSendFollowUp(leadId, observacao, etapa);
