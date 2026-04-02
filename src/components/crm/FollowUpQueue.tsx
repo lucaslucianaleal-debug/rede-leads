@@ -91,6 +91,8 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const [sharedLeadsMap, setSharedLeadsMap] = useState<Record<string, any>>({});
   const [showNewLeads, setShowNewLeads] = useState(false);
   const [tab, setTab] = useState<'pendentes' | 'feitos'>('pendentes');
+  const [visibleCount, setVisibleCount] = useState(30);
+  const PAGE_SIZE = 30;
 
   const handleExportExcel = async () => {
     try {
@@ -248,6 +250,9 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
     return list;
   }, [filteredLeads, today]);
 
+  // Reset visibleCount quando muda filtro ou aba
+  const pendentesVisiveis = useMemo(() => pendentes.slice(0, visibleCount), [pendentes, visibleCount]);
+
   const feitosHoje = useMemo(() => {
     return filteredLeads
       .filter(l => l.lastFollowUpDone === today)
@@ -335,6 +340,14 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
           Novos leads
         </Button>
       </h3>
+
+      {/* Aviso de backlog */}
+      {pendentes.length > PAGE_SIZE && tab === 'pendentes' && (
+        <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+          <span className="font-semibold">⚠️ {pendentes.length} leads no backlog.</span>
+          <span>Exibindo os {Math.min(visibleCount, pendentes.length)} mais urgentes — foque neles hoje.</span>
+        </div>
+      )}
 
       {/* Abas Pendentes / Feitos Hoje */}
       <div className="flex gap-1 mb-4 bg-muted/40 rounded-lg p-1">
@@ -428,7 +441,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
           </p>
         )}
         <AnimatePresence initial={false}>
-          {(tab === 'pendentes' ? pendentes : feitosHoje).map((lead, i) => {
+          {(tab === 'pendentes' ? pendentesVisiveis : feitosHoje).map((lead, i) => {
               const daysSince = getDaysSince(lead.lastFollowUpDone || lead.dataFollowUp);
               
               return (
@@ -530,6 +543,15 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
               );
             })}
         </AnimatePresence>
+        {/* Botão carregar mais */}
+        {tab === 'pendentes' && visibleCount < pendentes.length && (
+          <button
+            onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+            className="w-full mt-3 py-2 text-xs text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 rounded-lg hover:border-muted-foreground/60 transition-colors"
+          >
+            Carregar mais {Math.min(PAGE_SIZE, pendentes.length - visibleCount)} leads ({pendentes.length - visibleCount} restantes)
+          </button>
+        )}
       </div>
 
       <FollowUpDialog
