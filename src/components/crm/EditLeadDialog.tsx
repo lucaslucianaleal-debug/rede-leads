@@ -92,13 +92,27 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
 
     // Se está criando ou alterando agendamento, sempre setar dataAgendamentoCriado se não existe
     if (finalAgendamento) {
-      const hoje = format(new Date(), "dd/MM/yyyy");
+      const hoje = format(new Date(), "dd/MM/yyyy HH:mm");
+      const hojeDate = format(new Date(), "dd/MM/yyyy");
+      const agendamentoAnterior = lead.dataAgendamento;
+
       if (!form.dataAgendamentoCriado) {
-        updates.dataAgendamentoCriado = hoje;
+        // Primeiro agendamento
+        updates.dataAgendamentoCriado = hojeDate;
+        updates.historicoAgendamentos = [];
+      } else if (agendamentoAnterior && agendamentoAnterior !== finalAgendamento) {
+        // Reagendamento — empurra o anterior para o histórico
+        updates.dataAgendamentoAlterado = hojeDate;
+        const historicoAtual: any[] = Array.isArray(lead.historicoAgendamentos) ? lead.historicoAgendamentos : [];
+        updates.historicoAgendamentos = [
+          ...historicoAtual,
+          { data: agendamentoAnterior, registradoEm: hoje },
+        ];
       }
     } else {
       // Se removeu o agendamento, limpa o campo criado
       updates.dataAgendamentoCriado = "";
+      updates.dataAgendamentoAlterado = "";
     }
 
     // Validação básica do telefone antes de chamar o sync

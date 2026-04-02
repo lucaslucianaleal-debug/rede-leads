@@ -53,6 +53,8 @@ export interface Lead {
   // Data em que o agendamento foi ALTERADO (reagendamento) pela última vez
   dataAgendamentoAlterado?: string;
   dataAgendamento: string;
+  // Histórico de todos os agendamentos anteriores (reagendamentos)
+  historicoAgendamentos?: { data: string; registradoEm: string; motivo?: string }[];
   dataRetornoLigacao: string;
   observacao: string;
   // Briefing específico para recepção, exibido na Agenda do Dia

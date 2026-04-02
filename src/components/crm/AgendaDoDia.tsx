@@ -454,10 +454,21 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
                         const formatted = `${dd}/${mm}/${yyyy} ${editTime}`;
                         const now = new Date();
                         const ts = format(now, "dd/MM/yyyy HH:mm");
+                        const tsDate = format(now, "dd/MM/yyyy");
                         const obsEntry = editBriefing && appendToObs ? `[Briefing ${ts}] ${editBriefing}` : '';
                         const newObs = obsEntry ? (selectedLead.observacao ? `${selectedLead.observacao} | ${obsEntry}` : obsEntry) : selectedLead.observacao;
+                        // Se a data mudou → registrar reagendamento no histórico
+                        const reagendamentoUpdates: any = {};
+                        if (formatted !== selectedLead.dataAgendamento && selectedLead.dataAgendamento) {
+                          reagendamentoUpdates.dataAgendamentoAlterado = tsDate;
+                          const historicoAtual = Array.isArray(selectedLead.historicoAgendamentos) ? selectedLead.historicoAgendamentos : [];
+                          reagendamentoUpdates.historicoAgendamentos = [
+                            ...historicoAtual,
+                            { data: selectedLead.dataAgendamento, registradoEm: ts },
+                          ];
+                        }
                         // call update handler
-                        onUpdateLead?.(selectedLead.id, { dataAgendamento: formatted, briefingRecepcao: editBriefing, observacao: newObs });
+                        onUpdateLead?.(selectedLead.id, { dataAgendamento: formatted, briefingRecepcao: editBriefing, observacao: newObs, ...reagendamentoUpdates });
                         setEditing(false);
                         setSelectedLead(null);
                       }}

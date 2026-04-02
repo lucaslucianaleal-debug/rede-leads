@@ -136,6 +136,28 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
             </div>
           </div>
 
+          {/* Histórico de Reagendamentos */}
+          {Array.isArray(lead.historicoAgendamentos) && lead.historicoAgendamentos.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="font-heading font-semibold text-sm mb-3 text-foreground">Histórico de Reagendamentos</h3>
+                <div className="space-y-2">
+                  {lead.historicoAgendamentos.map((h, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50 text-sm">
+                      <span className="font-medium text-foreground">{h.data}</span>
+                      <span className="text-xs text-muted-foreground">Reagendado em {h.registradoEm}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-primary/10 text-sm border border-primary/20">
+                    <span className="font-semibold text-primary">{lead.dataAgendamento}</span>
+                    <span className="text-xs text-primary/70">Agendamento atual</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
           <Separator />
 
           {/* Origem */}
