@@ -36,6 +36,7 @@ const ETAPAS: LeadStage[] = [
 ];
 
 const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Influenciador", "Hotleads", "Outro"];
+const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
 
 export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogProps) {
   const { allLeads } = useLeads();
@@ -185,7 +186,13 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           {/* Serviço */}
           <div className="space-y-1">
             <Label>Serviço Procurado</Label>
-            <Input value={form.servicoProcurado || ""} onChange={(e) => set("servicoProcurado", e.target.value)} />
+            <Select value={selectValue(form.servicoProcurado)} onValueChange={(v) => set("servicoProcurado", fromSelect(v))}>
+              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={"__none__"}>—</SelectItem>
+                {SERVICOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Captador */}
