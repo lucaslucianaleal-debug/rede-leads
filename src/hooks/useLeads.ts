@@ -1135,6 +1135,8 @@ export function useLeads() {
       if ((l as any)._deleted) return false;
       // Sempre inclui se foi feito hoje (para aparecer na aba "Feitos Hoje")
       if (l.lastFollowUpDone === todayStr) return true;
+      // Leads com agendamento mas sem comparecimento marcado devem aparecer na fila
+      if (l.dataAgendamento && !l.comparecimento) return true;
       if (!l.dataFollowUp) return false;
       const parts = l.dataFollowUp.split('/');
       if (parts.length < 3) return false;
