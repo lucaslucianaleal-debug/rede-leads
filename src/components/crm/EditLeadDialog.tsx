@@ -91,25 +91,30 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
       : "";
     let updates: any = { ...safeUpdates, dataAgendamento: finalAgendamento };
 
-    // Se está criando ou alterando agendamento, sempre setar dataAgendamentoCriado se não existe
+    // Se está criando ou alterando agendamento, registrar corretamente
     if (finalAgendamento) {
       const hoje = format(new Date(), "dd/MM/yyyy HH:mm");
       const hojeDate = format(new Date(), "dd/MM/yyyy");
       const agendamentoAnterior = lead.dataAgendamento;
 
-      if (!form.dataAgendamentoCriado) {
-        // Primeiro agendamento
-        updates.dataAgendamentoCriado = hojeDate;
-        updates.historicoAgendamentos = [];
-      } else if (agendamentoAnterior && agendamentoAnterior !== finalAgendamento) {
-        // Reagendamento — empurra o anterior para o histórico
+      if (!agendamentoAnterior) {
+        // Lead não tinha agendamento — primeiro agendamento
+        if (!form.dataAgendamentoCriado) updates.dataAgendamentoCriado = hojeDate;
+      } else if (agendamentoAnterior !== finalAgendamento) {
+        // Lead já tinha agendamento e mudou — reagendamento
         updates.dataAgendamentoAlterado = hojeDate;
         const historicoAtual: any[] = Array.isArray(lead.historicoAgendamentos) ? lead.historicoAgendamentos : [];
         updates.historicoAgendamentos = [
           ...historicoAtual,
           { data: agendamentoAnterior, registradoEm: hoje },
         ];
+        // Se dataAgendamentoCriado nunca foi setado (lead antigo), usa a data anterior
+        // para não contar como novo agendamento hoje
+        if (!form.dataAgendamentoCriado) {
+          updates.dataAgendamentoCriado = agendamentoAnterior.split(' ')[0];
+        }
       }
+      // Se agendamentoAnterior === finalAgendamento → apenas editando outros campos, sem mudança de rastreamento
     } else {
       // Se removeu o agendamento, limpa o campo criado
       updates.dataAgendamentoCriado = "";
