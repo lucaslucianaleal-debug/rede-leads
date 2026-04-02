@@ -169,7 +169,16 @@ export default async function handler(req, res) {
     const cleanToken = rawToken.trim();
     console.log(`[z-api] instance(${cleanInstance.length}): "${cleanInstance.substring(0, 8)}..." token(${cleanToken.length}): "${cleanToken.substring(0, 8)}..."`);
 
-    const isInterestMessage = message.startsWith("Olá! Gostaria de mais informações");
+    const msgLower = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const isInterestMessage =
+      msgLower.includes("gostaria de mais informacoes") ||
+      msgLower.includes("tenho interesse") ||
+      msgLower.includes("queria mais informacoes") ||
+      msgLower.includes("quero mais informacoes") ||
+      msgLower.includes("gostaria de informacoes") ||
+      msgLower.includes("gostaria de saber mais") ||
+      msgLower.startsWith("ola!") ||
+      msgLower.startsWith("ola,");
 
     if (!existing.exists) {
       // Lead 100% novo → salva e envia auto-reply
