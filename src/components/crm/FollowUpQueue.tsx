@@ -90,8 +90,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
   const [sharedLeadsMap, setSharedLeadsMap] = useState<Record<string, any>>({});
   const [showNewLeads, setShowNewLeads] = useState(false);
-
-  
+  const [tab, setTab] = useState<'pendentes' | 'feitos'>('pendentes');
 
   const handleExportExcel = async () => {
     try {
@@ -197,6 +196,11 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
 
 
 
+  const today = useMemo(() => {
+    const d = new Date();
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  }, []);
+
   const filteredLeads = useMemo(() => {
     const term = search.trim().toLowerCase();
     // start from a shallow copy to avoid mutating props
@@ -210,7 +214,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
     if (term) {
       list = list.filter(
         (l) =>
-          l.nome.includes(term) ||
+          l.nome.toLowerCase().includes(term) ||
           l.telefone.includes(term)
       );
     }
@@ -225,20 +229,30 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
       list = list.filter((l) => l.dataAgendamento && l.comparecimento === "NÃO COMPARECEU");
     }
 
-    // Prioritize overdue leads: those with daysSince > OVERDUE_DAYS
-    const OVERDUE_DAYS = 7;
-    list.sort((a, b) => {
-      const da = getDaysSince(a.lastFollowUpDone || a.dataFollowUp);
-      const db = getDaysSince(b.lastFollowUpDone || b.dataFollowUp);
-      const aOver = da > OVERDUE_DAYS ? 1 : 0;
-      const bOver = db > OVERDUE_DAYS ? 1 : 0;
-      if (aOver !== bOver) return bOver - aOver; // overdue first
-      if (da !== db) return db - da; // more days first
-      return a.nome.localeCompare(b.nome);
-    });
-
     return list;
   }, [leads, search, debouncedSearch, selectedService, noShowOnly]);
+
+  // Separa pendentes (não feitos hoje) de feitos hoje
+  const pendentes = useMemo(() => {
+    const OVERDUE_DAYS = 7;
+    const list = filteredLeads.filter(l => l.lastFollowUpDone !== today);
+    list.sort((a, b) => {
+      const da = getDaysSince(a.lastFollowUpDone || a.dataFollowUp);
+      const db_val = getDaysSince(b.lastFollowUpDone || b.dataFollowUp);
+      const aOver = da > OVERDUE_DAYS ? 1 : 0;
+      const bOver = db_val > OVERDUE_DAYS ? 1 : 0;
+      if (aOver !== bOver) return bOver - aOver;
+      if (da !== db_val) return db_val - da;
+      return a.nome.localeCompare(b.nome);
+    });
+    return list;
+  }, [filteredLeads, today]);
+
+  const feitosHoje = useMemo(() => {
+    return filteredLeads
+      .filter(l => l.lastFollowUpDone === today)
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [filteredLeads, today]);
   
   const handleConfirmFollowUp = (leadId: string, observacao: string, etapa?: LeadStage) => {
     onSendFollowUp(leadId, observacao, etapa);
@@ -316,11 +330,45 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
       <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2">
         <Send className="h-5 w-5 text-primary" />
         Fila de Follow-up
-        <span className="ml-auto text-sm font-body text-muted-foreground">{leads.length} leads</span>
+        <span className="ml-auto text-sm font-body text-muted-foreground">{pendentes.length} pendentes</span>
         <Button size="sm" variant="ghost" className="ml-3" onClick={() => setShowNewLeads(true)}>
           Novos leads
         </Button>
       </h3>
+
+      {/* Abas Pendentes / Feitos Hoje */}
+      <div className="flex gap-1 mb-4 bg-muted/40 rounded-lg p-1">
+        <button
+          onClick={() => setTab('pendentes')}
+          className={`flex-1 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+            tab === 'pendentes'
+              ? 'bg-background shadow text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Pendentes
+          {pendentes.length > 0 && (
+            <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+              tab === 'pendentes' ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+            }`}>{pendentes.length}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('feitos')}
+          className={`flex-1 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+            tab === 'feitos'
+              ? 'bg-background shadow text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Feitos Hoje
+          {feitosHoje.length > 0 && (
+            <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+              tab === 'feitos' ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
+            }`}>{feitosHoje.length}</span>
+          )}
+        </button>
+      </div>
 
       {/* Search */}
       <div className="relative mb-3">
@@ -371,13 +419,16 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
       </div>
 
       <div className="space-y-2 max-h-[400px] overflow-y-auto">
-        {filteredLeads.length === 0 ? (
+        {tab === 'feitos' && feitosHoje.length === 0 && (
+          <p className="text-sm text-muted-foreground py-4 text-center">Nenhum follow-up feito hoje ainda.</p>
+        )}
+        {tab === 'pendentes' && pendentes.length === 0 && (
           <p className="text-sm text-muted-foreground py-4 text-center">
             {search ? "Nenhum lead encontrado" : "Nenhum follow-up pendente 🎉"}
           </p>
-        ) : (
-          <AnimatePresence initial={false}>
-            {filteredLeads.map((lead, i) => {
+        )}
+        <AnimatePresence initial={false}>
+          {(tab === 'pendentes' ? pendentes : feitosHoje).map((lead, i) => {
               const daysSince = getDaysSince(lead.lastFollowUpDone || lead.dataFollowUp);
               
               return (
@@ -478,8 +529,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
                 </motion.div>
               );
             })}
-          </AnimatePresence>
-        )}
+        </AnimatePresence>
       </div>
 
       <FollowUpDialog
@@ -527,7 +577,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
       <div className="print-header print-only:block hidden text-center mb-4">
         <h2 className="text-xl font-bold">{clinicMeta?.name || "Clínica"}</h2>
         <div className="font-semibold">Fila de Follow-up</div>
-        <div className="print-total">Total de leads na fila: {filteredLeads.length}</div>
+        <div className="print-total">Total de leads na fila: {pendentes.length + feitosHoje.length}</div>
         <div className="text-sm">Data: {new Date().toLocaleDateString()}</div>
       </div>
       {/* Tabela de impressão - só aparece na impressão */}
@@ -543,7 +593,7 @@ export function FollowUpQueue({ leads, onSendFollowUp, onRegisterCall, followUps
           </tr>
         </thead>
         <tbody>
-          {filteredLeads.map(lead => (
+          {[...pendentes, ...feitosHoje].map(lead => (
             <tr key={lead.id}>
               <td className="border border-slate-300 p-2">{lead.nome}</td>
               <td className="border border-slate-300 p-2">{lead.telefone}</td>
