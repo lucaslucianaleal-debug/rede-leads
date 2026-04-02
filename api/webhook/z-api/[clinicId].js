@@ -157,57 +157,67 @@ export default async function handler(req, res) {
     const ref = db.collection("clinics").doc(clinicId).collection("triagem").doc(phoneNorm);
     const existing = await ref.get();
 
-    // Se já existe (na triagem ou já convertido), ignora completamente
-    if (existing.exists) {
-      const data = existing.data();
-      if (data?.convertido === true) {
-        console.log(`[triagem] Lead já cadastrado no CRM (convertido): ${phoneNorm} - ignorando`);
-      } else {
-        console.log(`[triagem] Lead já está na triagem aguardando cadastro: ${phoneNorm} - ignorando`);
-      }
+    // Se já foi convertido em lead → ignora completamente
+    if (existing.exists && existing.data()?.convertido === true) {
+      console.log(`[triagem] Lead já cadastrado no CRM (convertido): ${phoneNorm} - ignorando`);
       return res.status(200).json({ ok: true, skipped: true });
     }
 
-    // Apenas leads 100% novos chegam aqui
-    const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-    await ref.set({
-      telefone: phoneNorm,
-      nome: nome,
-      mensagem: message,
-      dataRecebimento: agora,
-      createdAt: Date.now(),
-      lida: false,
-      convertido: false,
-    });
-    console.log(`[triagem] ✓ Salvo: ${phoneNorm} → ${clinicId}`);
+    const rawInstance = process.env.Z_API_INSTANCE || "";
+    const rawToken = process.env.Z_API_TOKEN || "";
+    const cleanInstance = rawInstance.trim();
+    const cleanToken = rawToken.trim();
+    console.log(`[z-api] instance(${cleanInstance.length}): "${cleanInstance.substring(0, 8)}..." token(${cleanToken.length}): "${cleanToken.substring(0, 8)}..."`);
 
-      // ENVIAR MENSAGENS AUTOMÁTICAS: apenas se for mensagem de interesse (da plataforma)
-      const isInterestMessage = message.startsWith("Olá! Gostaria de mais informações");
-      if (!isInterestMessage) {
-        console.log(`[triagem] Mensagem não é de interesse, não envia auto-resposta: "${message.substring(0, 50)}"`);
+    const isInterestMessage = message.startsWith("Olá! Gostaria de mais informações");
+
+    if (!existing.exists) {
+      // Lead 100% novo → salva e envia auto-reply
+      const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+      await ref.set({
+        telefone: phoneNorm,
+        nome: nome,
+        mensagem: message,
+        dataRecebimento: agora,
+        createdAt: Date.now(),
+        lida: false,
+        convertido: false,
+        autoReplySent: false,
+      });
+      console.log(`[triagem] ✓ Salvo: ${phoneNorm} → ${clinicId}`);
+    } else {
+      // Já está na triagem aguardando cadastro
+      const autoReplySent = existing.data()?.autoReplySent === true;
+      if (autoReplySent) {
+        console.log(`[triagem] Lead já na triagem + auto-reply já enviado: ${phoneNorm} - ignorando`);
+        return res.status(200).json({ ok: true, skipped: true });
       }
+      console.log(`[triagem] Lead na triagem sem auto-reply enviado: ${phoneNorm} - tentando reenviar`);
+    }
 
-      const rawInstance = process.env.Z_API_INSTANCE || "";
-      const rawToken = process.env.Z_API_TOKEN || "";
-      const cleanInstance = rawInstance.trim();
-      const cleanToken = rawToken.trim();
-      console.log(`[z-api] instance(${cleanInstance.length}): "${cleanInstance.substring(0, 8)}..." token(${cleanToken.length}): "${cleanToken.substring(0, 8)}..."`);
+    // Enviar auto-reply se for mensagem de interesse
+    if (!isInterestMessage) {
+      console.log(`[triagem] Mensagem não é de interesse, não envia auto-resposta: "${message.substring(0, 50)}"`);
+      return res.status(200).json({ ok: true });
+    }
 
-      if (cleanInstance && cleanToken && isInterestMessage) {
-        const greeting = getGreeting();
-        const clinicName = CLINIC_NAMES[clinicId] || clinicId;
-        
-        const msg1 = `${greeting}, como você está? 😊`;
-        const msg2 = `Meu nome é Lucas e sou da ${clinicName}`;
-        const msg3 = `Me conta um pouquinho mais... o que vem te incomodando no seu sorriso? 😁`;
-        
-        // Delays de 1s — total ~2s, seguro dentro do limite de 10s do Vercel
-        await sendMessageWithDelay(phoneNorm, msg1, cleanInstance, cleanToken, 0);
-        await sendMessageWithDelay(phoneNorm, msg2, cleanInstance, cleanToken, 1000);
-        await sendMessageWithDelay(phoneNorm, msg3, cleanInstance, cleanToken, 1000);
-        
-        console.log(`[triagem] ✓ Msgs automáticas enviadas: ${phoneNorm}`);
-      }
+    if (cleanInstance && cleanToken) {
+      const greeting = getGreeting();
+      const clinicName = CLINIC_NAMES[clinicId] || clinicId;
+
+      const msg1 = `${greeting}, como você está? 😊`;
+      const msg2 = `Meu nome é Lucas e sou da ${clinicName}`;
+      const msg3 = `Me conta um pouquinho mais... o que vem te incomodando no seu sorriso? 😁`;
+
+      // Delays de 1s — total ~2s, seguro dentro do limite de 10s do Vercel
+      await sendMessageWithDelay(phoneNorm, msg1, cleanInstance, cleanToken, 0);
+      await sendMessageWithDelay(phoneNorm, msg2, cleanInstance, cleanToken, 1000);
+      await sendMessageWithDelay(phoneNorm, msg3, cleanInstance, cleanToken, 1000);
+
+      // Marca que o auto-reply foi enviado com sucesso
+      await ref.set({ autoReplySent: true }, { merge: true });
+      console.log(`[triagem] ✓ Msgs automáticas enviadas: ${phoneNorm}`);
+    }
   } catch (err) {
     console.error(`[triagem] ✗ Erro:`, err.message);
   }
