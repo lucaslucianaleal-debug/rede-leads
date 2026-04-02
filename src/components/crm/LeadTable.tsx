@@ -350,7 +350,18 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
                   <TableCell className="text-xs">{lead.lastFollowUpDone || "—"}</TableCell>
                   <TableCell className={`text-xs font-medium ${lead.comparecimento === "COMPARECEU" ? "text-success" : "text-primary"}`}>{lead.comparecimento === "COMPARECEU" ? "✓ Finalizado" : (lead.dataFollowUp || "—")}</TableCell>
                   <TableCell className="text-xs">{lead.dataAgendamento || "—"}</TableCell>
-                  <TableCell className="text-xs max-w-[200px] truncate" title={lead.observacao}>{lead.observacao || "—"}</TableCell>
+                  <TableCell className="text-xs max-w-[200px] truncate" title={lead.observacao}>
+                    {lead.observacao ? (
+                      <>
+                        {/^\[\d{2}\/\d{2}\/\d{4}/.test(lead.observacao) && (
+                          <Phone className="h-3 w-3 inline mr-1 text-info" />
+                        )}
+                        {lead.observacao}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                   {(onSendFollowUp || onRegisterCall) && (
                     <TableCell>
                       <div className="flex gap-1">
