@@ -1201,17 +1201,51 @@ export function useLeads() {
     return format(next, "dd/MM/yyyy");
   };
 
+  // Calcular próxima etapa automática (progressão linear)
+  const getNextLeadStage = (currentStage?: string): LeadStage => {
+    const stageProgression: LeadStage[] = [
+      "Novo",
+      "Em contato",
+      "Follow-Up 1",
+      "Follow-Up 2",
+      "Follow-Up 3",
+      "Follow-Up 4",
+      "Follow-Up 5",
+      "Follow-Up 6",
+      "Follow-Up 7",
+      "Follow-Up 8",
+      "Follow-Up 9",
+      "Follow-Up 10",
+      "Follow-Up 11",
+      "Follow-Up 12",
+      "Avaliação agendada",
+    ];
+    // Se final (Finalizado, Desistência, Fora da região), não muda
+    const finalStages: LeadStage[] = ["Finalizado", "Desistência", "Fora da região"];
+    if (currentStage && finalStages.includes(currentStage as LeadStage)) {
+      return currentStage as LeadStage;
+    }
+    const currentIdx = stageProgression.findIndex(s => s === currentStage);
+    if (currentIdx === -1) return "Novo"; // Default
+    // Avança para próxima, ou fica na última se já está
+    const nextIdx = Math.min(currentIdx + 1, stageProgression.length - 1);
+    return stageProgression[nextIdx];
+  };
+
   // Função para registrar follow-up
-  const sendFollowUp = (leadId: string, observacao: string = "") => {
+  const sendFollowUp = (leadId: string, observacao: string = "", nextStage?: LeadStage) => {
     setLeads(prev => prev.map(l => {
       if (l.id !== leadId) return l;
       const newCount = (l.followUpCount || 0) + 1;
+      // Use provided stage or auto-calculate next
+      const stageToUse = nextStage || getNextLeadStage(l.etapaLead);
       return {
         ...l,
         lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
         observacao,
         followUpCount: newCount,
         dataFollowUp: calcNextFollowUpDate(newCount),
+        etapaLead: stageToUse,
       };
     }));
   };
@@ -1280,6 +1314,7 @@ export function useLeads() {
     reminderQueue,
     followUpsDoneToday,
     sendFollowUp,
+    getNextLeadStage,
     markReminder,
     updateLead,
     createLead,

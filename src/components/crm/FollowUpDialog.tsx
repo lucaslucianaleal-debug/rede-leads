@@ -25,7 +25,39 @@ interface FollowUpDialogProps {
 export function FollowUpDialog({ lead, open, onClose, onConfirm }: FollowUpDialogProps) {
   const [observacao, setObservacao] = useState("");
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
-  const [etapa, setEtapa] = useState<LeadStage>(lead?.etapaLead || "Novo");
+  // useAutoStage: se true (padrão), usa a progressão automática; se false, o usuário escolheu manual
+  const [useAutoStage, setUseAutoStage] = useState(true);
+  const [manualStage, setManualStage] = useState<LeadStage>(lead?.etapaLead || "Novo");
+
+  // Calcular próxima etapa automática
+  const getNextStageAuto = (): LeadStage => {
+    const stageProgression: LeadStage[] = [
+      "Novo",
+      "Em contato",
+      "Follow-Up 1",
+      "Follow-Up 2",
+      "Follow-Up 3",
+      "Follow-Up 4",
+      "Follow-Up 5",
+      "Follow-Up 6",
+      "Follow-Up 7",
+      "Follow-Up 8",
+      "Follow-Up 9",
+      "Follow-Up 10",
+      "Follow-Up 11",
+      "Follow-Up 12",
+      "Avaliação agendada",
+    ];
+    const finalStages: LeadStage[] = ["Finalizado", "Desistência", "Fora da região"];
+    const current = lead?.etapaLead || "Novo";
+    if (finalStages.includes(current as LeadStage)) return current as LeadStage;
+    const idx = stageProgression.findIndex(s => s === current);
+    if (idx === -1) return "Novo";
+    const nextIdx = Math.min(idx + 1, stageProgression.length - 1);
+    return stageProgression[nextIdx];
+  };
+
+  const nextAutoStage = getNextStageAuto();
 
   const ETAPA_OPTIONS = [
     "Novo",
@@ -51,10 +83,12 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm }: FollowUpDialo
   if (!lead) return null;
 
   const handleConfirm = () => {
-    onConfirm(lead.id, observacao, etapa);
-    toast.success(`Follow-Up registrado para ${lead.nome}`);
+    const finalStage = useAutoStage ? nextAutoStage : manualStage;
+    onConfirm(lead.id, observacao, finalStage);
+    toast.success(`Follow-Up registrado: ${lead.nome} → ${finalStage}`);
     setObservacao("");
-    setEtapa(lead?.etapaLead || "Novo");
+    setUseAutoStage(true);
+    setManualStage(lead?.etapaLead || "Novo");
     onClose();
   };
 
@@ -69,28 +103,61 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm }: FollowUpDialo
         </DialogHeader>
 
         <div className="space-y-3 py-2">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Etapa do lead</Label>
-              <button
-                type="button"
-                onClick={() => setEtapa("Desistência")}
-                className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition font-medium"
-              >
-                Desistiu
-              </button>
+          {/* Auto-progression indicator */}
+          <div className="p-2 rounded bg-blue-50 border border-blue-200">
+            <div className="text-xs font-medium text-blue-900">
+              Progressão automática:
             </div>
-            <Select value={etapa} onValueChange={(value) => setEtapa(value as LeadStage)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a etapa" />
-              </SelectTrigger>
-              <SelectContent>
-                {ETAPA_OPTIONS.map((e) => (
-                  <SelectItem key={e} value={e}>{e}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="text-sm text-blue-700 mt-1">
+              {lead.etapaLead} → <span className="font-semibold">{nextAutoStage}</span>
+            </div>
           </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="auto-stage"
+                checked={useAutoStage}
+                onChange={(e) => setUseAutoStage(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <label htmlFor="auto-stage" className="text-sm font-medium cursor-pointer">
+                Usar progressão automática
+              </label>
+            </div>
+          </div>
+
+          {/* Manual override section */}
+          {!useAutoStage && (
+            <div className="space-y-2">
+              <Label>Escolher etapa diferente</Label>
+              <Select value={manualStage} onValueChange={(value) => setManualStage(value as LeadStage)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a etapa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ETAPA_OPTIONS.map((e) => (
+                    <SelectItem key={e} value={e}>{e}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Quick desist button */}
+          {useAutoStage && (
+            <button
+              type="button"
+              onClick={() => {
+                setUseAutoStage(false);
+                setManualStage("Desistência");
+              }}
+              className="w-full text-xs px-2 py-2 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition font-medium"
+            >
+              Marcar como Desistência  
+            </button>
+          )}
           <div className="space-y-2">
             <Label>Observação do contato</Label>
             <Textarea
