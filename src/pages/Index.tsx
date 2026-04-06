@@ -46,6 +46,7 @@ const CRMDashboard = () => {
   const { permissions, isReceptionist } = useUserPermissions();
   const {
     leads,
+    loading,
     stats,
     callReturnQueue,
     followUpQueue,
@@ -340,6 +341,12 @@ const CRMDashboard = () => {
       </header>
 
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
+            <div className="h-2 w-2 rounded-full bg-primary animate-bounce" />
+            Sincronizando dados...
+          </div>
+        )}
         {isReceptionist ? (
           <AgendaDoDia
             leads={leads}

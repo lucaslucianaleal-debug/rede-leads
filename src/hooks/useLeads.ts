@@ -104,6 +104,8 @@ export function useLeads() {
   const canWriteRef = useRef(false);
   // Trava para bloquear gravação até doc remoto ser carregado
   const [canWrite, setCanWrite] = useState(false);
+  // loading: true enquanto o primeiro getDoc ainda não resolveu
+  const [loading, setLoading] = useState(true);
 
   // Inicializa vazio — nunca arriscamos gravar dados mock no Firestore
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -126,6 +128,7 @@ export function useLeads() {
     // Bloqueia escritas imediatamente (sincronamente) até o novo doc remoto ser confirmado
     canWriteRef.current = false;
     setCanWrite(false);
+    setLoading(true);
     const effectiveClinic = currentClinic || selectedClinic || undefined;
     const targetDoc = resolveTargetDoc(effectiveClinic);
     // Sanitize clinic id for logging
@@ -133,6 +136,19 @@ export function useLeads() {
     try { console.log(`[useLeads] resolving ${clinicLabel ? `clinics/${clinicLabel}/shared/shared` : 'crm_data/shared'} (current=${currentClinic} selected=${selectedClinic})`); } catch {}
 
     let unsub: () => void = () => {};
+
+    // Pré-carrega o cache local imediatamente para evitar flash de tela vazia.
+    // canWrite=false garante que não será gravado de volta no Firestore.
+    if (effectiveClinic && userId) {
+      try {
+        const preload = localStorage.getItem(getStorageKey(effectiveClinic, userId));
+        if (preload) {
+          const parsed = JSON.parse(preload) as Lead[];
+          const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
+          if (normalized.length > 0) setLeads(normalized);
+        }
+      } catch (e) {}
+    }
 
     const init = async () => {
       try {
@@ -150,6 +166,7 @@ export function useLeads() {
           // Remote doc present -> allow writes
           canWriteRef.current = true;
           setCanWrite(true);
+          setLoading(false);
         } else {
           // Remote doc missing: prefer Firestore as source-of-truth. Do NOT create/overwrite remote from empty local.
           try {
@@ -174,6 +191,7 @@ export function useLeads() {
           }
           // Do not enable writes when remote doc is absent
           setCanWrite(false);
+          setLoading(false);
         }
       } catch (err) {
         // If getDoc fails (network), try local cache before giving up
@@ -187,6 +205,7 @@ export function useLeads() {
             console.log(`[useLeads] used local cache after getDoc failure for clinic=${String(effectiveClinic)}`);
           }
         } catch (e) {}
+        setLoading(false);
       }
 
       // After initial resolution, subscribe to realtime updates
@@ -1239,6 +1258,7 @@ export function useLeads() {
   return {
     leads: filteredLeads,
     allLeads: leads,
+    loading,
     filters,
     setFilters,
     stats,
