@@ -1230,7 +1230,9 @@ export function useLeads() {
     if (currentStage && finalStages.includes(currentStage as LeadStage)) {
       return currentStage as LeadStage;
     }
-    const currentIdx = stageProgression.findIndex(s => s === currentStage);
+    // Normalize currentStage: replace spaces with hyphens in "Follow-Up" stages
+    const normalized = currentStage ? currentStage.replace(/Follow Up/g, "Follow-Up") : "";
+    const currentIdx = stageProgression.findIndex(s => s === normalized);
     if (currentIdx === -1) return "Novo"; // Default
     // Avança para próxima, ou fica na última se já está
     const nextIdx = Math.min(currentIdx + 1, stageProgression.length - 1);

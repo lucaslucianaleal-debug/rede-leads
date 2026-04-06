@@ -64,7 +64,9 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete }: Fol
     const finalStages: LeadStage[] = ["Finalizado", "Desistência", "Fora da região"];
     const current = lead?.etapaLead || "Novo";
     if (finalStages.includes(current as LeadStage)) return current as LeadStage;
-    const idx = stageProgression.findIndex(s => s === current);
+    // Normalize current: replace spaces with hyphens in "Follow-Up" stages
+    const normalized = current.replace(/Follow Up/g, "Follow-Up");
+    const idx = stageProgression.findIndex(s => s === normalized);
     if (idx === -1) return "Novo";
     const nextIdx = Math.min(idx + 1, stageProgression.length - 1);
     return stageProgression[nextIdx];
