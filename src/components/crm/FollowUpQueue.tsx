@@ -199,11 +199,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
   }, []);
 
 
-
-  const today = useMemo(() => {
-    const d = new Date();
-    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-  }, []);
+  const today = `${String(new Date().getDate()).padStart(2,'0')}/${String(new Date().getMonth()+1).padStart(2,'0')}/${new Date().getFullYear()}`;
 
   const filteredLeads = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -277,6 +273,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
     const base = allLeads || leads;
     const term = search.trim().toLowerCase();
     return base
+      .filter(l => !( l as any)._deleted) // Filtra soft-deleted
       .filter(l => l.lastFollowUpDone === today)
       .filter(l => !term || l.nome.toLowerCase().includes(term) || l.telefone.includes(term))
       .sort((a, b) => a.nome.localeCompare(b.nome));
