@@ -1059,6 +1059,11 @@ export function useLeads() {
     }));
   };
 
+  // Deletar um único lead (para botão de lixeira rápido)
+  const deleteLead = (leadId: string) => {
+    deleteLeads([leadId]);
+  };
+
   const clearAllLeads = () => {
     // Soft-delete all leads (keep data for audit/restore)
     const by = user?.email || user?.uid || 'unknown';
@@ -1307,6 +1312,7 @@ export function useLeads() {
     exportWeeklyAppointments,
     exportWeeklyAppointmentsXlsx,
     deleteLeads,
+    deleteLead,
     clearAllLeads,
     clearDuplicates,
     callReturnQueue,

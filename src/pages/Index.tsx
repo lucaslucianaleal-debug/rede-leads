@@ -68,6 +68,7 @@ const CRMDashboard = () => {
     exportWeeklyAppointmentsXlsx,
     importCSV,
     deleteLeads,
+    deleteLead,
     clearAllLeads,
     clearDuplicates,
     allLeads,
@@ -395,6 +396,7 @@ const CRMDashboard = () => {
                   leads={followUpQueue}
                   allLeads={allLeads}
                   onSendFollowUp={handleFollowUp}
+                  onDeleteLead={deleteLead}
                   onRegisterCall={handleRegisterCall}
                   followUpsDoneToday={followUpsDoneToday}
                   followUpGoal={followUpGoal}

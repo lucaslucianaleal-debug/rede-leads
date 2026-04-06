@@ -23,6 +23,7 @@ interface FollowUpQueueProps {
   allLeads?: Lead[];
   onSendFollowUp: (leadId: string, observacao?: string, etapa?: LeadStage) => void;
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
+  onDeleteLead?: (leadId: string) => void;
   followUpsDoneToday?: number;
   followUpGoal?: number;
   onOpenChat?: (phone: string, message?: string) => void;
@@ -77,7 +78,7 @@ const parseToDate = (v: any): Date | null => {
   return null;
 };
 
-export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat, onCreateLead }: FollowUpQueueProps) {
+export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall, onDeleteLead, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat, onCreateLead }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [whatsLead, setWhatsLead] = useState<Lead | null>(null);
@@ -581,6 +582,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
         open={!!selectedLead}
         onClose={() => setSelectedLead(null)}
         onConfirm={handleConfirmFollowUp}
+        onDelete={onDeleteLead}
       />
 
       <CallLogDialog

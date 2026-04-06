@@ -7,10 +7,21 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
@@ -20,11 +31,13 @@ interface FollowUpDialogProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (leadId: string, observacao: string, etapa?: LeadStage) => void;
+  onDelete?: (leadId: string) => void;
 }
 
-export function FollowUpDialog({ lead, open, onClose, onConfirm }: FollowUpDialogProps) {
+export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete }: FollowUpDialogProps) {
   const [observacao, setObservacao] = useState("");
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // useAutoStage: se true (padrão), usa a progressão automática; se false, o usuário escolheu manual
   const [useAutoStage, setUseAutoStage] = useState(true);
   const [manualStage, setManualStage] = useState<LeadStage>(lead?.etapaLead || "Novo");
@@ -170,6 +183,14 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm }: FollowUpDialo
         </div>
 
         <DialogFooter className="gap-2">
+          <Button
+            variant="ghost"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Lixeira
+          </Button>
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
@@ -183,6 +204,34 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm }: FollowUpDialo
             Feito
           </Button>
         </DialogFooter>
+
+        {/* Delete confirmation dialog */}
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Enviar para lixeira?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {lead?.nome} será movido para a lixeira. Você pode recuperar depois.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (onDelete && lead) {
+                    onDelete(lead.id);
+                    toast.success(`${lead.nome} enviado para lixeira`);
+                    setShowDeleteConfirm(false);
+                    onClose();
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Enviar para lixeira
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         {lead && showWhatsAppDialog && (
           <WhatsAppMessageDialog
             lead={lead}
