@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Lead, ClinicFilter, DashboardStats, LeadStage, LeadComparecimento } from "@/types/crm";
-import { mockLeads } from "@/data/mockLeads";
 import { format, addDays, parse } from "date-fns";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import Papa from "papaparse";
@@ -101,12 +100,13 @@ const ensureDateCriacao = (lead: Lead): Lead => {
 
 export function useLeads() {
   const isFromFirebase = useRef(false);
-  const isMounted = useRef(true);
+  // canWriteRef espelha canWrite mas pode ser lido sincronamente dentro de callbacks async
+  const canWriteRef = useRef(false);
   // Trava para bloquear gravação até doc remoto ser carregado
   const [canWrite, setCanWrite] = useState(false);
 
-  // Inicializa com dados mock enquanto resolvemos o remoto; não ler diretamente do localStorage aqui
-  const [leads, setLeads] = useState<Lead[]>(() => mockLeads.map((l: Lead) => ensureDateCriacao(normalizeLead(l))));
+  // Inicializa vazio — nunca arriscamos gravar dados mock no Firestore
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [filters, setFilters] = useState<ClinicFilter>({
     etapa: "Todas",
     status: "Todos",
@@ -121,7 +121,11 @@ export function useLeads() {
   const userId = user?.uid || null;
 
   useEffect(() => {
-    isMounted.current = true;
+    // flag local por run de effect — imune a async stale de runs anteriores
+    let active = true;
+    // Bloqueia escritas imediatamente (sincronamente) até o novo doc remoto ser confirmado
+    canWriteRef.current = false;
+    setCanWrite(false);
     const effectiveClinic = currentClinic || selectedClinic || undefined;
     const targetDoc = resolveTargetDoc(effectiveClinic);
     // Sanitize clinic id for logging
@@ -134,7 +138,7 @@ export function useLeads() {
       try {
         // First attempt a one-time read from Firestore to prefer remote state
         const snap = await getDoc(targetDoc as any);
-        if (!isMounted.current) return;
+        if (!active) return;
         if (snap && snap.exists()) {
           let data = (snap.data() as any).leads as Lead[];
           if (data && Array.isArray(data)) {
@@ -144,6 +148,7 @@ export function useLeads() {
             try { localStorage.setItem(getStorageKey(effectiveClinic, userId), JSON.stringify(data)); } catch {}
           }
           // Remote doc present -> allow writes
+          canWriteRef.current = true;
           setCanWrite(true);
         } else {
           // Remote doc missing: prefer Firestore as source-of-truth. Do NOT create/overwrite remote from empty local.
@@ -187,7 +192,7 @@ export function useLeads() {
       // After initial resolution, subscribe to realtime updates
       try {
         unsub = onSnapshot(targetDoc, (snapshot) => {
-          if (!isMounted.current) return;
+          if (!active) return;
           if (snapshot.exists()) {
             let data = (snapshot.data() as any).leads as Lead[];
             if (data && Array.isArray(data)) {
@@ -197,6 +202,7 @@ export function useLeads() {
               try { localStorage.setItem(getStorageKey(effectiveClinic, userId), JSON.stringify(data)); } catch {}
             }
             // Remote doc present -> allow writes
+            canWriteRef.current = true;
             setCanWrite(true);
           } else {
             try {
@@ -204,6 +210,7 @@ export function useLeads() {
               console.log(`[useLeads] clinic doc not found on snapshot -> leaving in-memory leads intact for clinic=${String(effectiveClinic)}`);
             } catch {}
             // Block writes until a remote doc appears
+            canWriteRef.current = false;
             setCanWrite(false);
           }
         }, (err) => {
@@ -217,7 +224,7 @@ export function useLeads() {
     init();
 
     return () => {
-      isMounted.current = false;
+      active = false;
       try { unsub(); } catch {}
     };
   }, [currentClinic, selectedClinic]);
@@ -236,6 +243,9 @@ export function useLeads() {
     // Salva no Firebase com debounce de 1,5s, normalizando fontes e garantindo dataCriacao
     const timer = setTimeout(async () => {
       try {
+        // Verificação dupla dentro do callback async — previne escritas obsoletas
+        // caso a clínica tenha mudado entre o agendamento e a execução do timeout
+        if (!canWriteRef.current) return;
         // Não sobrescreve Firestore com array vazio automaticamente!
         if (!leads || leads.length === 0) return;
         const normalizedLeads = leads.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
