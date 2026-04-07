@@ -56,6 +56,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedAttendance, setSelectedAttendance] = useState<string>("all");
   const [selectedStage, setSelectedStage] = useState<string>("all");
+  const [selectedService, setSelectedService] = useState<string>("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -156,6 +157,17 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     return Array.from(sources).sort();
   }, [leads]);
 
+  // Get available services
+  const availableServices = useMemo(() => {
+    const services = new Set<string>();
+    leads.forEach((lead) => {
+      if (lead.servicoProcurado && lead.servicoProcurado.trim() !== "") {
+        services.add(lead.servicoProcurado.trim());
+      }
+    });
+    return Array.from(services).sort();
+  }, [leads]);
+
   // Lista fixa de etapas igual ao tipo LeadStage
   const STAGES: LeadStage[] = [
     "Novo",
@@ -229,13 +241,18 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       });
     }
 
+    // Filter by service
+    if (selectedService !== "all") {
+      result = result.filter((lead) => lead.servicoProcurado?.trim() === selectedService);
+    }
+
     return result;
-  }, [leads, dateFilterType, selectedDateMonth, selectedDateDay, reportStart, reportEnd, selectedAppointmentMonth, selectedSource, selectedStage, selectedAttendance]);
+  }, [leads, dateFilterType, selectedDateMonth, selectedDateDay, reportStart, reportEnd, selectedAppointmentMonth, selectedSource, selectedStage, selectedAttendance, selectedService]);
 
   // Relatório filtrado: todos os cards refletem SEMPRE os filtros ativos
   const stats = useMemo(() => {
     // Verificar se há filtros ativos
-    const hasFiltersActive = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all" || selectedStage !== "all";
+    const hasFiltersActive = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all" || selectedStage !== "all" || selectedService !== "all";
     
     // Base: leads filtrados pelos filtros ativos (fonte, etapa, etc.)
     const leadsFiltrados = leadsFilteredByMonthSource;
@@ -358,9 +375,10 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     setSelectedAppointmentMonth("all");
     setSelectedSource("all");
     setSelectedStage("all");
+    setSelectedService("all");
   };
 
-  const hasActiveFilters = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all" || selectedStage !== "all";
+  const hasActiveFilters = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all" || selectedStage !== "all" || selectedService !== "all";
 
   const colorMap: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
@@ -465,6 +483,18 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
                     <SelectItem value="all">Todas</SelectItem>
                     {STAGES.map((st) => (
                       <SelectItem key={st} value={st}>{st}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground mb-1">Serviço</span>
+                <Select value={selectedService} onValueChange={setSelectedService}>
+                  <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {availableServices.map((service) => (
+                      <SelectItem key={service} value={service}>{service}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
