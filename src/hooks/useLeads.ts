@@ -1266,8 +1266,14 @@ export function useLeads() {
 
   // Função para atualizar lead
   const updateLead = (leadId: string, updates: Partial<Lead>) => {
+    // Whenever dataAgendamento is set or changed, automatically reset comparecimento to "AGUARDANDO DATA"
+    // unless the caller is explicitly providing a comparecimento value in the same update
+    const finalUpdates: Partial<Lead> = { ...updates };
+    if ("dataAgendamento" in updates && updates.dataAgendamento && !("comparecimento" in updates)) {
+      finalUpdates.comparecimento = "AGUARDANDO DATA";
+    }
     setLeads(prev => prev.map(l =>
-      l.id === leadId ? { ...l, ...updates } : l
+      l.id === leadId ? { ...l, ...finalUpdates } : l
     ));
   };
 
