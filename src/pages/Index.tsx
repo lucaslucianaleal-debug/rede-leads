@@ -17,6 +17,7 @@ import { ChatView } from "@/components/crm/ChatView";
 import { PerformanceChart } from "@/components/crm/PerformanceChart";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { NewLeadsTab } from "@/components/crm/NewLeadsTab";
+import { ROIAnalysisView } from "@/components/crm/ROIAnalysisView";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -31,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign } from "lucide-react";
 import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
@@ -372,6 +373,10 @@ const CRMDashboard = () => {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="roi-custos" className="flex items-center gap-1.5">
+              <DollarSign className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">ROI/Custos</span>
+            </TabsTrigger>
               {permissions?.canEdit && (
                 <button
                   onClick={() => setShowCreateDialog(true)}
@@ -445,6 +450,10 @@ const CRMDashboard = () => {
 
           <TabsContent value="novos-leads" className="mt-6">
             <NewLeadsTab onCreateLead={handleCreateLead} onCountChange={setNewLeadsCount} />
+          </TabsContent>
+
+          <TabsContent value="roi-custos" className="mt-6">
+            <ROIAnalysisView leads={leads} clinicId={user?.uid} />
           </TabsContent>
 
           {/* Chat content removido */}
