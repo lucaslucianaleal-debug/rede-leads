@@ -132,10 +132,13 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
     const totalAppointments = leadsInPeriod.filter((l) => l.dataAgendamento).length;
     const totalPresence = leadsInPeriod.filter((l) => l.comparecimento === "COMPARECEU").length;
 
-    // Group by service
+    // Group by service - ONLY leads with valid servicoProcurado
     const serviceMap = new Map<string, Lead[]>();
     leadsInPeriod.forEach((lead) => {
-      const service = lead.servicoProcurado || "Sem serviço";
+      // Skip leads sem serviço informado
+      const service = (lead.servicoProcurado || "").trim();
+      if (!service) return;
+      
       if (!serviceMap.has(service)) {
         serviceMap.set(service, []);
       }
@@ -151,24 +154,36 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
       const appointmentsCount = serviceLeads.filter((l) => l.dataAgendamento).length;
       const presenceCount = serviceLeads.filter((l) => l.comparecimento === "COMPARECEU").length;
 
-      // Allocate budget proportionally
+      // Allocate budget proportionally by leads
       const allocatedBudget = (leadsCount / totalLeads) * investmentAmount;
-      const costPerEffectiveLead = presenceCount > 0 ? allocatedBudget / presenceCount : 0;
+      
+      // Cost per EFFECTIVE lead = budget / presence
+      // Only services with presence count - others are waste/desperdício
+      const costPerEffectiveLead = presenceCount > 0 ? allocatedBudget / presenceCount : Infinity;
 
       serviceROIs.push({
         service,
         leadsCreated: leadsCount,
         appointments: appointmentsCount,
         presence: presenceCount,
-        appointmentRate: totalLeads > 0 ? (appointmentsCount / leadsCount) * 100 : 0,
+        appointmentRate: leadsCount > 0 ? (appointmentsCount / leadsCount) * 100 : 0,
         presenceRate: appointmentsCount > 0 ? (presenceCount / appointmentsCount) * 100 : 0,
         allocatedBudget,
         costPerEffectiveLead,
       });
     });
 
-    // Sort by cost/lead (ascending = best)
-    serviceROIs.sort((a, b) => a.costPerEffectiveLead - b.costPerEffectiveLead);
+    // Sort by cost/lead (only services with presence)
+    // Services com presença = 0 ficam com Infinity e vão pro final
+    serviceROIs.sort((a, b) => {
+      // Se ambos têm presença 0, são iguais (aparecem no final)
+      if (a.presence === 0 && b.presence === 0) return 0;
+      // Se só um tem presença 0, vai pro final
+      if (a.presence === 0) return 1;
+      if (b.presence === 0) return -1;
+      // Ambos têm presença, ordena por custo
+      return a.costPerEffectiveLead - b.costPerEffectiveLead;
+    });
 
     const overallCostPerLead = totalPresence > 0 ? investmentAmount / totalPresence : 0;
 
@@ -181,7 +196,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
       overallCostPerLead,
       investmentAmount,
       services: serviceROIs,
-      top3: serviceROIs.slice(0, 3),
+      top3: serviceROIs.filter((s) => s.presence > 0).slice(0, 3), // Apenas com presença
     };
   }, [leadsInPeriod, investmentRecord]);
 
@@ -449,7 +464,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
       )}
 
       {/* Top 3 Services */}
-      {roiData.top3.length > 0 && roiData.investmentAmount > 0 && (
+      {roiData.investmentAmount > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -458,47 +473,53 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {roiData.top3.map((service, idx) => (
-              <div
-                key={service.service}
-                className="p-4 border rounded-lg bg-gradient-to-r from-green-50 to-transparent"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="text-2xl font-bold text-green-600">#{idx + 1}</div>
+            {roiData.top3.length > 0 ? (
+              roiData.top3.map((service, idx) => (
+                <div
+                  key={service.service}
+                  className="p-4 border rounded-lg bg-gradient-to-r from-green-50 to-transparent"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="text-2xl font-bold text-green-600">#{idx + 1}</div>
+                      <div>
+                        <h3 className="font-semibold">{service.service}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Custo/Lead: <strong>R$ {service.costPerEffectiveLead.toFixed(2)}</strong>
+                        </p>
+                      </div>
+                    </div>
+                    {service.costPerEffectiveLead <= 80 && <Badge className="bg-green-500">✅ IDEAL</Badge>}
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-sm">
                     <div>
-                      <h3 className="font-semibold">{service.service}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        Custo/Lead: <strong>R$ {service.costPerEffectiveLead.toFixed(2)}</strong>
+                      <p className="text-muted-foreground">Leads</p>
+                      <p className="font-semibold">{service.leadsCreated}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Agendamentos</p>
+                      <p className="font-semibold">
+                        {service.appointments} <span className="text-xs">({service.appointmentRate.toFixed(0)}%)</span>
                       </p>
                     </div>
-                  </div>
-                  {service.costPerEffectiveLead <= 80 && <Badge className="bg-green-500">✅ IDEAL</Badge>}
-                </div>
-                <div className="grid grid-cols-4 gap-2 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Leads</p>
-                    <p className="font-semibold">{service.leadsCreated}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Agendamentos</p>
-                    <p className="font-semibold">
-                      {service.appointments} <span className="text-xs">({service.appointmentRate.toFixed(0)}%)</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Presença</p>
-                    <p className="font-semibold">
-                      {service.presence} <span className="text-xs">({service.presenceRate.toFixed(0)}%)</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Orçamento</p>
-                    <p className="font-semibold">R$ {service.allocatedBudget.toFixed(2)}</p>
+                    <div>
+                      <p className="text-muted-foreground">Presença</p>
+                      <p className="font-semibold">
+                        {service.presence} <span className="text-xs">({service.presenceRate.toFixed(0)}%)</span>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Orçamento</p>
+                      <p className="font-semibold">R$ {service.allocatedBudget.toFixed(2)}</p>
+                    </div>
                   </div>
                 </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-sm text-muted-foreground border rounded-lg bg-yellow-50">
+                ⚠️ Nenhum serviço teve presença neste período. Verifique os dados de agendamento.
               </div>
-            ))}
+            )}
           </CardContent>
         </Card>
       )}
@@ -524,8 +545,20 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                 </thead>
                 <tbody>
                   {roiData.services.map((service) => (
-                    <tr key={service.service} className="border-b hover:bg-muted/50">
-                      <td className="py-2 px-2">{service.service}</td>
+                    <tr 
+                      key={service.service} 
+                      className={`border-b hover:bg-muted/50 ${
+                        service.presence === 0 ? "bg-red-50" : ""
+                      }`}
+                    >
+                      <td className="py-2 px-2">
+                        <div className="flex items-center gap-2">
+                          <span>{service.service}</span>
+                          {service.presence === 0 && (
+                            <Badge className="bg-red-600 text-xs">Desperdício</Badge>
+                          )}
+                        </div>
+                      </td>
                       <td className="text-center py-2 px-2">{service.leadsCreated}</td>
                       <td className="text-center py-2 px-2">
                         {service.appointments} ({service.appointmentRate.toFixed(0)}%)
@@ -536,10 +569,14 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                       <td className="text-center py-2 px-2">R$ {service.allocatedBudget.toFixed(2)}</td>
                       <td
                         className={`text-center py-2 px-2 font-semibold ${
-                          service.costPerEffectiveLead <= 80 ? "text-green-600" : "text-red-600"
+                          service.presence === 0 
+                            ? "text-red-600" 
+                            : service.costPerEffectiveLead <= 80 
+                            ? "text-green-600" 
+                            : "text-orange-600"
                         }`}
                       >
-                        R$ {service.costPerEffectiveLead.toFixed(2)}
+                        {service.presence === 0 ? "—" : `R$ ${service.costPerEffectiveLead.toFixed(2)}`}
                       </td>
                     </tr>
                   ))}
