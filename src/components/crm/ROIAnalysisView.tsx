@@ -541,8 +541,10 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                       </p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Orçamento</p>
-                      <p className="font-semibold">R$ {service.allocatedBudget.toFixed(2)}</p>
+                      <p className="text-muted-foreground">Custo/Lead</p>
+                      <p className={`font-semibold ${service.costPerEffectiveLead <= 80 ? "text-green-600" : "text-orange-600"}`}>
+                        R$ {service.costPerEffectiveLead.toFixed(2)}
+                      </p>
                     </div>
                   </div>
                 </div>
