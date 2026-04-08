@@ -83,16 +83,16 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [whatsLead, setWhatsLead] = useState<Lead | null>(null);
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectedService, setSelectedService] = useState<string | null>(null);
-  const [noShowOnly, setNoShowOnly] = useState(false);
+  const [search, setSearch] = useState(() => localStorage.getItem("fq_search") ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(() => localStorage.getItem("fq_search") ?? "");
+  const [selectedService, setSelectedService] = useState<string | null>(() => localStorage.getItem("fq_service") || null);
+  const [noShowOnly, setNoShowOnly] = useState(() => localStorage.getItem("fq_noshow") === "1");
   const [suggestedMessage, setSuggestedMessage] = useState<string | null>(null);
   const { clinicMeta, currentClinic } = useAuth();
   const progress = Math.min((followUpsDoneToday / followUpGoal) * 100, 100);
   const [sharedLeadsMap, setSharedLeadsMap] = useState<Record<string, any>>({});
   const [showNewLeads, setShowNewLeads] = useState(false);
-  const [tab, setTab] = useState<'pendentes' | 'feitos'>('pendentes');
+  const [tab, setTab] = useState<'pendentes' | 'feitos'>(() => (localStorage.getItem("fq_tab") as 'pendentes' | 'feitos') ?? 'pendentes');
   const [visibleCount, setVisibleCount] = useState(30);
   const PAGE_SIZE = 30;
 
@@ -372,7 +372,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
       {/* Abas Pendentes / Feitos Hoje */}
       <div className="flex gap-1 mb-4 bg-muted/40 rounded-lg p-1">
         <button
-          onClick={() => setTab('pendentes')}
+          onClick={() => { setTab('pendentes'); localStorage.setItem('fq_tab', 'pendentes'); }}
           className={`flex-1 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
             tab === 'pendentes'
               ? 'bg-background shadow text-foreground'
@@ -387,7 +387,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
           )}
         </button>
         <button
-          onClick={() => setTab('feitos')}
+          onClick={() => { setTab('feitos'); localStorage.setItem('fq_tab', 'feitos'); }}
           className={`flex-1 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
             tab === 'feitos'
               ? 'bg-background shadow text-foreground'
@@ -408,13 +408,13 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); localStorage.setItem('fq_search', e.target.value); }}
           placeholder="Buscar por nome ou telefone..."
           className="pl-9 pr-9"
         />
         {search && (
           <button
-            onClick={() => setSearch("")}
+            onClick={() => { setSearch(""); localStorage.removeItem('fq_search'); }}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
@@ -425,7 +425,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
       <div className="flex gap-2 items-center mb-4">
         <select
           value={selectedService || ""}
-          onChange={(e) => setSelectedService(e.target.value || null)}
+          onChange={(e) => { const v = e.target.value || null; setSelectedService(v); v ? localStorage.setItem('fq_service', v) : localStorage.removeItem('fq_service'); }}
           className="bg-slate-700 border-slate-600 text-white p-2 rounded"
         >
           <option value="">Filtrar por serviço (todos)</option>
@@ -435,7 +435,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
         </select>
 
         <label className="text-sm flex items-center gap-2">
-          <input type="checkbox" checked={noShowOnly} onChange={(e) => setNoShowOnly(e.target.checked)} />
+          <input type="checkbox" checked={noShowOnly} onChange={(e) => { setNoShowOnly(e.target.checked); localStorage.setItem('fq_noshow', e.target.checked ? '1' : '0'); }} />
           <span className="text-muted-foreground">Apenas não compareceram</span>
         </label>
       </div>
