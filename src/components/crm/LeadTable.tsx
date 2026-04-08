@@ -142,7 +142,27 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
       let aValue = a[sortField] || '';
       let bValue = b[sortField] || '';
 
-      // Convert to string for comparison
+      // Se for campo de data, converter para Date antes de comparar
+      if (sortField === 'dataAgendamento' || sortField === 'dataFollowUp') {
+        const parseDate = (dateStr: string): Date => {
+          const trimmed = String(dateStr).trim();
+          if (!trimmed) return new Date(0); // Colocar datas vazias no fim
+          const parts = trimmed.split('/');
+          if (parts.length >= 3) {
+            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+          }
+          return new Date(0);
+        };
+        const aDate = parseDate(String(aValue));
+        const bDate = parseDate(String(bValue));
+        if (sortDirection === 'asc') {
+          return aDate.getTime() - bDate.getTime();
+        } else {
+          return bDate.getTime() - aDate.getTime();
+        }
+      }
+
+      // Para outros campos, comparar como string
       aValue = String(aValue).toLowerCase();
       bValue = String(bValue).toLowerCase();
 
