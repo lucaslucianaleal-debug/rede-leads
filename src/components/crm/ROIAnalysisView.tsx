@@ -106,13 +106,18 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
 
   const { start: periodStart, end: periodEnd, label: periodLabel } = getPeriodRange();
 
-  // Filter leads by period
+  const ONLINE_SOURCES = ["Online", "Instagram", "Facebook", "WhatsApp"];
+
+  // Filter leads by period AND online source only (investment is online ads)
   const leadsInPeriod = useMemo(() => {
     return leads.filter((lead) => {
       if (!lead.dataCriacao) return false;
       const [day, month, year] = lead.dataCriacao.split("/");
       const leadDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      return leadDate >= periodStart && leadDate <= periodEnd;
+      if (leadDate < periodStart || leadDate > periodEnd) return false;
+      // Only online leads
+      const fonte = (lead.fonteLead || "").trim();
+      return ONLINE_SOURCES.some((s) => fonte.toLowerCase().includes(s.toLowerCase()));
     });
   }, [leads, periodStart, periodEnd]);
 
@@ -252,6 +257,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
             Análise ROI & Custos
+            <Badge variant="outline" className="text-xs font-normal ml-1">Apenas leads Online</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
