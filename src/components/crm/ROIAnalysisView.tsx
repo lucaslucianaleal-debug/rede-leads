@@ -111,6 +111,8 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
   // Filter leads by period AND online source only (investment is online ads)
   const leadsInPeriod = useMemo(() => {
     return leads.filter((lead) => {
+      // Skip soft-deleted leads
+      if (lead._deleted) return false;
       if (!lead.dataCriacao) return false;
       const [day, month, year] = lead.dataCriacao.split("/");
       const leadDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
