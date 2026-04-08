@@ -320,7 +320,14 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
             {useAutoStage && (
               <button
                 type="button"
-                onClick={() => { setUseAutoStage(false); setEtapa("Desistência"); setStatus("FRIO"); }}
+                onClick={() => {
+                  setUseAutoStage(false);
+                  setEtapa("Desistência");
+                  setStatus("FRIO");
+                  if (updateLead && lead && lead.status !== "FRIO") {
+                    updateLead(lead.id, { status: "FRIO" as any });
+                  }
+                }}
                 className="w-full text-xs px-2 py-2 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition font-medium"
               >
                 Desistiu
