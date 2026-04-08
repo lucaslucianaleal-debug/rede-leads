@@ -434,7 +434,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
 
       {/* Summary Cards */}
       {roiData.investmentAmount > 0 && (
-        <div className="grid md:grid-cols-5 gap-4">
+        <div className="grid md:grid-cols-6 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">{roiData.totalLeads}</div>
@@ -455,6 +455,14 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                 {roiData.totalPresence} <span className="text-sm">({roiData.presenceRate.toFixed(1)}%)</span>
               </div>
               <p className="text-xs text-muted-foreground">Presença</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-600">
+                R$ {roiData.totalLeads > 0 ? (roiData.investmentAmount / roiData.totalLeads).toFixed(2) : "—"}
+              </div>
+              <p className="text-xs text-muted-foreground">Custo/Lead Criado</p>
             </CardContent>
           </Card>
           <Card>
