@@ -249,9 +249,12 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
   };
 
   const getStatusBadge = () => {
+    // No presence = 100% waste = CRÍTICO
+    if (roiData.totalPresence === 0) return <Badge className="bg-red-600">❌ CRÍTICO (Sem conversão)</Badge>;
+    // With presence: check cost
     if (roiData.overallCostPerLead <= 80) return <Badge className="bg-green-500">✅ DENTRO</Badge>;
     if (roiData.overallCostPerLead <= 100) return <Badge className="bg-yellow-500">⚠️ ACIMA</Badge>;
-    return <Badge className="bg-red-500">❌ CRÍTICO</Badge>;
+    return <Badge className="bg-red-600">❌ CRÍTICO</Badge>;
   };
 
   // Get available months by leads dataCriacao
@@ -456,8 +459,14 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold">
-                R$ {roiData.overallCostPerLead.toFixed(2)}
+              <div className={`text-2xl font-bold ${
+                roiData.totalPresence === 0 
+                  ? "text-red-600" 
+                  : roiData.overallCostPerLead <= 80
+                  ? "text-green-600"
+                  : "text-orange-600"
+              }`}>
+                {roiData.totalPresence === 0 ? "—" : `R$ ${roiData.overallCostPerLead.toFixed(2)}`}
               </div>
               <p className="text-xs text-muted-foreground">Custo/Lead Efetivo</p>
             </CardContent>
