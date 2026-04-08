@@ -63,6 +63,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
   const [showInvestmentDialog, setShowInvestmentDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedROI, setSelectedROI] = useState<ROIRecord | null>(null);
+  const [drillService, setDrillService] = useState<string | null>(null);
 
   // Load ROI history from localStorage
   const roiHistory = useMemo<ROIRecord[]>(() => {
@@ -211,7 +212,8 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
       overallCostPerLead,
       investmentAmount,
       services: serviceROIs,
-      top3: serviceROIs.filter((s) => s.presence > 0).slice(0, 3), // Apenas com presença
+      top3: serviceROIs.filter((s) => s.presence > 0).slice(0, 3),
+      serviceLeadsMap: serviceMap, // expose for drill-down
     };
   }, [leadsInPeriod, investmentRecord]);
 
@@ -581,8 +583,9 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                   {roiData.services.map((service) => (
                     <tr 
                       key={service.service} 
-                      className={`border-b hover:bg-muted/50 ${
-                        service.presence === 0 ? "bg-red-50" : ""
+                      onClick={() => setDrillService(service.service)}
+                      className={`border-b cursor-pointer hover:bg-blue-50 transition-colors ${
+                        service.presence === 0 ? "bg-red-50 hover:bg-red-100" : ""
                       }`}
                     >
                       <td className="py-2 px-2">
@@ -620,6 +623,58 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
           </CardContent>
         </Card>
       )}
+
+      {/* Drill-down: leads por serviço */}
+      <Dialog open={!!drillService} onOpenChange={(open) => !open && setDrillService(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Leads — {drillService}</DialogTitle>
+            <DialogDescription>
+              {drillService && (roiData.serviceLeadsMap.get(drillService)?.length ?? 0)} leads no período
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-2">Nome</th>
+                  <th className="text-left py-2 px-2">Telefone</th>
+                  <th className="text-center py-2 px-2">Contato</th>
+                  <th className="text-center py-2 px-2">Agendamento</th>
+                  <th className="text-center py-2 px-2">Presença</th>
+                  <th className="text-left py-2 px-2">Etapa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drillService && (roiData.serviceLeadsMap.get(drillService) ?? []).map((lead) => (
+                  <tr
+                    key={lead.id}
+                    className={`border-b ${
+                      lead.comparecimento === "COMPARECEU"
+                        ? "bg-green-50"
+                        : lead.dataAgendamento && lead.comparecimento === "NÃO COMPARECEU"
+                        ? "bg-red-50"
+                        : ""
+                    }`}
+                  >
+                    <td className="py-2 px-2 font-medium">{lead.nome}</td>
+                    <td className="py-2 px-2 text-muted-foreground">{lead.telefone}</td>
+                    <td className="text-center py-2 px-2">{lead.dataContato || "—"}</td>
+                    <td className="text-center py-2 px-2">{lead.dataAgendamento || "—"}</td>
+                    <td className="text-center py-2 px-2">
+                      {lead.comparecimento === "COMPARECEU" && <Badge className="bg-green-500 text-xs">✅ Compareceu</Badge>}
+                      {lead.comparecimento === "NÃO COMPARECEU" && <Badge className="bg-red-500 text-xs">❌ Não compareceu</Badge>}
+                      {lead.comparecimento === "AGUARDANDO DATA" && <Badge variant="outline" className="text-xs">⏳ Aguardando</Badge>}
+                      {!lead.comparecimento && <span className="text-muted-foreground text-xs">—</span>}
+                    </td>
+                    <td className="py-2 px-2 text-xs text-muted-foreground">{lead.etapaLead}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog para salvar investimento */}
       <Dialog open={showInvestmentDialog} onOpenChange={setShowInvestmentDialog}>
