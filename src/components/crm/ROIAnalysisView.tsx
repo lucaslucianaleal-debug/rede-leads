@@ -31,7 +31,8 @@ interface ServiceROI {
   appointmentRate: number; // %
   presenceRate: number; // % of appointments
   allocatedBudget: number;
-  costPerEffectiveLead: number;
+  costPerLeadCreated: number; // budget / leads (goal metric)
+  costPerEffectiveLead: number; // budget / presence (conversion metric)
 }
 
 const getStorageKey = (clinicId?: string) => `rede_roi_history_${clinicId || "default"}`;
@@ -165,7 +166,10 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
       // Allocate budget proportionally by leads
       const allocatedBudget = (leadsCount / totalLeads) * investmentAmount;
       
-      // Cost per EFFECTIVE lead = budget / presence
+      // Cost per lead CREATED = budget / leads (goal/target metric)
+      const costPerLeadCreated = leadsCount > 0 ? allocatedBudget / leadsCount : 0;
+      
+      // Cost per EFFECTIVE lead = budget / presence (conversion metric)
       // Only services with presence count - others are waste/desperdício
       const costPerEffectiveLead = presenceCount > 0 ? allocatedBudget / presenceCount : Infinity;
 
@@ -177,20 +181,22 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
         appointmentRate: leadsCount > 0 ? (appointmentsCount / leadsCount) * 100 : 0,
         presenceRate: appointmentsCount > 0 ? (presenceCount / appointmentsCount) * 100 : 0,
         allocatedBudget,
+        costPerLeadCreated,
         costPerEffectiveLead,
       });
     });
 
-    // Sort by cost/lead (only services with presence)
-    // Services com presença = 0 ficam com Infinity e vão pro final
+    // Sort by cost/lead created (primary) and appointments (secondary for presence=0)
     serviceROIs.sort((a, b) => {
-      // Se ambos têm presença 0, são iguais (aparecem no final)
-      if (a.presence === 0 && b.presence === 0) return 0;
-      // Se só um tem presença 0, vai pro final
-      if (a.presence === 0) return 1;
-      if (b.presence === 0) return -1;
-      // Ambos têm presença, ordena por custo
-      return a.costPerEffectiveLead - b.costPerEffectiveLead;
+      // If both have presence, sort by cost/lead created (lowest first - best)
+      if (a.presence > 0 && b.presence > 0) {
+        return a.costPerLeadCreated - b.costPerLeadCreated;
+      }
+      // If only one has presence, put it first
+      if (a.presence > 0) return -1;
+      if (b.presence > 0) return 1;
+      // Both have presence=0: sort by appointments (descending - most appointments first)
+      return b.appointments - a.appointments;
     });
 
     const overallCostPerLead = totalPresence > 0 ? investmentAmount / totalPresence : 0;
