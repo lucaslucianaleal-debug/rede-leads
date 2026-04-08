@@ -36,6 +36,19 @@ interface ServiceROI {
 
 const getStorageKey = (clinicId?: string) => `rede_roi_history_${clinicId || "default"}`;
 
+// Parse YYYY-MM-DD without UTC offset issues
+const parseLocalDate = (s: string): Date => {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
+// Parse stored date (ISO string or YYYY-MM-DD)
+const parseStoredDate = (s: string): Date => {
+  if (!s) return new Date();
+  if (s.includes("T")) return new Date(s); // ISO string
+  return parseLocalDate(s);
+};
+
 export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?: string }) {
   const [periodType, setPeriodType] = useState<"mes" | "semana" | "custom">("mes");
   const today = new Date();
@@ -81,10 +94,12 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
         label: `Semana ${week}/${year}`,
       };
     } else {
+      const start = parseLocalDate(customStart);
+      const end = parseLocalDate(customEnd);
       return {
-        start: new Date(customStart),
-        end: new Date(customEnd),
-        label: `${format(new Date(customStart), "dd/MM/yyyy")} a ${format(new Date(customEnd), "dd/MM/yyyy")}`,
+        start,
+        end,
+        label: `${format(start, "dd/MM/yyyy")} a ${format(end, "dd/MM/yyyy")}`,
       };
     }
   };
@@ -269,12 +284,9 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
           </div>
 
           {/* Period Selectors */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {periodType === "mes" && (
-              <Select value={`${selectedMonth.split("-")[1]}/${selectedMonth.split("-")[0]}`} onValueChange={(v) => {
-                const [m, y] = v.split("/");
-                setSelectedMonth(`${y}-${m}`);
-              }}>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                 <SelectTrigger className="w-[150px]"><SelectValue placeholder="Selecione o mês" /></SelectTrigger>
                 <SelectContent>
                   {availableMonths.map((month) => (
@@ -298,15 +310,15 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                 <PopoverTrigger asChild>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" aria-label="Data início">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {format(new Date(customStart), "dd/MM/yyyy")}
+                      <CalendarIcon className="h-4 w-4 mr-1" />
+                      {customStart ? format(parseLocalDate(customStart), "dd/MM/yyyy") : "Início"}
                     </Button>
                   </div>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar 
                     mode="single" 
-                    selected={new Date(customStart)} 
+                    selected={customStart ? parseLocalDate(customStart) : undefined} 
                     onSelect={(d) => d && setCustomStart(format(d, "yyyy-MM-dd"))} 
                     locale={ptBR} 
                   />
@@ -318,14 +330,14 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" aria-label="Data fim">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    {format(new Date(customEnd), "dd/MM/yyyy")}
+                    <CalendarIcon className="h-4 w-4 mr-1" />
+                    {customEnd ? format(parseLocalDate(customEnd), "dd/MM/yyyy") : "Fim"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar 
                     mode="single" 
-                    selected={new Date(customEnd)} 
+                    selected={customEnd ? parseLocalDate(customEnd) : undefined} 
                     onSelect={(d) => d && setCustomEnd(format(d, "yyyy-MM-dd"))} 
                     locale={ptBR} 
                   />
@@ -371,7 +383,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
               <div className="flex justify-between items-center">
                 <span>
                   💰 <strong>R$ {investmentRecord.investmentAmount.toFixed(2)}</strong> registrado em{" "}
-                  {format(new Date(investmentRecord.createdAt), "dd/MM/yyyy")}
+                  {format(parseStoredDate(investmentRecord.createdAt), "dd/MM/yyyy")}
                 </span>
                 <button
                   onClick={() => {
@@ -561,13 +573,13 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                       <CalendarIcon className="h-4 w-4 mr-2" />
-                      {format(new Date(investmentDate), "dd/MM/yyyy")}
+                      {investmentDate ? format(parseLocalDate(investmentDate), "dd/MM/yyyy") : "Selecione"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={new Date(investmentDate)}
+                      selected={investmentDate ? parseLocalDate(investmentDate) : undefined}
                       onSelect={(d) => d && setInvestmentDate(format(d, "yyyy-MM-dd"))}
                       locale={ptBR}
                     />
