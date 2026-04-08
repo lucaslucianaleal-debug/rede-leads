@@ -45,6 +45,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
   const [customStart, setCustomStart] = useState<string>(format(startOfMonth(today), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState<string>(format(endOfMonth(today), "yyyy-MM-dd"));
   const [investmentAmount, setInvestmentAmount] = useState<string>("");
+  const [investmentDate, setInvestmentDate] = useState<string>(format(today, "yyyy-MM-dd"));
   const [showInvestmentDialog, setShowInvestmentDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedROI, setSelectedROI] = useState<ROIRecord | null>(null);
@@ -179,7 +180,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
       periodType,
       periodLabel,
       investmentAmount: amount,
-      createdAt: new Date().toISOString(),
+      createdAt: investmentDate, // Use selected date, not current date
     };
 
     // Remove old record for this period if exists
@@ -189,6 +190,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
     localStorage.setItem(storageKey, JSON.stringify(updated));
     toast.success(`Investimento de R$ ${amount.toFixed(2)} registrado para ${periodLabel}`);
     setInvestmentAmount("");
+    setInvestmentDate(format(today, "yyyy-MM-dd"));
     setShowInvestmentDialog(false);
   };
 
@@ -347,8 +349,16 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                   className="flex-1"
                   min="0"
                   step="0.01"
+                  disabled
                 />
-                <Button onClick={() => setShowInvestmentDialog(true)} size="sm">
+                <Button 
+                  onClick={() => {
+                    setInvestmentAmount("");
+                    setInvestmentDate(format(today, "yyyy-MM-dd"));
+                    setShowInvestmentDialog(true);
+                  }} 
+                  size="sm"
+                >
                   Registrar
                 </Button>
               </div>
@@ -543,6 +553,27 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                 min="0"
                 step="0.01"
               />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Data do Investimento</label>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      {format(new Date(investmentDate), "dd/MM/yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={new Date(investmentDate)}
+                      onSelect={(d) => d && setInvestmentDate(format(d, "yyyy-MM-dd"))}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </div>
           <DialogFooter>
