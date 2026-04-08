@@ -7,7 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DollarSign, TrendingUp, Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { DollarSign, TrendingUp, Trash2, Calendar as CalendarIcon } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -36,10 +38,12 @@ const getStorageKey = (clinicId?: string) => `rede_roi_history_${clinicId || "de
 
 export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?: string }) {
   const [periodType, setPeriodType] = useState<"mes" | "semana" | "custom">("mes");
-  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
-  const [selectedWeek, setSelectedWeek] = useState<string>(format(new Date(), "yyyy-ww"));
-  const [customStart, setCustomStart] = useState<string>(format(startOfMonth(new Date()), "yyyy-MM-dd"));
-  const [customEnd, setCustomEnd] = useState<string>(format(endOfMonth(new Date()), "yyyy-MM-dd"));
+  const today = new Date();
+  const currentMonth = `${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+  const [selectedWeek, setSelectedWeek] = useState<string>(format(today, "yyyy-'W'ww"));
+  const [customStart, setCustomStart] = useState<string>(format(startOfMonth(today), "yyyy-MM-dd"));
+  const [customEnd, setCustomEnd] = useState<string>(format(endOfMonth(today), "yyyy-MM-dd"));
   const [investmentAmount, setInvestmentAmount] = useState<string>("");
   const [showInvestmentDialog, setShowInvestmentDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -54,15 +58,17 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
 
   // Determine period date range
   const getPeriodRange = () => {
-    const today = new Date();
     if (periodType === "mes") {
+      const [month, year] = selectedMonth.split("/");
+      const start = startOfMonth(new Date(parseInt(year), parseInt(month) - 1, 1));
+      const end = endOfMonth(new Date(parseInt(year), parseInt(month) - 1, 1));
       return {
-        start: startOfMonth(new Date(selectedMonth + "-01")),
-        end: endOfMonth(new Date(selectedMonth + "-01")),
-        label: format(new Date(selectedMonth + "-01"), "MMMM yyyy", { locale: ptBR }),
+        start,
+        end,
+        label: format(start, "MMMM yyyy", { locale: ptBR }),
       };
     } else if (periodType === "semana") {
-      const [year, week] = selectedWeek.split("-ww");
+      const [year, week] = selectedWeek.split("-W");
       const jan4 = new Date(parseInt(year), 0, 4);
       const weekStart = new Date(jan4);
       weekStart.setDate(jan4.getDate() - jan4.getDay() + 1 + (parseInt(week) - 1) * 7);
@@ -77,7 +83,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
       return {
         start: new Date(customStart),
         end: new Date(customEnd),
-        label: `${customStart} a ${customEnd}`,
+        label: `${format(new Date(customStart), "dd/MM/yyyy")} a ${format(new Date(customEnd), "dd/MM/yyyy")}`,
       };
     }
   };
@@ -203,16 +209,23 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
     return <Badge className="bg-red-500">❌ CRÍTICO</Badge>;
   };
 
+  // Get available months by leads dataCriacao
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
     leads.forEach((lead) => {
       if (lead.dataCriacao) {
         const [, m, y] = lead.dataCriacao.split("/");
-        months.add(`${y}-${m}`);
+        if (m && y) months.add(`${m}/${y}`);
       }
     });
-    return Array.from(months).sort().reverse();
+    return Array.from(months).sort((a, b) => {
+      const [monthA, yearA] = a.split("/");
+      const [monthB, yearB] = b.split("/");
+      return yearB.localeCompare(yearA) || monthB.localeCompare(monthA);
+    });
   }, [leads]);
+
+  // Get available weeks by leads dataCriacao
 
   return (
     <div className="space-y-6">
@@ -226,64 +239,96 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Period Type Selection */}
-          <div className="flex gap-2">
-            <Button
-              variant={periodType === "mes" ? "default" : "outline"}
-              onClick={() => setPeriodType("mes")}
-              size="sm"
-            >
-              Mês
-            </Button>
-            <Button
-              variant={periodType === "semana" ? "default" : "outline"}
-              onClick={() => setPeriodType("semana")}
-              size="sm"
-            >
-              Semana
-            </Button>
-            <Button
-              variant={periodType === "custom" ? "default" : "outline"}
-              onClick={() => setPeriodType("custom")}
-              size="sm"
-            >
-              Período
-            </Button>
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-muted-foreground mb-2">Período</span>
+            <div className="flex gap-2">
+              <Button
+                variant={periodType === "mes" ? "default" : "outline"}
+                onClick={() => setPeriodType("mes")}
+                size="sm"
+              >
+                Mês
+              </Button>
+              <Button
+                variant={periodType === "semana" ? "default" : "outline"}
+                onClick={() => setPeriodType("semana")}
+                size="sm"
+              >
+                Semana
+              </Button>
+              <Button
+                variant={periodType === "custom" ? "default" : "outline"}
+                onClick={() => setPeriodType("custom")}
+                size="sm"
+              >
+                Período
+              </Button>
+            </div>
           </div>
 
-          {/* Period Input */}
+          {/* Period Selectors */}
           <div className="flex gap-2">
             {periodType === "mes" && (
-              <Input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-40"
-              />
+              <Select value={`${selectedMonth.split("-")[1]}/${selectedMonth.split("-")[0]}`} onValueChange={(v) => {
+                const [m, y] = v.split("/");
+                setSelectedMonth(`${y}-${m}`);
+              }}>
+                <SelectTrigger className="w-[150px]"><SelectValue placeholder="Selecione o mês" /></SelectTrigger>
+                <SelectContent>
+                  {availableMonths.map((month) => (
+                    <SelectItem key={month} value={month}>{month}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
+
             {periodType === "semana" && (
               <Input
                 type="week"
                 value={selectedWeek}
                 onChange={(e) => setSelectedWeek(e.target.value)}
-                className="w-40"
+                className="w-[150px]"
               />
             )}
+
             {periodType === "custom" && (
-              <>
-                <Input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="w-40"
-                />
-                <span className="self-center text-muted-foreground">até</span>
-                <Input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="w-40"
-                />
-              </>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" aria-label="Data início">
+                      <Calendar className="h-4 w-4 mr-1" />
+                      {format(new Date(customStart), "dd/MM/yyyy")}
+                    </Button>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar 
+                    mode="single" 
+                    selected={new Date(customStart)} 
+                    onSelect={(d) => d && setCustomStart(format(d, "yyyy-MM-dd"))} 
+                    locale={ptBR} 
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+
+            {periodType === "custom" && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" aria-label="Data fim">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    {format(new Date(customEnd), "dd/MM/yyyy")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar 
+                    mode="single" 
+                    selected={new Date(customEnd)} 
+                    onSelect={(d) => d && setCustomEnd(format(d, "yyyy-MM-dd"))} 
+                    locale={ptBR} 
+                  />
+                </PopoverContent>
+              </Popover>
             )}
           </div>
 
