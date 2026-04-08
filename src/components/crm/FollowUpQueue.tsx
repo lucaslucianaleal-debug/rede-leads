@@ -115,29 +115,27 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
       ];
 
       filteredLeads.forEach((l) => {
+        // Manter as datas como strings já formatadas em dd/MM/yyyy
         const createdRaw = l.createdAt || l.dataCriacao || l.dataCadastro || l.created || l.created_at || '';
         const lastRaw = l.lastFollowUpDone || '';
         const nextRaw = l.dataFollowUp || '';
-        const createdDate = parseToDate(createdRaw);
-        const lastDate = parseToDate(lastRaw);
-        const nextDate = parseToDate(nextRaw);
         sheet.addRow([
           l.nome || '',
-          createdDate,
+          createdRaw || '',  // Manter como string
           l.telefone || '',
           l.servicoProcurado || '',
           l.etapaLead || '',
           l.status || '',
           l.observacao || '',
-          lastDate,
-          nextDate,
+          lastRaw || '',  // Manter como string
+          nextRaw || '',  // Manter como string
         ]);
       });
-      // Ensure date columns are formatted as dates in Excel
+      // Garantir formato de texto para colunas de data (não aplicar formato numérico)
       try {
-        sheet.getColumn(2).numFmt = 'dd/mm/yyyy'; // Data Criação
-        sheet.getColumn(8).numFmt = 'dd/mm/yyyy'; // Último Follow-up
-        sheet.getColumn(9).numFmt = 'dd/mm/yyyy'; // Próx. Follow-up
+        sheet.getColumn(2).alignment = { horizontal: 'left' }; // Data Criação
+        sheet.getColumn(8).alignment = { horizontal: 'left' }; // Último Follow-up
+        sheet.getColumn(9).alignment = { horizontal: 'left' }; // Próx. Follow-up
       } catch (e) {
         // ignore if column indices are not available yet
       }
