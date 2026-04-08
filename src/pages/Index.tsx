@@ -136,8 +136,8 @@ const CRMDashboard = () => {
     }
   };
 
-  const handleRegisterCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
-    registerCall(leadId, outcome, obs, returnDate);
+  const handleRegisterCall = (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: import("@/types/crm").LeadStage) => {
+    registerCall(leadId, outcome, obs, returnDate, nextStage);
   };
 
   const handleCreateLead = (lead: Omit<Lead, 'id'>) => {

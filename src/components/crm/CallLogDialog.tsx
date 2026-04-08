@@ -58,7 +58,7 @@ interface CallLogDialogProps {
   lead: Lead | null;
   open: boolean;
   onClose: () => void;
-  onConfirm: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
+  onConfirm: (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: LeadStage) => void;
 }
 
 const OUTCOMES = [
@@ -101,7 +101,27 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   const [suggestedMessage, setSuggestedMessage] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<string>(lead?.status || "MORNO");
   const [etapa, setEtapa] = useState<LeadStage>(lead?.etapaLead || "Novo");
+  const [useAutoStage, setUseAutoStage] = useState(true);
     const [showAgenda, setShowAgenda] = useState(false);
+
+  // Calcular próxima etapa automática (progressão linear igual ao FollowUpDialog)
+  const getNextStageAuto = (): LeadStage => {
+    const stageProgression: LeadStage[] = [
+      "Novo", "Em contato",
+      "Follow-Up 1", "Follow-Up 2", "Follow-Up 3", "Follow-Up 4",
+      "Follow-Up 5", "Follow-Up 6", "Follow-Up 7", "Follow-Up 8",
+      "Follow-Up 9", "Follow-Up 10", "Follow-Up 11", "Follow-Up 12",
+      "Avaliação agendada",
+    ];
+    const finalStages: LeadStage[] = ["Finalizado", "Desistência", "Fora da região"];
+    const current = lead?.etapaLead || "Novo";
+    if (finalStages.includes(current as LeadStage)) return current as LeadStage;
+    const normalized = current.replace(/Follow Up/g, "Follow-Up");
+    const idx = stageProgression.findIndex(s => s === normalized);
+    if (idx === -1) return "Novo";
+    return stageProgression[Math.min(idx + 1, stageProgression.length - 1)];
+  };
+  const nextAutoStage = getNextStageAuto();
 
   // Pré-preencher se já tem retorno ligação agendado
   useEffect(() => {
@@ -132,6 +152,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     setObs("");
     setStatus(lead?.status || "MORNO");
     setEtapa(lead?.etapaLead || "Novo");
+    setUseAutoStage(true);
   }, [lead?.dataRetornoLigacao, open, lead?.status, lead?.etapaLead]);
 
   if (!lead) return null;
@@ -141,22 +162,19 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     if (agendarRetorno && returnDate) {
       returnDateStr = `${format(returnDate, "dd/MM/yyyy")} ${returnTime}`;
     }
-    // Atualiza status e etapa do lead
-    if (updateLead) {
-      const updates: any = {};
-      if (status && lead.status !== status) updates.status = status as any;
-      if (etapa && lead.etapaLead !== etapa) updates.etapaLead = etapa;
-      if (Object.keys(updates).length > 0) {
-        updateLead(lead.id, updates);
-      }
+    const finalStage = useAutoStage ? nextAutoStage : etapa;
+    // Atualiza apenas o status; etapa é gerenciada pelo registerCall via finalStage
+    if (updateLead && status && lead.status !== status) {
+      updateLead(lead.id, { status: status as any });
     }
-    onConfirm(lead.id, outcome, obs, returnDateStr);
+    onConfirm(lead.id, outcome, obs, returnDateStr, finalStage);
     toast.success(returnDateStr ? `Ligação registrada! Retorno agendado para ${returnDateStr}` : "Ligação registrada!");
     setObs("");
     setOutcome("Caixa de mensagem");
     setAgendarRetorno(false);
     setReturnDate(new Date());
     setReturnTime("17:00");
+    setUseAutoStage(true);
     onClose();
   };
 
@@ -264,31 +282,50 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
             </div>
           </div>
 
-          {/* Etapa */}
+          {/* Etapa — progressão automática ou manual, igual ao FollowUpDialog */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Etapa do lead</Label>
+            <div className="p-2 rounded bg-blue-50 border border-blue-200">
+              <div className="text-xs font-medium text-blue-900">Progressão automática:</div>
+              <div className="text-sm text-blue-700 mt-1">
+                {lead.etapaLead} → <span className="font-semibold">{nextAutoStage}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="call-auto-stage"
+                checked={useAutoStage}
+                onChange={(e) => setUseAutoStage(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <label htmlFor="call-auto-stage" className="text-sm font-medium cursor-pointer">
+                Usar progressão automática
+              </label>
+            </div>
+            {!useAutoStage && (
+              <div className="space-y-2">
+                <Label>Escolher etapa diferente</Label>
+                <Select value={etapa} onValueChange={(value) => setEtapa(value as LeadStage)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a etapa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ETAPA_OPTIONS.map((e) => (
+                      <SelectItem key={e} value={e}>{e}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {useAutoStage && (
               <button
                 type="button"
-                onClick={() => {
-                  setEtapa("Desistência");
-                  setStatus("FRIO");
-                }}
-                className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition font-medium"
+                onClick={() => { setUseAutoStage(false); setEtapa("Desistência"); setStatus("FRIO"); }}
+                className="w-full text-xs px-2 py-2 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition font-medium"
               >
                 Desistiu
               </button>
-            </div>
-            <Select value={etapa} onValueChange={(value) => setEtapa(value as LeadStage)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a etapa" />
-              </SelectTrigger>
-              <SelectContent>
-                {ETAPA_OPTIONS.map((e) => (
-                  <SelectItem key={e} value={e}>{e}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            )}
           </div>
 
           {/* Outcome */}

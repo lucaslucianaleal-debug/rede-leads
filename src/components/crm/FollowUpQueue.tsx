@@ -22,7 +22,7 @@ interface FollowUpQueueProps {
   leads: Lead[];
   allLeads?: Lead[];
   onSendFollowUp: (leadId: string, observacao?: string, etapa?: LeadStage) => void;
-  onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
+  onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: import("@/types/crm").LeadStage) => void;
   onDeleteLead?: (leadId: string) => void;
   followUpsDoneToday?: number;
   followUpGoal?: number;
@@ -284,8 +284,8 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
     setSelectedLead(null);
   };
 
-  const handleConfirmCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
-    onRegisterCall?.(leadId, outcome, obs, returnDate);
+  const handleConfirmCall = (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: import("@/types/crm").LeadStage) => {
+    onRegisterCall?.(leadId, outcome, obs, returnDate, nextStage);
     setCallLead(null);
   };
 

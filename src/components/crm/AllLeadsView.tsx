@@ -28,7 +28,7 @@ interface AllLeadsViewProps {
   onDeleteSelected?: () => void;
   onClearDuplicates?: () => void;
   onSendFollowUp?: (leadId: string, observacao?: string) => void;
-  onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
+  onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: import("@/types/crm").LeadStage) => void;
   onOpenChat?: (phone: string, message?: string) => void;
   onOpenCall?: (phone: string) => void;
   onExport?: (leads: Lead[]) => void;

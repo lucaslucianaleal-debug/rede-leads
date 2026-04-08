@@ -59,7 +59,7 @@ interface LeadTableProps {
   onSelectionChange?: (leadIds: string[]) => void;
   onEditLead?: (lead: Lead) => void;
   onSendFollowUp?: (leadId: string, observacao?: string) => void;
-  onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
+  onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: import("@/types/crm").LeadStage) => void;
   onOpenChat?: (phone: string, message?: string) => void;
 }
 
@@ -436,8 +436,8 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
           lead={callLead}
           open={!!callLead}
           onClose={() => setCallLead(null)}
-          onConfirm={(leadId, outcome, obs, returnDate) => {
-            onRegisterCall(leadId, outcome, obs, returnDate);
+          onConfirm={(leadId, outcome, obs, returnDate, nextStage) => {
+            onRegisterCall(leadId, outcome, obs, returnDate, nextStage);
             setCallLead(null);
           }}
         />

@@ -1291,14 +1291,24 @@ export function useLeads() {
     ));
   };
 
-  // Função para registrar ligação — appends to observacao
-  const registerCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
+  // Função para registrar ligação — funciona igual a sendFollowUp + salva resultado
+  const registerCall = (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: LeadStage) => {
     setLeads(prev => prev.map(l => {
       if (l.id !== leadId) return l;
       const timestamp = format(new Date(), "dd/MM/yyyy HH:mm");
       const entry = `[${timestamp}] ${outcome}${obs ? ` — ${obs}` : ""}`;
       const newObs = l.observacao ? `${l.observacao} | ${entry}` : entry;
-      return { ...l, observacao: newObs, dataRetornoLigacao: returnDate || "" };
+      const newCount = (l.followUpCount || 0) + 1;
+      const stageToUse = nextStage || getNextLeadStage(l.etapaLead);
+      return {
+        ...l,
+        observacao: newObs,
+        dataRetornoLigacao: returnDate || "",
+        lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
+        followUpCount: newCount,
+        dataFollowUp: calcNextFollowUpDate(newCount),
+        etapaLead: stageToUse,
+      };
     }));
   };
 

@@ -8,7 +8,7 @@ import { formatPhoneNumber } from "@/lib/phone";
 
 interface CallReturnQueueProps {
   leads: Lead[];
-  onRegisterCall: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
+  onRegisterCall: (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: import("@/types/crm").LeadStage) => void;
   onClearReturn: (leadId: string) => void;
 }
 
@@ -113,8 +113,8 @@ export function CallReturnQueue({ leads, onRegisterCall, onClearReturn }: CallRe
         lead={callLead}
         open={!!callLead}
         onClose={() => setCallLead(null)}
-        onConfirm={(leadId, outcome, obs, returnDate) => {
-          onRegisterCall(leadId, outcome, obs, returnDate);
+        onConfirm={(leadId, outcome, obs, returnDate, nextStage) => {
+          onRegisterCall(leadId, outcome, obs, returnDate, nextStage);
           // Se não agendou novo retorno, limpa o atual
           if (!returnDate) onClearReturn(leadId);
           setCallLead(null);

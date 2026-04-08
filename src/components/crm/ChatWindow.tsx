@@ -121,15 +121,20 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
     setShowLeadPanel(false);
   };
 
-  const handleConfirmCall = (leadId: string, outcome: string, obs: string, returnDate?: string) => {
+  const handleConfirmCall = (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: import("@/types/crm").LeadStage) => {
     if (!onUpdateLead) return;
     const now = new Date();
     const callTime = format(now, "dd/MM/yyyy HH:mm", { locale: ptBR });
+    const timestamp = format(now, "dd/MM/yyyy HH:mm", { locale: ptBR });
+    const entry = `[${timestamp}] ${outcome}${obs ? ` — ${obs}` : ""}`;
+    const currentObs = currentLead?.observacao || "";
+    const newObs = currentObs ? `${currentObs} | ${entry}` : entry;
     onUpdateLead(leadId, {
-      observacao: obs ? `${obs} (${outcome})` : outcome,
-      dataRetornoLigacao: returnDate || callTime,
+      observacao: newObs,
+      dataRetornoLigacao: returnDate || "",
       respostaLead: outcome === "Atendeu" ? "RESPONDEU" : "NÃO RESPONDEU",
-      etapaLead: returnDate ? "Follow-Up 1" : currentLead?.etapaLead || "Em contato",
+      etapaLead: nextStage || currentLead?.etapaLead || "Em contato",
+      lastFollowUpDone: format(now, "dd/MM/yyyy"),
     });
   };
 
