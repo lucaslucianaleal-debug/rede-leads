@@ -106,20 +106,26 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
 
   const { start: periodStart, end: periodEnd, label: periodLabel } = getPeriodRange();
 
-  const ONLINE_SOURCES = ["Online", "Instagram", "Facebook", "WhatsApp"];
+  // Same source grouping as AllLeadsView
+  const getSourceGroup = (fonte: string): string => {
+    if (["Instagram", "Facebook", "WhatsApp"].includes(fonte)) return "Online";
+    if (fonte === "Cupom Indicação") return "Indicação";
+    return fonte;
+  };
 
   // Filter leads by period AND online source only (investment is online ads)
+  // Uses dataContato for month matching — same field as AllLeadsView "Mês" filter
   const leadsInPeriod = useMemo(() => {
     return leads.filter((lead) => {
       // Skip soft-deleted leads
       if (lead._deleted) return false;
-      if (!lead.dataCriacao) return false;
-      const [day, month, year] = lead.dataCriacao.split("/");
+      // Use dataContato for month filter (same as AllLeadsView)
+      if (!lead.dataContato) return false;
+      const [day, month, year] = lead.dataContato.split("/");
       const leadDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       if (leadDate < periodStart || leadDate > periodEnd) return false;
-      // Only online leads
-      const fonte = (lead.fonteLead || "").trim();
-      return ONLINE_SOURCES.some((s) => fonte.toLowerCase().includes(s.toLowerCase()));
+      // Only online leads — same grouping as AllLeadsView
+      return getSourceGroup(lead.fonteLead || "") === "Online";
     });
   }, [leads, periodStart, periodEnd]);
 

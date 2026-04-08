@@ -44,8 +44,6 @@ export interface Lead {
   etapaLead: LeadStage;
   status: LeadStatus;
   respostaLead: LeadResposta;
-  // Resultado da última ligação telefônica registrada
-  resultadoLigacao?: string;
   comparecimento: LeadComparecimento;
   dataFollowUp: string;
   // Data em que o último follow-up foi efetuado (registro de execução)
@@ -63,6 +61,10 @@ export interface Lead {
   briefingRecepcao?: string;
   followUpCount: number;
   lembretes: ReminderStatus;
+  // Soft-delete fields
+  _deleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 export interface ReminderStatus {
