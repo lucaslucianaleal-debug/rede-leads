@@ -207,7 +207,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Registrar Ligação</DialogTitle>
           <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
@@ -256,7 +256,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
         </div>
       )}
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1">
           {/* Status do lead */}
           <div className="space-y-2">
             <Label>Status do lead</Label>
