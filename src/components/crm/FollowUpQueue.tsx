@@ -114,7 +114,9 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
         { header: 'Próx. Follow-up', key: 'dataFollowUp', width: 14 },
       ];
 
-      filteredLeads.forEach((l) => {
+      // Usar a mesma ordenação da fila visual (pendentes: mais atrasado primeiro)
+      const leadsParaExportar = tab === 'feitos' ? feitosHoje : pendentes;
+      leadsParaExportar.forEach((l) => {
         // Manter as datas como strings já formatadas em dd/MM/yyyy
         const createdRaw = l.createdAt || l.dataCriacao || l.dataCadastro || l.created || l.created_at || '';
         const lastRaw = l.lastFollowUpDone || '';
