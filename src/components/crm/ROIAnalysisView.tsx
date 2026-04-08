@@ -186,16 +186,13 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
       });
     });
 
-    // Sort by cost/lead created (primary) and appointments (secondary for presence=0)
+    // Sort by cost/lead created (primary: ascending = cheap to expensive)
+    // Tie-breaker: appointments (descending = most appointments first)
     serviceROIs.sort((a, b) => {
-      // If both have presence, sort by cost/lead created (lowest first - best)
-      if (a.presence > 0 && b.presence > 0) {
-        return a.costPerLeadCreated - b.costPerLeadCreated;
-      }
-      // If only one has presence, put it first
-      if (a.presence > 0) return -1;
-      if (b.presence > 0) return 1;
-      // Both have presence=0: sort by appointments (descending - most appointments first)
+      // Primary sort: cost/lead created (lowest first)
+      const costDiff = a.costPerLeadCreated - b.costPerLeadCreated;
+      if (costDiff !== 0) return costDiff;
+      // Tie-breaker: by appointments (most first)
       return b.appointments - a.appointments;
     });
 
