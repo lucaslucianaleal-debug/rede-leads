@@ -43,7 +43,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 const CRMDashboard = () => {
-  const { user } = useAuth();
+  const { user, currentClinic } = useAuth();
   const { permissions, isReceptionist } = useUserPermissions();
   const {
     leads,
@@ -453,7 +453,7 @@ const CRMDashboard = () => {
           </TabsContent>
 
           <TabsContent value="roi-custos" className="mt-6">
-            <ROIAnalysisView leads={leads} clinicId={user?.uid} />
+            <ROIAnalysisView leads={leads} clinicId={currentClinic ?? user?.uid} />
           </TabsContent>
 
           {/* Chat content removido */}
