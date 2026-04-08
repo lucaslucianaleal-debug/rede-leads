@@ -114,11 +114,19 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
         { header: 'Próx. Follow-up', key: 'dataFollowUp', width: 14 },
       ];
 
-      // Usar a mesma ordenação da fila visual (pendentes: mais atrasado primeiro)
-      const leadsParaExportar = tab === 'feitos' ? feitosHoje : pendentes;
+      // Ordenar por data de criação: mais antigo primeiro
+      const parseDate = (dateStr: string): number => {
+        if (!dateStr) return 0;
+        const parts = dateStr.split('/');
+        if (parts.length === 3) return new Date(+parts[2], +parts[1] - 1, +parts[0]).getTime();
+        return 0;
+      };
+      const leadsParaExportar = (tab === 'feitos' ? feitosHoje : filteredLeads)
+        .slice()
+        .sort((a, b) => parseDate(a.dataCriacao) - parseDate(b.dataCriacao));
       leadsParaExportar.forEach((l) => {
         // Manter as datas como strings já formatadas em dd/MM/yyyy
-        const createdRaw = l.createdAt || l.dataCriacao || l.dataCadastro || l.created || l.created_at || '';
+        const createdRaw = l.dataCriacao || '';
         const lastRaw = l.lastFollowUpDone || '';
         const nextRaw = l.dataFollowUp || '';
         sheet.addRow([
