@@ -6,6 +6,15 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { CheckSquare, Square, Trophy, MapPin, User, Phone, Plus, Check } from "lucide-react";
 
+function maskPhone(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 11);
+  if (d.length === 0) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 type Step = "login" | "captura";
 
 interface Sessao {
@@ -70,15 +79,17 @@ export default function SorteioCupons() {
 
     setSaving(true);
     try {
-      await addCupom(sessao.clinicaId, {
+      const cupomData: Parameters<typeof addCupom>[1] = {
         clinicaId: sessao.clinicaId,
         nome: nome.trim(),
-        telefone1: telefone1.trim(),
-        telefone2: telefone2.trim() || undefined,
+        telefone1: telefone1.replace(/\D/g, ""),
         vouchers: selectedVouchers,
         local: sessao.local,
         abordadora: sessao.abordadora,
-      });
+      };
+      const tel2 = telefone2.replace(/\D/g, "");
+      if (tel2) cupomData.telefone2 = tel2;
+      await addCupom(sessao.clinicaId, cupomData);
       setLastAdded(nome.trim());
       resetForm();
       toast.success(`✅ Cupom de ${nome.trim()} adicionado!`);
@@ -206,11 +217,11 @@ export default function SorteioCupons() {
             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               value={telefone1}
-              onChange={(e) => setTelefone1(e.target.value)}
+              onChange={(e) => setTelefone1(maskPhone(e.target.value))}
               placeholder="(17) 99999-0000"
               className="pl-9"
               type="tel"
-              inputMode="tel"
+              inputMode="numeric"
             />
           </div>
         </div>
@@ -221,11 +232,11 @@ export default function SorteioCupons() {
             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               value={telefone2}
-              onChange={(e) => setTelefone2(e.target.value)}
+              onChange={(e) => setTelefone2(maskPhone(e.target.value))}
               placeholder="(17) 99999-0000"
               className="pl-9"
               type="tel"
-              inputMode="tel"
+              inputMode="numeric"
             />
           </div>
         </div>
