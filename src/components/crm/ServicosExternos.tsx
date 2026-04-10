@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
+import { format, parse, differenceInMinutes } from "date-fns";
 import { useCupons, useSessoes, CLINICAS, Cupom } from "@/hooks/useCupons";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
 import { Lead } from "@/types/crm";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +38,7 @@ interface ServicosExternosProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
-type ServicoTab = "cupom" | "visita";
+type MainTab = "cupom" | "visita" | "sessoes";
 
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
@@ -48,12 +48,22 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const [clinicaId, setClinicaId] = useState<string>(defaultClinic);
 
   const { cupons, loading, updateStatus } = useCupons(clinicaId);
-  const { sessoes } = useSessoes(clinicaId);
 
-  const [servicoTab, setServicoTab] = useState<ServicoTab>("cupom");
+  const [mainTab, setMainTab] = useState<MainTab>("cupom");
+  const servicoTab = mainTab !== "sessoes" ? mainTab : "cupom";
+
+  // State for sessões tab
+  const todayInput = format(new Date(), "yyyy-MM-dd");
+  const [sessaoDateInput, setSessaoDateInput] = useState(todayInput);
+  const sessaoDateFormatted = (() => {
+    const [y, m, d] = sessaoDateInput.split("-");
+    return `${d}/${m}/${y}`;
+  })();
+  const { sessoes, loading: sessoesLoading } = useSessoes(clinicaId, sessaoDateFormatted);
+
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"todos" | Cupom["status"]>("todos");
-  const [filterDate, setFilterDate] = useState(""); // yyyy-MM-dd from <input type="date">
+  const [filterDate, setFilterDate] = useState(""); // yyyy-MM-dd
   const [selected, setSelected] = useState<Cupom | null>(null);
   const [converting, setConverting] = useState(false);
 
@@ -148,10 +158,22 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   const pendingCount = cupons.filter((c) => (c.tipo ?? "cupom") === servicoTab && c.status === "pendente").length;
   const totalCount = cupons.filter((c) => (c.tipo ?? "cupom") === servicoTab).length;
+  const activeSessoes = sessoes.filter((s) => s.horaFim == null).length;
 
   const serviceUrl = servicoTab === "cupom"
     ? `${window.location.origin}/sorteio-cupons`
     : `${window.location.origin}/visita-comercial`;
+
+  // Duration helper
+  const calcDuracao = (s: { horaInicio: string; horaFim: string | null; data: string }) => {
+    try {
+      const inicio = parse(s.horaInicio, "dd/MM/yyyy HH:mm", new Date());
+      const fim = s.horaFim ? parse(s.horaFim, "dd/MM/yyyy HH:mm", new Date()) : new Date();
+      const mins = differenceInMinutes(fim, inicio);
+      if (mins < 60) return `${mins}min`;
+      return `${Math.floor(mins / 60)}h${mins % 60 > 0 ? String(mins % 60).padStart(2, "0") : ""}`;
+    } catch { return "-"; }
+  };
 
   return (
     <div className="flex flex-col h-full min-h-0 space-y-4">
@@ -162,12 +184,21 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           <h2 className="text-lg font-bold">Serviços Externos</h2>
         </div>
         <div className="flex gap-2 sm:ml-auto flex-wrap">
-          <Badge variant="outline" className="bg-yellow-50 border-yellow-300 text-yellow-800">
-            {pendingCount} pendente{pendingCount !== 1 ? "s" : ""}
-          </Badge>
-          <Badge variant="outline" className={servicoTab === "cupom" ? "bg-blue-50 border-blue-200 text-blue-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}>
-            {totalCount} {servicoTab === "cupom" ? `cupom${totalCount !== 1 ? "s" : ""}` : `visita${totalCount !== 1 ? "s" : ""}`}
-          </Badge>
+          {mainTab !== "sessoes" && (
+            <>
+              <Badge variant="outline" className="bg-yellow-50 border-yellow-300 text-yellow-800">
+                {pendingCount} pendente{pendingCount !== 1 ? "s" : ""}
+              </Badge>
+              <Badge variant="outline" className={servicoTab === "cupom" ? "bg-blue-50 border-blue-200 text-blue-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}>
+                {totalCount} {servicoTab === "cupom" ? `cupom${totalCount !== 1 ? "s" : ""}` : `visita${totalCount !== 1 ? "s" : ""}`}
+              </Badge>
+            </>
+          )}
+          {mainTab === "sessoes" && activeSessoes > 0 && (
+            <Badge variant="outline" className="bg-green-50 border-green-300 text-green-800">
+              {activeSessoes} ativa{activeSessoes !== 1 ? "s" : ""} agora
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -191,9 +222,9 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       {/* Service tabs + public link */}
       <div className="flex items-stretch border-b">
         <button
-          onClick={() => { setServicoTab("cupom"); setSelected(null); setFilterDate(""); }}
+          onClick={() => { setMainTab("cupom"); setSelected(null); setFilterDate(""); }}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            servicoTab === "cupom"
+            mainTab === "cupom"
               ? "border-blue-600 text-blue-700"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
@@ -202,9 +233,9 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           Cupom Sorteio
         </button>
         <button
-          onClick={() => { setServicoTab("visita"); setSelected(null); setFilterDate(""); }}
+          onClick={() => { setMainTab("visita"); setSelected(null); setFilterDate(""); }}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            servicoTab === "visita"
+            mainTab === "visita"
               ? "border-emerald-600 text-emerald-700"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
@@ -212,57 +243,131 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           <Briefcase className="h-4 w-4" />
           Visita Comercial
         </button>
-        <div className={`ml-auto flex items-center gap-2 mb-1 px-3 py-1.5 rounded-lg text-xs border self-center ${
-          servicoTab === "cupom"
-            ? "bg-blue-50 border-blue-200 text-blue-700"
-            : "bg-emerald-50 border-emerald-200 text-emerald-700"
-        }`}>
-          <span className="font-medium">Link público</span>
-          <button
-            onClick={() => { navigator.clipboard.writeText(serviceUrl); toast.success("Link copiado!"); }}
-            className={`border rounded px-2 py-0.5 hover:opacity-80 ${
-              servicoTab === "cupom" ? "border-blue-300" : "border-emerald-300"
-            }`}
-          >
-            Copiar link
-          </button>
-        </div>
+        <button
+          onClick={() => { setMainTab("sessoes"); setSelected(null); }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            mainTab === "sessoes"
+              ? "border-violet-600 text-violet-700"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          Sessões
+          {activeSessoes > 0 && (
+            <span className="h-2 w-2 rounded-full bg-green-500" />
+          )}
+        </button>
+        {mainTab !== "sessoes" && (
+          <div className={`ml-auto flex items-center gap-2 mb-1 px-3 py-1.5 rounded-lg text-xs border self-center ${
+            servicoTab === "cupom"
+              ? "bg-blue-50 border-blue-200 text-blue-700"
+              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+          }`}>
+            <span className="font-medium">Link público</span>
+            <button
+              onClick={() => { navigator.clipboard.writeText(serviceUrl); toast.success("Link copiado!"); }}
+              className={`border rounded px-2 py-0.5 hover:opacity-80 ${
+                servicoTab === "cupom" ? "border-blue-300" : "border-emerald-300"
+              }`}
+            >
+              Copiar link
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Sessões ativas hoje */}
-      {(() => {
-        const sessoesTab = sessoes.filter((s) => s.tipo === servicoTab);
-        if (sessoesTab.length === 0) return null;
-        return (
-          <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
-            <div className="flex items-center gap-1.5 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              <Users className="h-3.5 w-3.5" />
-              Sessões de hoje
+      {/* ===== ABA SESSÕES ===== */}
+      {mainTab === "sessoes" && (
+        <div className="flex flex-col gap-4 flex-1 min-h-0">
+          {/* Date picker */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex items-center">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="date"
+                value={sessaoDateInput}
+                onChange={(e) => setSessaoDateInput(e.target.value)}
+                className="pl-8 pr-3 h-9 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+              />
             </div>
-            <div className="flex flex-wrap gap-2">
-              {sessoesTab.map((s) => (
-                <div
-                  key={s.id}
-                  className={`flex items-center gap-2 text-xs rounded-full border px-3 py-1 ${
-                    s.horaFim == null
-                      ? "bg-green-50 border-green-300 text-green-800"
-                      : "bg-gray-50 border-gray-300 text-gray-500"
-                  }`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${s.horaFim == null ? "bg-green-500" : "bg-gray-400"}`} />
-                  <span className="font-medium">{s.abordadora}</span>
-                  {s.local && <span className="text-muted-foreground hidden sm:inline">· {s.local}</span>}
-                  <span className="flex items-center gap-0.5">
-                    <Clock className="h-3 w-3" />
-                    {s.horaInicio}{s.horaFim ? ` – ${s.horaFim}` : " · ativa"}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <span className="text-sm text-muted-foreground">
+              {sessoes.length} sessão{sessoes.length !== 1 ? "ões" : ""} · {activeSessoes} ativa{activeSessoes !== 1 ? "s" : ""}
+            </span>
           </div>
-        );
-      })()}
 
+          {/* Tabela de sessões */}
+          <div className="flex-1 overflow-auto rounded-lg border bg-card">
+            {sessoesLoading ? (
+              <div className="flex items-center justify-center py-20 text-muted-foreground text-sm animate-pulse">Carregando...</div>
+            ) : sessoes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
+                <Users className="h-8 w-8 opacity-30" />
+                <span className="text-sm">Nenhuma sessão nesta data</span>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground w-6"></th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Abordadora</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden sm:table-cell">Serviço</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Local</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Início</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Fim</th>
+                    <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden sm:table-cell">Duração</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessoes.map((s) => {
+                    const ativa = s.horaFim == null;
+                    return (
+                      <tr key={s.id} className={`border-b last:border-0 ${ativa ? "bg-green-50/60" : ""}`}>
+                        <td className="px-3 py-2.5">
+                          <span
+                            title={ativa ? "Ativa" : "Encerrada"}
+                            className={`inline-block h-2.5 w-2.5 rounded-full ${ativa ? "bg-green-500" : "bg-gray-300"}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2.5 font-medium">{s.abordadora}</td>
+                        <td className="px-3 py-2.5 hidden sm:table-cell">
+                          <span className={`text-xs border rounded-full px-2 py-0.5 font-medium ${
+                            s.tipo === "cupom"
+                              ? "bg-blue-50 border-blue-200 text-blue-700"
+                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                          }`}>
+                            {s.tipo === "cupom" ? "Cupom" : "Visita"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 hidden md:table-cell text-muted-foreground">{s.local || "—"}</td>
+                        <td className="px-3 py-2.5">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            {s.horaInicio?.slice(11)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {ativa ? (
+                            <span className="text-xs text-green-700 font-medium">Ativa agora</span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {s.horaFim?.slice(11)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 hidden sm:table-cell text-muted-foreground">{calcDuracao(s)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== ABAS CUPOM / VISITA ===== */}
+      {mainTab !== "sessoes" && <>
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">
         <div className="relative flex-1 min-w-[180px]">
@@ -532,6 +637,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           </div>
         )}
       </div>
+      </>}
     </div>
   );
 }

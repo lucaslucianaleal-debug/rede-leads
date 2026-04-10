@@ -60,20 +60,20 @@ export interface Sessao {
   timestamp: number;
 }
 
-export function useSessoes(clinicaId: string | null) {
+export function useSessoes(clinicaId: string | null, filterDate?: string) {
   const [sessoes, setSessoes] = useState<Sessao[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!clinicaId) { setSessoes([]); setLoading(false); return; }
-    const hoje = format(new Date(), "dd/MM/yyyy");
-    const q = query(getSessoesRef(clinicaId), where("data", "==", hoje), orderBy("timestamp", "desc"));
+    const dateToUse = filterDate ?? format(new Date(), "dd/MM/yyyy");
+    const q = query(getSessoesRef(clinicaId), where("data", "==", dateToUse), orderBy("timestamp", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setSessoes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Sessao)));
       setLoading(false);
     });
     return () => unsub();
-  }, [clinicaId]);
+  }, [clinicaId, filterDate]);
 
   return { sessoes, loading };
 }
