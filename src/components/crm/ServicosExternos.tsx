@@ -44,8 +44,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
   const { createLead } = useLeads();
 
-  const defaultClinic = currentClinic ?? CLINICAS[0].id;
-  const [clinicaId, setClinicaId] = useState<string>(defaultClinic);
+  const clinicaId = currentClinic ?? CLINICAS[0].id;
+  const clinicaLabel = CLINICAS.find((c) => c.id === clinicaId)?.label ?? "";
 
   const { cupons, loading, updateStatus } = useCupons(clinicaId);
 
@@ -181,7 +181,10 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex items-center gap-2">
           <Trophy className="h-5 w-5 text-amber-500" />
-          <h2 className="text-lg font-bold">Serviços Externos</h2>
+          <div>
+            <h2 className="text-lg font-bold">Serviços Externos</h2>
+            <p className="text-xs text-muted-foreground">{clinicaLabel.replace("Odontocompany ", "")}</p>
+          </div>
         </div>
         <div className="flex gap-2 sm:ml-auto flex-wrap">
           {mainTab !== "sessoes" && (
@@ -200,23 +203,6 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
             </Badge>
           )}
         </div>
-      </div>
-
-      {/* Clinic tabs */}
-      <div className="flex gap-1 bg-muted rounded-lg p-1 w-fit flex-wrap">
-        {CLINICAS.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => { setClinicaId(c.id); setSelected(null); }}
-            className={`text-xs px-3 py-1.5 rounded-md font-medium transition-colors ${
-              clinicaId === c.id
-                ? "bg-white text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {c.label.replace("Odontocompany ", "")}
-          </button>
-        ))}
       </div>
 
       {/* Service tabs + public link */}
@@ -254,7 +240,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           <Users className="h-4 w-4" />
           Sessões
           {activeSessoes > 0 && (
-            <span className="h-2 w-2 rounded-full bg-green-500" />
+            <span className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
           )}
         </button>
         {mainTab !== "sessoes" && (
