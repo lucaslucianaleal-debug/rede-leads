@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { CLINICAS, VOUCHERS, useCupons } from "@/hooks/useCupons";
+import { useState, useEffect, useMemo } from "react";
+import { CLINICAS, VOUCHERS, useCupons, startSessao, endSessao } from "@/hooks/useCupons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { CheckSquare, Square, Trophy, MapPin, User, Phone, Plus, Check } from "lucide-react";
+import { CheckSquare, Square, Trophy, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock } from "lucide-react";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -15,18 +15,28 @@ function maskPhone(value: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-type Step = "login" | "captura";
+const SESSION_KEY = "sorteio_sessao";
 
-interface Sessao {
+interface SessaoLocal {
   clinicaId: string;
   clinicaLabel: string;
   abordadora: string;
   local: string;
+  sessaoId: string;
+  horaInicio: string;
 }
 
+type PageTab = "novo" | "meus";
+
 export default function SorteioCupons() {
-  const [step, setStep] = useState<Step>("login");
-  const [sessao, setSessao] = useState<Sessao | null>(null);
+  // Restore session from sessionStorage on mount
+  const [sessao, setSessao] = useState<SessaoLocal | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+  const step = sessao ? "captura" : "login";
 
   // Login fields
   const [clinicaId, setClinicaId] = useState(CLINICAS[0].id);
@@ -40,35 +50,65 @@ export default function SorteioCupons() {
   const [selectedVouchers, setSelectedVouchers] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [lastAdded, setLastAdded] = useState<string | null>(null);
+  const [pageTab, setPageTab] = useState<PageTab>("novo");
+  const [dupWarning, setDupWarning] = useState<string | null>(null);
 
-  // Contador em tempo real
   const { cupons, addCupom } = useCupons(sessao?.clinicaId ?? null);
-  const hoje = new Date().toLocaleDateString("pt-BR");
-  const cuponHoje = cupons.filter((c) => c.dataCupom?.startsWith(hoje.split("/").reverse().join("/").slice(0,10)) || c.dataCupom?.startsWith(hoje));
 
-  const handleComençar = () => {
+  // Meus cupons: filtrado pela abordadora desta sessão
+  const meusCupons = useMemo(() =>
+    cupons.filter((c) => c.abordadora === sessao?.abordadora && (c.tipo ?? "cupom") === "cupom"),
+    [cupons, sessao]
+  );
+
+  // Verificação de duplicidade ao digitar telefone
+  useEffect(() => {
+    const digits = telefone1.replace(/\D/g, "");
+    if (digits.length >= 10) {
+      const found = cupons.find((c) => c.telefone1.replace(/\D/g, "") === digits || (c.telefone2 || "").replace(/\D/g, "") === digits);
+      setDupWarning(found ? `Já cadastrado: ${found.nome} (${found.dataCupom})` : null);
+    } else {
+      setDupWarning(null);
+    }
+  }, [telefone1, cupons]);
+
+  const handleComençar = async () => {
     if (!abordadora.trim()) { toast.error("Informe seu nome"); return; }
     if (!local.trim()) { toast.error("Informe o local"); return; }
-    setSessao({
-      clinicaId,
-      clinicaLabel: CLINICAS.find((c) => c.id === clinicaId)?.label ?? clinicaId,
-      abordadora: abordadora.trim(),
-      local: local.trim(),
-    });
-    setStep("captura");
+    try {
+      const sessaoId = await startSessao(clinicaId, abordadora.trim(), local.trim(), "cupom");
+      const horaInicio = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const nova: SessaoLocal = {
+        clinicaId,
+        clinicaLabel: CLINICAS.find((c) => c.id === clinicaId)?.label ?? clinicaId,
+        abordadora: abordadora.trim(),
+        local: local.trim(),
+        sessaoId,
+        horaInicio,
+      };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(nova));
+      setSessao(nova);
+    } catch {
+      toast.error("Erro ao iniciar sessão. Tente novamente.");
+    }
   };
 
-  const toggleVoucher = (v: string) => {
-    setSelectedVouchers((prev) =>
-      prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]
-    );
+  const handleEncerrar = async () => {
+    if (!sessao) return;
+    if (!window.confirm("Encerrar sua sessão? Você precisará fazer login novamente.")) return;
+    try {
+      await endSessao(sessao.clinicaId, sessao.sessaoId);
+    } catch {}
+    sessionStorage.removeItem(SESSION_KEY);
+    setSessao(null);
+    setNome(""); setTelefone1(""); setTelefone2(""); setSelectedVouchers([]); setLastAdded(null);
   };
+
+  const toggleVoucher = (v: string) =>
+    setSelectedVouchers((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]);
 
   const resetForm = () => {
-    setNome("");
-    setTelefone1("");
-    setTelefone2("");
-    setSelectedVouchers([]);
+    setNome(""); setTelefone1(""); setTelefone2(""); setSelectedVouchers([]); setDupWarning(null);
   };
 
   const handleAdicionarCupom = async () => {
@@ -76,10 +116,10 @@ export default function SorteioCupons() {
     if (!telefone1.trim()) { toast.error("Informe o telefone"); return; }
     if (selectedVouchers.length === 0) { toast.error("Selecione pelo menos um voucher"); return; }
     if (!sessao) return;
-
     setSaving(true);
     try {
       const cupomData: Parameters<typeof addCupom>[1] = {
+        tipo: "cupom",
         clinicaId: sessao.clinicaId,
         nome: nome.trim(),
         telefone1: telefone1.replace(/\D/g, ""),
@@ -93,7 +133,7 @@ export default function SorteioCupons() {
       setLastAdded(nome.trim());
       resetForm();
       toast.success(`✅ Cupom de ${nome.trim()} adicionado!`);
-    } catch (e) {
+    } catch {
       toast.error("Erro ao salvar. Tente novamente.");
     } finally {
       setSaving(false);
@@ -104,7 +144,6 @@ export default function SorteioCupons() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-4">
         <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-5">
-          {/* Header */}
           <div className="text-center space-y-1">
             <div className="flex justify-center mb-2">
               <div className="bg-blue-100 p-3 rounded-full">
@@ -115,7 +154,6 @@ export default function SorteioCupons() {
             <p className="text-sm text-gray-500">Odontocompany</p>
           </div>
 
-          {/* Clínica */}
           <div className="space-y-1.5">
             <Label>Clínica</Label>
             <select
@@ -129,31 +167,19 @@ export default function SorteioCupons() {
             </select>
           </div>
 
-          {/* Abordadora */}
           <div className="space-y-1.5">
             <Label>Seu nome</Label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                value={abordadora}
-                onChange={(e) => setAbordadora(e.target.value)}
-                placeholder="Nome da abordadora"
-                className="pl-9"
-              />
+              <Input value={abordadora} onChange={(e) => setAbordadora(e.target.value)} placeholder="Nome da abordadora" className="pl-9" />
             </div>
           </div>
 
-          {/* Local */}
           <div className="space-y-1.5">
             <Label>Local de abordagem</Label>
             <div className="relative">
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                value={local}
-                onChange={(e) => setLocal(e.target.value)}
-                placeholder="Ex: Praça Central, Shopping..."
-                className="pl-9"
-              />
+              <Input value={local} onChange={(e) => setLocal(e.target.value)} placeholder="Ex: Praça Central, Shopping..." className="pl-9" />
             </div>
           </div>
 
@@ -174,117 +200,133 @@ export default function SorteioCupons() {
           <div className="text-white/70 text-xs flex items-center gap-1">
             <MapPin className="h-3 w-3" />{sessao?.local} · {sessao?.clinicaLabel.replace("Odontocompany ", "")}
           </div>
+          <div className="text-white/50 text-xs flex items-center gap-1 mt-0.5">
+            <Clock className="h-3 w-3" /> Início: {sessao?.horaInicio}
+          </div>
         </div>
         <div className="text-right">
-          <div className="text-3xl font-bold text-white">{cupons.length}</div>
-          <div className="text-white/70 text-xs">cupons hoje</div>
+          <div className="text-3xl font-bold text-white">{meusCupons.length}</div>
+          <div className="text-white/70 text-xs">meus cupons</div>
         </div>
       </div>
 
-      {/* Feedback último adicionado */}
-      {lastAdded && (
-        <div className="w-full max-w-sm mb-3 flex items-center gap-2 bg-green-500/20 border border-green-400/30 rounded-lg px-3 py-2">
-          <Check className="h-4 w-4 text-green-300 shrink-0" />
-          <span className="text-green-200 text-sm">Cupom de <strong>{lastAdded}</strong> salvo!</span>
+      {/* Abas */}
+      <div className="w-full max-w-sm flex rounded-xl overflow-hidden mb-4 bg-white/10">
+        <button
+          onClick={() => setPageTab("novo")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${pageTab === "novo" ? "bg-white text-blue-800" : "text-white/70 hover:text-white"}`}
+        >
+          <Plus className="h-4 w-4" /> Novo
+        </button>
+        <button
+          onClick={() => setPageTab("meus")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${pageTab === "meus" ? "bg-white text-blue-800" : "text-white/70 hover:text-white"}`}
+        >
+          <List className="h-4 w-4" /> Meus cupons {meusCupons.length > 0 && `(${meusCupons.length})`}
+        </button>
+      </div>
+
+      {pageTab === "meus" ? (
+        <div className="w-full max-w-sm space-y-2">
+          {meusCupons.length === 0 ? (
+            <div className="text-center text-white/60 py-10 text-sm">Nenhum cupom adicionado ainda.</div>
+          ) : (
+            meusCupons.map((c) => (
+              <div key={c.id} className="bg-white rounded-xl px-4 py-3 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-gray-800 text-sm truncate">{c.nome}</div>
+                  <div className="text-gray-500 text-xs">{c.telefone1}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-xs text-gray-400">{c.dataCupom?.slice(11)}</div>
+                  <div className={`text-xs mt-0.5 font-medium ${c.status === "convertido" ? "text-green-600" : c.status === "ligado" ? "text-blue-600" : "text-yellow-600"}`}>
+                    {c.status}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
+      ) : (
+        <>
+          {lastAdded && (
+            <div className="w-full max-w-sm mb-3 flex items-center gap-2 bg-green-500/20 border border-green-400/30 rounded-lg px-3 py-2">
+              <Check className="h-4 w-4 text-green-300 shrink-0" />
+              <span className="text-green-200 text-sm">Cupom de <strong>{lastAdded}</strong> salvo!</span>
+            </div>
+          )}
+
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5 space-y-4">
+            <h2 className="font-bold text-gray-800 text-base flex items-center gap-2">
+              <Plus className="h-4 w-4 text-blue-600" /> Novo Cupom
+            </h2>
+
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" className="pl-9" autoComplete="off" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Telefone 01</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  value={telefone1}
+                  onChange={(e) => setTelefone1(maskPhone(e.target.value))}
+                  placeholder="(17) 99999-0000"
+                  className={`pl-9 ${dupWarning ? "border-yellow-400 focus-visible:ring-yellow-400" : ""}`}
+                  type="tel"
+                  inputMode="numeric"
+                />
+              </div>
+              {dupWarning && (
+                <div className="flex items-start gap-1.5 text-xs text-yellow-700 bg-yellow-50 border border-yellow-300 rounded px-2.5 py-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>{dupWarning}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Telefone 02 <span className="text-gray-400 font-normal">(opcional)</span></Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input value={telefone2} onChange={(e) => setTelefone2(maskPhone(e.target.value))} placeholder="(17) 99999-0000" className="pl-9" type="tel" inputMode="numeric" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Voucher(s) escolhido(s)</Label>
+              <div className="space-y-2">
+                {VOUCHERS.map((v) => {
+                  const checked = selectedVouchers.includes(v);
+                  return (
+                    <button key={v} type="button" onClick={() => toggleVoucher(v)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left text-sm transition-colors ${checked ? "bg-blue-50 border-blue-400 text-blue-800" : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"}`}
+                    >
+                      {checked ? <CheckSquare className="h-4 w-4 text-blue-600 shrink-0" /> : <Square className="h-4 w-4 text-gray-400 shrink-0" />}
+                      {v}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Button className="w-full py-5 text-base" onClick={handleAdicionarCupom} disabled={saving}>
+              {saving ? "Salvando..." : "+ Adicionar Cupom"}
+            </Button>
+          </div>
+        </>
       )}
 
-      {/* Formulário */}
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5 space-y-4">
-        <h2 className="font-bold text-gray-800 text-base flex items-center gap-2">
-          <Plus className="h-4 w-4 text-blue-600" /> Novo Cupom
-        </h2>
-
-        {/* Nome */}
-        <div className="space-y-1.5">
-          <Label>Nome</Label>
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Nome completo"
-              className="pl-9"
-              autoComplete="off"
-            />
-          </div>
-        </div>
-
-        {/* Telefones */}
-        <div className="space-y-1.5">
-          <Label>Telefone 01</Label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              value={telefone1}
-              onChange={(e) => setTelefone1(maskPhone(e.target.value))}
-              placeholder="(17) 99999-0000"
-              className="pl-9"
-              type="tel"
-              inputMode="numeric"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Telefone 02 <span className="text-gray-400 font-normal">(opcional)</span></Label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              value={telefone2}
-              onChange={(e) => setTelefone2(maskPhone(e.target.value))}
-              placeholder="(17) 99999-0000"
-              className="pl-9"
-              type="tel"
-              inputMode="numeric"
-            />
-          </div>
-        </div>
-
-        {/* Vouchers */}
-        <div className="space-y-2">
-          <Label>Voucher(s) escolhido(s)</Label>
-          <div className="space-y-2">
-            {VOUCHERS.map((v) => {
-              const checked = selectedVouchers.includes(v);
-              return (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => toggleVoucher(v)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left text-sm transition-colors ${
-                    checked
-                      ? "bg-blue-50 border-blue-400 text-blue-800"
-                      : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {checked
-                    ? <CheckSquare className="h-4 w-4 text-blue-600 shrink-0" />
-                    : <Square className="h-4 w-4 text-gray-400 shrink-0" />
-                  }
-                  {v}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <Button
-          className="w-full py-5 text-base"
-          onClick={handleAdicionarCupom}
-          disabled={saving}
-        >
-          {saving ? "Salvando..." : "+ Adicionar Cupom"}
-        </Button>
-      </div>
-
       {/* Encerrar sessão */}
-      <button
-        onClick={() => { setStep("login"); setSessao(null); resetForm(); setLastAdded(null); }}
-        className="mt-6 text-white/50 text-xs underline"
-      >
-        Encerrar sessão
+      <button onClick={handleEncerrar} className="mt-6 flex items-center gap-1.5 text-white/50 text-xs hover:text-white/80 transition-colors">
+        <LogOut className="h-3.5 w-3.5" /> Encerrar sessão
       </button>
     </div>
   );
 }
+

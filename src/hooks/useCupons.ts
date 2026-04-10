@@ -6,7 +6,7 @@ import {
   onSnapshot,
   query,
   orderBy,
-  Timestamp,
+  where,
   doc,
   updateDoc,
 } from "firebase/firestore";
@@ -44,6 +44,65 @@ export interface Cupom {
 
 const getRef = (clinicaId: string) =>
   collection(db, "clinics", clinicaId, "cupons");
+
+const getSessoesRef = (clinicaId: string) =>
+  collection(db, "clinics", clinicaId, "sessoes");
+
+export interface Sessao {
+  id: string;
+  tipo: "cupom" | "visita";
+  clinicaId: string;
+  abordadora: string;
+  local: string;
+  horaInicio: string;  // "dd/MM/yyyy HH:mm"
+  horaFim: string | null;
+  data: string;        // "dd/MM/yyyy" para filtrar por dia
+  timestamp: number;
+}
+
+export function useSessoes(clinicaId: string | null) {
+  const [sessoes, setSessoes] = useState<Sessao[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!clinicaId) { setSessoes([]); setLoading(false); return; }
+    const hoje = format(new Date(), "dd/MM/yyyy");
+    const q = query(getSessoesRef(clinicaId), where("data", "==", hoje), orderBy("timestamp", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setSessoes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Sessao)));
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [clinicaId]);
+
+  return { sessoes, loading };
+}
+
+export async function startSessao(
+  clinicaId: string,
+  abordadora: string,
+  local: string,
+  tipo: "cupom" | "visita"
+): Promise<string> {
+  const now = new Date();
+  const ref = await addDoc(getSessoesRef(clinicaId), {
+    tipo,
+    clinicaId,
+    abordadora,
+    local,
+    horaInicio: format(now, "dd/MM/yyyy HH:mm"),
+    horaFim: null,
+    data: format(now, "dd/MM/yyyy"),
+    timestamp: now.getTime(),
+  });
+  return ref.id;
+}
+
+export async function endSessao(clinicaId: string, sessaoId: string): Promise<void> {
+  await updateDoc(doc(db, "clinics", clinicaId, "sessoes", sessaoId), {
+    horaFim: format(new Date(), "dd/MM/yyyy HH:mm"),
+  });
+}
 
 export function useCupons(clinicaId: string | null) {
   const [cupons, setCupons] = useState<Cupom[]>([]);

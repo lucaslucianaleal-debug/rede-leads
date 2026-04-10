@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useCupons, CLINICAS, Cupom } from "@/hooks/useCupons";
+import { useCupons, useSessoes, CLINICAS, Cupom } from "@/hooks/useCupons";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
 import { Lead } from "@/types/crm";
@@ -23,6 +23,8 @@ import {
   Briefcase,
   FileText,
   Building2,
+  Clock,
+  Users,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/phone";
 
@@ -46,6 +48,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const [clinicaId, setClinicaId] = useState<string>(defaultClinic);
 
   const { cupons, loading, updateStatus } = useCupons(clinicaId);
+  const { sessoes } = useSessoes(clinicaId);
 
   const [servicoTab, setServicoTab] = useState<ServicoTab>("cupom");
   const [search, setSearch] = useState("");
@@ -225,6 +228,40 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           </button>
         </div>
       </div>
+
+      {/* Sessões ativas hoje */}
+      {(() => {
+        const sessoesTab = sessoes.filter((s) => s.tipo === servicoTab);
+        if (sessoesTab.length === 0) return null;
+        return (
+          <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+            <div className="flex items-center gap-1.5 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <Users className="h-3.5 w-3.5" />
+              Sessões de hoje
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {sessoesTab.map((s) => (
+                <div
+                  key={s.id}
+                  className={`flex items-center gap-2 text-xs rounded-full border px-3 py-1 ${
+                    s.horaFim == null
+                      ? "bg-green-50 border-green-300 text-green-800"
+                      : "bg-gray-50 border-gray-300 text-gray-500"
+                  }`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${s.horaFim == null ? "bg-green-500" : "bg-gray-400"}`} />
+                  <span className="font-medium">{s.abordadora}</span>
+                  {s.local && <span className="text-muted-foreground hidden sm:inline">· {s.local}</span>}
+                  <span className="flex items-center gap-0.5">
+                    <Clock className="h-3 w-3" />
+                    {s.horaInicio}{s.horaFim ? ` – ${s.horaFim}` : " · ativa"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">
