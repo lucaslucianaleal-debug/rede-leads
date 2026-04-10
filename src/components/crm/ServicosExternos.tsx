@@ -20,7 +20,6 @@ import {
   Trophy,
   AlertTriangle,
   ChevronRight,
-  ExternalLink,
   Briefcase,
   FileText,
   Building2,
@@ -37,21 +36,21 @@ interface ServicosExternosProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
-type TipoFilter = "todos" | "cupom" | "visita";
+type ServicoTab = "cupom" | "visita";
 
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
   const { createLead } = useLeads();
 
-  // Selected clinic tab (default to user's clinic, else first)
   const defaultClinic = currentClinic ?? CLINICAS[0].id;
   const [clinicaId, setClinicaId] = useState<string>(defaultClinic);
 
   const { cupons, loading, updateStatus } = useCupons(clinicaId);
 
+  const [servicoTab, setServicoTab] = useState<ServicoTab>("cupom");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"todos" | Cupom["status"]>("todos");
-  const [filterTipo, setFilterTipo] = useState<TipoFilter>("todos");
+  const [filterDate, setFilterDate] = useState(""); // yyyy-MM-dd from <input type="date">
   const [selected, setSelected] = useState<Cupom | null>(null);
   const [converting, setConverting] = useState(false);
 
@@ -69,9 +68,15 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     phoneCounts[c.telefone1.replace(/\D/g, "")] > 1;
 
   const filtered = useMemo(() => {
-    let list = cupons;
-    if (filterTipo !== "todos") list = list.filter((c) => (c.tipo ?? "cupom") === filterTipo);
+    // Always filter by the active service tab
+    let list = cupons.filter((c) => (c.tipo ?? "cupom") === servicoTab);
     if (filterStatus !== "todos") list = list.filter((c) => c.status === filterStatus);
+    if (filterDate) {
+      // dataCupom is "dd/MM/yyyy HH:mm"; filterDate is "yyyy-MM-dd"
+      const [year, month, day] = filterDate.split("-");
+      const dateStr = `${day}/${month}/${year}`;
+      list = list.filter((c) => c.dataCupom?.startsWith(dateStr));
+    }
     if (search.trim()) {
       const s = search.toLowerCase();
       list = list.filter(
@@ -83,7 +88,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       );
     }
     return list;
-  }, [cupons, search, filterStatus, filterTipo]);
+  }, [cupons, servicoTab, search, filterStatus, filterDate]);
 
   const handleWhatsApp = (cupom: Cupom) => {
     const raw = cupom.telefone1.replace(/\D/g, "");
@@ -138,12 +143,12 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     }
   };
 
-  const pendingCount = cupons.filter((c) => c.status === "pendente").length;
-  const cupomCount = cupons.filter((c) => (c.tipo ?? "cupom") === "cupom").length;
-  const visitaCount = cupons.filter((c) => c.tipo === "visita").length;
+  const pendingCount = cupons.filter((c) => (c.tipo ?? "cupom") === servicoTab && c.status === "pendente").length;
+  const totalCount = cupons.filter((c) => (c.tipo ?? "cupom") === servicoTab).length;
 
-  const cupomUrl = `${window.location.origin}/sorteio-cupons`;
-  const visitaUrl = `${window.location.origin}/visita-comercial`;
+  const serviceUrl = servicoTab === "cupom"
+    ? `${window.location.origin}/sorteio-cupons`
+    : `${window.location.origin}/visita-comercial`;
 
   return (
     <div className="flex flex-col h-full min-h-0 space-y-4">
@@ -157,11 +162,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           <Badge variant="outline" className="bg-yellow-50 border-yellow-300 text-yellow-800">
             {pendingCount} pendente{pendingCount !== 1 ? "s" : ""}
           </Badge>
-          <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-800">
-            {cupomCount} cupom{cupomCount !== 1 ? "s" : ""}
-          </Badge>
-          <Badge variant="outline" className="bg-emerald-50 border-emerald-200 text-emerald-800">
-            {visitaCount} visita{visitaCount !== 1 ? "s" : ""}
+          <Badge variant="outline" className={servicoTab === "cupom" ? "bg-blue-50 border-blue-200 text-blue-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}>
+            {totalCount} {servicoTab === "cupom" ? `cupom${totalCount !== 1 ? "s" : ""}` : `visita${totalCount !== 1 ? "s" : ""}`}
           </Badge>
         </div>
       </div>
@@ -183,24 +185,41 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         ))}
       </div>
 
-      {/* Links públicos */}
-      <div className="grid sm:grid-cols-2 gap-2">
-        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
-          <Trophy className="h-4 w-4 text-blue-600 shrink-0" />
-          <span className="text-blue-700 font-medium text-xs">Cupom Sorteio</span>
+      {/* Service tabs + public link */}
+      <div className="flex items-stretch border-b">
+        <button
+          onClick={() => { setServicoTab("cupom"); setSelected(null); setFilterDate(""); }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            servicoTab === "cupom"
+              ? "border-blue-600 text-blue-700"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Trophy className="h-4 w-4" />
+          Cupom Sorteio
+        </button>
+        <button
+          onClick={() => { setServicoTab("visita"); setSelected(null); setFilterDate(""); }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            servicoTab === "visita"
+              ? "border-emerald-600 text-emerald-700"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Briefcase className="h-4 w-4" />
+          Visita Comercial
+        </button>
+        <div className={`ml-auto flex items-center gap-2 mb-1 px-3 py-1.5 rounded-lg text-xs border self-center ${
+          servicoTab === "cupom"
+            ? "bg-blue-50 border-blue-200 text-blue-700"
+            : "bg-emerald-50 border-emerald-200 text-emerald-700"
+        }`}>
+          <span className="font-medium">Link público</span>
           <button
-            onClick={() => { navigator.clipboard.writeText(cupomUrl); toast.success("Link copiado!"); }}
-            className="ml-auto text-blue-600 text-xs border border-blue-300 rounded px-2 py-0.5 hover:bg-blue-100 shrink-0"
-          >
-            Copiar link
-          </button>
-        </div>
-        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm">
-          <Briefcase className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span className="text-emerald-700 font-medium text-xs">Visita Comercial</span>
-          <button
-            onClick={() => { navigator.clipboard.writeText(visitaUrl); toast.success("Link copiado!"); }}
-            className="ml-auto text-emerald-600 text-xs border border-emerald-300 rounded px-2 py-0.5 hover:bg-emerald-100 shrink-0"
+            onClick={() => { navigator.clipboard.writeText(serviceUrl); toast.success("Link copiado!"); }}
+            className={`border rounded px-2 py-0.5 hover:opacity-80 ${
+              servicoTab === "cupom" ? "border-blue-300" : "border-emerald-300"
+            }`}
           >
             Copiar link
           </button>
@@ -208,8 +227,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex gap-2 flex-wrap items-center">
+        <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
@@ -218,36 +237,25 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
             className="pl-9 h-9"
           />
         </div>
-        {(["todos", "cupom", "visita"] as TipoFilter[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setFilterTipo(t)}
-            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
-              filterTipo === t
-                ? t === "visita" ? "bg-emerald-600 text-white border-emerald-600"
-                  : t === "cupom" ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-primary text-primary-foreground border-primary"
-                : "bg-background border-border text-muted-foreground hover:border-foreground"
-            }`}
-          >
-            {t === "todos" ? "Todos" : t === "cupom" ? "Cupom Sorteio" : "Visita Comercial"}
-          </button>
-        ))}
-        {(["todos", "cupom", "visita"] as TipoFilter[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setFilterTipo(t)}
-            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
-              filterTipo === t
-                ? t === "visita" ? "bg-emerald-600 text-white border-emerald-600"
-                  : t === "cupom" ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-primary text-primary-foreground border-primary"
-                : "bg-background border-border text-muted-foreground hover:border-foreground"
-            }`}
-          >
-            {t === "todos" ? "Todos" : t === "cupom" ? "Cupom Sorteio" : "Visita Comercial"}
-          </button>
-        ))}
+        {/* Date picker */}
+        <div className="relative flex items-center">
+          <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="pl-8 pr-7 h-9 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          {filterDate && (
+            <button
+              onClick={() => setFilterDate("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {/* Status filters */}
         {(["todos", "pendente", "ligado", "convertido"] as const).map((s) => (
           <button
             key={s}
@@ -269,12 +277,15 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         <div className={`flex-1 min-w-0 overflow-auto rounded-lg border bg-card ${selected ? "hidden sm:block" : ""}`}>
           {loading ? (
             <div className="flex items-center justify-center py-20 text-muted-foreground text-sm animate-pulse">
-              Carregando cupons...
+              Carregando...
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
-              <Trophy className="h-8 w-8 opacity-30" />
-              <span className="text-sm">Nenhum cupom encontrado</span>
+              {servicoTab === "cupom"
+                ? <Trophy className="h-8 w-8 opacity-30" />
+                : <Briefcase className="h-8 w-8 opacity-30" />
+              }
+              <span className="text-sm">Nenhum registro encontrado</span>
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -284,8 +295,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Telefone</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Vouchers</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Captador</th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Tipo</th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Tipo</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Data</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Hora</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Status</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground w-6"></th>
@@ -294,7 +304,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               <tbody>
                 {filtered.map((cupom) => {
                   const dup = isDuplicate(cupom);
-                  const isActive = selected?.id === cupom.id;                  const isVisitaRow = (cupom.tipo ?? "cupom") === "visita";                  return (
+                  const isActive = selected?.id === cupom.id;
+                  return (
                     <tr
                       key={cupom.id}
                       onClick={() => setSelected(isActive ? null : cupom)}
@@ -308,7 +319,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                     >
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5">
-                          {dup && <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" title="Telefone duplicado" />}
+                          {dup && <span title="Telefone duplicado"><AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" /></span>}
                           <span className="font-medium truncate max-w-[120px]">{cupom.nome}</span>
                         </div>
                       </td>
@@ -328,11 +339,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                         </div>
                       </td>
                       <td className="px-3 py-2.5 hidden md:table-cell text-muted-foreground">{cupom.abordadora}</td>
-                      <td className="px-3 py-2.5 hidden lg:table-cell">
-                        {isVisitaRow
-                          ? <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 w-fit"><Briefcase className="h-3 w-3" />Visita</span>
-                          : <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 w-fit"><Trophy className="h-3 w-3" />Cupom</span>
-                        }
+                      <td className="px-3 py-2.5 hidden lg:table-cell text-muted-foreground text-xs">
+                        {cupom.dataCupom?.slice(0, 10)}
                       </td>
                       <td className="px-3 py-2.5 hidden lg:table-cell text-muted-foreground text-xs">
                         {cupom.dataCupom?.slice(11)}
@@ -359,7 +367,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
             {/* Panel header */}
             <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40">
               <div className="flex items-center gap-2 min-w-0">
-                {(selected.tipo ?? "cupom") === "visita"
+                {servicoTab === "visita"
                   ? <Briefcase className="h-4 w-4 text-emerald-600 shrink-0" />
                   : <Trophy className="h-4 w-4 text-blue-600 shrink-0" />
                 }
@@ -397,7 +405,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   <span>{selected.abordadora}</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  {(selected.tipo ?? "cupom") === "visita"
+                  {servicoTab === "visita"
                     ? <Building2 className="h-4 w-4 shrink-0" />
                     : <MapPin className="h-4 w-4 shrink-0" />
                   }
