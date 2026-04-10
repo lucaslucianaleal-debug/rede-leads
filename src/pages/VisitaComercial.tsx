@@ -22,7 +22,6 @@ interface Sessao {
   clinicaId: string;
   clinicaLabel: string;
   vendedor: string;
-  estabelecimento: string;
 }
 
 export default function VisitaComercial() {
@@ -32,10 +31,10 @@ export default function VisitaComercial() {
   // Login fields
   const [clinicaId, setClinicaId] = useState(CLINICAS[0].id);
   const [vendedor, setVendedor] = useState("");
-  const [estabelecimento, setEstabelecimento] = useState("");
 
   // Lead fields
   const [nome, setNome] = useState("");
+  const [estabelecimento, setEstabelecimento] = useState("");
   const [telefone1, setTelefone1] = useState("");
   const [telefone2, setTelefone2] = useState("");
   const [selectedVouchers, setSelectedVouchers] = useState<string[]>([]);
@@ -48,12 +47,10 @@ export default function VisitaComercial() {
 
   const handleComeçar = () => {
     if (!vendedor.trim()) { toast.error("Informe seu nome"); return; }
-    if (!estabelecimento.trim()) { toast.error("Informe o estabelecimento"); return; }
     setSessao({
       clinicaId,
       clinicaLabel: CLINICAS.find((c) => c.id === clinicaId)?.label ?? clinicaId,
       vendedor: vendedor.trim(),
-      estabelecimento: estabelecimento.trim(),
     });
     setStep("captura");
   };
@@ -66,6 +63,7 @@ export default function VisitaComercial() {
 
   const resetForm = () => {
     setNome("");
+    setEstabelecimento("");
     setTelefone1("");
     setTelefone2("");
     setSelectedVouchers([]);
@@ -80,13 +78,14 @@ export default function VisitaComercial() {
 
     setSaving(true);
     try {
+      if (!estabelecimento.trim()) { toast.error("Informe o estabelecimento"); setSaving(false); return; }
       const data: Parameters<typeof addCupom>[1] = {
         tipo: "visita",
         clinicaId: sessao.clinicaId,
         nome: nome.trim(),
         telefone1: telefone1.replace(/\D/g, ""),
         vouchers: selectedVouchers,
-        local: sessao.estabelecimento,
+        local: estabelecimento.trim(),
         abordadora: sessao.vendedor,
       };
       const tel2 = telefone2.replace(/\D/g, "");
@@ -145,20 +144,6 @@ export default function VisitaComercial() {
             </div>
           </div>
 
-          {/* Estabelecimento */}
-          <div className="space-y-1.5">
-            <Label>Estabelecimento</Label>
-            <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                value={estabelecimento}
-                onChange={(e) => setEstabelecimento(e.target.value)}
-                placeholder="Ex: Empresa X, Comércio Y..."
-                className="pl-9"
-              />
-            </div>
-          </div>
-
           <Button className="w-full text-base py-5 bg-emerald-600 hover:bg-emerald-700" onClick={handleComeçar}>
             Começar
           </Button>
@@ -173,9 +158,7 @@ export default function VisitaComercial() {
       <div className="w-full max-w-sm mt-4 mb-4 bg-white/10 backdrop-blur rounded-xl px-4 py-3 flex items-center justify-between">
         <div className="text-white text-sm">
           <div className="font-semibold">{sessao?.vendedor}</div>
-          <div className="text-white/70 text-xs flex items-center gap-1">
-            <Building2 className="h-3 w-3" />{sessao?.estabelecimento} · {sessao?.clinicaLabel.replace("Odontocompany ", "")}
-          </div>
+          <div className="text-white/70 text-xs">{sessao?.clinicaLabel.replace("Odontocompany ", "")}</div>
         </div>
         <div className="text-right">
           <div className="text-3xl font-bold text-white">{visitasHoje.length}</div>
@@ -206,6 +189,21 @@ export default function VisitaComercial() {
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               placeholder="Nome completo"
+              className="pl-9"
+              autoComplete="off"
+            />
+          </div>
+        </div>
+
+        {/* Estabelecimento */}
+        <div className="space-y-1.5">
+          <Label>Estabelecimento</Label>
+          <div className="relative">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              value={estabelecimento}
+              onChange={(e) => setEstabelecimento(e.target.value)}
+              placeholder="Ex: Empresa X, Comércio Y..."
               className="pl-9"
               autoComplete="off"
             />
@@ -298,7 +296,7 @@ export default function VisitaComercial() {
         onClick={() => { setStep("login"); setSessao(null); resetForm(); setLastAdded(null); }}
         className="mt-6 text-white/50 text-xs underline"
       >
-        Trocar estabelecimento
+        Reiniciar sessão
       </button>
     </div>
   );
