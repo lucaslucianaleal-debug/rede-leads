@@ -67,9 +67,11 @@ export function useSessoes(clinicaId: string | null, filterDate?: string) {
   useEffect(() => {
     if (!clinicaId) { setSessoes([]); setLoading(false); return; }
     const dateToUse = filterDate ?? format(new Date(), "dd/MM/yyyy");
-    const q = query(getSessoesRef(clinicaId), where("data", "==", dateToUse), orderBy("timestamp", "desc"));
+    const q = query(getSessoesRef(clinicaId), where("data", "==", dateToUse));
     const unsub = onSnapshot(q, (snap) => {
-      setSessoes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Sessao)));
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Sessao));
+      list.sort((a, b) => b.timestamp - a.timestamp);
+      setSessoes(list);
       setLoading(false);
     });
     return () => unsub();
