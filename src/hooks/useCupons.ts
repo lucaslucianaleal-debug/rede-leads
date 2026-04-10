@@ -39,7 +39,7 @@ export interface Cupom {
   briefing?: string;   // observação do vendedor (visita)
   dataCupom: string; // dd/MM/yyyy HH:mm
   timestamp: number;
-  status: "pendente" | "ligado" | "convertido";
+  status: "pendente" | "ligado" | "whatsapp_enviado" | "convertido";
 }
 
 const getRef = (clinicaId: string) =>

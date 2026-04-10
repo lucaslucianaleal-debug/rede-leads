@@ -33,6 +33,7 @@ import { formatPhoneNumber } from "@/lib/phone";
 const STATUS_LABELS: Record<Cupom["status"], { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "bg-yellow-100 text-yellow-800 border-yellow-300" },
   ligado: { label: "Ligado", color: "bg-blue-100 text-blue-800 border-blue-300" },
+  whatsapp_enviado: { label: "WhatsApp Enviado", color: "bg-green-50 text-green-700 border-green-300" },
   convertido: { label: "Convertido", color: "bg-green-100 text-green-800 border-green-300" },
 };
 
@@ -111,7 +112,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   const buildDefaultMsg = (cupom: Cupom) => {
     const tratamento = cupom.vouchers.join(", ");
-    return `Oi, ${cupom.nome}! Tudo bem??\n\nNosso pessoal do servi\u00e7o externo me avisou que voc\u00ea ganhou o nosso cupom de benef\u00edcio para ${tratamento}! \uD83E\uDDB7\u2728\n\nEstou te chamando para voc\u00ea j\u00e1 garantir a sua vaga!\n\nVoc\u00ea prefere o per\u00edodo da manh\u00e3 ou da tarde para usar seu Benef\u00edcio?`;
+    return `Oi, ${cupom.nome}! Tudo bem??\n\nNosso pessoal do serviço externo me avisou que você ganhou o nosso cupom de benefício para ${tratamento}! 🦷✨\n\nEstou te chamando para você já garantir a sua vaga!\n\nVocê prefere o período da manhã ou da tarde para usar seu Benefício?`;
   };
 
   const handleWhatsApp = (cupom: Cupom) => {
@@ -124,8 +125,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     const raw = whatsDialogCupom.telefone1.replace(/\D/g, "");
     const num = raw.length === 11 || raw.length === 10 ? `55${raw}` : raw;
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(whatsMsg)}`, "_blank");
-    updateStatus(clinicaId, whatsDialogCupom.id, "ligado");
-    setSelected((prev) => prev ? { ...prev, status: "ligado" } : null);
+    updateStatus(clinicaId, whatsDialogCupom.id, "whatsapp_enviado");
+    setSelected((prev) => prev ? { ...prev, status: "whatsapp_enviado" } : null);
     setWhatsDialogCupom(null);
   };
 
@@ -398,7 +399,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           )}
         </div>
         {/* Status filters */}
-        {(["todos", "pendente", "ligado", "convertido"] as const).map((s) => (
+        {(["todos", "pendente", "ligado", "whatsapp_enviado", "convertido"] as const).map((s) => (
           <button
             key={s}
             onClick={() => setFilterStatus(s)}
