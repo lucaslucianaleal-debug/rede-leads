@@ -7,6 +7,8 @@ import { Lead } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   Phone,
@@ -67,6 +69,10 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const [selected, setSelected] = useState<Cupom | null>(null);
   const [converting, setConverting] = useState(false);
 
+  // WhatsApp dialog
+  const [whatsDialogCupom, setWhatsDialogCupom] = useState<Cupom | null>(null);
+  const [whatsMsg, setWhatsMsg] = useState("");
+
   // Duplicate detection: check if phone1 appears more than once
   const phoneCounts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -103,16 +109,24 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     return list;
   }, [cupons, servicoTab, search, filterStatus, filterDate]);
 
+  const buildDefaultMsg = (cupom: Cupom) => {
+    const tratamento = cupom.vouchers.join(", ");
+    return `Oi, ${cupom.nome}! Tudo bem??\n\nNosso pessoal do servi\u00e7o externo me avisou que voc\u00ea ganhou o nosso cupom de benef\u00edcio para ${tratamento}! \uD83E\uDDB7\u2728\n\nEstou te chamando para voc\u00ea j\u00e1 garantir a sua vaga!\n\nVoc\u00ea prefere o per\u00edodo da manh\u00e3 ou da tarde para usar seu Benef\u00edcio?`;
+  };
+
   const handleWhatsApp = (cupom: Cupom) => {
-    const raw = cupom.telefone1.replace(/\D/g, "");
+    setWhatsMsg(buildDefaultMsg(cupom));
+    setWhatsDialogCupom(cupom);
+  };
+
+  const sendWhatsApp = () => {
+    if (!whatsDialogCupom) return;
+    const raw = whatsDialogCupom.telefone1.replace(/\D/g, "");
     const num = raw.length === 11 || raw.length === 10 ? `55${raw}` : raw;
-    const isVisita = (cupom.tipo ?? "cupom") === "visita";
-    const msg = encodeURIComponent(
-      isVisita
-        ? `Olá ${cupom.nome}! Tudo bem? Entrei em contato da Odontocompany! Recebi seu contato via visita comercial em ${cupom.local} e queria te apresentar nossas condições especiais. Posso te ajudar?`
-        : `Olá ${cupom.nome}! Tudo bem? Entrei em contato da Odontocompany! Vi que você pegou nosso cupom de sorteio com ${cupom.abordadora} e queria te apresentar nossas condições especiais. Posso te ajudar?`
-    );
-    window.open(`https://wa.me/${num}?text=${msg}`, "_blank");
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(whatsMsg)}`, "_blank");
+    updateStatus(clinicaId, whatsDialogCupom.id, "ligado");
+    setSelected((prev) => prev ? { ...prev, status: "ligado" } : null);
+    setWhatsDialogCupom(null);
   };
 
   const handleConvertLead = async (cupom: Cupom) => {
@@ -578,11 +592,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                 variant="outline"
                 size="sm"
                 className="w-full justify-start gap-2 border-green-500 text-green-700 hover:bg-green-50"
-                onClick={() => {
-                  handleWhatsApp(selected);
-                  updateStatus(clinicaId, selected.id, "ligado");
-                  setSelected((prev) => prev ? { ...prev, status: "ligado" } : null);
-                }}
+                onClick={() => handleWhatsApp(selected)}
               >
                 <MessageSquare className="h-4 w-4" />
                 WhatsApp
@@ -624,6 +634,34 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         )}
       </div>
       </>}
+
+      {/* WhatsApp edit dialog */}
+      <Dialog open={!!whatsDialogCupom} onOpenChange={(o) => { if (!o) setWhatsDialogCupom(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-green-600" />
+              Mensagem para {whatsDialogCupom?.nome}
+            </DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={whatsMsg}
+            onChange={(e) => setWhatsMsg(e.target.value)}
+            className="min-h-[200px] text-sm resize-none font-mono"
+          />
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setWhatsDialogCupom(null)}>Cancelar</Button>
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white gap-2"
+              onClick={sendWhatsApp}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Abrir WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
