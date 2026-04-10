@@ -3,7 +3,8 @@ import { format, parse, differenceInMinutes } from "date-fns";
 import { useCupons, useSessoes, CLINICAS, Cupom } from "@/hooks/useCupons";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
-import { Lead } from "@/types/crm";
+import { Lead, LeadStage } from "@/types/crm";
+import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +46,7 @@ type MainTab = "cupom" | "visita" | "sessoes";
 
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
-  const { createLead } = useLeads();
+  const { createLead, registerCall } = useLeads();
 
   const clinicaId = currentClinic ?? CLINICAS[0].id;
   const clinicaLabel = CLINICAS.find((c) => c.id === clinicaId)?.label ?? "";
@@ -73,6 +74,11 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   // WhatsApp dialog
   const [whatsDialogCupom, setWhatsDialogCupom] = useState<Cupom | null>(null);
   const [whatsMsg, setWhatsMsg] = useState("");
+
+  // Ligar dialog
+  const [callConfirmCupom, setCallConfirmCupom] = useState<Cupom | null>(null);
+  const [callLead, setCallLead] = useState<Lead | null>(null);
+  const [callLogOpen, setCallLogOpen] = useState(false);
 
   // Duplicate detection: check if phone1 appears more than once
   const phoneCounts = useMemo(() => {
@@ -130,37 +136,71 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     setWhatsDialogCupom(null);
   };
 
+  const buildLeadFromCupom = (cupom: Cupom): Omit<Lead, "id"> => {
+    const now = format(new Date(), "dd/MM/yyyy");
+    const isVisita = (cupom.tipo ?? "cupom") === "visita";
+    const obsExtra = [
+      `Origem: ${isVisita ? "Visita Comercial" : "Cupom sorteio"} (${cupom.local}) em ${cupom.dataCupom}.`,
+      `Vouchers: ${cupom.vouchers.join("; ")}.`,
+      cupom.telefone2 ? `Tel2: ${cupom.telefone2}.` : "",
+      cupom.briefing ? `Briefing: ${cupom.briefing}` : "",
+    ].filter(Boolean).join(" ");
+    return {
+      dataCriacao: now,
+      dataContato: now,
+      nome: cupom.nome,
+      telefone: cupom.telefone1,
+      servicoProcurado: cupom.vouchers.join(", "),
+      captador: cupom.abordadora,
+      fonteLead: isVisita ? "Visita Comercial" : "Sorteio Cupom",
+      etapaLead: "Novo",
+      status: "QUENTE",
+      respostaLead: "",
+      comparecimento: "",
+      dataFollowUp: "",
+      dataAgendamento: "",
+      dataRetornoLigacao: "",
+      observacao: obsExtra,
+      followUpCount: 0,
+      lembretes: { h24: false, today: false },
+    };
+  };
+
+  const handleLigar = (cupom: Cupom) => {
+    setCallConfirmCupom(cupom);
+  };
+
+  const handleSoLigar = () => {
+    if (!callConfirmCupom) return;
+    window.location.href = `tel:${callConfirmCupom.telefone1.replace(/\D/g, "")}`;
+    updateStatus(clinicaId, callConfirmCupom.id, "ligado");
+    setSelected((prev) => prev ? { ...prev, status: "ligado" } : null);
+    setCallConfirmCupom(null);
+  };
+
+  const handleConvertAndCall = async () => {
+    if (!callConfirmCupom) return;
+    try {
+      const leadData = buildLeadFromCupom(callConfirmCupom);
+      const newLead = createLead(leadData);
+      await updateStatus(clinicaId, callConfirmCupom.id, "convertido");
+      if (selected?.id === callConfirmCupom.id) setSelected(null);
+      window.open(`tel:${callConfirmCupom.telefone1.replace(/\D/g, "")}`);
+      setCallLead(newLead);
+      setCallLogOpen(true);
+      toast.success(`Lead criado: ${callConfirmCupom.nome}`);
+    } catch {
+      toast.error("Erro ao converter. Tente novamente.");
+    } finally {
+      setCallConfirmCupom(null);
+    }
+  };
+
   const handleConvertLead = async (cupom: Cupom) => {
     setConverting(true);
     try {
-      const now = format(new Date(), "dd/MM/yyyy");
-      const isVisita = (cupom.tipo ?? "cupom") === "visita";
-      const obsExtra = [
-        `Origem: ${isVisita ? "Visita Comercial" : "Cupom sorteio"} (${cupom.local}) em ${cupom.dataCupom}.`,
-        `Vouchers: ${cupom.vouchers.join("; ")}.`,
-        cupom.telefone2 ? `Tel2: ${cupom.telefone2}.` : "",
-        cupom.briefing ? `Briefing: ${cupom.briefing}` : "",
-      ].filter(Boolean).join(" ");
-      const newLead: Omit<Lead, "id"> = {
-        dataCriacao: now,
-        dataContato: now,
-        nome: cupom.nome,
-        telefone: cupom.telefone1,
-        servicoProcurado: cupom.vouchers.join(", "),
-        captador: cupom.abordadora,
-        fonteLead: isVisita ? "Visita Comercial" : "Sorteio Cupom",
-        etapaLead: "Novo",
-        status: "QUENTE",
-        respostaLead: "",
-        comparecimento: "",
-        dataFollowUp: "",
-        dataAgendamento: "",
-        dataRetornoLigacao: "",
-        observacao: obsExtra,
-        followUpCount: 0,
-        lembretes: { h24: false, today: false },
-      };
-      createLead(newLead);
+      const leadData = buildLeadFromCupom(cupom);
+      createLead(leadData);
       await updateStatus(clinicaId, cupom.id, "convertido");
       if (selected?.id === cupom.id) setSelected(null);
       toast.success(`Lead criado: ${cupom.nome}`);
@@ -604,11 +644,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                 variant="outline"
                 size="sm"
                 className="w-full justify-start gap-2"
-                onClick={() => {
-                  window.location.href = `tel:${selected.telefone1.replace(/\D/g, "")}`;
-                  updateStatus(clinicaId, selected.id, "ligado");
-                  setSelected((prev) => prev ? { ...prev, status: "ligado" } : null);
-                }}
+                onClick={() => handleLigar(selected)}
               >
                 <Phone className="h-4 w-4" />
                 Ligar
@@ -635,6 +671,47 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         )}
       </div>
       </>}
+
+      {/* Confirmar ligar */}
+      <Dialog open={!!callConfirmCupom} onOpenChange={(o) => { if (!o) setCallConfirmCupom(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-blue-600" />
+              Ligar para {callConfirmCupom?.nome}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Quer converter em Lead e registrar o resultado da ligação depois?
+          </p>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button
+              className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handleConvertAndCall}
+            >
+              <UserPlus className="h-4 w-4" />
+              Converter em Lead e Ligar
+            </Button>
+            <Button variant="outline" className="w-full gap-2" onClick={handleSoLigar}>
+              <Phone className="h-4 w-4" />
+              Só Ligar
+            </Button>
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => setCallConfirmCupom(null)}>Cancelar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CallLogDialog após conversão */}
+      <CallLogDialog
+        lead={callLead}
+        open={callLogOpen}
+        onClose={() => { setCallLogOpen(false); setCallLead(null); }}
+        onConfirm={(leadId, outcome, obs, returnDate, nextStage) => {
+          registerCall(leadId, outcome, obs, returnDate, nextStage);
+          setCallLogOpen(false);
+          setCallLead(null);
+        }}
+      />
 
       {/* WhatsApp edit dialog */}
       <Dialog open={!!whatsDialogCupom} onOpenChange={(o) => { if (!o) setWhatsDialogCupom(null); }}>
