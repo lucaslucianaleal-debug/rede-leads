@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 import SorteioCupons from "./pages/SorteioCupons";
+import VisitaComercial from "./pages/VisitaComercial";
 
 const queryClient = new QueryClient();
 
@@ -15,10 +16,11 @@ function AppRoutes() {
   const { user, loading } = useAuth();
 
   // Public routes — no auth required
-  if (window.location.pathname === "/sorteio-cupons") {
+  if (window.location.pathname === "/sorteio-cupons" || window.location.pathname === "/visita-comercial") {
     return (
       <Routes>
         <Route path="/sorteio-cupons" element={<SorteioCupons />} />
+        <Route path="/visita-comercial" element={<VisitaComercial />} />
       </Routes>
     );
   }
@@ -39,6 +41,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/sorteio-cupons" element={<SorteioCupons />} />
+      <Route path="/visita-comercial" element={<VisitaComercial />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

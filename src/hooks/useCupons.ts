@@ -28,13 +28,15 @@ export const VOUCHERS = [
 
 export interface Cupom {
   id: string;
+  tipo: "cupom" | "visita";
   clinicaId: string;
   nome: string;
   telefone1: string;
   telefone2?: string;
   vouchers: string[];
-  local: string;
-  abordadora: string;
+  local: string;       // local de abordagem (cupom) ou estabelecimento (visita)
+  abordadora: string;  // nome da abordadora (cupom) ou vendedor (visita)
+  briefing?: string;   // observação do vendedor (visita)
   dataCupom: string; // dd/MM/yyyy HH:mm
   timestamp: number;
   status: "pendente" | "ligado" | "convertido";

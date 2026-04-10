@@ -21,6 +21,9 @@ import {
   AlertTriangle,
   ChevronRight,
   ExternalLink,
+  Briefcase,
+  FileText,
+  Building2,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/phone";
 
@@ -34,6 +37,8 @@ interface ServicosExternosProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
+type TipoFilter = "todos" | "cupom" | "visita";
+
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
   const { createLead } = useLeads();
@@ -46,6 +51,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<"todos" | Cupom["status"]>("todos");
+  const [filterTipo, setFilterTipo] = useState<TipoFilter>("todos");
   const [selected, setSelected] = useState<Cupom | null>(null);
   const [converting, setConverting] = useState(false);
 
@@ -64,6 +70,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   const filtered = useMemo(() => {
     let list = cupons;
+    if (filterTipo !== "todos") list = list.filter((c) => (c.tipo ?? "cupom") === filterTipo);
     if (filterStatus !== "todos") list = list.filter((c) => c.status === filterStatus);
     if (search.trim()) {
       const s = search.toLowerCase();
@@ -76,15 +83,16 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       );
     }
     return list;
-  }, [cupons, search, filterStatus]);
+  }, [cupons, search, filterStatus, filterTipo]);
 
   const handleWhatsApp = (cupom: Cupom) => {
     const raw = cupom.telefone1.replace(/\D/g, "");
-    const num = raw.length === 11 || raw.length === 10
-      ? `55${raw}`
-      : raw;
+    const num = raw.length === 11 || raw.length === 10 ? `55${raw}` : raw;
+    const isVisita = (cupom.tipo ?? "cupom") === "visita";
     const msg = encodeURIComponent(
-      `Olá ${cupom.nome}! Tudo bem? Entrei em contato da Odontocompany! Vi que você pegou nosso cupom de sorteio com ${cupom.abordadora} e queria te apresentar nossas condições especiais. Posso te ajudar?`
+      isVisita
+        ? `Olá ${cupom.nome}! Tudo bem? Entrei em contato da Odontocompany! Recebi seu contato via visita comercial em ${cupom.local} e queria te apresentar nossas condições especiais. Posso te ajudar?`
+        : `Olá ${cupom.nome}! Tudo bem? Entrei em contato da Odontocompany! Vi que você pegou nosso cupom de sorteio com ${cupom.abordadora} e queria te apresentar nossas condições especiais. Posso te ajudar?`
     );
     window.open(`https://wa.me/${num}?text=${msg}`, "_blank");
   };
@@ -93,6 +101,13 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     setConverting(true);
     try {
       const now = format(new Date(), "dd/MM/yyyy");
+      const isVisita = (cupom.tipo ?? "cupom") === "visita";
+      const obsExtra = [
+        `Origem: ${isVisita ? "Visita Comercial" : "Cupom sorteio"} (${cupom.local}) em ${cupom.dataCupom}.`,
+        `Vouchers: ${cupom.vouchers.join("; ")}.`,
+        cupom.telefone2 ? `Tel2: ${cupom.telefone2}.` : "",
+        cupom.briefing ? `Briefing: ${cupom.briefing}` : "",
+      ].filter(Boolean).join(" ");
       const newLead: Omit<Lead, "id"> = {
         dataCriacao: now,
         dataContato: now,
@@ -100,7 +115,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         telefone: cupom.telefone1,
         servicoProcurado: cupom.vouchers.join(", "),
         captador: cupom.abordadora,
-        fonteLead: "Sorteio Cupom",
+        fonteLead: isVisita ? "Visita Comercial" : "Sorteio Cupom",
         etapaLead: "Novo",
         status: "QUENTE",
         respostaLead: "",
@@ -108,7 +123,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         dataFollowUp: "",
         dataAgendamento: "",
         dataRetornoLigacao: "",
-        observacao: `Origem: Cupom sorteio (${cupom.local}) em ${cupom.dataCupom}. Vouchers: ${cupom.vouchers.join("; ")}.${cupom.telefone2 ? ` Tel2: ${cupom.telefone2}` : ""}`,
+        observacao: obsExtra,
         followUpCount: 0,
         lembretes: { h24: false, today: false },
       };
@@ -124,8 +139,11 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   };
 
   const pendingCount = cupons.filter((c) => c.status === "pendente").length;
+  const cupomCount = cupons.filter((c) => (c.tipo ?? "cupom") === "cupom").length;
+  const visitaCount = cupons.filter((c) => c.tipo === "visita").length;
 
-  const publicUrl = `${window.location.origin}/sorteio-cupons`;
+  const cupomUrl = `${window.location.origin}/sorteio-cupons`;
+  const visitaUrl = `${window.location.origin}/visita-comercial`;
 
   return (
     <div className="flex flex-col h-full min-h-0 space-y-4">
@@ -133,14 +151,17 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex items-center gap-2">
           <Trophy className="h-5 w-5 text-amber-500" />
-          <h2 className="text-lg font-bold">Serviços Externos — Cupons</h2>
+          <h2 className="text-lg font-bold">Serviços Externos</h2>
         </div>
         <div className="flex gap-2 sm:ml-auto flex-wrap">
           <Badge variant="outline" className="bg-yellow-50 border-yellow-300 text-yellow-800">
             {pendingCount} pendente{pendingCount !== 1 ? "s" : ""}
           </Badge>
-          <Badge variant="outline" className="bg-gray-50">
-            {cupons.length} total hoje / histórico
+          <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-800">
+            {cupomCount} cupom{cupomCount !== 1 ? "s" : ""}
+          </Badge>
+          <Badge variant="outline" className="bg-emerald-50 border-emerald-200 text-emerald-800">
+            {visitaCount} visita{visitaCount !== 1 ? "s" : ""}
           </Badge>
         </div>
       </div>
@@ -162,24 +183,28 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         ))}
       </div>
 
-      {/* Link público */}
-      <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
-        <ExternalLink className="h-4 w-4 text-blue-600 shrink-0" />
-        <span className="text-blue-700 font-medium">Link das abordadoras:</span>
-        <a
-          href={publicUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 underline truncate max-w-xs"
-        >
-          {publicUrl}
-        </a>
-        <button
-          onClick={() => { navigator.clipboard.writeText(publicUrl); toast.success("Link copiado!"); }}
-          className="ml-auto text-blue-600 text-xs border border-blue-300 rounded px-2 py-0.5 hover:bg-blue-100 shrink-0"
-        >
-          Copiar
-        </button>
+      {/* Links públicos */}
+      <div className="grid sm:grid-cols-2 gap-2">
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
+          <Trophy className="h-4 w-4 text-blue-600 shrink-0" />
+          <span className="text-blue-700 font-medium text-xs">Cupom Sorteio</span>
+          <button
+            onClick={() => { navigator.clipboard.writeText(cupomUrl); toast.success("Link copiado!"); }}
+            className="ml-auto text-blue-600 text-xs border border-blue-300 rounded px-2 py-0.5 hover:bg-blue-100 shrink-0"
+          >
+            Copiar link
+          </button>
+        </div>
+        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm">
+          <Briefcase className="h-4 w-4 text-emerald-600 shrink-0" />
+          <span className="text-emerald-700 font-medium text-xs">Visita Comercial</span>
+          <button
+            onClick={() => { navigator.clipboard.writeText(visitaUrl); toast.success("Link copiado!"); }}
+            className="ml-auto text-emerald-600 text-xs border border-emerald-300 rounded px-2 py-0.5 hover:bg-emerald-100 shrink-0"
+          >
+            Copiar link
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -193,6 +218,36 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
             className="pl-9 h-9"
           />
         </div>
+        {(["todos", "cupom", "visita"] as TipoFilter[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setFilterTipo(t)}
+            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+              filterTipo === t
+                ? t === "visita" ? "bg-emerald-600 text-white border-emerald-600"
+                  : t === "cupom" ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-primary text-primary-foreground border-primary"
+                : "bg-background border-border text-muted-foreground hover:border-foreground"
+            }`}
+          >
+            {t === "todos" ? "Todos" : t === "cupom" ? "Cupom Sorteio" : "Visita Comercial"}
+          </button>
+        ))}
+        {(["todos", "cupom", "visita"] as TipoFilter[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setFilterTipo(t)}
+            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+              filterTipo === t
+                ? t === "visita" ? "bg-emerald-600 text-white border-emerald-600"
+                  : t === "cupom" ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-primary text-primary-foreground border-primary"
+                : "bg-background border-border text-muted-foreground hover:border-foreground"
+            }`}
+          >
+            {t === "todos" ? "Todos" : t === "cupom" ? "Cupom Sorteio" : "Visita Comercial"}
+          </button>
+        ))}
         {(["todos", "pendente", "ligado", "convertido"] as const).map((s) => (
           <button
             key={s}
@@ -203,7 +258,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                 : "bg-background border-border text-muted-foreground hover:border-foreground"
             }`}
           >
-            {s === "todos" ? "Todos" : STATUS_LABELS[s].label}
+            {s === "todos" ? "Qualquer status" : STATUS_LABELS[s].label}
           </button>
         ))}
       </div>
@@ -228,7 +283,9 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Nome</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Telefone</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Vouchers</th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Abordadora</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Captador</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Tipo</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Tipo</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Hora</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground">Status</th>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground w-6"></th>
@@ -237,8 +294,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               <tbody>
                 {filtered.map((cupom) => {
                   const dup = isDuplicate(cupom);
-                  const isActive = selected?.id === cupom.id;
-                  return (
+                  const isActive = selected?.id === cupom.id;                  const isVisitaRow = (cupom.tipo ?? "cupom") === "visita";                  return (
                     <tr
                       key={cupom.id}
                       onClick={() => setSelected(isActive ? null : cupom)}
@@ -272,6 +328,12 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                         </div>
                       </td>
                       <td className="px-3 py-2.5 hidden md:table-cell text-muted-foreground">{cupom.abordadora}</td>
+                      <td className="px-3 py-2.5 hidden lg:table-cell">
+                        {isVisitaRow
+                          ? <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 w-fit"><Briefcase className="h-3 w-3" />Visita</span>
+                          : <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 w-fit"><Trophy className="h-3 w-3" />Cupom</span>
+                        }
+                      </td>
                       <td className="px-3 py-2.5 hidden lg:table-cell text-muted-foreground text-xs">
                         {cupom.dataCupom?.slice(11)}
                       </td>
@@ -296,8 +358,14 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           <div className="w-full sm:w-80 shrink-0 rounded-lg border bg-card flex flex-col overflow-hidden">
             {/* Panel header */}
             <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40">
-              <h3 className="font-semibold text-sm truncate">{selected.nome}</h3>
-              <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-foreground">
+              <div className="flex items-center gap-2 min-w-0">
+                {(selected.tipo ?? "cupom") === "visita"
+                  ? <Briefcase className="h-4 w-4 text-emerald-600 shrink-0" />
+                  : <Trophy className="h-4 w-4 text-blue-600 shrink-0" />
+                }
+                <h3 className="font-semibold text-sm truncate">{selected.nome}</h3>
+              </div>
+              <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-foreground ml-2 shrink-0">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -329,7 +397,10 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   <span>{selected.abordadora}</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4 shrink-0" />
+                  {(selected.tipo ?? "cupom") === "visita"
+                    ? <Building2 className="h-4 w-4 shrink-0" />
+                    : <MapPin className="h-4 w-4 shrink-0" />
+                  }
                   <span>{selected.local}</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -350,6 +421,18 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   ))}
                 </div>
               </div>
+
+              {/* Briefing — visita comercial */}
+              {selected.briefing && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5" /> Briefing
+                  </p>
+                  <p className="text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-900 leading-relaxed">
+                    {selected.briefing}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
