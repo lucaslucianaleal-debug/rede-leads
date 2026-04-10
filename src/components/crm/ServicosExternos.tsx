@@ -76,7 +76,6 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const [whatsMsg, setWhatsMsg] = useState("");
 
   // Ligar dialog
-  const [callConfirmCupom, setCallConfirmCupom] = useState<Cupom | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [callLogOpen, setCallLogOpen] = useState(false);
 
@@ -166,35 +165,22 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     };
   };
 
-  const handleLigar = (cupom: Cupom) => {
-    setCallConfirmCupom(cupom);
-  };
-
-  const handleSoLigar = () => {
-    if (!callConfirmCupom) return;
-    window.location.href = `tel:${callConfirmCupom.telefone1.replace(/\D/g, "")}`;
-    updateStatus(clinicaId, callConfirmCupom.id, "ligado");
-    setSelected((prev) => prev ? { ...prev, status: "ligado" } : null);
-    setCallConfirmCupom(null);
-  };
-
-  const handleConvertAndCall = async () => {
-    if (!callConfirmCupom) return;
+  const handleLigar = async (cupom: Cupom) => {
     try {
-      const leadData = buildLeadFromCupom(callConfirmCupom);
+      const leadData = buildLeadFromCupom(cupom);
       const newLead = createLead(leadData);
-      await updateStatus(clinicaId, callConfirmCupom.id, "convertido");
-      if (selected?.id === callConfirmCupom.id) setSelected(null);
-      window.open(`tel:${callConfirmCupom.telefone1.replace(/\D/g, "")}`);
+      await updateStatus(clinicaId, cupom.id, "convertido");
+      if (selected?.id === cupom.id) setSelected(null);
       setCallLead(newLead);
       setCallLogOpen(true);
-      toast.success(`Lead criado: ${callConfirmCupom.nome}`);
+      toast.success(`Lead criado: ${cupom.nome}`);
     } catch {
       toast.error("Erro ao converter. Tente novamente.");
-    } finally {
-      setCallConfirmCupom(null);
     }
   };
+
+  const handleSoLigar = () => {};
+  const handleConvertAndCall = async () => {};
 
   const handleConvertLead = async (cupom: Cupom) => {
     setConverting(true);
@@ -672,36 +658,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       </div>
       </>}
 
-      {/* Confirmar ligar */}
-      <Dialog open={!!callConfirmCupom} onOpenChange={(o) => { if (!o) setCallConfirmCupom(null); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-blue-600" />
-              Ligar para {callConfirmCupom?.nome}
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Quer converter em Lead e registrar o resultado da ligação depois?
-          </p>
-          <DialogFooter className="flex-col gap-2 sm:flex-col">
-            <Button
-              className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={handleConvertAndCall}
-            >
-              <UserPlus className="h-4 w-4" />
-              Converter em Lead e Ligar
-            </Button>
-            <Button variant="outline" className="w-full gap-2" onClick={handleSoLigar}>
-              <Phone className="h-4 w-4" />
-              Só Ligar
-            </Button>
-            <Button variant="ghost" size="sm" className="w-full" onClick={() => setCallConfirmCupom(null)}>Cancelar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* CallLogDialog após conversão */}
+      {/* CallLogDialog após ligação */}
       <CallLogDialog
         lead={callLead}
         open={callLogOpen}
