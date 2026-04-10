@@ -18,6 +18,7 @@ import { PerformanceChart } from "@/components/crm/PerformanceChart";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { NewLeadsTab } from "@/components/crm/NewLeadsTab";
 import { ROIAnalysisView } from "@/components/crm/ROIAnalysisView";
+import { ServicosExternos } from "@/components/crm/ServicosExternos";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,7 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign, Ticket } from "lucide-react";
 import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
@@ -377,6 +378,10 @@ const CRMDashboard = () => {
               <DollarSign className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">ROI/Custos</span>
             </TabsTrigger>
+            <TabsTrigger value="externos" className="flex items-center gap-1.5">
+              <Ticket className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Serviços Externos</span>
+            </TabsTrigger>
               {permissions?.canEdit && (
                 <button
                   onClick={() => setShowCreateDialog(true)}
@@ -454,6 +459,10 @@ const CRMDashboard = () => {
 
           <TabsContent value="roi-custos" className="mt-6">
             <ROIAnalysisView leads={leads} clinicId={currentClinic ?? user?.uid} />
+          </TabsContent>
+
+          <TabsContent value="externos" className="mt-6">
+            <ServicosExternos onRegisterCall={handleRegisterCall} />
           </TabsContent>
 
           {/* Chat content removido */}

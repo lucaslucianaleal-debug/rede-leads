@@ -7,11 +7,21 @@ import { useAuth, AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
+import SorteioCupons from "./pages/SorteioCupons";
 
 const queryClient = new QueryClient();
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+
+  // Public routes — no auth required
+  if (window.location.pathname === "/sorteio-cupons") {
+    return (
+      <Routes>
+        <Route path="/sorteio-cupons" element={<SorteioCupons />} />
+      </Routes>
+    );
+  }
 
   if (loading) {
     return (
@@ -28,6 +38,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
+      <Route path="/sorteio-cupons" element={<SorteioCupons />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
