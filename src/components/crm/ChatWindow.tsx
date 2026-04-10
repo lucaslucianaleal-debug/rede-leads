@@ -139,12 +139,11 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
   };
 
   const handleConfirmAgendamento = (leadId: string, dataAgendamento: string) => {
-    if (!onUpdateLead) return;
+    if (!onUpdateLead || !currentLead) return;
     // Reagendar: reativar automação e limpar envios anteriores
     const hoje = format(new Date(), "dd/MM/yyyy");
-    onUpdateLead(leadId, {
+    const updates: Record<string, any> = {
       dataAgendamento,
-      dataAgendamentoCriado: hoje,
       etapaLead: "Avaliação agendada",
       lembretes: {
         h24: false,
@@ -152,7 +151,18 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
         disabled: false,
         sent: { "24h": null, "12h": null, "3h": null, "1h": null },
       },
-    });
+    };
+    
+    // Detectar se é primeiro agendamento ou reagendamento
+    if (!currentLead.dataAgendamento) {
+      // Primeiro agendamento
+      updates.dataAgendamentoCriado = hoje;
+    } else if (currentLead.dataAgendamento !== dataAgendamento) {
+      // Reagendamento: alteração do agendamento
+      updates.dataAgendamentoAlterado = hoje;
+    }
+    
+    onUpdateLead(leadId, updates);
     toast.success("Agendamento atualizado! Automação reativada.");
     // Pré-preencher a barra de conversa com a confirmação completa para o lead
     setText(generateAppointmentConfirmationText(dataAgendamento));

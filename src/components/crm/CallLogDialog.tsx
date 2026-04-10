@@ -185,9 +185,8 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   const handleConfirmAgendamento = (leadId: string, dataAgendamento: string) => {
     if (!updateLead || !lead) return;
     const hoje = format(new Date(), "dd/MM/yyyy");
-    updateLead(leadId, {
+    const updates: Record<string, any> = {
       dataAgendamento,
-      dataAgendamentoCriado: hoje,
       etapaLead: "Avaliação agendada",
       lembretes: {
         h24: false,
@@ -196,7 +195,18 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
         sent: { "24h": null, "12h": null, "3h": null, "1h": null },
       },
       briefingRecepcao: lead.briefingRecepcao ?? ""
-    });
+    };
+    
+    // Detectar se é primeiro agendamento ou reagendamento
+    if (!lead.dataAgendamento) {
+      // Primeiro agendamento
+      updates.dataAgendamentoCriado = hoje;
+    } else if (lead.dataAgendamento !== dataAgendamento) {
+      // Reagendamento: alteração do agendamento
+      updates.dataAgendamentoAlterado = hoje;
+    }
+    
+    updateLead(leadId, updates);
     toast.success("Agendamento atualizado! Automação reativada.");
     const text = generateAppointmentConfirmationTextForClinic(clinicMeta, dataAgendamento);
     setSuggestedMessage(text);
