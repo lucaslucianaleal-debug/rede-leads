@@ -86,6 +86,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
   const [search, setSearch] = useState(() => localStorage.getItem("fq_search") ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState(() => localStorage.getItem("fq_search") ?? "");
   const [selectedService, setSelectedService] = useState<string | null>(() => localStorage.getItem("fq_service") || null);
+  const [selectedFonte, setSelectedFonte] = useState<string | null>(() => localStorage.getItem("fq_fonte") || null);
   const [noShowOnly, setNoShowOnly] = useState(() => localStorage.getItem("fq_noshow") === "1");
   const [suggestedMessage, setSuggestedMessage] = useState<string | null>(null);
   const { clinicMeta, currentClinic } = useAuth();
@@ -232,13 +233,18 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
       list = list.filter((l) => (l.servicoProcurado || "") === selectedService);
     }
 
+    // filter by selected fonte
+    if (selectedFonte) {
+      list = list.filter((l) => (l.fonteLead || "") === selectedFonte);
+    }
+
     // filter only not-showed
     if (noShowOnly) {
       list = list.filter((l) => l.dataAgendamento && l.comparecimento === "NÃO COMPARECEU");
     }
 
     return list;
-  }, [leads, search, debouncedSearch, selectedService, noShowOnly]);
+  }, [leads, search, debouncedSearch, selectedService, selectedFonte, noShowOnly]);
 
   // Lista para "Feitos Hoje" — sem filtro de etapa, pois o lead pode ter sido finalizado durante o follow-up
   const filteredLeadsSemEtapa = useMemo(() => {
@@ -439,6 +445,17 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
           <option value="">Filtrar por serviço (todos)</option>
           {Array.from(new Set(leads.map(l => l.servicoProcurado).filter(Boolean))).map(s => (
             <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+
+        <select
+          value={selectedFonte || ""}
+          onChange={(e) => { const v = e.target.value || null; setSelectedFonte(v); v ? localStorage.setItem('fq_fonte', v) : localStorage.removeItem('fq_fonte'); }}
+          className="bg-slate-700 border-slate-600 text-white p-2 rounded"
+        >
+          <option value="">Filtrar por fonte (todas)</option>
+          {Array.from(new Set(leads.map(l => l.fonteLead).filter(Boolean))).map(f => (
+            <option key={f} value={f}>{f}</option>
           ))}
         </select>
 
