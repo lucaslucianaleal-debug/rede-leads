@@ -402,15 +402,11 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                   className="flex-1"
                   min="0"
                   step="0.01"
-                  disabled
                 />
                 <Button 
-                  onClick={() => {
-                    setInvestmentAmount("");
-                    setInvestmentDate(format(today, "yyyy-MM-dd"));
-                    setShowInvestmentDialog(true);
-                  }} 
+                  onClick={() => setShowInvestmentDialog(true)} 
                   size="sm"
+                  disabled={!investmentAmount || parseFloat(investmentAmount) <= 0}
                 >
                   Registrar
                 </Button>
@@ -680,7 +676,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
       <Dialog open={showInvestmentDialog} onOpenChange={setShowInvestmentDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Registrar Investimento</DialogTitle>
+            <DialogTitle>Confirmar Investimento</DialogTitle>
             <DialogDescription>
               Período: <strong>{periodLabel}</strong>
             </DialogDescription>
@@ -719,12 +715,15 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
                 </Popover>
               </div>
             </div>
+            <div className="text-sm text-muted-foreground">
+              <strong>Resumo:</strong> R$ {investmentAmount || "0.00"} em {format(investmentDate ? parseLocalDate(investmentDate) : today, "dd/MM/yyyy")}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowInvestmentDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveInvestment}>Salvar</Button>
+            <Button onClick={handleSaveInvestment}>Confirmar e Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
