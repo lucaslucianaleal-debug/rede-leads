@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Lead } from "@/types/crm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import { DollarSign, TrendingUp, Trash2, Calendar as CalendarIcon } from "lucide
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { db } from "@/lib/firebase";
+import { doc, setDoc, deleteDoc, collection, getDocs } from "firebase/firestore";
 
 interface ROIRecord {
   id: string;
@@ -64,12 +66,62 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedROI, setSelectedROI] = useState<ROIRecord | null>(null);
   const [drillService, setDrillService] = useState<string | null>(null);
+  const [syncTrigger, setSyncTrigger] = useState(0);  // Force re-render after Firebase sync
 
   // Load ROI history from localStorage
   const roiHistory = useMemo<ROIRecord[]>(() => {
     const storageKey = getStorageKey(clinicId);
     const stored = localStorage.getItem(storageKey);
     return stored ? JSON.parse(stored) : [];
+  }, [clinicId, syncTrigger]);
+
+  // Sync ROI data from Firebase on mount/clinicId change
+  useEffect(() => {
+    if (!clinicId) return;
+    
+    const syncFromFirebase = async () => {
+      try {
+        const collectionPath = `clinics/${clinicId}/roi_investments`;
+        const snapshot = await getDocs(collection(db, collectionPath));
+        const firebaseRecords: ROIRecord[] = [];
+        
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          firebaseRecords.push({
+            id: data.id || doc.id,
+            date: data.date,
+            periodType: data.periodType,
+            periodLabel: data.periodLabel,
+            investmentAmount: data.investmentAmount,
+            createdAt: data.createdAt,
+          });
+        });
+        
+        // Merge with localStorage (Firebase is source of truth)
+        const storageKey = getStorageKey(clinicId);
+        const localRecords = localStorage.getItem(storageKey);
+        const local: ROIRecord[] = localRecords ? JSON.parse(localRecords) : [];
+        
+        // Firebase records override local ones (by periodLabel)
+        const merged = [...local];
+        firebaseRecords.forEach((fbRecord) => {
+          const idx = merged.findIndex((r) => r.periodLabel === fbRecord.periodLabel);
+          if (idx >= 0) {
+            merged[idx] = fbRecord;
+          } else {
+            merged.push(fbRecord);
+          }
+        });
+        
+        localStorage.setItem(storageKey, JSON.stringify(merged));
+        setSyncTrigger((prev) => prev + 1);  // Trigger re-render
+        console.log(`[ROI] Sincronizado ${firebaseRecords.length} registros do Firebase`);
+      } catch (err) {
+        console.warn("[ROI] Erro ao sincronizar do Firebase (usando cache local):", err);
+      }
+    };
+    
+    syncFromFirebase();
   }, [clinicId]);
 
   // Determine period date range
@@ -218,7 +270,7 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
   }, [leadsInPeriod, investmentRecord]);
 
   // Handle save investment
-  const handleSaveInvestment = () => {
+  const handleSaveInvestment = async () => {
     const amount = parseFloat(investmentAmount);
     if (isNaN(amount) || amount < 0) {
       toast.error("Valor inválido");
@@ -239,20 +291,52 @@ export function ROIAnalysisView({ leads, clinicId }: { leads: Lead[]; clinicId?:
     const updated = roiHistory.filter((r) => r.periodLabel !== periodLabel);
     updated.push(newRecord);
 
+    // Save to localStorage (local cache)
     localStorage.setItem(storageKey, JSON.stringify(updated));
-    toast.success(`Investimento de R$ ${amount.toFixed(2)} registrado para ${periodLabel}`);
+    setSyncTrigger((prev) => prev + 1);  // Trigger re-render of roiHistory
+    
+    // Save to Firebase (online sync)
+    if (clinicId) {
+      try {
+        const firestorePath = `clinics/${clinicId}/roi_investments/${newRecord.id}`;
+        const sanitized = JSON.parse(JSON.stringify(newRecord));
+        await setDoc(doc(db, firestorePath), sanitized, { merge: true });
+        toast.success(`Investimento de R$ ${amount.toFixed(2)} registrado para ${periodLabel} ✓`);
+      } catch (err) {
+        console.error("Erro ao salvar no Firebase:", err);
+        toast.warning(`Investimento salvo localmente, mas houve erro ao sincronizar com Firebase`);
+      }
+    } else {
+      toast.success(`Investimento de R$ ${amount.toFixed(2)} registrado para ${periodLabel}`);
+    }
+    
     setInvestmentAmount("");
     setInvestmentDate(format(today, "yyyy-MM-dd"));
     setShowInvestmentDialog(false);
   };
 
   // Handle delete investment
-  const handleDeleteInvestment = () => {
+  const handleDeleteInvestment = async () => {
     if (!selectedROI) return;
     const storageKey = getStorageKey(clinicId);
     const updated = roiHistory.filter((r) => r.id !== selectedROI.id);
     localStorage.setItem(storageKey, JSON.stringify(updated));
-    toast.success("Investimento removido");
+    setSyncTrigger((prev) => prev + 1);  // Trigger re-render
+    
+    // Delete from Firebase
+    if (clinicId) {
+      try {
+        const firestorePath = `clinics/${clinicId}/roi_investments/${selectedROI.id}`;
+        await deleteDoc(doc(db, firestorePath));
+        toast.success("Investimento removido");
+      } catch (err) {
+        console.error("Erro ao remover do Firebase:", err);
+        toast.warning("Investimento removido localmente, mas houve erro ao sincronizar");
+      }
+    } else {
+      toast.success("Investimento removido");
+    }
+    
     setShowDeleteDialog(false);
     setSelectedROI(null);
   };
