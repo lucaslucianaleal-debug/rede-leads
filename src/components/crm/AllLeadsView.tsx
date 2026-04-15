@@ -278,41 +278,78 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       leadsCriados = leadsFiltrados;
     }
 
-    // Agendamentos realizados no período (dataAgendamentoCriado)
-    // Se há filtros ativos (fonte, etapa, etc.), usa leads filtrados; caso contrário, usa todos
-    const baseForAppointments = hasFiltersActive ? leadsFiltrados : leads;
-    
-    let agendamentosNoPeriodo: Lead[] = [];
-    if (dateFilterType === 'dia' && selectedDateDay !== 'all') {
-      // Filtro por dia exato
-      agendamentosNoPeriodo = baseForAppointments.filter(l => l.dataAgendamentoCriado === selectedDateDay);
-    } else if (dateFilterType === 'periodo') {
-      // Filtro por intervalo de datas
-      agendamentosNoPeriodo = baseForAppointments.filter(l => {
-        if (!l.dataAgendamentoCriado) return false;
-        const [d, m, y] = l.dataAgendamentoCriado.split("/");
-        const agDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-        return agDate >= reportStart && agDate <= reportEnd;
-      });
-    } else if (dateFilterType === 'mes' && selectedDateMonth !== 'all') {
-      // Filtro por mês/ano
-      const [monthAg, yearAg] = selectedDateMonth.split("/");
-      agendamentosNoPeriodo = baseForAppointments.filter(l => {
-        if (!l.dataAgendamentoCriado) return false;
-        const [d, m, y] = l.dataAgendamentoCriado.split("/");
-        return m === monthAg && y === yearAg;
-      });
-    } else {
-      // Sem filtro de data, pega todos do base
-      agendamentosNoPeriodo = baseForAppointments.filter(l => !!l.dataAgendamentoCriado);
-    }
+    // Agendamentos no período: inclui leads cujo primeiro agendamento (dataAgendamentoCriado)
+    // OU cujo reagendamento (dataAgendamentoAlterado) caiu dentro do período.
+    // Sempre usa todos os leads como base (leads de outros meses podem ter sido reagendados).
+    // Filtros de fonte/etapa/serviço ainda são aplicados.
+    const baseForAppointments = leads.filter(l => {
+      if (l._deleted) return false;
+      if (selectedSource !== "all" && getSourceGroup(l.fonteLead) !== selectedSource) return false;
+      if (selectedStage !== "all" && l.etapaLead !== selectedStage) return false;
+      if (selectedService !== "all" && (l.servicoProcurado || "").trim() !== selectedService) return false;
+      return true;
+    });
 
-    // Agendados Novos/Recuperados
+    const leadsInPeriodSet = new Set<string>();
+    const addIfInPeriod = (l: Lead, dateStr: string | undefined) => {
+      if (!dateStr || leadsInPeriodSet.has(l.id)) return;
+      const parts = dateStr.split("/");
+      if (parts.length < 3) return;
+      const [d, m, y] = parts;
+      const dt = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+      if (isNaN(dt.getTime())) return;
+      if (dateFilterType === 'dia' && selectedDateDay !== 'all') {
+        if (dateStr === selectedDateDay) leadsInPeriodSet.add(l.id);
+      } else if (dateFilterType === 'periodo') {
+        if (dt >= reportStart && dt <= reportEnd) leadsInPeriodSet.add(l.id);
+      } else if (dateFilterType === 'mes' && selectedDateMonth !== 'all') {
+        const [mf, yf] = selectedDateMonth.split("/");
+        if (m === mf && y === yf) leadsInPeriodSet.add(l.id);
+      } else {
+        leadsInPeriodSet.add(l.id);
+      }
+    };
+
+    baseForAppointments.forEach(l => {
+      addIfInPeriod(l, l.dataAgendamentoCriado);
+      if (l.dataAgendamentoAlterado) {
+        // dataAgendamentoAlterado pode ser "dd/MM/yyyy HH:mm" ou "dd/MM/yyyy"
+        const datePart = l.dataAgendamentoAlterado.split(" ")[0];
+        addIfInPeriod(l, datePart);
+      }
+    });
+
+    const agendamentosNoPeriodo = baseForAppointments.filter(l => leadsInPeriodSet.has(l.id));
+
+    // Classificar: Agendados Novos / Recuperados / Reagendados
     let agendadosNovos = 0;
     let agendadosRecuperados = 0;
+    let reagendados = 0;
     agendamentosNoPeriodo.forEach(l => {
-      if (l.dataCriacao === l.dataAgendamentoCriado) agendadosNovos++;
-      else agendadosRecuperados++;
+      // Verificar se o dataAgendamentoCriado está no período
+      const dacStr = l.dataAgendamentoCriado || "";
+      const dacParts = dacStr.split("/");
+      const dacInPeriod = (() => {
+        if (dacParts.length < 3) return false;
+        const [d, m, y] = dacParts;
+        const dt = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+        if (isNaN(dt.getTime())) return false;
+        if (dateFilterType === 'dia' && selectedDateDay !== 'all') return dacStr === selectedDateDay;
+        if (dateFilterType === 'periodo') return dt >= reportStart && dt <= reportEnd;
+        if (dateFilterType === 'mes' && selectedDateMonth !== 'all') {
+          const [mf, yf] = selectedDateMonth.split("/");
+          return m === mf && y === yf;
+        }
+        return true;
+      })();
+
+      if (dacInPeriod) {
+        if (l.dataCriacao === l.dataAgendamentoCriado) agendadosNovos++;
+        else agendadosRecuperados++;
+      } else {
+        // Entrou no período só via reagendamento
+        reagendados++;
+      }
     });
 
     // Comparecimentos dos agendamentos do período
@@ -330,6 +367,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       followUpsRealizados,
       agendadosNovos,
       agendadosRecuperados,
+      reagendados,
       agendamentosTotais: agendamentosNoPeriodo.length,
       compareceram,
       taxaConversaoTotal,
@@ -393,6 +431,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     { key: "agendamentosTotais" as const, label: "Total Agendamentos", icon: CalendarCheck, color: "success", pct: stats.taxaConversaoTotal },
     { key: "agendadosNovos" as const, label: "Agendados Novos", icon: CalendarCheck, color: "success" },
     { key: "agendadosRecuperados" as const, label: "Agendados Recuperados", icon: CalendarCheck, color: "accent" },
+    { key: "reagendados" as const, label: "Reagendamentos", icon: CalendarCheck, color: "warning" },
     { key: "compareceram" as const, label: "Comparecimentos", icon: UserCheck, color: "success", pct: stats.taxaComparecimento },
   ];
 
