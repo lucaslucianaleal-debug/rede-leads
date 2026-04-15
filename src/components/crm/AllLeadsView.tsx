@@ -430,8 +430,8 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     { key: "entradaLeads" as const, label: "Leads Criados", icon: Users, color: "primary" },
     { key: "agendamentosTotais" as const, label: "Total Agendamentos", icon: CalendarCheck, color: "success", pct: stats.taxaConversaoTotal },
     { key: "agendadosNovos" as const, label: "Agendados Novos", icon: CalendarCheck, color: "success" },
-    { key: "agendadosRecuperados" as const, label: "Agendados Recuperados", icon: CalendarCheck, color: "accent" },
-    { key: "reagendados" as const, label: "Reagendamentos", icon: CalendarCheck, color: "warning" },
+    { key: "agendadosRecuperados" as const, label: "Resgatados", description: "1º agendamento de leads antigos", icon: CalendarCheck, color: "accent" },
+    { key: "reagendados" as const, label: "Reagendados", description: "Data alterada de leads já agendados", icon: CalendarCheck, color: "warning" },
     { key: "compareceram" as const, label: "Comparecimentos", icon: UserCheck, color: "success", pct: stats.taxaComparecimento },
   ];
 
@@ -670,6 +670,9 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
                     )}
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-1">{card.label}</p>
+                  {'description' in card && card.description && (
+                    <p className="text-[9px] text-muted-foreground/70 mt-0.5 leading-tight">{card.description}</p>
+                  )}
                 </motion.div>
               );
             })}
