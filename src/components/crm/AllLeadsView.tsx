@@ -340,7 +340,8 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
           const [mf, yf] = selectedDateMonth.split("/");
           return m === mf && y === yf;
         }
-        return true;
+        // Modo "todos": se o lead foi reagendado em algum momento, classifica como reagendado
+        return !l.dataAgendamentoAlterado;
       })();
 
       if (dacInPeriod) {
@@ -649,7 +650,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       {/* Cards de estatísticas */}
       <Card>
         <CardContent className="py-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 justify-center items-center">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 justify-center items-center">
             {statsCards.map((card, i) => {
               const Icon = card.icon;
               return (
