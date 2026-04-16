@@ -6,6 +6,7 @@ import Papa from "papaparse";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection } from "firebase/firestore";
 import { attachLastWriter } from '../lib/crmGuard';
+import { saveLeadWithSync } from '@/lib/crmSync';
 import { useAuth } from "./useAuth";
 
 // Use per-clinic and per-user localStorage key to avoid mixing caches between clinics and users
@@ -1277,9 +1278,20 @@ export function useLeads() {
     if ("dataAgendamento" in updates && updates.dataAgendamento && !("comparecimento" in updates)) {
       finalUpdates.comparecimento = "AGUARDANDO DATA";
     }
+    
+    // Find the lead to get current data for sync
+    const leadToUpdate = leads.find(l => l.id === leadId);
+    if (!leadToUpdate) return;
+    
+    // Update local state immediately
     setLeads(prev => prev.map(l =>
       l.id === leadId ? { ...l, ...finalUpdates } : l
     ));
+    
+    // Sync to Firestore asynchronously (fire-and-forget to not block UI)
+    const syncData = { ...leadToUpdate, ...finalUpdates };
+    saveLeadWithSync(db, syncData, { previousPhone: leadToUpdate.telefone })
+      .catch((err) => console.error('Erro ao sincronizar lead com Firestore:', err));
   };
 
   // Função para criar lead
