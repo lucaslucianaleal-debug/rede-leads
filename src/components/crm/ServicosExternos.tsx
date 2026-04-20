@@ -681,7 +681,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
         {/* Side panel */}
         {selected && (
-          <div className="w-full sm:w-80 shrink-0 rounded-lg border bg-card flex flex-col overflow-hidden">
+          <div className="w-full sm:w-80 shrink-0 rounded-lg border bg-card flex flex-col overflow-hidden max-h-[75vh] sm:max-h-full">
             {/* Panel header */}
             <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40">
               <div className="flex items-center gap-2 min-w-0">
@@ -737,16 +737,21 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                 </div>
               </div>
 
-              {/* Vouchers — só cupom e visita */}
-              {servicoTab !== "promotora" && selected.vouchers.length > 0 && (
+              {/* Vouchers / Serviços */}
+              {selected.vouchers.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Vouchers</p>
-                <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                  {servicoTab === "promotora" ? "Serviço de interesse" : "Vouchers"}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
                   {selected.vouchers.map((v) => (
-                    <div key={v} className="flex items-center gap-2 text-sm">
-                      <div className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                    <span key={v} className={`text-xs border rounded-full px-2.5 py-1 font-medium ${
+                      servicoTab === "promotora"
+                        ? "bg-pink-50 text-pink-800 border-pink-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                    }`}>
                       {v}
-                    </div>
+                    </span>
                   ))}
                 </div>
               </div>

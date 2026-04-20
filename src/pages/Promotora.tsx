@@ -49,6 +49,9 @@ export default function Promotora() {
   const [telefone1, setTelefone1] = useState("");
   const [telefone2, setTelefone2] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [servicosSelecionados, setServicosSelecionados] = useState<string[]>([]);
+  const SERVICOS_PROMOTORA = ["Avaliação", "Limpeza Profilaxia", "Clareamento", "Ortodontia", "Implante", "Outro"];
+  const toggleServico = (s: string) => setServicosSelecionados((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
   const [saving, setSaving] = useState(false);
   const [lastAdded, setLastAdded] = useState<string | null>(null);
   const [pageTab, setPageTab] = useState<PageTab>("novo");
@@ -114,7 +117,7 @@ export default function Promotora() {
   };
 
   const resetForm = () => {
-    setNome(""); setTelefone1(""); setTelefone2(""); setObservacao(""); setDupWarning(null);
+    setNome(""); setTelefone1(""); setTelefone2(""); setObservacao(""); setServicosSelecionados([]); setDupWarning(null);
   };
 
   const handleAdicionar = async () => {
@@ -128,7 +131,7 @@ export default function Promotora() {
         clinicaId: sessao.clinicaId,
         nome: nome.trim(),
         telefone1: telefone1.replace(/\D/g, ""),
-        vouchers: [],
+        vouchers: servicosSelecionados,
         local: sessao.local,
         abordadora: sessao.abordadora,
         briefing: observacao.trim() || undefined,
@@ -391,6 +394,26 @@ export default function Promotora() {
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input value={telefone2} onChange={(e) => setTelefone2(maskPhone(e.target.value))} placeholder="(17) 99999-0000" className="pl-9" type="tel" inputMode="numeric" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Serviço de interesse <span className="text-gray-400 font-normal">(opcional)</span></Label>
+              <div className="flex flex-wrap gap-2">
+                {SERVICOS_PROMOTORA.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => toggleServico(s)}
+                    className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
+                      servicosSelecionados.includes(s)
+                        ? "bg-pink-700 text-white border-pink-700"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-pink-400"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
             </div>
 
