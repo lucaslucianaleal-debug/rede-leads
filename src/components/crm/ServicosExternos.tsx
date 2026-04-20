@@ -28,6 +28,7 @@ import {
   Building2,
   Clock,
   Users,
+  UserCheck,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/phone";
 
@@ -42,7 +43,7 @@ interface ServicosExternosProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
-type MainTab = "cupom" | "visita" | "sessoes";
+type MainTab = "cupom" | "visita" | "promotora" | "sessoes";
 
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
@@ -138,11 +139,13 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const buildLeadFromCupom = (cupom: Cupom): Omit<Lead, "id"> => {
     const now = format(new Date(), "dd/MM/yyyy");
     const isVisita = (cupom.tipo ?? "cupom") === "visita";
+    const isPromotora = cupom.tipo === "promotora";
+    const origemLabel = isVisita ? "Visita Comercial" : isPromotora ? "Promotora" : "Cupom sorteio";
     const obsExtra = [
-      `Origem: ${isVisita ? "Visita Comercial" : "Cupom sorteio"} (${cupom.local}) em ${cupom.dataCupom}.`,
-      `Vouchers: ${cupom.vouchers.join("; ")}.`,
+      `Origem: ${origemLabel} (${cupom.local}) em ${cupom.dataCupom}.`,
+      cupom.vouchers.length > 0 ? `Vouchers: ${cupom.vouchers.join("; ")}.` : "",
       cupom.telefone2 ? `Tel2: ${cupom.telefone2}.` : "",
-      cupom.briefing ? `Briefing: ${cupom.briefing}` : "",
+      cupom.briefing ? (isPromotora ? `Observação: ${cupom.briefing}` : `Briefing: ${cupom.briefing}`) : "",
     ].filter(Boolean).join(" ");
     return {
       dataCriacao: now,
@@ -151,7 +154,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       telefone: cupom.telefone1,
       servicoProcurado: cupom.vouchers.join(", "),
       captador: cupom.abordadora,
-      fonteLead: isVisita ? "Visita Comercial" : "Sorteio Cupom",
+      fonteLead: isVisita ? "Visita Comercial" : isPromotora ? "Promotora" : "Sorteio Cupom",
       etapaLead: "Novo",
       status: "QUENTE",
       respostaLead: "",
@@ -203,7 +206,9 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   const serviceUrl = servicoTab === "cupom"
     ? `${window.location.origin}/sorteio-cupons`
-    : `${window.location.origin}/visita-comercial`;
+    : servicoTab === "visita"
+    ? `${window.location.origin}/visita-comercial`
+    : `${window.location.origin}/promotora`;
 
   // Duration helper
   const calcDuracao = (s: { horaInicio: string; horaFim: string | null; data: string }) => {
@@ -233,8 +238,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               <Badge variant="outline" className="bg-yellow-50 border-yellow-300 text-yellow-800">
                 {pendingCount} pendente{pendingCount !== 1 ? "s" : ""}
               </Badge>
-              <Badge variant="outline" className={servicoTab === "cupom" ? "bg-blue-50 border-blue-200 text-blue-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}>
-                {totalCount} {servicoTab === "cupom" ? `cupom${totalCount !== 1 ? "s" : ""}` : `visita${totalCount !== 1 ? "s" : ""}`}
+              <Badge variant="outline" className={servicoTab === "cupom" ? "bg-blue-50 border-blue-200 text-blue-800" : servicoTab === "visita" ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-pink-50 border-pink-200 text-pink-800"}>
+                {totalCount} {servicoTab === "cupom" ? `cupom${totalCount !== 1 ? "s" : ""}` : servicoTab === "visita" ? `visita${totalCount !== 1 ? "s" : ""}` : `contato${totalCount !== 1 ? "s" : ""}`}
               </Badge>
             </>
           )}
@@ -271,6 +276,17 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           Visita Comercial
         </button>
         <button
+          onClick={() => { setMainTab("promotora"); setSelected(null); setFilterDate(""); }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            mainTab === "promotora"
+              ? "border-pink-600 text-pink-700"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <UserCheck className="h-4 w-4" />
+          Promotora
+        </button>
+        <button
           onClick={() => { setMainTab("sessoes"); setSelected(null); }}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
             mainTab === "sessoes"
@@ -288,13 +304,15 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           <div className={`ml-auto flex items-center gap-2 mb-1 px-3 py-1.5 rounded-lg text-xs border self-center ${
             servicoTab === "cupom"
               ? "bg-blue-50 border-blue-200 text-blue-700"
-              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+              : servicoTab === "visita"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+              : "bg-pink-50 border-pink-200 text-pink-700"
           }`}>
             <span className="font-medium">Link público</span>
             <button
               onClick={() => { navigator.clipboard.writeText(serviceUrl); toast.success("Link copiado!"); }}
               className={`border rounded px-2 py-0.5 hover:opacity-80 ${
-                servicoTab === "cupom" ? "border-blue-300" : "border-emerald-300"
+                servicoTab === "cupom" ? "border-blue-300" : servicoTab === "visita" ? "border-emerald-300" : "border-pink-300"
               }`}
             >
               Copiar link
@@ -452,7 +470,9 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
               {servicoTab === "cupom"
                 ? <Trophy className="h-8 w-8 opacity-30" />
-                : <Briefcase className="h-8 w-8 opacity-30" />
+                : servicoTab === "visita"
+                ? <Briefcase className="h-8 w-8 opacity-30" />
+                : <UserCheck className="h-8 w-8 opacity-30" />
               }
               <span className="text-sm">Nenhum registro encontrado</span>
             </div>
@@ -538,6 +558,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               <div className="flex items-center gap-2 min-w-0">
                 {servicoTab === "visita"
                   ? <Briefcase className="h-4 w-4 text-emerald-600 shrink-0" />
+                  : servicoTab === "promotora"
+                  ? <UserCheck className="h-4 w-4 text-pink-600 shrink-0" />
                   : <Trophy className="h-4 w-4 text-blue-600 shrink-0" />
                 }
                 <h3 className="font-semibold text-sm truncate">{selected.nome}</h3>
@@ -586,7 +608,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                 </div>
               </div>
 
-              {/* Vouchers */}
+              {/* Vouchers — só cupom e visita */}
+              {servicoTab !== "promotora" && selected.vouchers.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Vouchers</p>
                 <div className="space-y-1">
@@ -598,14 +621,27 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   ))}
                 </div>
               </div>
+              )}
 
               {/* Briefing — visita comercial */}
-              {selected.briefing && (
+              {servicoTab === "visita" && selected.briefing && (
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
                     <FileText className="h-3.5 w-3.5" /> Briefing
                   </p>
                   <p className="text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-900 leading-relaxed">
+                    {selected.briefing}
+                  </p>
+                </div>
+              )}
+
+              {/* Observação — promotora */}
+              {servicoTab === "promotora" && selected.briefing && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5" /> Observação
+                  </p>
+                  <p className="text-sm bg-pink-50 border border-pink-200 rounded-lg px-3 py-2 text-pink-900 leading-relaxed">
                     {selected.briefing}
                   </p>
                 </div>

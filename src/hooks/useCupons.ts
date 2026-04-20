@@ -28,7 +28,7 @@ export const VOUCHERS = [
 
 export interface Cupom {
   id: string;
-  tipo: "cupom" | "visita";
+  tipo: "cupom" | "visita" | "promotora";
   clinicaId: string;
   nome: string;
   telefone1: string;
@@ -50,7 +50,7 @@ const getSessoesRef = (clinicaId: string) =>
 
 export interface Sessao {
   id: string;
-  tipo: "cupom" | "visita";
+  tipo: "cupom" | "visita" | "promotora";
   clinicaId: string;
   abordadora: string;
   local: string;
@@ -84,7 +84,7 @@ export async function startSessao(
   clinicaId: string,
   abordadora: string,
   local: string,
-  tipo: "cupom" | "visita"
+  tipo: "cupom" | "visita" | "promotora"
 ): Promise<string> {
   const now = new Date();
   const ref = await addDoc(getSessoesRef(clinicaId), {
