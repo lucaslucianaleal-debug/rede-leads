@@ -141,6 +141,7 @@ export default function Promotora() {
     } finally {
       setSaving(false);
     }
+  };
 
   if (step === "login") {
     return (
