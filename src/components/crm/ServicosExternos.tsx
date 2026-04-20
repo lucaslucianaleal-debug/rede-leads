@@ -89,7 +89,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const [importPreview, setImportPreview] = useState<Array<{ nome: string; telefone: string; dup: boolean }> | null>(null);
 
   // Promotora: datas disponíveis configuráveis para mensagem
-  const [promotoraDatas, setPromotoraDatas] = useState("22/04, 23/04 ou 24/04");
+  const [promotoraDatas, setPromotoraDatas] = useState("na quarta às 15h ou na sexta às 10h");
 
   // Duplicate detection: check if phone1 appears more than once
   const phoneCounts = useMemo(() => {
@@ -130,7 +130,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const buildDefaultMsg = (cupom: Cupom) => {
     const primeiroNome = cupom.nome.split(" ")[0];
     if (cupom.tipo === "promotora") {
-      return `Oi, ${primeiroNome}! Tudo bem? 😊\n\nTentei te ligar mas não consegui falar contigo. A Julia me passou seu contato!\n\nTemos vagas disponíveis nos dias ${promotoraDatas}. Consigo te encaixar numa dessas datas?\n\nVocê prefere o período da manhã ou da tarde? 🦷✨`;
+      return `Boa tarde, tudo bem? 😊\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia.\n\nVocê deixou seu contato com uma de nossas promotoras e estamos em campanha de reinauguração da clínica 🎉\n\nEstamos liberando alguns horários com avaliação + limpeza profilaxia sem custo nessa semana.\n\nTenho horário disponível ${promotoraDatas}. Qual desses fica melhor pra você?`;
     }
     const tratamento = cupom.vouchers.join(", ");
     return `Oi, ${primeiroNome}! Tudo bem??\n\nNosso pessoal do serviço externo me avisou que você ganhou o nosso cupom de benefício para ${tratamento}! 🦷✨\n\nEstou te chamando para você já garantir a sua vaga!\n\nVocê prefere o período da manhã ou da tarde para usar seu Benefício?`;
@@ -139,7 +139,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const handleWhatsApp = (cupom: Cupom) => {
     const primeiroNome = cupom.nome.split(" ")[0];
     const msg = cupom.tipo === "promotora"
-      ? `Oi, ${primeiroNome}! Tudo bem? 😊\n\nTentei te ligar mas não consegui falar contigo. A Julia me passou seu contato!\n\nTemos vagas disponíveis nos dias ${promotoraDatas}. Consigo te encaixar numa dessas datas?\n\nVocê prefere o período da manhã ou da tarde? 🦷✨`
+      ? `Boa tarde, tudo bem? 😊\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia.\n\nVocê deixou seu contato com uma de nossas promotoras e estamos em campanha de reinauguração da clínica 🎉\n\nEstamos liberando alguns horários com avaliação + limpeza profilaxia sem custo nessa semana.\n\nTenho horário disponível ${promotoraDatas}. Qual desses fica melhor pra você?`
       : buildDefaultMsg(cupom);
     setWhatsMsg(msg);
     setWhatsDialogCupom(cupom);
@@ -807,7 +807,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           </DialogHeader>
           {whatsDialogCupom?.tipo === "promotora" && (
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Datas disponíveis na agenda</Label>
+              <Label className="text-xs text-muted-foreground">Vagas disponíveis (horários)</Label>
               <Input
                 value={promotoraDatas}
                 onChange={(e) => {
@@ -815,10 +815,10 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   setPromotoraDatas(novasDatas);
                   if (whatsDialogCupom) {
                     const primeiroNome = whatsDialogCupom.nome.split(" ")[0];
-                    setWhatsMsg(`Oi, ${primeiroNome}! Tudo bem? 😊\n\nTentei te ligar mas não consegui falar contigo. A Julia me passou seu contato!\n\nTemos vagas disponíveis nos dias ${novasDatas}. Consigo te encaixar numa dessas datas?\n\nVocê prefere o período da manhã ou da tarde? 🦷✨`);
+                    setWhatsMsg(`Boa tarde, tudo bem? 😊\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia.\n\nVocê deixou seu contato com uma de nossas promotoras e estamos em campanha de reinauguração da clínica 🎉\n\nEstamos liberando alguns horários com avaliação + limpeza profilaxia sem custo nessa semana.\n\nTenho horário disponível ${novasDatas}. Qual desses fica melhor pra você?`);
                   }
                 }}
-                placeholder="Ex: 22/04, 23/04 ou 24/04"
+                placeholder="Ex: na quarta às 15h ou na sexta às 10h"
                 className="h-8 text-sm"
               />
             </div>
