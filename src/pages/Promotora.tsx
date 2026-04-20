@@ -243,9 +243,6 @@ export default function Promotora() {
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-xs text-gray-400">{c.dataCupom?.slice(11)}</div>
-                    <div className={`text-xs mt-0.5 font-medium ${c.status === "convertido" ? "text-green-600" : c.status === "ligado" ? "text-blue-600" : "text-yellow-600"}`}>
-                      {c.status}
-                    </div>
                   </div>
                 </div>
                 {c.briefing && (
