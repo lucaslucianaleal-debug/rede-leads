@@ -681,7 +681,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
         {/* Side panel */}
         {selected && (
-          <div className="w-full sm:w-80 shrink-0 rounded-lg border bg-card flex flex-col overflow-hidden">
+          <div className="w-full sm:w-80 shrink-0 rounded-lg border bg-card flex flex-col overflow-hidden sticky top-4 self-start max-h-[calc(100vh-8rem)]">
             {/* Panel header — fixo */}
             <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
