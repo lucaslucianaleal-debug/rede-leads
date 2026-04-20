@@ -88,6 +88,9 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const [importLoading, setImportLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<Array<{ nome: string; telefone: string; dup: boolean }> | null>(null);
 
+  // Promotora: datas disponíveis configuráveis para mensagem
+  const [promotoraDatas, setPromotoraDatas] = useState("22/04, 23/04 ou 24/04");
+
   // Duplicate detection: check if phone1 appears more than once
   const phoneCounts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -125,12 +128,20 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   }, [cupons, servicoTab, search, filterStatus, filterDate]);
 
   const buildDefaultMsg = (cupom: Cupom) => {
+    const primeiroNome = cupom.nome.split(" ")[0];
+    if (cupom.tipo === "promotora") {
+      return `Oi, ${primeiroNome}! Tudo bem? 😊\n\nTentei te ligar mas não consegui falar contigo. A Julia me passou seu contato!\n\nTemos vagas disponíveis nos dias ${promotoraDatas}. Consigo te encaixar numa dessas datas?\n\nVocê prefere o período da manhã ou da tarde? 🦷✨`;
+    }
     const tratamento = cupom.vouchers.join(", ");
-    return `Oi, ${cupom.nome}! Tudo bem??\n\nNosso pessoal do serviço externo me avisou que você ganhou o nosso cupom de benefício para ${tratamento}! 🦷✨\n\nEstou te chamando para você já garantir a sua vaga!\n\nVocê prefere o período da manhã ou da tarde para usar seu Benefício?`;
+    return `Oi, ${primeiroNome}! Tudo bem??\n\nNosso pessoal do serviço externo me avisou que você ganhou o nosso cupom de benefício para ${tratamento}! 🦷✨\n\nEstou te chamando para você já garantir a sua vaga!\n\nVocê prefere o período da manhã ou da tarde para usar seu Benefício?`;
   };
 
   const handleWhatsApp = (cupom: Cupom) => {
-    setWhatsMsg(buildDefaultMsg(cupom));
+    const primeiroNome = cupom.nome.split(" ")[0];
+    const msg = cupom.tipo === "promotora"
+      ? `Oi, ${primeiroNome}! Tudo bem? 😊\n\nTentei te ligar mas não consegui falar contigo. A Julia me passou seu contato!\n\nTemos vagas disponíveis nos dias ${promotoraDatas}. Consigo te encaixar numa dessas datas?\n\nVocê prefere o período da manhã ou da tarde? 🦷✨`
+      : buildDefaultMsg(cupom);
+    setWhatsMsg(msg);
     setWhatsDialogCupom(cupom);
   };
 
@@ -727,8 +738,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               )}
             </div>
 
-            {/* Actions */}
-            <div className="p-3 border-t space-y-2 bg-muted/20">
+            {/* Actions — sticky at bottom */}
+            <div className="p-3 border-t space-y-2 bg-muted/20 shrink-0">
               {/* WhatsApp */}
               <Button
                 variant="outline"
@@ -794,6 +805,24 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               Mensagem para {whatsDialogCupom?.nome}
             </DialogTitle>
           </DialogHeader>
+          {whatsDialogCupom?.tipo === "promotora" && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Datas disponíveis na agenda</Label>
+              <Input
+                value={promotoraDatas}
+                onChange={(e) => {
+                  const novasDatas = e.target.value;
+                  setPromotoraDatas(novasDatas);
+                  if (whatsDialogCupom) {
+                    const primeiroNome = whatsDialogCupom.nome.split(" ")[0];
+                    setWhatsMsg(`Oi, ${primeiroNome}! Tudo bem? 😊\n\nTentei te ligar mas não consegui falar contigo. A Julia me passou seu contato!\n\nTemos vagas disponíveis nos dias ${novasDatas}. Consigo te encaixar numa dessas datas?\n\nVocê prefere o período da manhã ou da tarde? 🦷✨`);
+                  }
+                }}
+                placeholder="Ex: 22/04, 23/04 ou 24/04"
+                className="h-8 text-sm"
+              />
+            </div>
+          )}
           <Textarea
             value={whatsMsg}
             onChange={(e) => setWhatsMsg(e.target.value)}
