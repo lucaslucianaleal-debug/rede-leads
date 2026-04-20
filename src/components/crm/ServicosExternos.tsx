@@ -681,9 +681,9 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
         {/* Side panel */}
         {selected && (
-          <div className="w-full sm:w-80 shrink-0 rounded-lg border bg-card flex flex-col overflow-hidden max-h-[75vh] sm:max-h-full">
-            {/* Panel header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40">
+          <div className="w-full sm:w-80 shrink-0 rounded-lg border bg-card flex flex-col overflow-hidden">
+            {/* Panel header — fixo */}
+            <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 {servicoTab === "visita"
                   ? <Briefcase className="h-4 w-4 text-emerald-600 shrink-0" />
@@ -698,7 +698,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Status + Actions — fixos no topo */}
+            <div className="px-4 py-3 border-b space-y-3 shrink-0 bg-background">
               {/* Status badge */}
               <div className="flex gap-2 items-center">
                 <span className={`text-xs border rounded-full px-2.5 py-1 font-medium ${STATUS_LABELS[selected.status]?.color}`}>
@@ -711,6 +712,44 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                 )}
               </div>
 
+              {/* WhatsApp */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start gap-2 border-green-500 text-green-700 hover:bg-green-50"
+                onClick={() => handleWhatsApp(selected)}
+              >
+                <MessageSquare className="h-4 w-4" />
+                WhatsApp
+              </Button>
+
+              {/* Ligar */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start gap-2"
+                onClick={() => handleLigar(selected)}
+              >
+                <Phone className="h-4 w-4" />
+                Ligar
+              </Button>
+
+              {/* Converter em Lead */}
+              {selected.status !== "convertido" && (
+                <Button
+                  size="sm"
+                  className="w-full justify-start gap-2 bg-primary hover:bg-primary/90"
+                  onClick={() => handleConvertLead(selected)}
+                  disabled={converting}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {converting ? "Convertendo..." : "Converter em Lead"}
+                </Button>
+              )}
+            </div>
+
+            {/* Content — scrollável se precisar */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Info */}
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -779,48 +818,6 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                     {selected.briefing}
                   </p>
                 </div>
-              )}
-            </div>
-
-            {/* Actions — sticky at bottom */}
-            <div className="p-3 border-t space-y-2 bg-muted/20 shrink-0">
-              {/* WhatsApp */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start gap-2 border-green-500 text-green-700 hover:bg-green-50"
-                onClick={() => handleWhatsApp(selected)}
-              >
-                <MessageSquare className="h-4 w-4" />
-                WhatsApp
-              </Button>
-
-              {/* Ligar */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start gap-2"
-                onClick={() => handleLigar(selected)}
-              >
-                <Phone className="h-4 w-4" />
-                Ligar
-              </Button>
-
-              {/* Converter em Lead */}
-              {selected.status !== "convertido" && (
-                <Button
-                  size="sm"
-                  className="w-full justify-start gap-2 bg-primary hover:bg-primary/90"
-                  onClick={() => handleConvertLead(selected)}
-                  disabled={converting}
-                >
-                  <UserPlus className="h-4 w-4" />
-                  {converting ? "Convertendo..." : "Converter em Lead"}
-                </Button>
-              )}
-
-              {selected.status === "convertido" && (
-                <p className="text-xs text-center text-muted-foreground py-1">Lead já criado ✓</p>
               )}
             </div>
           </div>

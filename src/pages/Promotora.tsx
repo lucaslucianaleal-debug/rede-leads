@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, Upload, X } from "lucide-react";
+import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X } from "lucide-react";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -56,12 +56,6 @@ export default function Promotora() {
   const [lastAdded, setLastAdded] = useState<string | null>(null);
   const [pageTab, setPageTab] = useState<PageTab>("novo");
   const [dupWarning, setDupWarning] = useState<string | null>(null);
-
-  // Import modal state
-  const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState("");
-  const [importLoading, setImportLoading] = useState(false);
-  const [importPreview, setImportPreview] = useState<Array<{ nome: string; telefone: string; dup: boolean }> | null>(null);
 
   const { cupons, addCupom } = useCupons(sessao?.clinicaId ?? null);
 
@@ -147,79 +141,6 @@ export default function Promotora() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const parseImportList = (text: string) => {
-    const lines = text.split("\n").filter(l => l.trim());
-    const parsed: Array<{ nome: string; telefone: string; dup: boolean }> = [];
-    const existingPhones = new Set(
-      cupons
-        .filter(c => c.tipo === "promotora")
-        .map(c => c.telefone1.replace(/\D/g, ""))
-    );
-
-    for (const line of lines) {
-      const parts = line.split(" - ");
-      if (parts.length >= 2) {
-        const nome = parts[0].trim();
-        const telefone = parts[1].trim().replace(/\D/g, "");
-        if (nome && telefone && telefone.length >= 10) {
-          const dup = existingPhones.has(telefone);
-          parsed.push({ nome, telefone, dup });
-          existingPhones.add(telefone);
-        }
-      }
-    }
-    return parsed;
-  };
-
-  const handleImportPreview = () => {
-    const preview = parseImportList(importText);
-    if (preview.length === 0) {
-      toast.error("Nenhum contato válido encontrado. Formato: Nome - Telefone");
-      return;
-    }
-    setImportPreview(preview);
-  };
-
-  const handleImportConfirm = async () => {
-    if (!importPreview || importPreview.length === 0 || !sessao) return;
-    setImportLoading(true);
-    try {
-      let successCount = 0;
-      let skipCount = 0;
-      for (const item of importPreview) {
-        if (item.dup) {
-          skipCount++;
-          continue;
-        }
-        try {
-          const data: Parameters<typeof addCupom>[1] = {
-            tipo: "promotora",
-            clinicaId: sessao.clinicaId,
-            nome: item.nome,
-            telefone1: item.telefone,
-            vouchers: [],
-            local: sessao.local,
-            abordadora: sessao.abordadora,
-          };
-          await addCupom(sessao.clinicaId, data);
-          successCount++;
-        } catch (e) {
-          console.error(`Erro ao importar ${item.nome}:`, e);
-        }
-      }
-      toast.success(`✅ ${successCount} contato${successCount !== 1 ? "s" : ""} importado${successCount !== 1 ? "s" : ""}${skipCount > 0 ? ` (${skipCount} já existente${skipCount !== 1 ? "s" : ""})` : ""}!`);
-      setImportOpen(false);
-      setImportText("");
-      setImportPreview(null);
-    } catch (e) {
-      toast.error("Erro na importação. Tente novamente.");
-      console.error(e);
-    } finally {
-      setImportLoading(false);
-    }
-  };
 
   if (step === "login") {
     return (
@@ -346,15 +267,6 @@ export default function Promotora() {
           )}
 
           <div className="w-full max-w-sm space-y-3">
-            {/* Botão de importação em lote */}
-            <button
-              onClick={() => setImportOpen(true)}
-              className="w-full bg-pink-700 hover:bg-pink-800 text-white rounded-2xl shadow-lg p-5 flex items-center justify-center gap-2 font-semibold transition-colors"
-            >
-              <Upload className="h-5 w-5" />
-              Importar em lote
-            </button>
-
             <div className="bg-white rounded-2xl shadow-2xl p-5 space-y-4">
               <h2 className="font-bold text-gray-800 text-base flex items-center gap-2">
                 <Plus className="h-4 w-4 text-pink-600" /> Novo Contato
@@ -439,99 +351,6 @@ export default function Promotora() {
       <button onClick={handleEncerrar} className="mt-6 flex items-center gap-1.5 text-white/50 text-xs hover:text-white/80 transition-colors">
         <LogOut className="h-3.5 w-3.5" /> Encerrar sessão
       </button>
-
-      {/* Modal de importação em lote */}
-      <Dialog open={importOpen} onOpenChange={(o) => {
-        if (!o) {
-          setImportOpen(false);
-          setImportText("");
-          setImportPreview(null);
-        }
-      }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-pink-600" />
-              Importar contatos em lote
-            </DialogTitle>
-          </DialogHeader>
-
-          {!importPreview ? (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-900">
-                <p className="font-medium mb-1">Formato esperado:</p>
-                <p className="font-mono text-xs">Nome - Telefone</p>
-                <p className="text-xs mt-1">Um contato por linha. Telefone pode ter qualquer formato.</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Cole a lista de contatos</Label>
-                <Textarea
-                  value={importText}
-                  onChange={(e) => setImportText(e.target.value)}
-                  placeholder="Murilo - promotora Julia&#10;17992362814&#10;Giovana - promotora Julia&#10;17992394259"
-                  className="min-h-[200px] font-mono text-xs resize-none"
-                />
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setImportOpen(false)}>Cancelar</Button>
-                <Button onClick={handleImportPreview} className="bg-pink-700 hover:bg-pink-800">
-                  Visualizar
-                </Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <p className="text-sm font-medium">
-                  {importPreview.filter(p => !p.dup).length} contato{importPreview.filter(p => !p.dup).length !== 1 ? "s" : ""} a importar
-                  {importPreview.filter(p => p.dup).length > 0 && (
-                    <span className="text-yellow-600 ml-2">
-                      ({importPreview.filter(p => p.dup).length} já existente{importPreview.filter(p => p.dup).length !== 1 ? "s" : ""})
-                    </span>
-                  )}
-                </p>
-                <div className="max-h-[300px] overflow-y-auto border rounded-lg divide-y bg-gray-50">
-                  {importPreview.map((item, i) => (
-                    <div
-                      key={i}
-                      className={`p-3 flex items-center justify-between text-sm ${
-                        item.dup ? "bg-yellow-50 text-yellow-700" : "bg-white text-gray-700"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{item.nome}</div>
-                        <div className="text-xs text-gray-500">{item.telefone}</div>
-                      </div>
-                      {item.dup && (
-                        <span className="text-xs font-medium shrink-0 ml-2">Duplicado</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setImportPreview(null)}
-                  disabled={importLoading}
-                >
-                  Voltar
-                </Button>
-                <Button
-                  onClick={handleImportConfirm}
-                  disabled={importLoading || importPreview.filter(p => !p.dup).length === 0}
-                  className="bg-pink-700 hover:bg-pink-800"
-                >
-                  {importLoading ? "Importando..." : `Importar (${importPreview.filter(p => !p.dup).length})`}
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
