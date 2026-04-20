@@ -35,8 +35,8 @@ const ETAPAS: LeadStage[] = [
   "Avaliação agendada", "Fora da região", "Desistência", "Finalizado",
 ];
 
-const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Influenciador", "Hotleads", "Outro"];
-const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
+const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Promotora", "Hotleads", "Outro"];
+const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento", "Limpeza"];
 
 export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogProps) {
   const { allLeads } = useLeads();

@@ -30,9 +30,9 @@ const ETAPAS: LeadStage[] = [
   "Avaliação agendada", "Fora da região", "Desistência", "Finalizado",
 ];
 
-const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento"];
+const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento", "Limpeza"];
 
-const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Influenciadora", "Influenciador", "Hotleads", "Outro"];
+const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Promotora", "Hotleads", "Outro"];
 
 const STATUSES: LeadStatus[] = ["QUENTE", "MORNO", "FRIO"];
 
