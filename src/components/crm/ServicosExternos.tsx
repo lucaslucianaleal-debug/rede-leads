@@ -49,7 +49,7 @@ type MainTab = "cupom" | "visita" | "promotora" | "sessoes";
 
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
-  const { createLead, registerCall } = useLeads();
+  const { createLead, registerCall, getAppointmentsFor } = useLeads();
 
   const clinicaId = currentClinic ?? CLINICAS[0].id;
   const clinicaLabel = CLINICAS.find((c) => c.id === clinicaId)?.label ?? "";
@@ -136,10 +136,49 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     return `Oi, ${primeiroNome}! Tudo bem??\n\nNosso pessoal do serviço externo me avisou que você ganhou o nosso cupom de benefício para ${tratamento}! 🦷✨\n\nEstou te chamando para você já garantir a sua vaga!\n\nVocê prefere o período da manhã ou da tarde para usar seu Benefício?`;
   };
 
+  // Retorna os 2 próximos horários livres da agenda (próximos dias úteis)
+  const getSlotsLivres = (): string => {
+    const DIAS = ["", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+    const found: string[] = [];
+    const cursor = new Date();
+    cursor.setDate(cursor.getDate() + 1);
+    cursor.setHours(0, 0, 0, 0);
+    let safety = 0;
+    while (found.length < 2 && safety < 14) {
+      safety++;
+      const dow = cursor.getDay();
+      if (dow === 0) { cursor.setDate(cursor.getDate() + 1); continue; } // domingo
+      const hours = dow === 6
+        ? [8, 9, 10, 11, 12]
+        : [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+      const agendados = getAppointmentsFor(new Date(cursor));
+      const ocupados = new Set(
+        agendados.map((l) => {
+          const parts = l.dataAgendamento?.split(" ");
+          return parts?.[1] ? parseInt(parts[1].split(":")[0]) : -1;
+        })
+      );
+      const nomeDia = DIAS[dow];
+      for (const h of hours) {
+        if (!ocupados.has(h) && found.length < 2) {
+          found.push(`na ${nomeDia} às ${h}h`);
+        }
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    if (found.length === 0) return "em breve";
+    if (found.length === 1) return found[0];
+    return `${found[0]} ou ${found[1]}`;
+  };
+
   const handleWhatsApp = (cupom: Cupom) => {
-    const primeiroNome = cupom.nome.split(" ")[0];
+    let datas = promotoraDatas;
+    if (cupom.tipo === "promotora") {
+      datas = getSlotsLivres();
+      setPromotoraDatas(datas);
+    }
     const msg = cupom.tipo === "promotora"
-      ? `Boa tarde, tudo bem? 😊\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia.\n\nVocê deixou seu contato com uma de nossas promotoras e estamos em campanha de reinauguração da clínica 🎉\n\nEstamos liberando alguns horários com avaliação + limpeza profilaxia sem custo nessa semana.\n\nTenho horário disponível ${promotoraDatas}. Qual desses fica melhor pra você?`
+      ? `Boa tarde, tudo bem? 😊\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia.\n\nVocê deixou seu contato com uma de nossas promotoras e estamos em campanha de reinauguração da clínica 🎉\n\nEstamos liberando alguns horários com avaliação + limpeza profilaxia sem custo nessa semana.\n\nTenho horário disponível ${datas}. Qual desses fica melhor pra você?`
       : buildDefaultMsg(cupom);
     setWhatsMsg(msg);
     setWhatsDialogCupom(cupom);
