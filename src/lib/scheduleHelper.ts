@@ -1,38 +1,62 @@
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { format } from "date-fns";
 
 export interface SlotInfo {
   date: Date;
   hour: number;
+  minute: number;
   dateStr: string;  // "dd/MM/yyyy HH:mm"
   dayLabel: string; // "Quarta, 23/04"
-  hourLabel: string; // "9h"
+  hourLabel: string; // "9h" ou "9h30"
 }
 
 const DAY_NAMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const CLAREAMENTO_VOUCHER = "1 Sessão de Clareamento (arcada inferior)";
 
-function getWorkingHours(dow: number): number[] {
-  if (dow === 0) return [];                            // domingo
-  if (dow === 6) return [8, 9, 10, 11];               // sábado
-  return [8, 9, 10, 11, 14, 15, 16, 17];             // seg-sex
+// Returns half-hour slots for a given day-of-week
+function getWorkingSlots(dow: number): { h: number; m: number }[] {
+  if (dow === 0) return []; // domingo
+  const hours = dow === 6 ? [8, 9, 10, 11] : [8, 9, 10, 11, 14, 15, 16, 17];
+  const slots: { h: number; m: number }[] = [];
+  for (const h of hours) {
+    slots.push({ h, m: 0 });
+    slots.push({ h, m: 30 });
+  }
+  return slots;
+}
+
+function slotKey(dateStr: string, h: number, m: number): string {
+  return `${dateStr} ${h}:${m === 0 ? "00" : "30"}`;
 }
 
 export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
-  const docRef = doc(db, "clinics", clinicId, "shared", "shared");
-  const snap = await getDoc(docRef);
-  const leads: any[] = snap.exists() ? ((snap.data() as any).leads ?? []) : [];
+  // Read from cupons collection — agendamentos feitos pelas captadoras
+  const cuponRef = collection(db, "clinics", clinicId, "cupons");
+  const snap = await getDocs(query(cuponRef, where("status", "==", "agendado")));
 
-  // Build set of occupied slots: "dd/MM/yyyy H"
+  // Build set of occupied slots — clareamento blocks 2 consecutive 30min slots
   const occupied = new Set<string>();
-  for (const l of leads) {
-    if (!l.dataAgendamento) continue;
-    const parts = l.dataAgendamento.split(" ");
-    if (parts.length >= 2) {
-      const hour = parseInt(parts[1].split(":")[0]);
-      occupied.add(`${parts[0]} ${hour}`);
+  snap.forEach((d) => {
+    const data = d.data();
+    if (!data.dataAgendamento) return;
+    const parts = (data.dataAgendamento as string).split(" ");
+    if (parts.length < 2) return;
+    const dateStr = parts[0];
+    const [hStr, mStr] = parts[1].split(":");
+    const h = parseInt(hStr);
+    const m = parseInt(mStr) || 0;
+    occupied.add(slotKey(dateStr, h, m));
+    // Clareamento = 1h → bloqueia slot seguinte também
+    const isClareamento = (data.vouchers as string[] | undefined)?.some(
+      (v) => v.toLowerCase().includes("clareamento")
+    );
+    if (isClareamento) {
+      const nextM = m === 0 ? 30 : 0;
+      const nextH = m === 0 ? h : h + 1;
+      occupied.add(slotKey(dateStr, nextH, nextM));
     }
-  }
+  });
 
   const slots: SlotInfo[] = [];
   const cursor = new Date();
@@ -40,23 +64,26 @@ export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
   cursor.setHours(0, 0, 0, 0);
 
   let safety = 0;
-  while (slots.length < 24 && safety < 14) {
+  while (slots.length < 32 && safety < 14) {
     safety++;
     const dow = cursor.getDay();
-    const hours = getWorkingHours(dow);
+    const workSlots = getWorkingSlots(dow);
     const dateStr = format(cursor, "dd/MM/yyyy");
     const dayLabel = `${DAY_NAMES[dow]}, ${dateStr.slice(0, 5)}`;
 
-    for (const h of hours) {
-      if (!occupied.has(`${dateStr} ${h}`) && slots.length < 24) {
+    for (const { h, m } of workSlots) {
+      if (!occupied.has(slotKey(dateStr, h, m)) && slots.length < 32) {
         const slotDate = new Date(cursor);
-        slotDate.setHours(h, 0, 0, 0);
+        slotDate.setHours(h, m, 0, 0);
+        const hh = String(h).padStart(2, "0");
+        const mm = m === 0 ? "00" : "30";
         slots.push({
           date: slotDate,
           hour: h,
-          dateStr: `${dateStr} ${String(h).padStart(2, "0")}:00`,
+          minute: m,
+          dateStr: `${dateStr} ${hh}:${mm}`,
           dayLabel,
-          hourLabel: `${h}h`,
+          hourLabel: m === 0 ? `${h}h` : `${h}h30`,
         });
       }
     }

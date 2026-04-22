@@ -136,23 +136,24 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     return "Boa noite";
   };
 
-  // Busca slots quando dialog de promotora abre
+  // Gera mensagem quando dialog de whatsapp abre
   useEffect(() => {
-    if (whatsDialogCupom?.tipo === "promotora" && !whatsMsg) {
-      if (whatsDialogCupom.status === "agendado" && whatsDialogCupom.dataAgendamento) {
-        // Mensagem de confirmação de agendamento
-        const clinicMeta = CLINICAS.find((c) => c.id === clinicaId);
-        const confirmMsg = generateAppointmentConfirmationTextForClinic(
-          clinicMeta ? { name: clinicMeta.label, id: clinicMeta.id } : undefined,
-          whatsDialogCupom.dataAgendamento
-        );
-        setWhatsMsg(confirmMsg);
-      } else {
-        // Mensagem de abordagem com slots livres
-        const datas = getSlotsLivres();
-        setPromotoraDatas(datas);
-        setWhatsMsg(buildPromoMsg(whatsDialogCupom.nome, datas));
-      }
+    if (!whatsDialogCupom || whatsMsg) return;
+    // Qualquer tipo com status agendado → mensagem de confirmação
+    if (whatsDialogCupom.status === "agendado" && whatsDialogCupom.dataAgendamento) {
+      const clinicMeta = CLINICAS.find((c) => c.id === clinicaId);
+      const confirmMsg = generateAppointmentConfirmationTextForClinic(
+        clinicMeta ? { name: clinicMeta.label, id: clinicMeta.id } : undefined,
+        whatsDialogCupom.dataAgendamento
+      );
+      setWhatsMsg(confirmMsg);
+    } else if (whatsDialogCupom.tipo === "promotora") {
+      // Promotora sem agendamento → mensagem de abordagem com slots livres
+      const datas = getSlotsLivres();
+      setPromotoraDatas(datas);
+      setWhatsMsg(buildPromoMsg(whatsDialogCupom.nome, datas));
+    } else {
+      setWhatsMsg(buildDefaultMsg(whatsDialogCupom));
     }
   }, [whatsDialogCupom?.id]);
 

@@ -68,7 +68,7 @@ export default function Promotora() {
   const { cupons, addCupom } = useCupons(sessao?.clinicaId ?? null);
 
   const meusContatos = useMemo(() =>
-    cupons.filter((c) => c.tipo === "promotora" && c.abordadora === sessao?.abordadora),
+    cupons.filter((c) => c.tipo === "promotora" && c.sessaoId === sessao?.sessaoId),
     [cupons, sessao]
   );
 
@@ -136,10 +136,11 @@ export default function Promotora() {
         vouchers: servicosSelecionados,
         local: sessao.local,
         abordadora: sessao.abordadora,
-        briefing: observacao.trim() || undefined,
+        sessaoId: sessao.sessaoId,
       };
       const tel2 = telefone2.replace(/\D/g, "");
       if (tel2) data.telefone2 = tel2;
+      if (observacao.trim()) data.briefing = observacao.trim();
       await addCupom(sessao.clinicaId, data);
       setLastAdded(nome.trim());
       resetForm();
@@ -182,11 +183,12 @@ export default function Promotora() {
         vouchers: servicosSelecionados,
         local: sessao.local,
         abordadora: sessao.abordadora,
-        briefing: observacao.trim() || undefined,
+        sessaoId: sessao.sessaoId,
         dataAgendamento: selectedSlot.dateStr,
       };
       const tel2 = telefone2.replace(/\D/g, "");
       if (tel2) cupomData.telefone2 = tel2;
+      if (observacao.trim()) cupomData.briefing = observacao.trim();
       await addCupom(sessao.clinicaId, cupomData, "agendado");
       setLastAdded(nome.trim());
       setAgendarOpen(false);
