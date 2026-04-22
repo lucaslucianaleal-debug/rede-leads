@@ -174,29 +174,33 @@ export function useLeads() {
           setCanWrite(true);
           setLoading(false);
         } else {
-          // Remote doc missing: prefer Firestore as source-of-truth. Do NOT create/overwrite remote from empty local.
+          // Remote doc missing: bootstrap from localStorage if available
           try {
             const cached = localStorage.getItem(getStorageKey(effectiveClinic, userId));
             if (cached) {
               const parsed = JSON.parse(cached) as Lead[];
               const normalized = (Array.isArray(parsed) ? parsed : []).map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
               if (normalized.length > 0) {
-                // Restore non-empty local cache but DO NOT enable automatic writes to remote
                 setLeads(normalized);
-                console.log(`[useLeads] used local cache for clinic=${String(effectiveClinic)}`);
+                console.log(`[useLeads] bootstrapping Firestore from local cache for clinic=${String(effectiveClinic)} (${normalized.length} leads)`);
+                // Bootstrap the remote doc so future reads see fresh data
+                try {
+                  const payload = { leads: JSON.parse(JSON.stringify(normalized)), lastUpdated: new Date().toISOString() };
+                  await setDoc(targetDoc as any, payload, { merge: true });
+                  canWriteRef.current = true;
+                  setCanWrite(true);
+                } catch (writeErr) {
+                  console.warn('[useLeads] bootstrap write failed, reads-only mode', writeErr);
+                }
               } else {
-                // empty cache: do not overwrite remote or localStorage
                 console.log(`[useLeads] clinic doc not found and local cache empty for clinic=${String(effectiveClinic)} — preserving current in-memory leads`);
               }
             } else {
-              // No cache: preserve current in-memory leads (do not initialize empty and do not write)
               console.log(`[useLeads] clinic doc not found and no local cache for clinic=${String(effectiveClinic)} — preserving current in-memory leads`);
             }
           } catch (e) {
             console.warn('[useLeads] failed to read local cache after missing remote', e);
           }
-          // Do not enable writes when remote doc is absent
-          setCanWrite(false);
           setLoading(false);
         }
       } catch (err) {

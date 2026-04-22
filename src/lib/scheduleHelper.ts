@@ -28,7 +28,8 @@ function getWorkingSlots(dow: number): { h: number; m: number }[] {
 }
 
 function slotKey(dateStr: string, h: number, m: number): string {
-  return `${dateStr} ${h}:${m === 0 ? "00" : "30"}`;
+  // Zero-pad hours to match CRM format ("09:00" not "9:00")
+  return `${dateStr} ${String(h).padStart(2, "0")}:${m === 0 ? "00" : "30"}`;
 }
 
 export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
@@ -39,7 +40,20 @@ export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
   // 2. Lê leads já agendados no CRM (shared/shared)
   const sharedRef = doc(db, "clinics", clinicId, "shared", "shared");
   const sharedSnap = await getDoc(sharedRef);
-  const crmLeads: any[] = sharedSnap.exists() ? (sharedSnap.data().leads ?? []) : [];
+  const rawLeads = sharedSnap.exists() ? (sharedSnap.data()?.leads ?? null) : null;
+  // Defensive: Firestore might return an object keyed by index instead of a real array
+  const crmLeads: any[] = Array.isArray(rawLeads)
+    ? rawLeads
+    : rawLeads && typeof rawLeads === "object"
+    ? Object.values(rawLeads)
+    : [];
+  // --- DEBUG (check browser console when opening booking modal) ---
+  console.group(`[scheduleHelper] getAvailableSlots clinic=${clinicId}`);
+  console.log("shared/shared exists:", sharedSnap.exists());
+  console.log("raw leads type:", Array.isArray(rawLeads) ? "array" : typeof rawLeads, "| count:", crmLeads.length);
+  const leadsComAgendamento = crmLeads.filter((l) => l?.dataAgendamento && l.dataAgendamento.includes("/"));
+  console.log("leads com dataAgendamento:", leadsComAgendamento.map((l) => `${l.nome ?? "?"}: ${l.dataAgendamento}`));
+  console.groupEnd();
 
   // Build set of occupied slots
   const occupied = new Set<string>();
@@ -70,6 +84,7 @@ export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
 
   // Dos leads do CRM
   for (const lead of crmLeads) {
+    if (!lead || lead._deleted) continue;
     if (lead.dataAgendamento) {
       // CRM usa servicoProcurado em vez de vouchers
       const vouchers = lead.servicoProcurado
