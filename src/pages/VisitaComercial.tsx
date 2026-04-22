@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CheckSquare, Square, Briefcase, User, Phone, Plus, Check, Building2, List, AlertTriangle, LogOut, Clock } from "lucide-react";
+import { CheckSquare, Square, Briefcase, User, Phone, Plus, Check, Building2, List, AlertTriangle, LogOut, Clock, CalendarCheck, MessageSquare } from "lucide-react";
+import { getAvailableSlots, type SlotInfo } from "@/lib/scheduleHelper";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -51,10 +53,17 @@ export default function VisitaComercial() {
   const [pageTab, setPageTab] = useState<PageTab>("novo");
   const [dupWarning, setDupWarning] = useState<string | null>(null);
 
+  // Agendamento
+  const [agendarOpen, setAgendarOpen] = useState(false);
+  const [slots, setSlots] = useState<SlotInfo[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<SlotInfo | null>(null);
+  const [agendando, setAgendando] = useState(false);
+
   const { cupons, addCupom } = useCupons(sessao?.clinicaId ?? null);
 
   const meusLeads = useMemo(() =>
-    cupons.filter((c) => c.tipo === "visita" && c.abordadora === sessao?.vendedor),
+    cupons.filter((c) => c.tipo === "visita" && c.sessaoId === sessao?.sessaoId),
     [cupons, sessao]
   );
 
@@ -121,6 +130,7 @@ export default function VisitaComercial() {
         vouchers: selectedVouchers,
         local: estabelecimento.trim(),
         abordadora: sessao.vendedor,
+        sessaoId: sessao.sessaoId,
       };
       const tel2 = telefone2.replace(/\D/g, "");
       if (tel2) data.telefone2 = tel2;
@@ -133,6 +143,56 @@ export default function VisitaComercial() {
       toast.error("Erro ao salvar. Tente novamente.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAbrirAgendar = async () => {
+    if (!nome.trim()) { toast.error("Informe o nome"); return; }
+    if (!estabelecimento.trim()) { toast.error("Informe o estabelecimento"); return; }
+    if (!telefone1.trim()) { toast.error("Informe o telefone"); return; }
+    if (!sessao) return;
+    setSelectedSlot(null);
+    setSlots([]);
+    setAgendarOpen(true);
+    setSlotsLoading(true);
+    try {
+      const available = await getAvailableSlots(sessao.clinicaId);
+      setSlots(available);
+    } catch {
+      toast.error("Erro ao buscar horários. Tente novamente.");
+      setAgendarOpen(false);
+    } finally {
+      setSlotsLoading(false);
+    }
+  };
+
+  const handleConfirmarAgendamento = async () => {
+    if (!selectedSlot || !sessao) return;
+    setAgendando(true);
+    try {
+      const cupomData: Parameters<typeof addCupom>[1] = {
+        tipo: "visita",
+        clinicaId: sessao.clinicaId,
+        nome: nome.trim(),
+        telefone1: telefone1.replace(/\D/g, ""),
+        vouchers: selectedVouchers,
+        local: estabelecimento.trim(),
+        abordadora: sessao.vendedor,
+        sessaoId: sessao.sessaoId,
+        dataAgendamento: selectedSlot.dateStr,
+      };
+      const tel2 = telefone2.replace(/\D/g, "");
+      if (tel2) cupomData.telefone2 = tel2;
+      if (briefing.trim()) cupomData.briefing = briefing.trim();
+      await addCupom(sessao.clinicaId, cupomData, "agendado");
+      setLastAdded(nome.trim());
+      setAgendarOpen(false);
+      resetForm();
+      toast.success(`Agendado: ${nome.trim()} — ${selectedSlot.dayLabel} às ${selectedSlot.hour}h!`);
+    } catch {
+      toast.error("Erro ao agendar. Tente novamente.");
+    } finally {
+      setAgendando(false);
     }
   };
 
@@ -209,17 +269,32 @@ export default function VisitaComercial() {
             <div className="text-center text-white/60 py-10 text-sm">Nenhum lead adicionado ainda.</div>
           ) : (
             meusLeads.map((c) => (
-              <div key={c.id} className="bg-white rounded-xl px-4 py-3 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold text-gray-800 text-sm truncate">{c.nome}</div>
-                  <div className="text-gray-500 text-xs">{c.telefone1} · {c.local}</div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-xs text-gray-400">{c.dataCupom?.slice(11)}</div>
-                  <div className={`text-xs mt-0.5 font-medium ${c.status === "convertido" ? "text-green-600" : c.status === "ligado" ? "text-blue-600" : "text-yellow-600"}`}>
-                    {c.status}
+              <div key={c.id} className={`bg-white rounded-xl px-4 py-3 space-y-1 ${c.status === "agendado" ? "border-2 border-purple-300" : ""}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-gray-800 text-sm truncate">{c.nome}</div>
+                    <div className="text-gray-500 text-xs">{c.telefone1} · {c.local}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {c.status === "agendado" ? (
+                      <span className="text-xs bg-purple-100 text-purple-800 border border-purple-300 rounded-full px-2 py-0.5 font-medium">Agendado</span>
+                    ) : (
+                      <div className="text-xs text-gray-400">{c.dataCupom?.slice(11)}</div>
+                    )}
                   </div>
                 </div>
+                {c.dataAgendamento && (
+                  <div className="text-xs text-purple-700 bg-purple-50 rounded px-2 py-1 flex items-center gap-1">
+                    <CalendarCheck className="h-3 w-3 shrink-0" />
+                    {c.dataAgendamento}
+                  </div>
+                )}
+                {c.briefing && (
+                  <div className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1 flex items-start gap-1">
+                    <MessageSquare className="h-3 w-3 shrink-0 mt-0.5 text-gray-400" />
+                    <span className="line-clamp-2">{c.briefing}</span>
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -302,9 +377,14 @@ export default function VisitaComercial() {
                 className="min-h-[80px] text-sm resize-none" />
             </div>
 
-            <Button className="w-full py-5 text-base bg-emerald-600 hover:bg-emerald-700" onClick={handleAdicionar} disabled={saving}>
-              {saving ? "Salvando..." : "+ Adicionar Lead"}
-            </Button>
+            <div className="flex gap-2">
+              <Button className="flex-1 py-5 text-base bg-emerald-600 hover:bg-emerald-700" onClick={handleAdicionar} disabled={saving || agendando}>
+                {saving ? "Salvando..." : "+ Salvar Lead"}
+              </Button>
+              <Button className="flex-1 py-5 text-base bg-purple-700 hover:bg-purple-800" onClick={handleAbrirAgendar} disabled={saving || agendando}>
+                <CalendarCheck className="h-4 w-4 mr-1.5" /> Agendar
+              </Button>
+            </div>
           </div>
         </>
       )}
@@ -312,6 +392,64 @@ export default function VisitaComercial() {
       <button onClick={handleEncerrar} className="mt-6 flex items-center gap-1.5 text-white/50 text-xs hover:text-white/80 transition-colors">
         <LogOut className="h-3.5 w-3.5" /> Encerrar sessão
       </button>
+
+      {/* Modal de agendamento */}
+      <Dialog open={agendarOpen} onOpenChange={(o) => { if (!o) setAgendarOpen(false); }}>
+        <DialogContent className="max-w-sm max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarCheck className="h-4 w-4 text-purple-600" />
+              Escolha um horário para {nome.trim() || "o cliente"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-1">
+            {slotsLoading ? (
+              <div className="text-center py-10 text-gray-500 text-sm">Buscando horários disponíveis...</div>
+            ) : slots.length === 0 ? (
+              <div className="text-center py-10 text-gray-500 text-sm">Nenhum horário disponível nos próximos dias.</div>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(
+                  slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {
+                    if (!acc[s.dayLabel]) acc[s.dayLabel] = [];
+                    acc[s.dayLabel].push(s);
+                    return acc;
+                  }, {})
+                ).map(([day, daySlots]) => (
+                  <div key={day}>
+                    <div className="text-sm font-semibold text-gray-700 mb-2">{day}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {daySlots.map((slot) => (
+                        <button key={slot.dateStr} onClick={() => setSelectedSlot(slot)}
+                          className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                            selectedSlot?.dateStr === slot.dateStr
+                              ? "bg-purple-700 text-white border-purple-700"
+                              : "bg-white text-gray-700 border-gray-300 hover:border-purple-400"
+                          }`}>
+                          {slot.hourLabel}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {selectedSlot && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm text-purple-800 font-medium">
+              Selecionado: {selectedSlot.dayLabel} às {selectedSlot.hour}h
+            </div>
+          )}
+          <DialogFooter className="gap-2 mt-3">
+            <Button variant="outline" size="sm" onClick={() => setAgendarOpen(false)}>Cancelar</Button>
+            <Button size="sm" disabled={!selectedSlot || agendando} onClick={handleConfirmarAgendamento}
+              className="bg-purple-700 hover:bg-purple-800 text-white gap-2">
+              <CalendarCheck className="h-4 w-4" />
+              {agendando ? "Agendando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
