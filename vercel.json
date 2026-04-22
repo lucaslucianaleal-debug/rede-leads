@@ -16,6 +16,9 @@
     }
   },
   "rewrites": [
+    { "source": "/promotora", "destination": "/promotora.html" },
+    { "source": "/visita-comercial", "destination": "/visita-comercial.html" },
+    { "source": "/sorteio-cupons", "destination": "/sorteio-cupons.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

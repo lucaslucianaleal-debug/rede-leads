@@ -1,0 +1,32 @@
+<svg viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#065f46"/>
+      <stop offset="100%" style="stop-color:#0369a1"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1050" cy="80" r="180" fill="rgba(255,255,255,0.08)"/>
+  <circle cx="150" cy="580" r="130" fill="rgba(255,255,255,0.06)"/>
+
+  <!-- Icon area -->
+  <rect x="80" y="140" width="200" height="200" rx="40" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+  <text x="180" y="270" font-size="100" text-anchor="middle">💼</text>
+
+  <!-- Text -->
+  <text x="340" y="200" font-size="60" font-weight="bold" fill="white" font-family="Arial, sans-serif">Visita Comercial</text>
+  <text x="340" y="265" font-size="32" fill="rgba(255,255,255,0.85)" font-family="Arial, sans-serif">Prospecção em Empresas</text>
+  <text x="340" y="320" font-size="26" fill="rgba(255,255,255,0.7)" font-family="Arial, sans-serif">Odontocompany</text>
+
+  <!-- Feature pills -->
+  <rect x="340" y="390" width="240" height="48" rx="24" fill="rgba(255,255,255,0.2)"/>
+  <text x="460" y="421" font-size="22" text-anchor="middle" fill="white" font-family="Arial, sans-serif">🏢 Estabelecimento</text>
+
+  <rect x="600" y="390" width="220" height="48" rx="24" fill="rgba(255,255,255,0.2)"/>
+  <text x="710" y="421" font-size="22" text-anchor="middle" fill="white" font-family="Arial, sans-serif">📅 Agendamento</text>
+
+  <rect x="840" y="390" width="200" height="48" rx="24" fill="rgba(255,255,255,0.2)"/>
+  <text x="940" y="421" font-size="22" text-anchor="middle" fill="white" font-family="Arial, sans-serif">🎟️ Vouchers</text>
+
+  <text x="600" y="570" font-size="22" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-family="Arial, sans-serif">rede-leads.vercel.app/visita-comercial</text>
+</svg>
