@@ -127,10 +127,22 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     return list;
   }, [cupons, servicoTab, search, filterStatus, filterDate]);
 
+  const saudacao = () => {
+    const h = new Date().getHours();
+    if (h < 12) return "Bom dia";
+    if (h < 18) return "Boa tarde";
+    return "Boa noite";
+  };
+
+  const buildPromoMsg = (nome: string, datas: string) => {
+    const primeiroNome = nome.split(" ")[0];
+    return `${saudacao()}, *${primeiroNome}*! Tudo bem?\n\nAqui é o *Lucas*, da *OdontoCompany de Olímpia*. 🦷\n\nEstou entrando em contato porque você conversou com nossa equipe na rua recentemente. Como estamos em campanha de reinauguração, selecionei seu contato para um *benefício especial*:\n\n✅ *Avaliação Completa + Limpeza (Profilaxia) sem custo* para você conhecer nossa nova estrutura nesta semana.\n\nPara facilitar, já separei dois horários: ${datas}.\n\nQual desses horários funciona melhor para você garantir sua vaga?`;
+  };
+
   const buildDefaultMsg = (cupom: Cupom) => {
     const primeiroNome = cupom.nome.split(" ")[0];
     if (cupom.tipo === "promotora") {
-      return `Boa tarde, tudo bem? 😊\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia.\n\nVocê deixou seu contato com uma de nossas promotoras e estamos em campanha de reinauguração da clínica 🎉\n\nEstamos liberando alguns horários com avaliação + limpeza profilaxia sem custo nessa semana.\n\nTenho horário disponível ${promotoraDatas}. Qual desses fica melhor pra você?`;
+      return buildPromoMsg(cupom.nome, promotoraDatas);
     }
     const tratamento = cupom.vouchers.join(", ");
     return `Oi, ${primeiroNome}! Tudo bem??\n\nNosso pessoal do serviço externo me avisou que você ganhou o nosso cupom de benefício para ${tratamento}! 🦷✨\n\nEstou te chamando para você já garantir a sua vaga!\n\nVocê prefere o período da manhã ou da tarde para usar seu Benefício?`;
@@ -178,7 +190,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       setPromotoraDatas(datas);
     }
     const msg = cupom.tipo === "promotora"
-      ? `Boa tarde, tudo bem? 😊\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia.\n\nVocê deixou seu contato com uma de nossas promotoras e estamos em campanha de reinauguração da clínica 🎉\n\nEstamos liberando alguns horários com avaliação + limpeza profilaxia sem custo nessa semana.\n\nTenho horário disponível ${datas}. Qual desses fica melhor pra você?`
+      ? buildPromoMsg(cupom.nome, datas)
       : buildDefaultMsg(cupom);
     setWhatsMsg(msg);
     setWhatsDialogCupom(cupom);
@@ -855,8 +867,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   const novasDatas = e.target.value;
                   setPromotoraDatas(novasDatas);
                   if (whatsDialogCupom) {
-                    const primeiroNome = whatsDialogCupom.nome.split(" ")[0];
-                    setWhatsMsg(`Boa tarde, tudo bem? 😊\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia.\n\nVocê deixou seu contato com uma de nossas promotoras e estamos em campanha de reinauguração da clínica 🎉\n\nEstamos liberando alguns horários com avaliação + limpeza profilaxia sem custo nessa semana.\n\nTenho horário disponível ${novasDatas}. Qual desses fica melhor pra você?`);
+                    setWhatsMsg(buildPromoMsg(whatsDialogCupom.nome, novasDatas));
                   }
                 }}
                 placeholder="Ex: na quarta às 15h ou na sexta às 10h"
