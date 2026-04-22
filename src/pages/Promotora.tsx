@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X, CalendarCheck } from "lucide-react";
-import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
+import { getAvailableSlots, type SlotInfo } from "@/lib/scheduleHelper";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -174,15 +174,6 @@ export default function Promotora() {
     if (!selectedSlot || !sessao) return;
     setAgendando(true);
     try {
-      await saveScheduledLead(sessao.clinicaId, {
-        nome: nome.trim(),
-        telefone: telefone1,
-        servicos: servicosSelecionados,
-        observacao: observacao.trim(),
-        abordadora: sessao.abordadora,
-        local: sessao.local,
-        dataAgendamento: selectedSlot.dateStr,
-      });
       const cupomData: Parameters<typeof addCupom>[1] = {
         tipo: "promotora",
         clinicaId: sessao.clinicaId,
@@ -192,6 +183,7 @@ export default function Promotora() {
         local: sessao.local,
         abordadora: sessao.abordadora,
         briefing: observacao.trim() || undefined,
+        dataAgendamento: selectedSlot.dateStr,
       };
       const tel2 = telefone2.replace(/\D/g, "");
       if (tel2) cupomData.telefone2 = tel2;
@@ -299,16 +291,26 @@ export default function Promotora() {
             <div className="text-center text-white/60 py-10 text-sm">Nenhum contato adicionado ainda.</div>
           ) : (
             meusContatos.map((c) => (
-              <div key={c.id} className="bg-white rounded-xl px-4 py-3 space-y-1">
+              <div key={c.id} className={`bg-white rounded-xl px-4 py-3 space-y-1 ${c.status === "agendado" ? "border-2 border-purple-300" : ""}`}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-semibold text-gray-800 text-sm truncate">{c.nome}</div>
                     <div className="text-gray-500 text-xs">{c.telefone1}</div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-xs text-gray-400">{c.dataCupom?.slice(11)}</div>
+                    {c.status === "agendado" ? (
+                      <span className="text-xs bg-purple-100 text-purple-800 border border-purple-300 rounded-full px-2 py-0.5 font-medium">Agendado</span>
+                    ) : (
+                      <div className="text-xs text-gray-400">{c.dataCupom?.slice(11)}</div>
+                    )}
                   </div>
                 </div>
+                {c.dataAgendamento && (
+                  <div className="text-xs text-purple-700 bg-purple-50 rounded px-2 py-1 flex items-center gap-1">
+                    <CalendarCheck className="h-3 w-3 shrink-0" />
+                    {c.dataAgendamento}
+                  </div>
+                )}
                 {c.briefing && (
                   <div className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1 flex items-start gap-1">
                     <MessageSquare className="h-3 w-3 shrink-0 mt-0.5 text-gray-400" />

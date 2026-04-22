@@ -37,6 +37,7 @@ export interface Cupom {
   local: string;       // local de abordagem (cupom) ou estabelecimento (visita)
   abordadora: string;  // nome da abordadora (cupom) ou vendedor (visita)
   briefing?: string;   // observação do vendedor (visita)
+  dataAgendamento?: string; // dd/MM/yyyy HH:mm — preenchido quando agendado
   dataCupom: string; // dd/MM/yyyy HH:mm
   timestamp: number;
   status: "pendente" | "ligado" | "whatsapp_enviado" | "convertido" | "agendado";

@@ -680,10 +680,14 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                       </td>
                       <td className="px-3 py-2.5 hidden md:table-cell text-muted-foreground">{cupom.abordadora}</td>
                       <td className="px-3 py-2.5 hidden lg:table-cell text-muted-foreground text-xs">
-                        {cupom.dataCupom?.slice(0, 10)}
+                        {cupom.status === "agendado" && cupom.dataAgendamento
+                          ? cupom.dataAgendamento.slice(0, 10)
+                          : cupom.dataCupom?.slice(0, 10)}
                       </td>
                       <td className="px-3 py-2.5 hidden lg:table-cell text-muted-foreground text-xs">
-                        {cupom.dataCupom?.slice(11)}
+                        {cupom.status === "agendado" && cupom.dataAgendamento
+                          ? cupom.dataAgendamento.slice(11)
+                          : cupom.dataCupom?.slice(11)}
                       </td>
                       <td className="px-3 py-2.5">
                         <span className={`text-xs border rounded-full px-2 py-0.5 font-medium ${STATUS_LABELS[cupom.status]?.color}`}>
