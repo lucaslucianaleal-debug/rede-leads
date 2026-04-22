@@ -136,7 +136,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   const buildPromoMsg = (nome: string, datas: string) => {
     const primeiroNome = nome.split(" ")[0];
-    return `${saudacao()}, *${primeiroNome}*! Tudo bem?\n\nAqui é o *Lucas*, da *OdontoCompany de Olímpia*. 🦷\n\nEstou entrando em contato porque você conversou com nossa equipe na rua recentemente. Como estamos em campanha de reinauguração, selecionei seu contato para um *benefício especial*:\n\n✅ *Avaliação Completa + Limpeza (Profilaxia) sem custo* para você conhecer nossa nova estrutura nesta semana.\n\nPara facilitar, já separei dois horários: ${datas}.\n\nQual desses horários funciona melhor para você garantir sua vaga?`;
+    return `${saudacao()}, *${primeiroNome}*! Tudo bem? 😊\n\nAqui é o *Lucas*, da *OdontoCompany de Olímpia*. 🦷\n\nEstou entrando em contato porque você conversou com nossa equipe na rua recentemente. Como estamos em campanha de reinauguração, selecionei seu contato para um *benefício especial*: 🎉\n\n✅ *Avaliação Completa + Limpeza (Profilaxia) sem custo* para você conhecer nossa nova estrutura nesta semana.\n\nPara facilitar, já separei dois horários: 🗓️ ${datas}.\n\nQual desses horários funciona melhor para você garantir sua vaga? 😄`;
   };
 
   const buildDefaultMsg = (cupom: Cupom) => {
