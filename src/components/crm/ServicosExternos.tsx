@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format, parse, differenceInMinutes } from "date-fns";
 import { useCupons, useSessoes, CLINICAS, Cupom } from "@/hooks/useCupons";
 import { useAuth } from "@/hooks/useAuth";
@@ -134,6 +134,15 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     return "Boa noite";
   };
 
+  // Busca slots quando dialog de promotora abre
+  useEffect(() => {
+    if (whatsDialogCupom?.tipo === "promotora" && !whatsMsg) {
+      const datas = getSlotsLivres();
+      setPromotoraDatas(datas);
+      setWhatsMsg(buildPromoMsg(whatsDialogCupom.nome, datas));
+    }
+  }, [whatsDialogCupom?.id]);
+
   const buildPromoMsg = (nome: string, datas: string) => {
     const primeiroNome = nome.split(" ")[0];
     return `${saudacao()}, *${primeiroNome}*! Tudo bem? 😊\n\nAqui é o *Lucas*, da *OdontoCompany de Olímpia*. 🦷\n\nEstou entrando em contato porque você conversou com nossa equipe na rua recentemente. Como estamos em campanha de reinauguração, selecionei seu contato para um *benefício especial*: 🎉\n\n✅ *Avaliação Completa + Limpeza (Profilaxia) sem custo* para você conhecer nossa nova estrutura nesta semana.\n\nPara facilitar, já separei dois horários: 🗓️ ${datas}.\n\nQual desses horários funciona melhor para você garantir sua vaga? 😄`;
@@ -184,20 +193,17 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   };
 
   const handleWhatsApp = (cupom: Cupom) => {
-    let datas = promotoraDatas;
-    if (cupom.tipo === "promotora") {
-      datas = getSlotsLivres();
-      setPromotoraDatas(datas);
+    // Para não-promotora, gera mensagem direto
+    if (cupom.tipo !== "promotora") {
+      setWhatsMsg(buildDefaultMsg(cupom));
+    } else {
+      setWhatsMsg(""); // Para promotora, será preenchido no useEffect ao buscar slots
     }
-    const msg = cupom.tipo === "promotora"
-      ? buildPromoMsg(cupom.nome, datas)
-      : buildDefaultMsg(cupom);
-    setWhatsMsg(msg);
     setWhatsDialogCupom(cupom);
   };
 
   const sendWhatsApp = () => {
-    if (!whatsDialogCupom) return;
+    if (!whatsDialogCupom || !whatsMsg) return;
     const raw = whatsDialogCupom.telefone1.replace(/\D/g, "");
     const num = raw.length === 11 || raw.length === 10 ? `55${raw}` : raw;
     navigator.clipboard.writeText(whatsMsg).then(() => {
@@ -862,26 +868,42 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
             </DialogTitle>
           </DialogHeader>
           {whatsDialogCupom?.tipo === "promotora" && (
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Vagas disponíveis (horários)</Label>
-              <Input
-                value={promotoraDatas}
-                onChange={(e) => {
-                  const novasDatas = e.target.value;
-                  setPromotoraDatas(novasDatas);
-                  if (whatsDialogCupom) {
-                    setWhatsMsg(buildPromoMsg(whatsDialogCupom.nome, novasDatas));
-                  }
-                }}
-                placeholder="Ex: na quarta às 15h ou na sexta às 10h"
-                className="h-8 text-sm"
-              />
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Vagas disponíveis</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={promotoraDatas}
+                  onChange={(e) => {
+                    const novasDatas = e.target.value;
+                    setPromotoraDatas(novasDatas);
+                    if (whatsDialogCupom) {
+                      setWhatsMsg(buildPromoMsg(whatsDialogCupom.nome, novasDatas));
+                    }
+                  }}
+                  placeholder="Ex: na quarta às 15h ou na sexta às 10h"
+                  className="h-8 text-sm flex-1"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (whatsDialogCupom) {
+                      const datas = getSlotsLivres();
+                      setPromotoraDatas(datas);
+                      setWhatsMsg(buildPromoMsg(whatsDialogCupom.nome, datas));
+                    }
+                  }}
+                >
+                  Atualizar
+                </Button>
+              </div>
             </div>
           )}
           <Textarea
-            value={whatsMsg}
+            value={whatsMsg || (whatsDialogCupom?.tipo === "promotora" ? "Carregando..." : "Clicando para gerar mensagem...")}
             onChange={(e) => setWhatsMsg(e.target.value)}
             className="min-h-[200px] text-sm resize-none font-mono"
+            readOnly={!whatsMsg && whatsDialogCupom?.tipo !== "promotora"}
           />
           <DialogFooter className="gap-2">
             <Button variant="outline" size="sm" onClick={() => setWhatsDialogCupom(null)}>Cancelar</Button>
@@ -889,6 +911,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               size="sm"
               className="bg-green-600 hover:bg-green-700 text-white gap-2"
               onClick={sendWhatsApp}
+              disabled={!whatsMsg}
             >
               <MessageSquare className="h-4 w-4" />
               Abrir WhatsApp
