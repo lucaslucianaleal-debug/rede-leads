@@ -207,12 +207,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   };
 
   const handleWhatsApp = (cupom: Cupom) => {
-    // Para não-promotora, gera mensagem direto
-    if (cupom.tipo !== "promotora") {
-      setWhatsMsg(buildDefaultMsg(cupom));
-    } else {
-      setWhatsMsg(""); // Para promotora, será preenchido no useEffect ao buscar slots
-    }
+    setWhatsMsg(""); // Deixar useEffect gerar a mensagem correta
     setWhatsDialogCupom(cupom);
   };
 
@@ -224,8 +219,10 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       toast.success("Mensagem copiada! Cole no WhatsApp com Ctrl+V (ou segurar para colar no celular).");
     });
     window.open(`https://wa.me/${num}`, "_blank");
-    updateStatus(clinicaId, whatsDialogCupom.id, "whatsapp_enviado");
-    setSelected((prev) => prev ? { ...prev, status: "whatsapp_enviado" } : null);
+    // Se é agendado, converter para convertido. Senão, marcar como whatsapp_enviado
+    const newStatus = whatsDialogCupom.status === "agendado" ? "convertido" : "whatsapp_enviado";
+    updateStatus(clinicaId, whatsDialogCupom.id, newStatus);
+    setSelected((prev) => prev ? { ...prev, status: newStatus } : null);
     setWhatsDialogCupom(null);
   };
 
