@@ -26,16 +26,24 @@ interface SessaoLocal {
   local: string;
   sessaoId: string;
   horaInicio: string;
+  lastActivity: number; // timestamp ms — expira em 12h de inatividade
 }
 
 type PageTab = "novo" | "meus";
 
 export default function SorteioCupons() {
-  // Restore session from sessionStorage on mount
+  // Restore session from localStorage on mount (persists across tab close; expires after 12h of inactivity)
   const [sessao, setSessao] = useState<SessaoLocal | null>(() => {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const parsed: SessaoLocal = JSON.parse(raw);
+      const TWELVE_H = 12 * 60 * 60 * 1000;
+      if (Date.now() - (parsed.lastActivity ?? 0) > TWELVE_H) {
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      return parsed;
     } catch { return null; }
   });
   const step = sessao ? "captura" : "login";
@@ -94,8 +102,9 @@ export default function SorteioCupons() {
         local: local.trim(),
         sessaoId,
         horaInicio,
+        lastActivity: Date.now(),
       };
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(nova));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(nova));
       setSessao(nova);
     } catch {
       toast.error("Erro ao iniciar sessão. Tente novamente.");
@@ -108,7 +117,7 @@ export default function SorteioCupons() {
     try {
       await endSessao(sessao.clinicaId, sessao.sessaoId);
     } catch {}
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
     setSessao(null);
     setNome(""); setTelefone1(""); setTelefone2(""); setSelectedVouchers([]); setLastAdded(null);
   };
@@ -118,6 +127,15 @@ export default function SorteioCupons() {
 
   const resetForm = () => {
     setNome(""); setTelefone1(""); setTelefone2(""); setSelectedVouchers([]); setDupWarning(null);
+  };
+
+  const updateActivity = () => {
+    setSessao((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, lastActivity: Date.now() };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const handleAdicionarCupom = async () => {
@@ -141,6 +159,7 @@ export default function SorteioCupons() {
       if (tel2) cupomData.telefone2 = tel2;
       await addCupom(sessao.clinicaId, cupomData);
       setLastAdded(nome.trim());
+      updateActivity();
       resetForm();
       toast.success(`✅ Cupom de ${nome.trim()} adicionado!`);
     } catch {
@@ -188,6 +207,7 @@ export default function SorteioCupons() {
       if (tel2) cupomData.telefone2 = tel2;
       await addCupom(sessao.clinicaId, cupomData, "agendado");
       setLastAdded(nome.trim());
+      updateActivity();
       setAgendarOpen(false);
       resetForm();
       toast.success(`Agendado: ${nome.trim()} — ${selectedSlot.dayLabel} às ${selectedSlot.hour}h!`);

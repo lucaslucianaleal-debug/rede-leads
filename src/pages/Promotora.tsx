@@ -27,6 +27,7 @@ interface SessaoLocal {
   local: string;
   sessaoId: string;
   horaInicio: string;
+  lastActivity: number; // timestamp ms — expira em 12h de inatividade
 }
 
 type PageTab = "novo" | "meus";
@@ -34,8 +35,15 @@ type PageTab = "novo" | "meus";
 export default function Promotora() {
   const [sessao, setSessao] = useState<SessaoLocal | null>(() => {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const parsed: SessaoLocal = JSON.parse(raw);
+      const TWELVE_H = 12 * 60 * 60 * 1000;
+      if (Date.now() - (parsed.lastActivity ?? 0) > TWELVE_H) {
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      return parsed;
     } catch { return null; }
   });
   const step = sessao ? "captura" : "login";
@@ -99,8 +107,9 @@ export default function Promotora() {
         local: local.trim(),
         sessaoId,
         horaInicio,
+        lastActivity: Date.now(),
       };
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(nova));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(nova));
       setSessao(nova);
     } catch {
       toast.error("Erro ao iniciar sessão. Tente novamente.");
@@ -113,13 +122,22 @@ export default function Promotora() {
     try {
       await endSessao(sessao.clinicaId, sessao.sessaoId);
     } catch {}
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
     setSessao(null);
     setNome(""); setTelefone1(""); setTelefone2(""); setObservacao(""); setLastAdded(null);
   };
 
   const resetForm = () => {
     setNome(""); setTelefone1(""); setTelefone2(""); setObservacao(""); setServicosSelecionados([]); setDupWarning(null);
+  };
+
+  const updateActivity = () => {
+    setSessao((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, lastActivity: Date.now() };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const handleAdicionar = async () => {
@@ -143,6 +161,7 @@ export default function Promotora() {
       if (observacao.trim()) data.briefing = observacao.trim();
       await addCupom(sessao.clinicaId, data);
       setLastAdded(nome.trim());
+      updateActivity();
       resetForm();
       toast.success(`✅ ${nome.trim()} adicionado!`);
     } catch {
@@ -191,6 +210,7 @@ export default function Promotora() {
       if (observacao.trim()) cupomData.briefing = observacao.trim();
       await addCupom(sessao.clinicaId, cupomData, "agendado");
       setLastAdded(nome.trim());
+      updateActivity();
       setAgendarOpen(false);
       resetForm();
       toast.success(`Agendado: ${nome.trim()} — ${selectedSlot.dayLabel} às ${selectedSlot.hour}h!`);

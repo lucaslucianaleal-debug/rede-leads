@@ -26,6 +26,7 @@ interface SessaoLocal {
   vendedor: string;
   sessaoId: string;
   horaInicio: string;
+  lastActivity: number; // timestamp ms — expira em 12h de inatividade
 }
 
 type PageTab = "novo" | "meus";
@@ -33,8 +34,15 @@ type PageTab = "novo" | "meus";
 export default function VisitaComercial() {
   const [sessao, setSessao] = useState<SessaoLocal | null>(() => {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const parsed: SessaoLocal = JSON.parse(raw);
+      const TWELVE_H = 12 * 60 * 60 * 1000;
+      if (Date.now() - (parsed.lastActivity ?? 0) > TWELVE_H) {
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      return parsed;
     } catch { return null; }
   });
   const step = sessao ? "captura" : "login";
@@ -88,8 +96,9 @@ export default function VisitaComercial() {
         vendedor: vendedor.trim(),
         sessaoId,
         horaInicio,
+        lastActivity: Date.now(),
       };
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(nova));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(nova));
       setSessao(nova);
     } catch {
       toast.error("Erro ao iniciar sessão. Tente novamente.");
@@ -102,7 +111,7 @@ export default function VisitaComercial() {
     try {
       await endSessao(sessao.clinicaId, sessao.sessaoId);
     } catch {}
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
     setSessao(null);
     setNome(""); setEstabelecimento(""); setTelefone1(""); setTelefone2(""); setSelectedVouchers([]); setBriefing(""); setLastAdded(null);
   };
@@ -112,6 +121,15 @@ export default function VisitaComercial() {
 
   const resetForm = () => {
     setNome(""); setEstabelecimento(""); setTelefone1(""); setTelefone2(""); setSelectedVouchers([]); setBriefing(""); setDupWarning(null);
+  };
+
+  const updateActivity = () => {
+    setSessao((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, lastActivity: Date.now() };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const handleAdicionar = async () => {
@@ -137,6 +155,7 @@ export default function VisitaComercial() {
       if (briefing.trim()) data.briefing = briefing.trim();
       await addCupom(sessao.clinicaId, data);
       setLastAdded(nome.trim());
+      updateActivity();
       resetForm();
       toast.success(`✅ ${nome.trim()} adicionado!`);
     } catch {
@@ -186,6 +205,7 @@ export default function VisitaComercial() {
       if (briefing.trim()) cupomData.briefing = briefing.trim();
       await addCupom(sessao.clinicaId, cupomData, "agendado");
       setLastAdded(nome.trim());
+      updateActivity();
       setAgendarOpen(false);
       resetForm();
       toast.success(`Agendado: ${nome.trim()} — ${selectedSlot.dayLabel} às ${selectedSlot.hour}h!`);
