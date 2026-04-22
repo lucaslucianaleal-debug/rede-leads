@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
 import { format } from "date-fns";
 
 export interface SlotInfo {
@@ -79,8 +79,6 @@ export async function saveScheduledLead(
   }
 ): Promise<void> {
   const docRef = doc(db, "clinics", clinicId, "shared", "shared");
-  const snap = await getDoc(docRef);
-  const existing: any[] = snap.exists() ? ((snap.data() as any).leads ?? []) : [];
 
   const now = format(new Date(), "dd/MM/yyyy");
   const newLead = {
@@ -103,5 +101,12 @@ export async function saveScheduledLead(
     observacao: `Origem: Promotora (${data.local}).${data.observacao ? ` Obs: ${data.observacao}` : ""}`,
   };
 
-  await setDoc(docRef, { leads: [...existing, newLead] }, { merge: true });
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    // Documento existe: adiciona atomicamente sem reescrever tudo
+    await updateDoc(docRef, { leads: arrayUnion(newLead) });
+  } else {
+    // Documento não existe: cria com o lead
+    await setDoc(docRef, { leads: [newLead] });
+  }
 }
