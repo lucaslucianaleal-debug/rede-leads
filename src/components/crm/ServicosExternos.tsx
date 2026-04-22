@@ -136,13 +136,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   const buildPromoMsg = (nome: string, datas: string) => {
     const primeiroNome = nome.split(" ")[0];
-    const smile = String.fromCodePoint(0x1F60A);
-    const tooth = String.fromCodePoint(0x1F9B7);
-    const party = String.fromCodePoint(0x1F389);
-    const check = String.fromCodePoint(0x2705);
-    const cal   = String.fromCodePoint(0x1F5D3);
-    const grin  = String.fromCodePoint(0x1F604);
-    return `${saudacao()}, *${primeiroNome}*! Tudo bem? ${smile}\n\nAqui é o *Lucas*, da *OdontoCompany de Olímpia*. ${tooth}\n\nEstou entrando em contato porque você conversou com nossa equipe na rua recentemente. Como estamos em campanha de reinauguração, selecionei seu contato para um *benefício especial*: ${party}\n\n${check} *Avaliação Completa + Limpeza (Profilaxia) sem custo* para você conhecer nossa nova estrutura nesta semana.\n\nPara facilitar, já separei dois horários: ${cal} ${datas}.\n\nQual desses horários funciona melhor para você garantir sua vaga? ${grin}`;
+    return `${saudacao()}, *${primeiroNome}*! Tudo bem? 😊\n\nAqui é o *Lucas*, da *OdontoCompany de Olímpia*. 🦷\n\nEstou entrando em contato porque você conversou com nossa equipe na rua recentemente. Como estamos em campanha de reinauguração, selecionei seu contato para um *benefício especial*: 🎉\n\n✅ *Avaliação Completa + Limpeza (Profilaxia) sem custo* para você conhecer nossa nova estrutura nesta semana.\n\nPara facilitar, já separei dois horários: 🗓️ ${datas}.\n\nQual desses horários funciona melhor para você garantir sua vaga? 😄`;
   };
 
   const buildDefaultMsg = (cupom: Cupom) => {
