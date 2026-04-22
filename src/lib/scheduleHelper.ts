@@ -17,7 +17,8 @@ const CLAREAMENTO_VOUCHER = "1 Sessão de Clareamento (arcada inferior)";
 // Returns half-hour slots for a given day-of-week
 function getWorkingSlots(dow: number): { h: number; m: number }[] {
   if (dow === 0) return []; // domingo
-  const hours = dow === 6 ? [8, 9, 10, 11] : [8, 9, 10, 11, 14, 15, 16, 17];
+  // Seg-Sex: 8h às 19h (último slot 18h30). Sáb: 8h às 13h (último slot 12h30)
+  const hours = dow === 6 ? [8, 9, 10, 11, 12] : [8, 9, 10, 11, 14, 15, 16, 17, 18];
   const slots: { h: number; m: number }[] = [];
   for (const h of hours) {
     slots.push({ h, m: 0 });
@@ -59,22 +60,25 @@ export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
   });
 
   const slots: SlotInfo[] = [];
+  // Começa de hoje, filtrando slots que já passaram (+ 1h de buffer)
+  const now = new Date();
+  const minTime = now.getTime() + 60 * 60 * 1000; // pelo menos 1h a partir de agora
   const cursor = new Date();
-  cursor.setDate(cursor.getDate() + 1);
-  cursor.setHours(0, 0, 0, 0);
+  cursor.setHours(0, 0, 0, 0); // início do dia de hoje
 
-  let safety = 0;
-  while (slots.length < 32 && safety < 14) {
-    safety++;
+  // Itera 10 dias corridos a partir de hoje
+  for (let day = 0; day < 10; day++) {
     const dow = cursor.getDay();
     const workSlots = getWorkingSlots(dow);
     const dateStr = format(cursor, "dd/MM/yyyy");
     const dayLabel = `${DAY_NAMES[dow]}, ${dateStr.slice(0, 5)}`;
 
     for (const { h, m } of workSlots) {
-      if (!occupied.has(slotKey(dateStr, h, m)) && slots.length < 32) {
-        const slotDate = new Date(cursor);
-        slotDate.setHours(h, m, 0, 0);
+      const slotDate = new Date(cursor);
+      slotDate.setHours(h, m, 0, 0);
+      // Pula slots que já passaram (com 1h de antecedência mínima)
+      if (slotDate.getTime() < minTime) continue;
+      if (!occupied.has(slotKey(dateStr, h, m))) {
         const hh = String(h).padStart(2, "0");
         const mm = m === 0 ? "00" : "30";
         slots.push({
