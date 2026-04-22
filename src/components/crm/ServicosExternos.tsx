@@ -33,6 +33,7 @@ import {
   Upload,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/phone";
+import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 
 const STATUS_LABELS: Record<Cupom["status"], { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "bg-yellow-100 text-yellow-800 border-yellow-300" },
@@ -138,9 +139,20 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   // Busca slots quando dialog de promotora abre
   useEffect(() => {
     if (whatsDialogCupom?.tipo === "promotora" && !whatsMsg) {
-      const datas = getSlotsLivres();
-      setPromotoraDatas(datas);
-      setWhatsMsg(buildPromoMsg(whatsDialogCupom.nome, datas));
+      if (whatsDialogCupom.status === "agendado" && whatsDialogCupom.dataAgendamento) {
+        // Mensagem de confirmação de agendamento
+        const clinicMeta = CLINICAS.find((c) => c.id === clinicaId);
+        const confirmMsg = generateAppointmentConfirmationTextForClinic(
+          clinicMeta ? { name: clinicMeta.label, id: clinicMeta.id } : undefined,
+          whatsDialogCupom.dataAgendamento
+        );
+        setWhatsMsg(confirmMsg);
+      } else {
+        // Mensagem de abordagem com slots livres
+        const datas = getSlotsLivres();
+        setPromotoraDatas(datas);
+        setWhatsMsg(buildPromoMsg(whatsDialogCupom.nome, datas));
+      }
     }
   }, [whatsDialogCupom?.id]);
 
