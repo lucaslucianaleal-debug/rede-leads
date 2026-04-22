@@ -200,7 +200,10 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
     if (!whatsDialogCupom) return;
     const raw = whatsDialogCupom.telefone1.replace(/\D/g, "");
     const num = raw.length === 11 || raw.length === 10 ? `55${raw}` : raw;
-    window.open(`https://wa.me/${num}?text=${encodeURIComponent(whatsMsg)}`, "_blank");
+    navigator.clipboard.writeText(whatsMsg).then(() => {
+      toast.success("Mensagem copiada! Cole no WhatsApp com Ctrl+V (ou segurar para colar no celular).");
+    });
+    window.open(`https://wa.me/${num}`, "_blank");
     updateStatus(clinicaId, whatsDialogCupom.id, "whatsapp_enviado");
     setSelected((prev) => prev ? { ...prev, status: "whatsapp_enviado" } : null);
     setWhatsDialogCupom(null);
