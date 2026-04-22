@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { format } from "date-fns";
 
 export interface SlotInfo {
@@ -32,16 +32,20 @@ function slotKey(dateStr: string, h: number, m: number): string {
 }
 
 export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
-  // Read from cupons collection — agendamentos feitos pelas captadoras
+  // 1. Lê cupons agendados pelas captadoras (coleção cupons)
   const cuponRef = collection(db, "clinics", clinicId, "cupons");
-  const snap = await getDocs(query(cuponRef, where("status", "==", "agendado")));
+  const cuponSnap = await getDocs(query(cuponRef, where("status", "==", "agendado")));
 
-  // Build set of occupied slots — clareamento blocks 2 consecutive 30min slots
+  // 2. Lê leads já agendados no CRM (shared/shared)
+  const sharedRef = doc(db, "clinics", clinicId, "shared", "shared");
+  const sharedSnap = await getDoc(sharedRef);
+  const crmLeads: any[] = sharedSnap.exists() ? (sharedSnap.data().leads ?? []) : [];
+
+  // Build set of occupied slots
   const occupied = new Set<string>();
-  snap.forEach((d) => {
-    const data = d.data();
-    if (!data.dataAgendamento) return;
-    const parts = (data.dataAgendamento as string).split(" ");
+
+  const addOccupied = (dataAgendamento: string, vouchers?: string[]) => {
+    const parts = dataAgendamento.split(" ");
     if (parts.length < 2) return;
     const dateStr = parts[0];
     const [hStr, mStr] = parts[1].split(":");
@@ -49,15 +53,31 @@ export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
     const m = parseInt(mStr) || 0;
     occupied.add(slotKey(dateStr, h, m));
     // Clareamento = 1h → bloqueia slot seguinte também
-    const isClareamento = (data.vouchers as string[] | undefined)?.some(
-      (v) => v.toLowerCase().includes("clareamento")
-    );
+    const isClareamento = vouchers?.some((v) => v.toLowerCase().includes("clareamento"))
+      || false;
     if (isClareamento) {
       const nextM = m === 0 ? 30 : 0;
       const nextH = m === 0 ? h : h + 1;
       occupied.add(slotKey(dateStr, nextH, nextM));
     }
+  };
+
+  // Dos cupons (captadoras na rua)
+  cuponSnap.forEach((d) => {
+    const data = d.data();
+    if (data.dataAgendamento) addOccupied(data.dataAgendamento, data.vouchers);
   });
+
+  // Dos leads do CRM
+  for (const lead of crmLeads) {
+    if (lead.dataAgendamento) {
+      // CRM usa servicoProcurado em vez de vouchers
+      const vouchers = lead.servicoProcurado
+        ? [lead.servicoProcurado]
+        : [];
+      addOccupied(lead.dataAgendamento, vouchers);
+    }
+  }
 
   const slots: SlotInfo[] = [];
   // Começa de hoje, filtrando slots que já passaram (+ 1h de buffer)
