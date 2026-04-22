@@ -38,6 +38,7 @@ const STATUS_LABELS: Record<Cupom["status"], { label: string; color: string }> =
   pendente: { label: "Pendente", color: "bg-yellow-100 text-yellow-800 border-yellow-300" },
   ligado: { label: "Ligado", color: "bg-blue-100 text-blue-800 border-blue-300" },
   whatsapp_enviado: { label: "WhatsApp Enviado", color: "bg-green-50 text-green-700 border-green-300" },
+  agendado: { label: "Agendado", color: "bg-purple-100 text-purple-800 border-purple-300" },
   convertido: { label: "Convertido", color: "bg-green-100 text-green-800 border-green-300" },
 };
 
@@ -593,7 +594,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           )}
         </div>
         {/* Status filters */}
-        {(["todos", "pendente", "ligado", "whatsapp_enviado", "convertido"] as const).map((s) => (
+        {(["todos", "pendente", "ligado", "whatsapp_enviado", "agendado", "convertido"] as const).map((s) => (
           <button
             key={s}
             onClick={() => setFilterStatus(s)}

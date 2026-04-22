@@ -39,7 +39,7 @@ export interface Cupom {
   briefing?: string;   // observação do vendedor (visita)
   dataCupom: string; // dd/MM/yyyy HH:mm
   timestamp: number;
-  status: "pendente" | "ligado" | "whatsapp_enviado" | "convertido";
+  status: "pendente" | "ligado" | "whatsapp_enviado" | "convertido" | "agendado";
 }
 
 const getRef = (clinicaId: string) =>
@@ -128,14 +128,15 @@ export function useCupons(clinicaId: string | null) {
 
   const addCupom = async (
     clinicaId: string,
-    data: Omit<Cupom, "id" | "timestamp" | "dataCupom" | "status">
+    data: Omit<Cupom, "id" | "timestamp" | "dataCupom" | "status">,
+    status: Cupom["status"] = "pendente"
   ) => {
     const now = new Date();
     await addDoc(getRef(clinicaId), {
       ...data,
       dataCupom: format(now, "dd/MM/yyyy HH:mm"),
       timestamp: now.getTime(),
-      status: "pendente",
+      status,
     });
   };
 
