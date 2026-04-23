@@ -229,7 +229,7 @@ export default function Promotora() {
     }
   };
 
-  const handleEnviarWhatsAgendamento = () => {
+  const handleEnviarWhatsAgendamento = async () => {
     if (!agendadoStep || !sessao) return;
     const msg = generateAppointmentConfirmationTextForClinic(
       { id: sessao.clinicaId, name: sessao.clinicaLabel },
@@ -238,15 +238,21 @@ export default function Promotora() {
     const raw = agendadoStep.telefone;
     const num = raw.startsWith("55") ? raw : `55${raw}`;
     window.open(`whatsapp://send?phone=${num}&text=${encodeURIComponent(msg)}`);
-    saveScheduledLead(sessao.clinicaId, {
-      nome: agendadoStep.nome,
-      telefone: agendadoStep.telefone,
-      servicos: agendadoStep.vouchers,
-      observacao: agendadoStep.observacao,
-      abordadora: agendadoStep.abordadora,
-      local: agendadoStep.local,
-      dataAgendamento: agendadoStep.slot.dateStr,
-    }).catch(() => {});
+    try {
+      await saveScheduledLead(sessao.clinicaId, {
+        nome: agendadoStep.nome,
+        telefone: agendadoStep.telefone,
+        servicos: agendadoStep.vouchers,
+        observacao: agendadoStep.observacao,
+        abordadora: agendadoStep.abordadora,
+        local: agendadoStep.local,
+        dataAgendamento: agendadoStep.slot.dateStr,
+      });
+      toast.success(`Lead criado no CRM: ${agendadoStep.nome}`);
+    } catch (err) {
+      console.error("Erro ao salvar lead no CRM:", err);
+      toast.error("Erro ao salvar lead no CRM. Verifique a conexão.");
+    }
     setAgendadoStep(null);
     setAgendarOpen(false);
     resetForm();

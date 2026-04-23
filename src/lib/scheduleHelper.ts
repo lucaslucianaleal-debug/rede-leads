@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where, updateDoc, setDoc, arrayUnion } from "firebase/firestore";
 import { format } from "date-fns";
 
 export interface SlotInfo {
