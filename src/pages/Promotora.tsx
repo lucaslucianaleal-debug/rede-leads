@@ -237,7 +237,7 @@ export default function Promotora() {
     );
     const raw = agendadoStep.telefone;
     const num = raw.startsWith("55") ? raw : `55${raw}`;
-    window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
+    window.open(`whatsapp://send?phone=${num}&text=${encodeURIComponent(msg)}`);
     saveScheduledLead(sessao.clinicaId, {
       nome: agendadoStep.nome,
       telefone: agendadoStep.telefone,
