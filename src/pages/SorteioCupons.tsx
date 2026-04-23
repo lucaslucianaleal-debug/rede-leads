@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CheckSquare, Square, Trophy, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, CalendarCheck } from "lucide-react";
-import { getAvailableSlots, type SlotInfo } from "@/lib/scheduleHelper";
+import { CheckSquare, Square, Trophy, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, CalendarCheck, MessageSquare } from "lucide-react";
+import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
+import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -69,6 +70,7 @@ export default function SorteioCupons() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<SlotInfo | null>(null);
   const [agendando, setAgendando] = useState(false);
+  const [agendadoStep, setAgendadoStep] = useState<{ slot: SlotInfo; nome: string; telefone: string; abordadora: string; local: string; vouchers: string[]; observacao: string } | null>(null);
 
   const { cupons, addCupom } = useCupons(sessao?.clinicaId ?? null);
 
@@ -208,14 +210,49 @@ export default function SorteioCupons() {
       await addCupom(sessao.clinicaId, cupomData, "agendado");
       setLastAdded(nome.trim());
       updateActivity();
-      setAgendarOpen(false);
-      resetForm();
-      toast.success(`Agendado: ${nome.trim()} — ${selectedSlot.dayLabel} às ${selectedSlot.hour}h!`);
+      setAgendadoStep({
+        slot: selectedSlot,
+        nome: nome.trim(),
+        telefone: telefone1.replace(/\D/g, ""),
+        abordadora: sessao.abordadora,
+        local: sessao.local,
+        vouchers: selectedVouchers,
+        observacao: "",
+      });
     } catch {
       toast.error("Erro ao agendar. Tente novamente.");
     } finally {
       setAgendando(false);
     }
+  };
+
+  const handleEnviarWhatsAgendamento = () => {
+    if (!agendadoStep || !sessao) return;
+    const msg = generateAppointmentConfirmationTextForClinic(
+      { id: sessao.clinicaId, name: sessao.clinicaLabel },
+      agendadoStep.slot.dateStr
+    );
+    const raw = agendadoStep.telefone;
+    const num = raw.startsWith("55") ? raw : `55${raw}`;
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
+    saveScheduledLead(sessao.clinicaId, {
+      nome: agendadoStep.nome,
+      telefone: agendadoStep.telefone,
+      servicos: agendadoStep.vouchers,
+      observacao: agendadoStep.observacao,
+      abordadora: agendadoStep.abordadora,
+      local: agendadoStep.local,
+      dataAgendamento: agendadoStep.slot.dateStr,
+    }).catch(() => {});
+    setAgendadoStep(null);
+    setAgendarOpen(false);
+    resetForm();
+  };
+
+  const handlePularWhats = () => {
+    setAgendadoStep(null);
+    setAgendarOpen(false);
+    resetForm();
   };
 
   if (step === "login") {
@@ -420,60 +457,82 @@ export default function SorteioCupons() {
       </button>
 
       {/* Modal de agendamento */}
-      <Dialog open={agendarOpen} onOpenChange={(o) => { if (!o) setAgendarOpen(false); }}>
+      <Dialog open={agendarOpen} onOpenChange={(o) => { if (!o) { setAgendarOpen(false); setAgendadoStep(null); } }}>
         <DialogContent className="max-w-sm max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarCheck className="h-4 w-4 text-purple-600" />
-              Escolha um horário para {nome.trim() || "o cliente"}
+              {agendadoStep ? "✅ Agendado!" : `Escolha um horário para ${nome.trim() || "o cliente"}`}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto pr-1">
-            {slotsLoading ? (
-              <div className="text-center py-10 text-gray-500 text-sm">Buscando horários disponíveis...</div>
-            ) : slots.length === 0 ? (
-              <div className="text-center py-10 text-gray-500 text-sm">Nenhum horário disponível nos próximos dias.</div>
-            ) : (
-              <div className="space-y-4">
-                {Object.entries(
-                  slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {
-                    if (!acc[s.dayLabel]) acc[s.dayLabel] = [];
-                    acc[s.dayLabel].push(s);
-                    return acc;
-                  }, {})
-                ).map(([day, daySlots]) => (
-                  <div key={day}>
-                    <div className="text-sm font-semibold text-gray-700 mb-2">{day}</div>
-                    <div className="flex flex-wrap gap-2">
-                      {daySlots.map((slot) => (
-                        <button key={slot.dateStr} onClick={() => setSelectedSlot(slot)}
-                          className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                            selectedSlot?.dateStr === slot.dateStr
-                              ? "bg-purple-700 text-white border-purple-700"
-                              : "bg-white text-gray-700 border-gray-300 hover:border-purple-400"
-                          }`}>
-                          {slot.hourLabel}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+
+          {agendadoStep ? (
+            <div className="flex flex-col gap-4 py-2">
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center space-y-1">
+                <p className="font-semibold text-green-800">{agendadoStep.nome}</p>
+                <p className="text-sm text-green-700">{agendadoStep.slot.dayLabel} às {agendadoStep.slot.hourLabel}</p>
               </div>
-            )}
-          </div>
-          {selectedSlot && (
-            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm text-purple-800 font-medium">
-              Selecionado: {selectedSlot.dayLabel} às {selectedSlot.hour}h
+              <p className="text-sm text-gray-500 text-center">Deseja enviar a confirmação por WhatsApp agora?</p>
+              <Button onClick={handleEnviarWhatsAgendamento} className="bg-green-600 hover:bg-green-700 text-white gap-2 w-full">
+                <MessageSquare className="h-4 w-4" />
+                Enviar confirmação WhatsApp
+              </Button>
+              <button onClick={handlePularWhats} className="text-xs text-gray-400 hover:text-gray-600 text-center">
+                Pular, enviar depois pelo painel
+              </button>
             </div>
+          ) : (
+            <>
+              <div className="flex-1 overflow-y-auto pr-1">
+                {slotsLoading ? (
+                  <div className="text-center py-10 text-gray-500 text-sm">Buscando horários disponíveis...</div>
+                ) : slots.length === 0 ? (
+                  <div className="text-center py-10 text-gray-500 text-sm">Nenhum horário disponível nos próximos dias.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(
+                      slots.reduce<Record<string, SlotInfo[]>>((acc, s) => {
+                        if (!acc[s.dayLabel]) acc[s.dayLabel] = [];
+                        acc[s.dayLabel].push(s);
+                        return acc;
+                      }, {})
+                    ).map(([day, daySlots]) => (
+                      <div key={day}>
+                        <div className="text-sm font-semibold text-gray-700 mb-2">{day}</div>
+                        <div className="flex flex-wrap gap-2">
+                          {daySlots.map((slot) => (
+                            <button key={slot.dateStr} onClick={() => setSelectedSlot(slot)}
+                              className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                                selectedSlot?.dateStr === slot.dateStr
+                                  ? "bg-purple-700 text-white border-purple-700"
+                                  : "bg-white text-gray-700 border-gray-300 hover:border-purple-400"
+                              }`}>
+                              {slot.hourLabel}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selectedSlot && (
+                <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm text-purple-800 font-medium">
+                  Selecionado: {selectedSlot.dayLabel} às {selectedSlot.hour}h
+                </div>
+              )}
+
+              <DialogFooter className="gap-2 mt-3">
+                <Button variant="outline" size="sm" onClick={() => setAgendarOpen(false)}>Cancelar</Button>
+                <Button size="sm" disabled={!selectedSlot || agendando} onClick={handleConfirmarAgendamento}
+                  className="bg-purple-700 hover:bg-purple-800 text-white gap-2">
+                  <CalendarCheck className="h-4 w-4" />
+                  {agendando ? "Agendando..." : "Confirmar"}
+                </Button>
+              </DialogFooter>
+            </>
           )}
-          <DialogFooter className="gap-2 mt-3">
-            <Button variant="outline" size="sm" onClick={() => setAgendarOpen(false)}>Cancelar</Button>
-            <Button size="sm" disabled={!selectedSlot || agendando} onClick={handleConfirmarAgendamento}
-              className="bg-purple-700 hover:bg-purple-800 text-white gap-2">
-              <CalendarCheck className="h-4 w-4" />
-              {agendando ? "Agendando..." : "Confirmar"}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
