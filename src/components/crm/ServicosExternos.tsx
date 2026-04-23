@@ -253,7 +253,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       fonteLead: isVisita ? "Visita Comercial" : isPromotora ? "Promotora" : "Sorteio Cupom",
       etapaLead: cupom.dataAgendamento ? "Avaliação agendada" : "Novo",
       status: "QUENTE",
-      respostaLead: "",
+      respostaLead: cupom.dataAgendamento ? "RESPONDEU" : "",
       comparecimento: cupom.dataAgendamento ? "AGUARDANDO DATA" : "",
       dataFollowUp: "",
       dataAgendamento: cupom.dataAgendamento ?? "",
