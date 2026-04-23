@@ -233,7 +233,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   };
 
   const buildLeadFromCupom = (cupom: Cupom): Omit<Lead, "id"> => {
-    const now = format(new Date(), "dd/MM/yyyy");
+    // Se tem agendamento, usar a data do agendamento; senão usar hoje
+    const dataBase = cupom.dataAgendamento ? cupom.dataAgendamento.split(" ")[0] : format(new Date(), "dd/MM/yyyy");
     const isVisita = (cupom.tipo ?? "cupom") === "visita";
     const isPromotora = cupom.tipo === "promotora";
     const origemLabel = isVisita ? "Visita Comercial" : isPromotora ? "Promotora" : "Cupom sorteio";
@@ -244,8 +245,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       cupom.briefing ? (isPromotora ? `Observação: ${cupom.briefing}` : `Briefing: ${cupom.briefing}`) : "",
     ].filter(Boolean).join(" ");
     return {
-      dataCriacao: now,
-      dataContato: now,
+      dataCriacao: dataBase,
+      dataContato: dataBase,
       nome: cupom.nome,
       telefone: cupom.telefone1,
       servicoProcurado: cupom.vouchers.join(", "),
@@ -257,7 +258,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       comparecimento: cupom.dataAgendamento ? "AGUARDANDO DATA" : "",
       dataFollowUp: "",
       dataAgendamento: cupom.dataAgendamento ?? "",
-      dataAgendamentoCriado: cupom.dataAgendamento ? now : "",
+      dataAgendamentoCriado: cupom.dataAgendamento ? dataBase : "",
       dataRetornoLigacao: "",
       observacao: obsExtra,
       followUpCount: 0,
