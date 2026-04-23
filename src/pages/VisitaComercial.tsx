@@ -228,7 +228,9 @@ export default function VisitaComercial() {
     if (!agendadoStep || !sessao) return;
     const msg = generateAppointmentConfirmationTextForClinic(
       { id: sessao.clinicaId, name: sessao.clinicaLabel },
-      agendadoStep.slot.dateStr
+      agendadoStep.slot.dateStr,
+      agendadoStep.nome,
+      agendadoStep.vouchers
     );
     const raw = agendadoStep.telefone;
     const num = raw.startsWith("55") ? raw : `55${raw}`;

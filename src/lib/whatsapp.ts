@@ -95,14 +95,42 @@ function slugify(s: string | undefined) {
     .replace(/^-+|-+$/g, "");
 }
 
-export function generateAppointmentConfirmationTextForClinic(clinicMeta: any | undefined, dataAgendamento: string): string {
+function getArticleForServico(servico: string): string {
+  // Serviços femininos (usa "sua")
+  const femininos = ["limpeza", "avaliação", "restauração"];
+  const servicoLower = servico.toLowerCase();
+  if (femininos.some((f) => servicoLower.includes(f))) {
+    return "sua";
+  }
+  // Padrão: "seu" (clareamento, implante, etc)
+  return "seu";
+}
+
+export function generateAppointmentConfirmationTextForClinic(
+  clinicMeta: any | undefined,
+  dataAgendamento: string,
+  clientName?: string,
+  servicos?: string[]
+): string {
   const clinicName = clinicMeta?.name || "Odontocompany";
   const clinicId = clinicMeta?.id;
   const clinicAddressFromMeta = clinicMeta?.address;
 
+  // Build services text with correct grammar
+  let servicoText = "sua avaliação";
+  if (servicos && servicos.length > 0) {
+    const servicoComArtigo = servicos
+      .map((s) => `${getArticleForServico(s)} ${s}`)
+      .join(", ");
+    servicoText = servicoComArtigo;
+  }
+
+  const greeting = clientName ? `Oi ${clientName}!\n\n` : "";
+  const msgHeader = `${greeting}Essa é a confirmação do ${servicoText} na ${clinicName}💚\n\nSua bonificação está agendada para:\n\nData e Horario: ${dataAgendamento}`;
+
   // If clinic has explicit address, use it
   if (clinicAddressFromMeta) {
-    return `Confirmação de Consulta na ${clinicName}💚\n\nSua consulta está agendada para:\n\nData e Horario: ${dataAgendamento}\n\n📍 Endereço : ${clinicAddressFromMeta}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+    return `${msgHeader}\n\n📍 Endereço : ${clinicAddressFromMeta}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
   }
 
   // Try multiple keys to find a fallback address (using normalized keys)
@@ -126,7 +154,7 @@ export function generateAppointmentConfirmationTextForClinic(clinicMeta: any | u
   // final fallback to olympia
   if (!address) address = CLINIC_ADDRESS_FALLBACK["odontocompany-olimpia"];
 
-  return `Confirmação de Consulta na ${clinicName}💚\n\nSua consulta está agendada para:\n\nData e Horario: ${dataAgendamento}\n\n📍 Endereço : ${address}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+  return `${msgHeader}\n\n📍 Endereço : ${address}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
 }
 
 export function generateAppointmentConfirmationLinkForClinic(leadPhone: string, clinicMeta: any | undefined, dataAgendamento: string): string {
