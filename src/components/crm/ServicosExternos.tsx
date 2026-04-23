@@ -219,9 +219,15 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       toast.success("Mensagem copiada! Cole no WhatsApp com Ctrl+V (ou segurar para colar no celular).");
     });
     window.open(`https://wa.me/${num}`, "_blank");
-    // Se é agendado, converter para convertido. Senão, marcar como whatsapp_enviado
+    // Se é agendado, converter para convertido e criar lead no CRM. Senão, marcar como whatsapp_enviado
     const newStatus = whatsDialogCupom.status === "agendado" ? "convertido" : "whatsapp_enviado";
     updateStatus(clinicaId, whatsDialogCupom.id, newStatus);
+    if (whatsDialogCupom.status === "agendado") {
+      try {
+        const leadData = buildLeadFromCupom(whatsDialogCupom);
+        createLead(leadData);
+      } catch {}
+    }
     setSelected((prev) => prev ? { ...prev, status: newStatus } : null);
     setWhatsDialogCupom(null);
   };
@@ -245,12 +251,13 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       servicoProcurado: cupom.vouchers.join(", "),
       captador: cupom.abordadora,
       fonteLead: isVisita ? "Visita Comercial" : isPromotora ? "Promotora" : "Sorteio Cupom",
-      etapaLead: "Novo",
+      etapaLead: cupom.dataAgendamento ? "Avaliação agendada" : "Novo",
       status: "QUENTE",
       respostaLead: "",
-      comparecimento: "",
+      comparecimento: cupom.dataAgendamento ? "AGUARDANDO DATA" : "",
       dataFollowUp: "",
-      dataAgendamento: "",
+      dataAgendamento: cupom.dataAgendamento ?? "",
+      dataAgendamentoCriado: cupom.dataAgendamento ? now : "",
       dataRetornoLigacao: "",
       observacao: obsExtra,
       followUpCount: 0,
