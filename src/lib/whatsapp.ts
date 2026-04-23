@@ -62,11 +62,11 @@ export function generateAppointmentConfirmationText(dataAgendamento: string): st
 
 const CLINIC_ADDRESS_FALLBACK: Record<string, string> = {
   "odontocompany-olimpia": "R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079",
-  "odontocompany-badybassit": "SP-355, 1160 - Distrito Urbano, Bady Bassitt - SP, 15115-000",
+  "odontocompany-badybassit": "Av. Camilo de Moraes, 1160 - Distrito Urbano, Bady Bassitt - SP",
   "odontocompany-novohorizonte": "Rua Coronel Carvalho Leme, 427 - Centro, Novo Horizonte - SP, 14960-000",
   // also allow shorter keys if clinics use different ids
   "olimpia": "R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079",
-  "badybassit": "SP-355, 1160 - Distrito Urbano, Bady Bassitt - SP, 15115-000",
+  "badybassit": "Av. Camilo de Moraes, 1160 - Distrito Urbano, Bady Bassitt - SP",
   "novohorizonte": "Rua Coronel Carvalho Leme, 427 - Centro, Novo Horizonte - SP, 14960-000",
 };
 
