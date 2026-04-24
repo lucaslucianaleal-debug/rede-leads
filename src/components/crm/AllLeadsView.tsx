@@ -356,8 +356,8 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     // Comparecimentos dos agendamentos do período
     const compareceram = agendamentosNoPeriodo.filter(l => l.comparecimento === "COMPARECEU").length;
 
-    // Conversão: % de leads criados que agendaram (novos + recuperados) e % de agendamentos que compareceram
-    const taxaConversaoTotal = leadsCriados.length > 0 ? (((agendadosNovos + agendadosRecuperados) / leadsCriados.length) * 100).toFixed(1) : null;
+    // Conversão: % total de agendamentos (inclui reagendamentos) sobre leads criados
+    const taxaConversaoTotal = leadsCriados.length > 0 ? ((agendamentosNoPeriodo.length / leadsCriados.length) * 100).toFixed(1) : null;
     const taxaComparecimento = agendamentosNoPeriodo.length > 0 ? ((compareceram / agendamentosNoPeriodo.length) * 100).toFixed(1) : null;
 
     // Follow-ups realizados (mantém lógica anterior, mas pode ser ajustado)
