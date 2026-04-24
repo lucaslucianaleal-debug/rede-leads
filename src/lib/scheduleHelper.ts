@@ -165,6 +165,8 @@ export async function saveScheduledLead(
     dataAgendamentoCriado: now,
     dataRetornoLigacao: "",
     observacao: `Origem: Promotora (${data.local}).${data.observacao ? ` Obs: ${data.observacao}` : ""}`,
+    followUpCount: 0,
+    lembretes: { h24: false, today: false },
   };
 
   const snap = await getDoc(docRef);
