@@ -57,6 +57,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
   const [selectedAttendance, setSelectedAttendance] = useState<string>("all");
   const [selectedStage, setSelectedStage] = useState<string>("all");
   const [selectedService, setSelectedService] = useState<string>("all");
+  const [selectedCaptador, setSelectedCaptador] = useState<string>("all");
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
@@ -168,6 +169,17 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     return Array.from(services).sort();
   }, [leads]);
 
+  // Get available captadores
+  const availableCaptadores = useMemo(() => {
+    const captadores = new Set<string>();
+    leads.forEach((lead) => {
+      if (lead.captador && lead.captador.trim() !== "") {
+        captadores.add(lead.captador.trim());
+      }
+    });
+    return Array.from(captadores).sort();
+  }, [leads]);
+
   // Lista fixa de etapas igual ao tipo LeadStage
   const STAGES: LeadStage[] = [
     "Novo",
@@ -246,8 +258,13 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       result = result.filter((lead) => lead.servicoProcurado?.trim() === selectedService);
     }
 
+    // Filter by captador
+    if (selectedCaptador !== "all") {
+      result = result.filter((lead) => lead.captador?.trim() === selectedCaptador);
+    }
+
     return result;
-  }, [leads, dateFilterType, selectedDateMonth, selectedDateDay, reportStart, reportEnd, selectedAppointmentMonth, selectedSource, selectedStage, selectedAttendance, selectedService]);
+  }, [leads, dateFilterType, selectedDateMonth, selectedDateDay, reportStart, reportEnd, selectedAppointmentMonth, selectedSource, selectedStage, selectedAttendance, selectedService, selectedCaptador]);
 
   // Relatório filtrado: todos os cards refletem SEMPRE os filtros ativos
   const stats = useMemo(() => {
@@ -415,9 +432,10 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
     setSelectedSource("all");
     setSelectedStage("all");
     setSelectedService("all");
+    setSelectedCaptador("all");
   };
 
-  const hasActiveFilters = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all" || selectedStage !== "all" || selectedService !== "all";
+  const hasActiveFilters = searchTerm !== "" || selectedCreationDay !== "all" || selectedContactMonth !== "all" || selectedAppointmentMonth !== "all" || selectedSource !== "all" || selectedStage !== "all" || selectedService !== "all" || selectedCaptador !== "all";
 
   const colorMap: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
@@ -535,6 +553,18 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
                     <SelectItem value="all">Todos</SelectItem>
                     {availableServices.map((service) => (
                       <SelectItem key={service} value={service}>{service}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground mb-1">Captador</span>
+                <Select value={selectedCaptador} onValueChange={setSelectedCaptador}>
+                  <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {availableCaptadores.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
