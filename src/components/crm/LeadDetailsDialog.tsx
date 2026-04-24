@@ -188,12 +188,12 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
           )}
 
           {/* Lembretes */}
-          {(lead.lembretes.h24 || lead.lembretes.today) && (
+          {(lead.lembretes?.h24 || lead.lembretes?.today) && (
             <div>
               <h3 className="font-heading font-semibold text-sm mb-2 text-foreground">Lembretes Ativados</h3>
               <div className="flex gap-2">
-                {lead.lembretes.h24 && <Badge variant="secondary">Lembrete 24h</Badge>}
-                {lead.lembretes.today && <Badge variant="secondary">Lembrete Hoje</Badge>}
+                {lead.lembretes?.h24 && <Badge variant="secondary">Lembrete 24h</Badge>}
+                {lead.lembretes?.today && <Badge variant="secondary">Lembrete Hoje</Badge>}
               </div>
             </div>
           )}
