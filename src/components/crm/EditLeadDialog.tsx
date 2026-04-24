@@ -150,9 +150,6 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           <DialogHeader>
             <DialogTitle>Editar Lead — {lead.nome}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">Editar as informações do lead</DialogDescription>
-            <div className="text-xs text-muted-foreground mt-1">
-              Lead criado em <strong>{form.dataCriacao}</strong>
-            </div>
           </DialogHeader>
 
         <div className="grid grid-cols-2 gap-4 py-2">
@@ -186,6 +183,36 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
                 <span>Telefone já cadastrado: <strong>{duplicateWarning.nome}</strong> ({duplicateWarning.etapa})</span>
               </div>
             )}
+          </div>
+
+          {/* Data de Criação */}
+          <div className="space-y-1">
+            <Label>Data de Criação</Label>
+            <Input
+              type="date"
+              value={form.dataCriacao?.split("/").reverse().join("-") || ""}
+              onChange={(e) => {
+                if (e.target.value) {
+                  const [year, month, day] = e.target.value.split("-");
+                  set("dataCriacao", `${day}/${month}/${year}`);
+                }
+              }}
+            />
+          </div>
+
+          {/* Data de Contato */}
+          <div className="space-y-1">
+            <Label>Data de Contato</Label>
+            <Input
+              type="date"
+              value={form.dataContato?.split("/").reverse().join("-") || ""}
+              onChange={(e) => {
+                if (e.target.value) {
+                  const [year, month, day] = e.target.value.split("-");
+                  set("dataContato", `${day}/${month}/${year}`);
+                }
+              }}
+            />
           </div>
 
           {/* Serviço */}
