@@ -304,6 +304,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       if (selectedSource !== "all" && getSourceGroup(l.fonteLead) !== selectedSource) return false;
       if (selectedStage !== "all" && l.etapaLead !== selectedStage) return false;
       if (selectedService !== "all" && (l.servicoProcurado || "").trim() !== selectedService) return false;
+      if (selectedCaptador !== "all" && (l.captador || "").trim() !== selectedCaptador) return false;
       return true;
     });
 
@@ -391,7 +392,7 @@ export function AllLeadsView({ leads, onMarkAttendance, onUpdateLead, onCreateLe
       taxaConversaoTotal,
       taxaComparecimento,
     };
-  }, [leadsFilteredByMonthSource, selectedAppointmentMonth, searchTerm, selectedCreationDay, selectedContactMonth, selectedSource, selectedStage, leads, dateFilterType, selectedDateMonth, selectedDateDay, reportStart, reportEnd]);
+  }, [leadsFilteredByMonthSource, selectedAppointmentMonth, searchTerm, selectedCreationDay, selectedContactMonth, selectedSource, selectedStage, selectedCaptador, leads, dateFilterType, selectedDateMonth, selectedDateDay, reportStart, reportEnd]);
 
   // Filter leads (apply duplicados and search filters on top of month/source)
   const filteredLeads = useMemo(() => {
