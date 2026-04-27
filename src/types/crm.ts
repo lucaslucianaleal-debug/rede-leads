@@ -61,6 +61,8 @@ export interface Lead {
   briefingRecepcao?: string;
   followUpCount: number;
   lembretes: ReminderStatus;
+  // Coordenadas do cliente para navegação e rastreamento
+  coordenadas?: { lat?: number; lng?: number };
   // Soft-delete fields
   _deleted?: boolean;
   deletedAt?: string;
