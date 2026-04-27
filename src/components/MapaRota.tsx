@@ -5,7 +5,7 @@ import type { GeoPoint } from "@/hooks/useGeoTracking";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 
-const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY as string;
+const MAPTILER_KEY = (import.meta.env.VITE_MAPTILER_KEY as string ?? "").trim();
 
 // Fix Leaflet default icons broken by Vite's asset bundling
 (L.Icon.Default as unknown as { mergeOptions: (o: object) => void }).mergeOptions({
@@ -103,8 +103,6 @@ export function MapaRota({
         attribution:
           '© <a href="https://www.maptiler.com/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 21,
-        tileSize: 512,
-        zoomOffset: -1,
       }
     ).addTo(map);
 
