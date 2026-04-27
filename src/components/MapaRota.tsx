@@ -5,7 +5,7 @@ import type { GeoPoint } from "@/hooks/useGeoTracking";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 
-const MAPTILER_KEY = (import.meta.env.VITE_MAPTILER_KEY as string ?? "").trim();
+const MAPTILER_KEY = (import.meta.env.VITE_MAPTILER_KEY as string ?? "kCvlfUrIUWwTIwossp9i").trim().replace(/\s/g, "");
 
 // Fix Leaflet default icons broken by Vite's asset bundling
 (L.Icon.Default as unknown as { mergeOptions: (o: object) => void }).mergeOptions({
@@ -98,7 +98,7 @@ export function MapaRota({
 
     // Maptiler Hybrid — satellite imagery + roads + labels (like Strava)
     L.tileLayer(
-      `https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
+      `https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
       {
         attribution:
           '© <a href="https://www.maptiler.com/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
