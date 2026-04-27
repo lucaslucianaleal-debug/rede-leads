@@ -11,6 +11,7 @@ import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/sched
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { useGeoTracking } from "@/hooks/useGeoTracking";
 import { MapaRota } from "@/components/MapaRota";
+import { PromotoraMapaGoogle } from "@/components/PromotoraMapaGoogle";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -407,18 +408,14 @@ export default function Promotora() {
       ) : pageTab === "mapa" ? (
         <div className="w-full max-w-sm space-y-2">
           <div className="bg-white rounded-2xl shadow-2xl overflow-hidden" style={{ height: "65vh" }}>
-            <MapaRota
-              points={points}
-              currentPosition={currentPosition}
-              error={geoError}
-              clinicId={sessao?.clinicaId}
-              sessaoId={sessao?.sessaoId}
-              abordadora={sessao?.abordadora}
-              height="100%"
+            <PromotoraMapaGoogle
+              sessaoId={sessao?.sessaoId ?? ""}
+              clinicId={sessao?.clinicaId ?? ""}
+              abordadora={sessao?.abordadora ?? ""}
             />
           </div>
           <p className="text-white/50 text-xs text-center pb-1">
-            Mantenha a aba aberta para o trajeto ser registrado automaticamente
+            Sua posição é atualizada a cada 15 segundos
           </p>
         </div>
       ) : (

@@ -36,10 +36,12 @@ import {
   Trash2,
   Undo2,
   Save,
+  Navigation,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/phone";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { MapaRota } from "@/components/MapaRota";
+import { RotasAtivasTab } from "@/components/crm/RotasAtivasTab";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import type { GeoPoint } from "@/hooks/useGeoTracking";
@@ -56,7 +58,7 @@ interface ServicosExternosProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
-type MainTab = "cupom" | "visita" | "promotora" | "sessoes";
+type MainTab = "cupom" | "visita" | "promotora" | "sessoes" | "rotas";
 
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
@@ -68,7 +70,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { cupons, loading, updateStatus } = useCupons(clinicaId);
 
   const [mainTab, setMainTab] = useState<MainTab>("cupom");
-  const servicoTab = mainTab !== "sessoes" ? mainTab : "cupom";
+  const servicoTab = (mainTab !== "sessoes" && mainTab !== "rotas") ? mainTab : "cupom";
 
   // State for sessões tab
   const todayInput = format(new Date(), "yyyy-MM-dd");
@@ -505,7 +507,18 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
             <span className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
           )}
         </button>
-        {mainTab !== "sessoes" && (
+        <button
+          onClick={() => { setMainTab("rotas"); setSelected(null); }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            mainTab === "rotas"
+              ? "border-pink-600 text-pink-700"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Navigation className="h-4 w-4" />
+          Rotas Ativas
+        </button>
+        {mainTab !== "sessoes" && mainTab !== "rotas" && (
           <div className={`ml-auto flex items-center gap-2 mb-1 px-3 py-1.5 rounded-lg text-xs border self-center ${
             servicoTab === "cupom"
               ? "bg-blue-50 border-blue-200 text-blue-700"
@@ -627,8 +640,13 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         </div>
       )}
 
+      {/* ===== ABA ROTAS ATIVAS ===== */}
+      {mainTab === "rotas" && (
+        <RotasAtivasTab clinicId={clinicaId} />
+      )}
+
       {/* ===== ABAS CUPOM / VISITA ===== */}
-      {mainTab !== "sessoes" && <>
+      {mainTab !== "sessoes" && mainTab !== "rotas" && <>
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">
         {mainTab === "promotora" && (
