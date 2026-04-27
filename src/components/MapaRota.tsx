@@ -47,6 +47,7 @@ export function MapaRota({
   const markerRef = useRef<L.Marker | null>(null);
   const startMarkerRef = useRef<L.Marker | null>(null);
   const onMapClickRef = useRef(onMapClick);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   const [remotePoints, setRemotePoints] = useState<GeoPoint[]>([]);
   const [firestorePlanned, setFirestorePlanned] = useState<GeoPoint[]>([]);
@@ -113,7 +114,22 @@ export function MapaRota({
 
     mapRef.current = map;
 
+    const invalidate = () => map.invalidateSize(false);
+    const frameId = requestAnimationFrame(invalidate);
+    const timeoutId = window.setTimeout(invalidate, 250);
+
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserverRef.current = new ResizeObserver(() => {
+        invalidate();
+      });
+      resizeObserverRef.current.observe(containerRef.current);
+    }
+
     return () => {
+      cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
       map.remove();
       mapRef.current = null;
       polylineRef.current = null;
