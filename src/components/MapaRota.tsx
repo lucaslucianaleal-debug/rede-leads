@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet-rotate";
+import * as LGeocode from "leaflet-control-geocoder";
+import "leaflet-control-geocoder/dist/Control.Geocoder.css";
 import type { GeoPoint } from "@/hooks/useGeoTracking";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -90,10 +93,13 @@ export function MapaRota({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const map = L.map(containerRef.current, { zoomControl: true }).setView(
-      [-21.0, -49.3],
-      14
-    );
+    const map = L.map(containerRef.current, {
+      zoomControl: true,
+      rotate: true,
+      touchRotate: true,
+      rotateControl: { closeOnZeroBearing: false },
+      bearing: 0,
+    }).setView([-21.0, -49.3], 14);
 
     // OpenStreetMap — free, no API key, reliable
     L.tileLayer(
@@ -104,6 +110,23 @@ export function MapaRota({
         maxZoom: 19,
       }
     ).addTo(map);
+
+    // Geocoder search (Nominatim — free, no key)
+    const geocoder = (LGeocode as any).geocoder({
+      defaultMarkGeocode: false,
+      collapsed: true,
+      placeholder: "Buscar endereço…",
+      geocoder: new (LGeocode as any).Nominatim({ serviceUrl: "https://nominatim.openstreetmap.org/" }),
+    });
+    geocoder.on("markgeocode", (e: any) => {
+      const center = e.geocode.center;
+      map.setView(center, 17);
+      // In draw mode → also add the found location as a waypoint
+      if (onMapClickRef.current) {
+        onMapClickRef.current({ lat: center.lat, lng: center.lng, ts: Date.now() });
+      }
+    });
+    geocoder.addTo(map);
 
     // Map click → draw mode callback
     map.on("click", (e: L.LeafletMouseEvent) => {
