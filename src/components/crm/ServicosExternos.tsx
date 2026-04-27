@@ -41,7 +41,7 @@ import {
 import { formatPhoneNumber } from "@/lib/phone";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { MapaRota } from "@/components/MapaRota";
-import { RotasAtivasTab } from "@/components/crm/RotasAtivasTab";
+import { RotasTab } from "@/components/crm/RotasTab";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import type { GeoPoint } from "@/hooks/useGeoTracking";
@@ -642,7 +642,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
       {/* ===== ABA ROTAS ATIVAS ===== */}
       {mainTab === "rotas" && (
-        <RotasAtivasTab clinicId={clinicaId} />
+        <RotasTab clinicId={clinicaId} />
       )}
 
       {/* ===== ABAS CUPOM / VISITA ===== */}

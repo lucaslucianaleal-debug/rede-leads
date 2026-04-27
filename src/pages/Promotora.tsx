@@ -6,12 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X, CalendarCheck, Map } from "lucide-react";
+import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X, CalendarCheck, Map, Navigation, Route } from "lucide-react";
 import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
-import { useGeoTracking } from "@/hooks/useGeoTracking";
-import { MapaRota } from "@/components/MapaRota";
-import { PromotoraMapaGoogle } from "@/components/PromotoraMapaGoogle";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { format } from "date-fns";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -80,17 +80,43 @@ export default function Promotora() {
 
   const { cupons, addCupom } = useCupons(sessao?.clinicaId ?? null);
 
-  // GPS tracking — only active after login
-  const { points, currentPosition, error: geoError } = useGeoTracking({
-    clinicId: sessao?.clinicaId ?? null,
-    sessaoId: sessao?.sessaoId ?? null,
-    enabled: !!sessao,
-  });
-
   const meusContatos = useMemo(() =>
     cupons.filter((c) => c.tipo === "promotora" && c.sessaoId === sessao?.sessaoId),
     [cupons, sessao]
   );
+
+  // Rota do dia para esta promotora
+  interface RotaDoDia {
+    id: string;
+    nome: string;
+    data: string;
+    waypoints: { lat: number; lng: number }[];
+  }
+  const [rotaDoDia, setRotaDoDia] = useState<RotaDoDia | null>(null);
+  const [rotaLoading, setRotaLoading] = useState(false);
+
+  useEffect(() => {
+    if (!sessao) { setRotaDoDia(null); return; }
+    setRotaLoading(true);
+    const today = format(new Date(), "dd/MM/yyyy");
+    getDocs(
+      query(
+        collection(db, "clinics", sessao.clinicaId, "rotas"),
+        where("abordadora", "==", sessao.abordadora),
+        where("data", "==", today)
+      )
+    )
+      .then((snap) => {
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          setRotaDoDia({ id: d.id, ...(d.data() as Omit<RotaDoDia, "id">) });
+        } else {
+          setRotaDoDia(null);
+        }
+      })
+      .catch(() => setRotaDoDia(null))
+      .finally(() => setRotaLoading(false));
+  }, [sessao]);
 
   useEffect(() => {
     const digits = telefone1.replace(/\D/g, "");
@@ -406,17 +432,61 @@ export default function Promotora() {
           )}
         </div>
       ) : pageTab === "mapa" ? (
-        <div className="w-full max-w-sm space-y-2">
-          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden" style={{ height: "65vh" }}>
-            <PromotoraMapaGoogle
-              sessaoId={sessao?.sessaoId ?? ""}
-              clinicId={sessao?.clinicaId ?? ""}
-              abordadora={sessao?.abordadora ?? ""}
-            />
-          </div>
-          <p className="text-white/50 text-xs text-center pb-1">
-            Sua posição é atualizada a cada 15 segundos
-          </p>
+        <div className="w-full max-w-sm space-y-3">
+          {rotaLoading ? (
+            <div className="bg-white/10 rounded-2xl px-5 py-8 text-center text-white/60 text-sm animate-pulse">
+              Buscando rota do dia…
+            </div>
+          ) : rotaDoDia ? (
+            <div className="bg-white rounded-2xl shadow-2xl p-5 space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="bg-pink-100 p-2.5 rounded-xl shrink-0">
+                  <Route className="h-5 w-5 text-pink-700" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Rota de hoje</p>
+                  <h2 className="font-bold text-gray-800 text-base leading-tight">{rotaDoDia.nome}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {rotaDoDia.waypoints.length} ponto{rotaDoDia.waypoints.length !== 1 ? "s" : ""} · {rotaDoDia.data}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                {rotaDoDia.waypoints.map((pt, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${i === 0 ? "bg-green-500" : i === rotaDoDia.waypoints.length - 1 ? "bg-red-500" : "bg-blue-400"}`}>
+                      {i === 0 ? "A" : i === rotaDoDia.waypoints.length - 1 ? "B" : i + 1}
+                    </div>
+                    <span className="text-gray-500 font-mono">
+                      {pt.lat.toFixed(5)}, {pt.lng.toFixed(5)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <a
+                href={`https://www.google.com/maps/dir/${rotaDoDia.waypoints.map((w) => `${w.lat},${w.lng}`).join("/")}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 w-full bg-pink-700 hover:bg-pink-800 text-white font-semibold rounded-xl py-3.5 transition-colors text-sm"
+              >
+                <Navigation className="h-4 w-4" />
+                Abrir no Google Maps
+              </a>
+              <p className="text-xs text-gray-400 text-center">
+                Abre o app Maps com o trajeto completo
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white/10 rounded-2xl px-5 py-10 text-center space-y-2">
+              <MapPin className="h-8 w-8 mx-auto text-white/30" />
+              <p className="text-white/70 text-sm font-medium">Nenhuma rota para hoje</p>
+              <p className="text-white/40 text-xs">
+                Peça para o administrador criar uma rota para <strong className="text-white/60">{sessao?.abordadora}</strong> com a data de hoje
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <>
