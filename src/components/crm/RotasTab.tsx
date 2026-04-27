@@ -52,7 +52,7 @@ interface RotasTabProps {
 function buildMapsUrl(waypoints: { lat: number; lng: number }[]): string {
   if (waypoints.length < 2) return "";
   const pts = waypoints.map((w) => `${w.lat},${w.lng}`).join("/");
-  return `https://www.google.com/maps/dir/${pts}`;
+  return `https://www.google.com/maps/dir/${pts}?travelmode=walking`;
 }
 
 export function RotasTab({ clinicId }: RotasTabProps) {

@@ -466,7 +466,7 @@ export default function Promotora() {
               </div>
 
               <a
-                href={`https://www.google.com/maps/dir/${rotaDoDia.waypoints.map((w) => `${w.lat},${w.lng}`).join("/")}`}
+                href={`https://www.google.com/maps/dir/${rotaDoDia.waypoints.map((w) => `${w.lat},${w.lng}`).join("/")}?travelmode=walking`}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center justify-center gap-2 w-full bg-pink-700 hover:bg-pink-800 text-white font-semibold rounded-xl py-3.5 transition-colors text-sm"

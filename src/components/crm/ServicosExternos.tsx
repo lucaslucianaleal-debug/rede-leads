@@ -42,6 +42,7 @@ import { formatPhoneNumber } from "@/lib/phone";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { MapaRota } from "@/components/MapaRota";
 import { RotasTab } from "@/components/crm/RotasTab";
+import { MapaGeralRotas } from "@/components/crm/MapaGeralRotas";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import type { GeoPoint } from "@/hooks/useGeoTracking";
@@ -58,7 +59,7 @@ interface ServicosExternosProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
-type MainTab = "cupom" | "visita" | "promotora" | "sessoes" | "rotas";
+type MainTab = "cupom" | "visita" | "promotora" | "sessoes" | "rotas" | "mapa-geral";
 
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
@@ -70,7 +71,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { cupons, loading, updateStatus } = useCupons(clinicaId);
 
   const [mainTab, setMainTab] = useState<MainTab>("cupom");
-  const servicoTab = (mainTab !== "sessoes" && mainTab !== "rotas") ? mainTab : "cupom";
+  const servicoTab = (mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral") ? mainTab : "cupom";
 
   // State for sessões tab
   const todayInput = format(new Date(), "yyyy-MM-dd");
@@ -518,7 +519,18 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           <Navigation className="h-4 w-4" />
           Rotas Ativas
         </button>
-        {mainTab !== "sessoes" && mainTab !== "rotas" && (
+        <button
+          onClick={() => { setMainTab("mapa-geral"); setSelected(null); }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            mainTab === "mapa-geral"
+              ? "border-emerald-600 text-emerald-700"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Map className="h-4 w-4" />
+          Mapa Geral
+        </button>
+        {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && (
           <div className={`ml-auto flex items-center gap-2 mb-1 px-3 py-1.5 rounded-lg text-xs border self-center ${
             servicoTab === "cupom"
               ? "bg-blue-50 border-blue-200 text-blue-700"
@@ -645,8 +657,13 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         <RotasTab clinicId={clinicaId} />
       )}
 
+      {/* ===== ABA MAPA GERAL ===== */}
+      {mainTab === "mapa-geral" && (
+        <MapaGeralRotas clinicId={clinicaId} />
+      )}
+
       {/* ===== ABAS CUPOM / VISITA ===== */}
-      {mainTab !== "sessoes" && mainTab !== "rotas" && <>
+      {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && <>
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">
         {mainTab === "promotora" && (
