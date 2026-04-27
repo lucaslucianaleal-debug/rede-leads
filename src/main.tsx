@@ -6,7 +6,7 @@ import "./index.css";
 const gmapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY as string;
 if (gmapsKey) {
   const script = document.createElement("script");
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${gmapsKey}&libraries=directions,marker`;
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${gmapsKey}&libraries=marker&loading=async`;
   script.async = true;
   document.head.appendChild(script);
 }
