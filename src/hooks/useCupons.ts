@@ -37,6 +37,7 @@ export interface Cupom {
   local: string;       // local de abordagem (cupom) ou estabelecimento (visita)
   abordadora: string;  // nome da abordadora (cupom) ou vendedor (visita)
   briefing?: string;   // observação do vendedor (visita)
+  sessaoId?: string;   // ID da sessão em que foi capturado
   dataAgendamento?: string; // dd/MM/yyyy HH:mm — preenchido quando agendado
   dataCupom: string; // dd/MM/yyyy HH:mm
   timestamp: number;
@@ -59,6 +60,7 @@ export interface Sessao {
   horaFim: string | null;
   data: string;        // "dd/MM/yyyy" para filtrar por dia
   timestamp: number;
+  rota?: { lat: number; lng: number; ts: number }[];
 }
 
 export function useSessoes(clinicaId: string | null, filterDate?: string) {

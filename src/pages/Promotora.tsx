@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X, CalendarCheck } from "lucide-react";
+import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X, CalendarCheck, Map } from "lucide-react";
 import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
+import { useGeoTracking } from "@/hooks/useGeoTracking";
+import { MapaRota } from "@/components/MapaRota";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -31,7 +33,7 @@ interface SessaoLocal {
   lastActivity: number; // timestamp ms — expira em 12h de inatividade
 }
 
-type PageTab = "novo" | "meus";
+type PageTab = "novo" | "meus" | "mapa";
 
 export default function Promotora() {
   const [sessao, setSessao] = useState<SessaoLocal | null>(() => {
@@ -76,6 +78,13 @@ export default function Promotora() {
   const [agendadoStep, setAgendadoStep] = useState<{ slot: SlotInfo; nome: string; telefone: string; abordadora: string; local: string; vouchers: string[]; observacao: string } | null>(null);
 
   const { cupons, addCupom } = useCupons(sessao?.clinicaId ?? null);
+
+  // GPS tracking — only active after login
+  const { points, currentPosition, error: geoError } = useGeoTracking({
+    clinicId: sessao?.clinicaId ?? null,
+    sessaoId: sessao?.sessaoId ?? null,
+    enabled: !!sessao,
+  });
 
   const meusContatos = useMemo(() =>
     cupons.filter((c) => c.tipo === "promotora" && c.sessaoId === sessao?.sessaoId),
@@ -349,7 +358,13 @@ export default function Promotora() {
           onClick={() => setPageTab("meus")}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${pageTab === "meus" ? "bg-white text-pink-800" : "text-white/70 hover:text-white"}`}
         >
-          <List className="h-4 w-4" /> Meus contatos {meusContatos.length > 0 && `(${meusContatos.length})`}
+          <List className="h-4 w-4" /> Meus {meusContatos.length > 0 && `(${meusContatos.length})`}
+        </button>
+        <button
+          onClick={() => setPageTab("mapa")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${pageTab === "mapa" ? "bg-white text-pink-800" : "text-white/70 hover:text-white"}`}
+        >
+          <Map className="h-4 w-4" /> Mapa
         </button>
       </div>
 
@@ -388,6 +403,21 @@ export default function Promotora() {
               </div>
             ))
           )}
+        </div>
+      ) : pageTab === "mapa" ? (
+        <div className="w-full max-w-sm space-y-2">
+          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden" style={{ height: "65vh" }}>
+            <MapaRota
+              points={points}
+              currentPosition={currentPosition}
+              error={geoError}
+              abordadora={sessao?.abordadora}
+              height="100%"
+            />
+          </div>
+          <p className="text-white/50 text-xs text-center pb-1">
+            Mantenha a aba aberta para o trajeto ser registrado automaticamente
+          </p>
         </div>
       ) : (
         <>

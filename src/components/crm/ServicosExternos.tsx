@@ -31,9 +31,11 @@ import {
   Users,
   UserCheck,
   Upload,
+  Map,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/phone";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
+import { MapaRota } from "@/components/MapaRota";
 
 const STATUS_LABELS: Record<Cupom["status"], { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "bg-yellow-100 text-yellow-800 border-yellow-300" },
@@ -86,6 +88,9 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   // Import modal (promotora)
   const [importOpen, setImportOpen] = useState(false);
+
+  // Rota modal
+  const [rotaModal, setRotaModal] = useState<{ clinicId: string; sessaoId: string; abordadora: string } | null>(null);
   const [importText, setImportText] = useState("");
   const [importLoading, setImportLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<Array<{ nome: string; telefone: string; dup: boolean }> | null>(null);
@@ -517,7 +522,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                     <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Local</th>
                     <th className="text-left px-3 py-2 font-medium text-muted-foreground">Início</th>
                     <th className="text-left px-3 py-2 font-medium text-muted-foreground">Fim</th>
-                    <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden sm:table-cell">Duração</th>
+                        <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden sm:table-cell">Duração</th>
+                    <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -559,6 +565,16 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                           )}
                         </td>
                         <td className="px-3 py-2.5 hidden sm:table-cell text-muted-foreground">{calcDuracao(s)}</td>
+                        <td className="px-3 py-2">
+                          {s.tipo === "promotora" && (
+                            <button
+                              onClick={() => setRotaModal({ clinicId: s.clinicaId, sessaoId: s.id, abordadora: s.abordadora })}
+                              className="flex items-center gap-1 text-xs text-pink-700 hover:text-pink-900 font-medium border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-50 transition-colors"
+                            >
+                              <Map className="h-3 w-3" /> Ver Rota
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -1008,6 +1024,28 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== MODAL ROTA PROMOTORA ===== */}
+      <Dialog open={!!rotaModal} onOpenChange={(o) => { if (!o) setRotaModal(null); }}>
+        <DialogContent className="max-w-2xl w-full p-0 overflow-hidden">
+          <DialogHeader className="px-4 pt-4 pb-2">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Map className="h-4 w-4 text-pink-700" />
+              Rota — {rotaModal?.abordadora}
+            </DialogTitle>
+          </DialogHeader>
+          <div style={{ height: "70vh" }}>
+            {rotaModal && (
+              <MapaRota
+                clinicId={rotaModal.clinicId}
+                sessaoId={rotaModal.sessaoId}
+                abordadora={rotaModal.abordadora}
+                height="100%"
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
