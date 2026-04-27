@@ -71,10 +71,21 @@ export function MapaRota({
       [-21.0, -49.3],
       13
     );
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors",
-      maxZoom: 19,
-    }).addTo(map);
+    // Satellite base layer (ESRI World Imagery — free, no API key)
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        attribution:
+          "Tiles © Esri — Source: Esri, USGS, NOAA",
+        maxZoom: 19,
+      }
+    ).addTo(map);
+
+    // Street labels overlay on top of satellite
+    L.tileLayer(
+      "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19, opacity: 0.7 }
+    ).addTo(map);
 
     mapRef.current = map;
 
