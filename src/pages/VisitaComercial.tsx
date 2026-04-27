@@ -244,6 +244,7 @@ export default function VisitaComercial() {
         abordadora: agendadoStep.abordadora,
         local: agendadoStep.local,
         dataAgendamento: agendadoStep.slot.dateStr,
+        fonteLead: "Visita Comercial",
       });
       toast.success(`Lead criado no CRM: ${agendadoStep.nome}`);
     } catch (err) {

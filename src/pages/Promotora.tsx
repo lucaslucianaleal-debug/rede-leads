@@ -249,6 +249,7 @@ export default function Promotora() {
         abordadora: agendadoStep.abordadora,
         local: agendadoStep.local,
         dataAgendamento: agendadoStep.slot.dateStr,
+        fonteLead: "Promotora",
       });
       toast.success(`Lead criado no CRM: ${agendadoStep.nome}`);
     } catch (err) {

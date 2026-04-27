@@ -246,6 +246,7 @@ export default function SorteioCupons() {
         abordadora: agendadoStep.abordadora,
         local: agendadoStep.local,
         dataAgendamento: agendadoStep.slot.dateStr,
+        fonteLead: "Sorteio",
       });
       toast.success(`Lead criado no CRM: ${agendadoStep.nome}`);
     } catch (err) {

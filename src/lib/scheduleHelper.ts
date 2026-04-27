@@ -142,6 +142,7 @@ export async function saveScheduledLead(
     abordadora: string;
     local: string;
     dataAgendamento: string;
+    fonteLead?: string;
   }
 ): Promise<void> {
   const docRef = doc(db, "clinics", clinicId, "shared", "shared");
@@ -155,7 +156,7 @@ export async function saveScheduledLead(
     telefone: data.telefone.replace(/\D/g, ""),
     servicoProcurado: data.servicos.length > 0 ? data.servicos.join(", ") : "Avaliação",
     captador: data.abordadora,
-    fonteLead: "Promotora",
+    fonteLead: data.fonteLead ?? "Promotora",
     etapaLead: "Avaliação agendada",
     status: "QUENTE",
     respostaLead: "RESPONDEU",
@@ -164,7 +165,8 @@ export async function saveScheduledLead(
     dataAgendamento: data.dataAgendamento,
     dataAgendamentoCriado: now,
     dataRetornoLigacao: "",
-    observacao: `Origem: Promotora (${data.local}).${data.observacao ? ` Obs: ${data.observacao}` : ""}`,
+    observacao: `Origem: ${data.fonteLead ?? "Promotora"} (${data.local}).${data.observacao ? ` Obs: ${data.observacao}` : ""}`,
+
     followUpCount: 0,
     lembretes: { h24: false, today: false },
   };
