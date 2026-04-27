@@ -411,6 +411,8 @@ export default function Promotora() {
               points={points}
               currentPosition={currentPosition}
               error={geoError}
+              clinicId={sessao?.clinicaId}
+              sessaoId={sessao?.sessaoId}
               abordadora={sessao?.abordadora}
               height="100%"
             />

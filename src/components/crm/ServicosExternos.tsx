@@ -32,10 +32,17 @@ import {
   UserCheck,
   Upload,
   Map,
+  Pencil,
+  Trash2,
+  Undo2,
+  Save,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/phone";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { MapaRota } from "@/components/MapaRota";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import type { GeoPoint } from "@/hooks/useGeoTracking";
 
 const STATUS_LABELS: Record<Cupom["status"], { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "bg-yellow-100 text-yellow-800 border-yellow-300" },
@@ -91,6 +98,41 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   // Rota modal
   const [rotaModal, setRotaModal] = useState<{ clinicId: string; sessaoId: string; abordadora: string } | null>(null);
+  const [rotaDrawMode, setRotaDrawMode] = useState(false);
+  const [draftWaypoints, setDraftWaypoints] = useState<GeoPoint[]>([]);
+  const [savingRota, setSavingRota] = useState(false);
+
+  // Load existing rotaDefinida when modal opens
+  useEffect(() => {
+    if (!rotaModal) {
+      setRotaDrawMode(false);
+      setDraftWaypoints([]);
+      return;
+    }
+    getDoc(doc(db, "clinics", rotaModal.clinicId, "sessoes", rotaModal.sessaoId))
+      .then((snap) => {
+        if (snap.exists()) {
+          setDraftWaypoints((snap.data()?.rotaDefinida as GeoPoint[]) ?? []);
+        }
+      })
+      .catch(() => {});
+  }, [rotaModal]);
+
+  async function handleSaveRota() {
+    if (!rotaModal) return;
+    setSavingRota(true);
+    try {
+      await updateDoc(doc(db, "clinics", rotaModal.clinicId, "sessoes", rotaModal.sessaoId), {
+        rotaDefinida: draftWaypoints,
+      });
+      toast.success("Rota salva com sucesso!");
+      setRotaDrawMode(false);
+    } catch {
+      toast.error("Erro ao salvar rota.");
+    } finally {
+      setSavingRota(false);
+    }
+  }
   const [importText, setImportText] = useState("");
   const [importLoading, setImportLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<Array<{ nome: string; telefone: string; dup: boolean }> | null>(null);
@@ -1036,12 +1078,84 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               Rota — {rotaModal?.abordadora}
             </DialogTitle>
           </DialogHeader>
-          <div style={{ height: "70vh" }}>
+
+          {/* Toolbar */}
+          <div className="px-4 pb-2 flex items-center gap-2 flex-wrap">
+            {!rotaDrawMode ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
+                onClick={() => setRotaDrawMode(true)}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                {draftWaypoints.length > 0 ? "Editar Rota" : "Definir Rota"}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setDraftWaypoints((prev) => prev.slice(0, -1))}
+                  disabled={draftWaypoints.length === 0}
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                  Desfazer
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50"
+                  onClick={() => setDraftWaypoints([])}
+                  disabled={draftWaypoints.length === 0}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Limpar
+                </Button>
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleSaveRota}
+                  disabled={savingRota || draftWaypoints.length === 0}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  {savingRota ? "Salvando…" : "Salvar Rota"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setRotaDrawMode(false);
+                    // Reload from Firestore by re-triggering the effect
+                    if (rotaModal) {
+                      getDoc(doc(db, "clinics", rotaModal.clinicId, "sessoes", rotaModal.sessaoId))
+                        .then((snap) => {
+                          if (snap.exists()) setDraftWaypoints((snap.data()?.rotaDefinida as GeoPoint[]) ?? []);
+                        })
+                        .catch(() => {});
+                    }
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </>
+            )}
+            {!rotaDrawMode && draftWaypoints.length > 0 && (
+              <span className="text-xs text-gray-500 ml-auto">
+                {draftWaypoints.length} pontos definidos
+              </span>
+            )}
+          </div>
+
+          <div style={{ height: "65vh" }}>
             {rotaModal && (
               <MapaRota
                 clinicId={rotaModal.clinicId}
                 sessaoId={rotaModal.sessaoId}
                 abordadora={rotaModal.abordadora}
+                plannedRoute={rotaDrawMode ? draftWaypoints : undefined}
+                onMapClick={rotaDrawMode ? (pt) => setDraftWaypoints((prev) => [...prev, pt]) : undefined}
                 height="100%"
               />
             )}

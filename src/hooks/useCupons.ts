@@ -61,6 +61,7 @@ export interface Sessao {
   data: string;        // "dd/MM/yyyy" para filtrar por dia
   timestamp: number;
   rota?: { lat: number; lng: number; ts: number }[];
+  rotaDefinida?: { lat: number; lng: number; ts: number }[];
 }
 
 export function useSessoes(clinicaId: string | null, filterDate?: string) {
