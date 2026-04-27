@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-rotate";
 import * as LGeocode from "leaflet-control-geocoder";
+import { geocoders } from "leaflet-control-geocoder";
 import "leaflet-control-geocoder/dist/Control.Geocoder.css";
 import type { GeoPoint } from "@/hooks/useGeoTracking";
 import { db } from "@/lib/firebase";
@@ -112,11 +113,11 @@ export function MapaRota({
     ).addTo(map);
 
     // Geocoder search (Nominatim — free, no key)
-    const geocoder = (LGeocode as any).geocoder({
+    const geocoder = LGeocode.geocoder({
       defaultMarkGeocode: false,
       collapsed: true,
       placeholder: "Buscar endereço…",
-      geocoder: new (LGeocode as any).Nominatim({ serviceUrl: "https://nominatim.openstreetmap.org/" }),
+      geocoder: new geocoders.Nominatim({ serviceUrl: "https://nominatim.openstreetmap.org/" }),
     });
     geocoder.on("markgeocode", (e: any) => {
       const center = e.geocode.center;
