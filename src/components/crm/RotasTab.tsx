@@ -51,7 +51,11 @@ interface RotasTabProps {
 
 function buildMapsUrl(waypoints: { lat: number; lng: number }[]): string {
   if (waypoints.length < 2) return "";
-  const pts = waypoints.map((w) => `${w.lat},${w.lng}`).join("/");
+  // Google Maps mobile suporta no máximo 25 waypoints
+  const pts = (waypoints.length > 25
+    ? [waypoints[0], ...waypoints.slice(1, 24), waypoints[waypoints.length - 1]]
+    : waypoints
+  ).map((w) => `${w.lat},${w.lng}`).join("/");
   return `https://www.google.com/maps/dir/${pts}?travelmode=walking`;
 }
 

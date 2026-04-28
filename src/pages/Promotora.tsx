@@ -6,11 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X, CalendarCheck, Map, Navigation, Route } from "lucide-react";
+import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X, CalendarCheck, Map, Navigation, Route, Pencil, Trash2 } from "lucide-react";
 import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { format } from "date-fns";
 
 function maskPhone(value: string): string {
@@ -94,6 +94,13 @@ export default function Promotora() {
   }
   const [rotaDoDia, setRotaDoDia] = useState<RotaDoDia | null>(null);
   const [rotaLoading, setRotaLoading] = useState(false);
+
+  // Editar lead
+  interface EditLeadState { id: string; nome: string; telefone1: string; telefone2: string; observacao: string; }
+  const [editLead, setEditLead] = useState<EditLeadState | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!sessao) { setRotaDoDia(null); return; }
@@ -303,6 +310,39 @@ export default function Promotora() {
     resetForm();
   };
 
+  const handleSaveEdit = async () => {
+    if (!editLead || !sessao) return;
+    setEditSaving(true);
+    try {
+      await updateDoc(doc(db, "clinics", sessao.clinicaId, "cupons", editLead.id), {
+        nome: editLead.nome.trim(),
+        telefone1: editLead.telefone1.replace(/\D/g, ""),
+        telefone2: editLead.telefone2.replace(/\D/g, ""),
+        briefing: editLead.observacao.trim(),
+      });
+      toast.success("Lead atualizado!");
+      setEditLead(null);
+    } catch {
+      toast.error("Erro ao salvar.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteLead = async (id: string) => {
+    if (!sessao) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, "clinics", sessao.clinicaId, "cupons", id));
+      toast.success("Lead removido.");
+      setDeleteConfirmId(null);
+    } catch {
+      toast.error("Erro ao excluir.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (step === "login") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-900 via-rose-800 to-fuchsia-900 flex items-center justify-center p-4">
@@ -403,16 +443,22 @@ export default function Promotora() {
             meusContatos.map((c) => (
               <div key={c.id} className={`bg-white rounded-xl px-4 py-3 space-y-1 ${c.status === "agendado" ? "border-2 border-purple-300" : ""}`}>
                 <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="font-semibold text-gray-800 text-sm truncate">{c.nome}</div>
                     <div className="text-gray-500 text-xs">{c.telefone1}</div>
                   </div>
-                  <div className="text-right shrink-0">
-                    {c.status === "agendado" ? (
-                      <span className="text-xs bg-purple-100 text-purple-800 border border-purple-300 rounded-full px-2 py-0.5 font-medium">Agendado</span>
-                    ) : (
-                      <div className="text-xs text-gray-400">{c.dataCupom?.slice(11)}</div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {c.status === "agendado" && (
+                      <span className="text-xs bg-purple-100 text-purple-800 border border-purple-300 rounded-full px-2 py-0.5 font-medium mr-1">Agendado</span>
                     )}
+                    <button
+                      onClick={() => setEditLead({ id: c.id, nome: c.nome, telefone1: c.telefone1, telefone2: c.telefone2 ?? "", observacao: c.briefing ?? "" })}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                    ><Pencil className="h-3.5 w-3.5" /></button>
+                    <button
+                      onClick={() => setDeleteConfirmId(c.id)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    ><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 </div>
                 {c.dataAgendamento && (
@@ -453,7 +499,12 @@ export default function Promotora() {
               </div>
 
               <a
-                href={`https://www.google.com/maps/dir/${rotaDoDia.waypoints.map((w) => `${w.lat},${w.lng}`).join("/")}?travelmode=walking`}
+                href={(() => {
+                  const wps = rotaDoDia.waypoints.length > 25
+                    ? [rotaDoDia.waypoints[0], ...rotaDoDia.waypoints.slice(1, 24), rotaDoDia.waypoints[rotaDoDia.waypoints.length - 1]]
+                    : rotaDoDia.waypoints;
+                  return `https://www.google.com/maps/dir/${wps.map((w) => `${w.lat},${w.lng}`).join("/")}?travelmode=walking`;
+                })()}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
@@ -571,6 +622,57 @@ export default function Promotora() {
       <button onClick={handleEncerrar} className="mt-6 flex items-center gap-1.5 text-white/50 text-xs hover:text-white/80 transition-colors">
         <LogOut className="h-3.5 w-3.5" /> Encerrar sessão
       </button>
+
+      {/* Modal editar lead */}
+      <Dialog open={!!editLead} onOpenChange={(o) => { if (!o) setEditLead(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Pencil className="h-4 w-4 text-blue-600" /> Editar Lead</DialogTitle>
+          </DialogHeader>
+          {editLead && (
+            <div className="space-y-3 py-1">
+              <div className="space-y-1">
+                <Label>Nome</Label>
+                <Input value={editLead.nome} onChange={(e) => setEditLead({ ...editLead, nome: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label>Telefone 01</Label>
+                <Input value={maskPhone(editLead.telefone1)} onChange={(e) => setEditLead({ ...editLead, telefone1: maskPhone(e.target.value) })} type="tel" inputMode="numeric" />
+              </div>
+              <div className="space-y-1">
+                <Label>Telefone 02 <span className="text-gray-400 font-normal">(opcional)</span></Label>
+                <Input value={maskPhone(editLead.telefone2)} onChange={(e) => setEditLead({ ...editLead, telefone2: maskPhone(e.target.value) })} type="tel" inputMode="numeric" />
+              </div>
+              <div className="space-y-1">
+                <Label>Observação</Label>
+                <Textarea value={editLead.observacao} onChange={(e) => setEditLead({ ...editLead, observacao: e.target.value })} rows={2} />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEditLead(null)}>Cancelar</Button>
+            <Button size="sm" disabled={editSaving} onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {editSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal confirmar exclusão */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={(o) => { if (!o) setDeleteConfirmId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600"><Trash2 className="h-4 w-4" /> Excluir Lead</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 py-1">Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.</p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDeleteConfirmId(null)}>Cancelar</Button>
+            <Button size="sm" disabled={deleting} onClick={() => deleteConfirmId && handleDeleteLead(deleteConfirmId)} className="bg-red-600 hover:bg-red-700 text-white">
+              {deleting ? "Excluindo..." : "Excluir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de agendamento */}
       <Dialog open={agendarOpen} onOpenChange={(o) => { if (!o) { setAgendarOpen(false); setAgendadoStep(null); } }}>

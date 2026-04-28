@@ -242,8 +242,11 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
             const color = COLORS[rotas.indexOf(rota) % COLORS.length];
             const isHidden = hidden.has(rota.id);
             const isSelected = selected === rota.id;
+            const wps = rota.waypoints.length > 25
+              ? [rota.waypoints[0], ...rota.waypoints.slice(1, 24), rota.waypoints[rota.waypoints.length - 1]]
+              : rota.waypoints;
             const mapsUrl = rota.waypoints.length >= 2
-              ? `https://www.google.com/maps/dir/${rota.waypoints.map((w) => `${w.lat},${w.lng}`).join("/")}?travelmode=walking`
+              ? `https://www.google.com/maps/dir/${wps.map((w) => `${w.lat},${w.lng}`).join("/")}?travelmode=walking`
               : "";
 
             return (
