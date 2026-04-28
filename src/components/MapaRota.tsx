@@ -102,19 +102,17 @@ export function MapaRota({
       bearing: 0,
     }).setView([-21.0, -49.3], 14);
 
-    // Esri World Imagery (satellite) + street labels overlay
+    // Esri satellite + road labels overlay
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       {
-        attribution:
-          'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+        attribution: "Tiles © Esri",
         maxZoom: 19,
       }
     ).addTo(map);
-    // Esri Reference labels (streets, names) — transparent overlay
     L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 19, opacity: 1 }
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+      { opacity: 0.7, maxZoom: 19 }
     ).addTo(map);
 
     // Geocoder search (Nominatim — free, no key)
@@ -275,7 +273,12 @@ export function MapaRota({
         </div>
       )}
 
-      {/* Draw mode instruction — removed to avoid covering the map */}
+      {/* Draw mode instruction — subtle corner badge */}
+      {onMapClick && (
+        <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur text-white text-[10px] rounded-md px-2 py-1 z-[1000] pointer-events-none">
+          ✏️ modo edição
+        </div>
+      )}
 
       {/* Waiting overlay */}
       {!hasContent && !error && !onMapClick && (

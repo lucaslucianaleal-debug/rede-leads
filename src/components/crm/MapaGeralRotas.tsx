@@ -72,14 +72,13 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
       bearing: 0,
     }).setView([-21.0, -49.3], 13);
 
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-      attribution: 'Tiles &copy; Esri',
-      maxZoom: 19,
-    }).addTo(map);
-    // Esri Reference labels (streets, names) — transparent overlay
     L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 19, opacity: 1 }
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Tiles © Esri", maxZoom: 19 }
+    ).addTo(map);
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+      { opacity: 0.7, maxZoom: 19 }
     ).addTo(map);
 
     const geocoder = LGeocode.geocoder({
