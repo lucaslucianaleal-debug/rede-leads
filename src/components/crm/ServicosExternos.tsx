@@ -928,8 +928,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                 </Button>
               )}
 
-              {/* Excluir lead — promotora */}
-              {servicoTab === "promotora" && (
+              {/* Excluir lead */}
+              {selected.status !== "convertido" && (
                 <Button
                   variant="outline"
                   size="sm"
