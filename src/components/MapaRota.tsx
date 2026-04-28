@@ -107,15 +107,16 @@ export function MapaRota({
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       {
         attribution: "Tiles © Esri",
+        maxNativeZoom: 17,
         maxZoom: 19,
       }
     ).addTo(map);
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
-      { opacity: 0.7, maxZoom: 19 }
+      { opacity: 0.7, maxNativeZoom: 17, maxZoom: 19 }
     ).addTo(map);    L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 19 }
+      { maxNativeZoom: 17, maxZoom: 19 }
     ).addTo(map);
     // Geocoder search (Nominatim — free, no key)
     const geocoder = LGeocode.geocoder({
