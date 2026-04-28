@@ -11,6 +11,7 @@ import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/sched
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { MapaRota } from "@/components/MapaRota";
 import { format } from "date-fns";
 
 function maskPhone(value: string): string {
@@ -484,34 +485,44 @@ export default function Promotora() {
               Buscando rota do dia…
             </div>
           ) : rotaDoDia ? (
-            <div className="bg-white rounded-2xl shadow-2xl p-5 space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="bg-pink-100 p-2.5 rounded-xl shrink-0">
-                  <Route className="h-5 w-5 text-pink-700" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Rota de hoje</p>
-                  <h2 className="font-bold text-gray-800 text-base leading-tight">{rotaDoDia.nome}</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {rotaDoDia.waypoints.length} ponto{rotaDoDia.waypoints.length !== 1 ? "s" : ""} · {rotaDoDia.data}
-                  </p>
-                </div>
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+              {/* Mini mapa */}
+              <div style={{ height: 240 }}>
+                <MapaRota
+                  plannedRoute={rotaDoDia.waypoints.map((w) => ({ ...w, ts: 0 }))}
+                  height="240px"
+                />
               </div>
 
-              <a
-                href={(() => {
-                  const wps = rotaDoDia.waypoints.length > 25
-                    ? [rotaDoDia.waypoints[0], ...rotaDoDia.waypoints.slice(1, 24), rotaDoDia.waypoints[rotaDoDia.waypoints.length - 1]]
-                    : rotaDoDia.waypoints;
-                  return `https://www.google.com/maps/dir/${wps.map((w) => `${w.lat},${w.lng}`).join("/")}?travelmode=walking`;
-                })()}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
-              >
-                <Navigation className="h-4 w-4" />
-                Ver no Google Maps
-              </a>
+              <div className="p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="bg-pink-100 p-2 rounded-xl shrink-0">
+                    <Route className="h-4 w-4 text-pink-700" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Rota de hoje</p>
+                    <h2 className="font-bold text-gray-800 text-sm leading-tight">{rotaDoDia.nome}</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {rotaDoDia.waypoints.length} pontos · {rotaDoDia.data}
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href={(() => {
+                    const wps = rotaDoDia.waypoints.length > 25
+                      ? [rotaDoDia.waypoints[0], ...rotaDoDia.waypoints.slice(1, 24), rotaDoDia.waypoints[rotaDoDia.waypoints.length - 1]]
+                      : rotaDoDia.waypoints;
+                    return `https://www.google.com/maps/dir/${wps.map((w) => `${w.lat},${w.lng}`).join("/")}?travelmode=walking`;
+                  })()}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center gap-2 w-full bg-pink-700 hover:bg-pink-800 text-white font-semibold rounded-xl py-3 transition-colors text-sm"
+                >
+                  <Navigation className="h-4 w-4" />
+                  Abrir no Google Maps
+                </a>
+              </div>
             </div>
           ) : (
             <div className="bg-white/10 rounded-2xl px-5 py-10 text-center space-y-2">
