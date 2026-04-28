@@ -102,7 +102,7 @@ export function MapaRota({
       bearing: 0,
     }).setView([-21.0, -49.3], 14);
 
-    // Esri World Imagery (satellite) — free, no key required
+    // Esri World Imagery (satellite) + street labels overlay
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       {
@@ -110,6 +110,11 @@ export function MapaRota({
           'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
         maxZoom: 19,
       }
+    ).addTo(map);
+    // Esri Reference labels (streets, names) — transparent overlay
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19, opacity: 1 }
     ).addTo(map);
 
     // Geocoder search (Nominatim — free, no key)
