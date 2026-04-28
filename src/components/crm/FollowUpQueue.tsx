@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import { Lead, LeadStage } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Phone, User, ExternalLink, Check, Target, Search, X, CalendarCheck } from "lucide-react";
+import { Send, Phone, User, ExternalLink, Check, Target, Search, X, CalendarCheck, Info } from "lucide-react";
+import { LeadDetailsDialog } from "./LeadDetailsDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
@@ -82,6 +83,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [whatsLead, setWhatsLead] = useState<Lead | null>(null);
+  const [detailLead, setDetailLead] = useState<Lead | null>(null);
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const [search, setSearch] = useState(() => localStorage.getItem("fq_search") ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState(() => localStorage.getItem("fq_search") ?? "");
@@ -501,7 +503,10 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="font-medium text-sm truncate">{lead.nome}</span>
+                      <button
+                        className="font-medium text-sm truncate text-left hover:underline hover:text-primary transition-colors"
+                        onClick={() => setDetailLead(lead)}
+                      >{lead.nome}</button>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                         lead.status === "QUENTE" ? "bg-destructive/15 text-destructive" :
                         lead.status === "MORNO" ? "bg-warning/15 text-warning" :
@@ -552,6 +557,9 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0">
+                    <Button size="icon" variant="outline" className="h-8 w-8 text-primary border-primary/30 hover:bg-primary/10" title="Ver informações e observações" onClick={() => setDetailLead(lead)}>
+                      <Info className="h-3.5 w-3.5" />
+                    </Button>
                     <Button size="icon" variant="outline" className="h-8 w-8" title="Registrar Ligação" onClick={() => setCallLead(lead)}>
                       <Phone className="h-3.5 w-3.5" />
                     </Button>
@@ -598,6 +606,12 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
           </button>
         )}
       </div>
+
+      <LeadDetailsDialog
+        lead={detailLead}
+        open={!!detailLead}
+        onClose={() => setDetailLead(null)}
+      />
 
       <FollowUpDialog
         lead={selectedLead}
