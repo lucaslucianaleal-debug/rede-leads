@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { format, parse, differenceInMinutes } from "date-fns";
-import { useCupons, useSessoes, CLINICAS, Cupom } from "@/hooks/useCupons";
+import { useCupons, useSessoes, CLINICAS, Cupom, endSessao } from "@/hooks/useCupons";
 import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
 import { Lead, LeadStage } from "@/types/crm";
@@ -41,10 +41,10 @@ import {
 import { formatPhoneNumber } from "@/lib/phone";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { MapaRota } from "@/components/MapaRota";
+import { db } from "@/lib/firebase";
+import { doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
 import { RotasTab } from "@/components/crm/RotasTab";
 import { MapaGeralRotas } from "@/components/crm/MapaGeralRotas";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
 import type { GeoPoint } from "@/hooks/useGeoTracking";
 
 const STATUS_LABELS: Record<Cupom["status"], { label: string; color: string }> = {
@@ -98,6 +98,13 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   // Import modal (promotora)
   const [importOpen, setImportOpen] = useState(false);
+
+  // Delete lead
+  const [deleteLeadId, setDeleteLeadId] = useState<string | null>(null);
+  const [deletingLead, setDeletingLead] = useState(false);
+
+  // Encerrar sessão
+  const [encerrando, setEncerrando] = useState<string | null>(null);
 
   // Rota modal
   const [rotaModal, setRotaModal] = useState<{ clinicId: string; sessaoId: string; abordadora: string } | null>(null);
@@ -332,6 +339,32 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   const handleSoLigar = () => {};
   const handleConvertAndCall = async () => {};
+
+  const handleDeleteLead = async (id: string) => {
+    setDeletingLead(true);
+    try {
+      await deleteDoc(doc(db, "clinics", clinicaId, "cupons", id));
+      toast.success("Lead excluído.");
+      setDeleteLeadId(null);
+      setSelected(null);
+    } catch {
+      toast.error("Erro ao excluir.");
+    } finally {
+      setDeletingLead(false);
+    }
+  };
+
+  const handleEncerrarSessao = async (sessaoId: string) => {
+    setEncerrando(sessaoId);
+    try {
+      await endSessao(clinicaId, sessaoId);
+      toast.success("Sessão encerrada.");
+    } catch {
+      toast.error("Erro ao encerrar sessão.");
+    } finally {
+      setEncerrando(null);
+    }
+  };
 
   const handleConvertLead = async (cupom: Cupom) => {
     setConverting(true);
@@ -633,14 +666,25 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                         </td>
                         <td className="px-3 py-2.5 hidden sm:table-cell text-muted-foreground">{calcDuracao(s)}</td>
                         <td className="px-3 py-2">
-                          {s.tipo === "promotora" && (
-                            <button
-                              onClick={() => setRotaModal({ clinicId: s.clinicaId, sessaoId: s.id, abordadora: s.abordadora })}
-                              className="flex items-center gap-1 text-xs text-pink-700 hover:text-pink-900 font-medium border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-50 transition-colors"
-                            >
-                              <Map className="h-3 w-3" /> Ver Rota
-                            </button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {s.tipo === "promotora" && (
+                              <button
+                                onClick={() => setRotaModal({ clinicId: s.clinicaId, sessaoId: s.id, abordadora: s.abordadora })}
+                                className="flex items-center gap-1 text-xs text-pink-700 hover:text-pink-900 font-medium border border-pink-200 rounded-full px-2 py-0.5 hover:bg-pink-50 transition-colors"
+                              >
+                                <Map className="h-3 w-3" /> Ver Rota
+                              </button>
+                            )}
+                            {ativa && (
+                              <button
+                                onClick={() => handleEncerrarSessao(s.id)}
+                                disabled={encerrando === s.id}
+                                className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium border border-red-200 rounded-full px-2 py-0.5 hover:bg-red-50 transition-colors disabled:opacity-50"
+                              >
+                                <X className="h-3 w-3" /> {encerrando === s.id ? "..." : "Encerrar"}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -883,6 +927,19 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   {converting ? "Convertendo..." : "Converter em Lead"}
                 </Button>
               )}
+
+              {/* Excluir lead — promotora */}
+              {servicoTab === "promotora" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 border-red-300 text-red-600 hover:bg-red-50"
+                  onClick={() => setDeleteLeadId(selected.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir Lead
+                </Button>
+              )}
             </div>
 
             {/* Content — scrollável se precisar */}
@@ -973,6 +1030,26 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           setCallLead(null);
         }}
       />
+
+      {/* Modal excluir lead */}
+      <Dialog open={!!deleteLeadId} onOpenChange={(o) => { if (!o) setDeleteLeadId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-4 w-4" /> Excluir Lead
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-1">
+            Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setDeleteLeadId(null)}>Cancelar</Button>
+            <Button size="sm" disabled={deletingLead} onClick={() => deleteLeadId && handleDeleteLead(deleteLeadId)} className="bg-red-600 hover:bg-red-700 text-white">
+              {deletingLead ? "Excluindo..." : "Excluir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* WhatsApp edit dialog */}
       <Dialog open={!!whatsDialogCupom} onOpenChange={(o) => { if (!o) setWhatsDialogCupom(null); }}>
