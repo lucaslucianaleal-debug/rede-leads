@@ -113,8 +113,10 @@ export function MapaRota({
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
       { opacity: 0.7, maxZoom: 19 }
+    ).addTo(map);    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19 }
     ).addTo(map);
-
     // Geocoder search (Nominatim — free, no key)
     const geocoder = LGeocode.geocoder({
       defaultMarkGeocode: false,
