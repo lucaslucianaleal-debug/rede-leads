@@ -102,12 +102,12 @@ export function MapaRota({
       bearing: 0,
     }).setView([-21.0, -49.3], 14);
 
-    // OpenStreetMap — free, no API key, reliable
+    // Esri World Imagery (satellite) — free, no key required
     L.tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       {
         attribution:
-          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
         maxZoom: 19,
       }
     ).addTo(map);
@@ -270,12 +270,7 @@ export function MapaRota({
         </div>
       )}
 
-      {/* Draw mode instruction */}
-      {onMapClick && (
-        <div className="absolute top-2 left-2 right-2 bg-blue-600/90 backdrop-blur text-white text-xs font-medium rounded-lg px-3 py-2 z-[1000] shadow text-center">
-          ✏️ Clique no mapa para adicionar pontos à rota
-        </div>
-      )}
+      {/* Draw mode instruction — removed to avoid covering the map */}
 
       {/* Waiting overlay */}
       {!hasContent && !error && !onMapClick && (
