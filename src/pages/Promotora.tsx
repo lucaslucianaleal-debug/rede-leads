@@ -443,7 +443,7 @@ export default function Promotora() {
                 <div className="bg-pink-100 p-2.5 rounded-xl shrink-0">
                   <Route className="h-5 w-5 text-pink-700" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Rota de hoje</p>
                   <h2 className="font-bold text-gray-800 text-base leading-tight">{rotaDoDia.nome}</h2>
                   <p className="text-xs text-gray-500 mt-0.5">
@@ -452,31 +452,15 @@ export default function Promotora() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                {rotaDoDia.waypoints.map((pt, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${i === 0 ? "bg-green-500" : i === rotaDoDia.waypoints.length - 1 ? "bg-red-500" : "bg-blue-400"}`}>
-                      {i === 0 ? "A" : i === rotaDoDia.waypoints.length - 1 ? "B" : i + 1}
-                    </div>
-                    <span className="text-gray-500 font-mono">
-                      {pt.lat.toFixed(5)}, {pt.lng.toFixed(5)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
               <a
                 href={`https://www.google.com/maps/dir/${rotaDoDia.waypoints.map((w) => `${w.lat},${w.lng}`).join("/")}?travelmode=walking`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-center gap-2 w-full bg-pink-700 hover:bg-pink-800 text-white font-semibold rounded-xl py-3.5 transition-colors text-sm"
+                className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
               >
                 <Navigation className="h-4 w-4" />
-                Abrir no Google Maps
+                Ver no Google Maps
               </a>
-              <p className="text-xs text-gray-400 text-center">
-                Abre o app Maps com o trajeto completo
-              </p>
             </div>
           ) : (
             <div className="bg-white/10 rounded-2xl px-5 py-10 text-center space-y-2">
