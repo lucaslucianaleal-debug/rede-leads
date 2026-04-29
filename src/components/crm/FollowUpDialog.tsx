@@ -241,9 +241,11 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete }: Fol
             onClose={() => setShowWhatsAppDialog(false)}
             suggestedMessage={(() => {
               const hasAppointment = !!(lead.dataAgendamentoCriado || lead.dataAgendamentoAlterado);
-              const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppointment);
+              const noShow = lead.comparecimento === "NÃO COMPARECEU";
+              const horario = lead.dataAgendamento ? lead.dataAgendamento.split(" ")[1] || "" : "";
+              const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppointment, noShow);
               if (template) {
-                return formatFollowUpMessage(template, lead.nome, lead.servicoProcurado);
+                return formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", horario);
               }
               return observacao || "";
             })()}

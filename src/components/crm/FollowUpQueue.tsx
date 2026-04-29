@@ -343,10 +343,12 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
       }
       setSuggestedMessage(msg);
     } else {
-      // prefills with follow-up template (with variation support)
+      // prefills with follow-up template (with variation + noShow support)
       const hasAppointment = !!(lead.dataAgendamentoCriado || lead.dataAgendamentoAlterado);
-      const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppointment);
-      if (template) setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado));
+      const noShow = lead.comparecimento === "NÃO COMPARECEU";
+      const horario = lead.dataAgendamento ? lead.dataAgendamento.split(" ")[1] || "" : "";
+      const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppointment, noShow);
+      if (template) setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", horario));
       else setSuggestedMessage("");
     }
     setShowWhatsAppDialog(true);
@@ -640,8 +642,10 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
           suggestedMessage={
             suggestedMessage ?? (() => {
               const hasAppointment = !!(whatsLead?.dataAgendamentoCriado || whatsLead?.dataAgendamentoAlterado);
-              const template = getFollowUpMessageForLead(whatsLead.etapaLead, whatsLead.followUpCount || 0, hasAppointment);
-              if (template) return formatFollowUpMessage(template, whatsLead.nome, whatsLead.servicoProcurado);
+              const noShow = whatsLead?.comparecimento === "NÃO COMPARECEU";
+              const horario = whatsLead?.dataAgendamento ? whatsLead.dataAgendamento.split(" ")[1] || "" : "";
+              const template = getFollowUpMessageForLead(whatsLead.etapaLead, whatsLead.followUpCount || 0, hasAppointment, noShow);
+              if (template) return formatFollowUpMessage(template, whatsLead.nome, whatsLead.servicoProcurado, "OdontoCompany", horario);
               return "";
             })()
           }
