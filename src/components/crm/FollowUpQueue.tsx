@@ -13,7 +13,7 @@ import { FollowUpDialog } from "./FollowUpDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import ExcelJS from 'exceljs';
-import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
+import { getFollowUpMessage, getFollowUpMessageForLead, formatFollowUpMessage } from "@/data/followUpMessages";
 import { useAuth } from "@/hooks/useAuth";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { ProgressWithLabel } from "@/components/ui/progress-with-label";
@@ -343,8 +343,9 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
       }
       setSuggestedMessage(msg);
     } else {
-      // prefills with follow-up template
-      const template = getFollowUpMessage(lead.etapaLead);
+      // prefills with follow-up template (with variation support)
+      const hasAppointment = !!(lead.dataAgendamentoCriado || lead.dataAgendamentoAlterado);
+      const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppointment);
       if (template) setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado));
       else setSuggestedMessage("");
     }
@@ -638,7 +639,8 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
           }}
           suggestedMessage={
             suggestedMessage ?? (() => {
-              const template = getFollowUpMessage(whatsLead.etapaLead);
+              const hasAppointment = !!(whatsLead?.dataAgendamentoCriado || whatsLead?.dataAgendamentoAlterado);
+              const template = getFollowUpMessageForLead(whatsLead.etapaLead, whatsLead.followUpCount || 0, hasAppointment);
               if (template) return formatFollowUpMessage(template, whatsLead.nome, whatsLead.servicoProcurado);
               return "";
             })()

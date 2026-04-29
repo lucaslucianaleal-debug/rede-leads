@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
-import { getFollowUpMessage, formatFollowUpMessage } from "@/data/followUpMessages";
+import { getFollowUpMessage, getFollowUpMessageForLead, formatFollowUpMessage } from "@/data/followUpMessages";
 
 interface FollowUpDialogProps {
   lead: Lead | null;
@@ -240,7 +240,8 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete }: Fol
             open={showWhatsAppDialog}
             onClose={() => setShowWhatsAppDialog(false)}
             suggestedMessage={(() => {
-              const template = getFollowUpMessage(lead.etapaLead);
+              const hasAppointment = !!(lead.dataAgendamentoCriado || lead.dataAgendamentoAlterado);
+              const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppointment);
               if (template) {
                 return formatFollowUpMessage(template, lead.nome, lead.servicoProcurado);
               }
