@@ -40,7 +40,7 @@ export const followUpMessages: FollowUpMessage[] = [
     ],
     templateWithAppointment: null,
     variationsNoShow: [
-      "Olá [primeiro_nome]. \n\nPercebi que você não conseguiu comparecer à sua consulta programada para as [horário]. Aconteceu algum imprevisto? \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual desses horários funcionaria melhor para você?",
+      "Olá [primeiro_nome]. \n\nPercebi que você não conseguiu comparecer à sua consulta programada para as [horário]. Aconteceu algum imprevisto? \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1]. \n\nFunciona para você?",
     ],
   },
   {
