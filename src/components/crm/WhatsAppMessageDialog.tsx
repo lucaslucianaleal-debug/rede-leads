@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLeads } from "@/hooks/useLeads";
 const STATUS_OPTIONS = [
   { value: "QUENTE", label: "🔥 Quente" },
@@ -36,6 +36,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, Send, Wifi, WifiOff } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -69,6 +70,10 @@ export function WhatsAppMessageDialog({
   const [etapa, setEtapa] = useState<LeadStage>(lead?.etapaLead || "Novo");
   const [isEditing, setIsEditing] = useState(false);
   const [sending, setSending] = useState(false);
+  const [dataSugerida, setDataSugerida] = useState("");
+  const [horaSugerida, setHoraSugerida] = useState("");
+  const baseMessageRef = useRef("");
+  const hasNoShowPlaceholders = (suggestedMessage || "").includes("[data_sugerida_1]");
   const [includeVoucher, setIncludeVoucher] = useState(false);
   const [voucherPreviewUrl, setVoucherPreviewUrl] = useState<string | null>(null);
   const [foundVoucherId, setFoundVoucherId] = useState<string | null>(null);
@@ -76,18 +81,40 @@ export function WhatsAppMessageDialog({
 
   useEffect(() => {
     if (suggestedMessage) {
+      baseMessageRef.current = suggestedMessage;
       setMessage(suggestedMessage);
       setIsEditing(false);
     } else {
+      baseMessageRef.current = "";
       setMessage("");
       setIsEditing(true);
     }
+    setDataSugerida("");
+    setHoraSugerida("");
     setIncludeVoucher(false);
     setVoucherPreviewUrl(null);
     setFoundVoucherId(null);
     setStatus(lead?.status || "MORNO");
     setEtapa(lead?.etapaLead || "Novo");
   }, [suggestedMessage, open, lead?.status]);
+
+  const handleDataSugeridaChange = (val: string) => {
+    setDataSugerida(val);
+    setMessage(
+      baseMessageRef.current
+        .replace(/\[data_sugerida_1\]/g, val || "[data_sugerida_1]")
+        .replace(/\[hora_sugerida_1\]/g, horaSugerida || "[hora_sugerida_1]")
+    );
+  };
+
+  const handleHoraSugeridaChange = (val: string) => {
+    setHoraSugerida(val);
+    setMessage(
+      baseMessageRef.current
+        .replace(/\[data_sugerida_1\]/g, dataSugerida || "[data_sugerida_1]")
+        .replace(/\[hora_sugerida_1\]/g, val || "[hora_sugerida_1]")
+    );
+  };
 
   if (!lead) return null;
 
@@ -339,6 +366,29 @@ export function WhatsAppMessageDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {hasNoShowPlaceholders && !isEditing && (
+            <div className="flex gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
+              <div className="flex-1 space-y-1">
+                <label className="text-xs font-medium text-blue-700">📅 Data sugerida</label>
+                <Input
+                  placeholder="ex: segunda-feira"
+                  value={dataSugerida}
+                  onChange={(e) => handleDataSugeridaChange(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="flex-1 space-y-1">
+                <label className="text-xs font-medium text-blue-700">🕐 Horário sugerido</label>
+                <Input
+                  placeholder="ex: 14:00"
+                  value={horaSugerida}
+                  onChange={(e) => handleHoraSugeridaChange(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+          )}
 
           {(lead.voucherPending || hasVoucherAvailable) && (
             <div className="flex items-center gap-2">

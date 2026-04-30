@@ -246,8 +246,8 @@ export function formatFollowUpMessage(
     .replace(/\[serviço\]/g, service)
     .replace(/\[clínica\]/g, clinicName)
     .replace(/\[horário\]/g, horario || "horário marcado")
-    .replace(/\[data_sugerida_1\]/g, dataSugerida1 || "segunda-feira")
-    .replace(/\[data_sugerida_2\]/g, dataSugerida2 || "quarta-feira")
-    .replace(/\[hora_sugerida_1\]/g, horaSugerida1 || "14:00")
-    .replace(/\[hora_sugerida_2\]/g, horaSugerida2 || "16:00");
+    .replace(/\[data_sugerida_1\]/g, dataSugerida1 || "[data_sugerida_1]")
+    .replace(/\[data_sugerida_2\]/g, dataSugerida2 || "[data_sugerida_2]")
+    .replace(/\[hora_sugerida_1\]/g, horaSugerida1 || "[hora_sugerida_1]")
+    .replace(/\[hora_sugerida_2\]/g, horaSugerida2 || "[hora_sugerida_2]");
 }
