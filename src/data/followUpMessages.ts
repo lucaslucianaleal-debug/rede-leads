@@ -12,10 +12,23 @@ export const followUpMessages: FollowUpMessage[] = [
   {
     stage: "Novo",
     template: null,
+    variations: [
+      "Oi [nome], tudo bem? Vi que você entrou em contato conosco e adoraria te ajudar! Se preferir, pode me mandar um áudio contando o que mais te incomoda no seu sorriso hoje. Será um prazer enorme te ouvir! 😊",
+      "Olá [nome]! Vi aqui que você se interessou pelos nossos tratamentos. Me conta um pouquinho: o que mais te incomoda no seu sorriso hoje? Pode ser por áudio, fica mais fácil!",
+      "Oi [nome]! Vi que você entrou em contato. Antes de tudo, quero entender melhor o seu caso. O que te incomoda no sorriso hoje? Me manda um áudio quando puder! 😊"
+    ],
   },
   {
     stage: "Em contato",
     template: null,
+    variations: [
+      "Oi [nome], tudo bem? Notei que nossa conversa deu uma paradinha... Se preferir, pode me enviar um áudio explicando o que mais te incomoda no seu sorriso hoje. Será um prazer enorme te ouvir e entender como podemos te ajudar! 😊",
+      "Olá [nome], como você está? Fique à vontade para me mandar um áudio contando o que te incomoda no seu sorriso hoje; será um prazer enorme te ouvir para buscarmos a melhor solução juntos!",
+      "Tudo certo, [nome]? Passando para saber se ficou alguma dúvida. Se ficar mais fácil, pode me mandar um áudio explicando o que hoje te incomoda no seu sorriso. Será um prazer enorme te ouvir e te orientar por aqui!"
+    ],
+    variationsNoShow: [
+      "Oi [nome], tudo bem? Notei que você não conseguiu vir na sua consulta das [horário]. Aconteceu algum imprevisto? Fique à vontade para me mandar um áudio contando se está tudo bem, tá? Se quiser, podemos reagendar."
+    ],
   },
   {
     stage: "Follow-Up 1",
@@ -179,7 +192,16 @@ export function getFollowUpMessageForLead(
   }
 
   // Fall back to standard template
-  return msg.template || null;
+  if (msg.template) return msg.template;
+
+  // Last resort: fall back to Follow-Up 1 variations
+  const fu1 = followUpMessages.find((m) => m.stage === "Follow-Up 1");
+  if (fu1?.variations && fu1.variations.length > 0) {
+    const idx = followUpCount % fu1.variations.length;
+    return fu1.variations[idx];
+  }
+
+  return null;
 }
 
 /**
