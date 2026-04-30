@@ -167,13 +167,13 @@ export function getFollowUpMessageForLead(
     return msg.variationsNoShow[idx];
   }
 
-  // Has appointment (but not no-show yet): use appointment-specific template
-  if (hasAppointment && !noShow && msg.templateWithAppointment !== undefined) {
+  // Has appointment (but not no-show yet): use appointment-specific template ONLY if it's a non-null string
+  if (hasAppointment && !noShow && msg.templateWithAppointment) {
     return msg.templateWithAppointment;
   }
 
-  // No appointment: round-robin in variations (FU 1-3)
-  if (!hasAppointment && msg.variations && msg.variations.length > 0) {
+  // Use variations (round-robin) — applies regardless of hasAppointment when no specific appointment template
+  if (msg.variations && msg.variations.length > 0) {
     const idx = followUpCount % msg.variations.length;
     return msg.variations[idx];
   }
