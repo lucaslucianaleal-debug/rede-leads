@@ -13,130 +13,130 @@ export const followUpMessages: FollowUpMessage[] = [
     stage: "Novo",
     template: null,
     variations: [
-      "Olá [primeiro_nome], tudo bem? \n\nPercebi que você entrou em contato conosco e gostaríamos de ajudá-lo. \n\nPoderia enviar-me um áudio explicando o que mais o incomoda no seu sorriso atualmente? \n\nSerá um prazer enorme ouvi-lo. 😊",
-      "Olá [primeiro_nome]! \n\nPercebi que você se interessou pelos nossos tratamentos. \n\nPoderia contar-me um pouco sobre o que mais o incomoda no seu sorriso atualmente? \n\nUm áudio é bem prático.",
-      "Olá [primeiro_nome]! \n\nPercebi que você entrou em contato. Antes de tudo, gostaria de entender melhor o seu caso. \n\nO que o incomoda no sorriso? \n\nPoderia enviar-me um áudio quando tiver disponibilidade?"
+      "Olá [primeiro_nome], tudo bem? \n\nPercebi que você entrou em contato conosco e gostaríamos de ajudá-lo. \n\nPoderia enviar-me um áudio explicando o que mais o incomoda no seu sorriso atualmente? \n\nSerá um prazer enorme ouvi-lo. 😊 \n\nFico no aguardo do seu retorno.",
+      "Olá [primeiro_nome]! \n\nPercebi que você se interessou pelos nossos tratamentos. \n\nPoderia contar-me um pouco sobre o que mais o incomoda no seu sorriso atualmente? \n\nUm áudio é bem prático. Aguardo seu contato.",
+      "Olá [primeiro_nome]! \n\nPercebi que você entrou em contato. Antes de tudo, gostaria de entender melhor o seu caso. \n\nO que o incomoda no sorriso? \n\nPoderia enviar-me um áudio quando tiver disponibilidade? Fico no aguardo."
     ],
   },
   {
     stage: "Em contato",
     template: null,
     variations: [
-      "Olá [primeiro_nome], tudo bem? \n\nPercebi que nossa comunicação ficou pausada. \n\nPoderia enviar-me um áudio explicando o que mais o incomoda no seu sorriso atualmente? \n\nSerá um prazer enorme ouvi-lo e entender como podemos ajudá-lo. 😊",
-      "Olá [primeiro_nome], como você está? \n\nFique à vontade para me enviar um áudio explicando o que o incomoda no seu sorriso atualmente. \n\nSerá um prazer enorme ouvi-lo para buscarmos a melhor solução para você.",
-      "Olá [primeiro_nome]. \n\nGostaria de verificar se ficou alguma dúvida. \n\nSe preferir, pode me enviar um áudio explicando o que o incomoda no seu sorriso. \n\nEstarei aqui para orientá-lo."
+      "Olá [primeiro_nome], tudo bem? \n\nPercebi que nossa comunicação ficou pausada. \n\nPoderia enviar-me um áudio explicando o que mais o incomoda no seu sorriso atualmente? \n\nSerá um prazer enorme ouvi-lo e entender como podemos ajudá-lo. 😊 \n\nQuando poderia me enviar esse áudio?",
+      "Olá [primeiro_nome], como você está? \n\nFique à vontade para me enviar um áudio explicando o que o incomoda no seu sorriso atualmente. \n\nSerá um prazer enorme ouvi-lo para buscarmos a melhor solução para você. \n\nPoderia responder-me hoje?",
+      "Olá [primeiro_nome]. \n\nGostaria de verificar se ficou alguma dúvida. \n\nSe preferir, pode me enviar um áudio explicando o que o incomoda no seu sorriso. \n\nEstarei aqui para orientá-lo. Quando poderia entrar em contato?"
     ],
     variationsNoShow: [
-      "Olá [primeiro_nome]. \n\nPercebi que você não conseguiu comparecer à sua consulta programada para as [horário]. Aconteceu algum imprevisto? \n\nFique à vontade para me enviar um áudio e nos informar. \n\nPodemos reagendar com prazer."
+      "Olá [primeiro_nome]. \n\nPercebi que você não conseguiu comparecer à sua consulta programada para as [horário]. Aconteceu algum imprevisto? \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual desses horários funcionaria melhor para você?"
     ],
   },
   {
     stage: "Follow-Up 1",
     template: null,
     variations: [
-      "Olá [primeiro_nome], tudo bem? \n\nPercebi que nossa comunicação ficou pausada. \n\nPoderia enviar-me um áudio explicando o que mais o incomoda no seu sorriso atualmente? \n\nSerá um prazer enorme ouvi-lo e entender como podemos ajudá-lo. 😊",
-      "Olá [primeiro_nome], como você está? \n\nPercebi que não demos continuidade no seu atendimento. \n\nFique à vontade para me enviar um áudio explicando o que o incomoda no seu sorriso atualmente. \n\nSerá um prazer enorme ouvi-lo para buscarmos a melhor solução para você.",
-      "Olá [primeiro_nome]. \n\nGostaria de verificar se ficou alguma dúvida. \n\nSe preferir, pode me enviar um áudio explicando o que o incomoda no seu sorriso. \n\nEstarei aqui para orientá-lo."
+      "Olá [primeiro_nome], tudo bem? \n\nPercebi que nossa comunicação ficou pausada. \n\nPoderia enviar-me um áudio explicando o que mais o incomoda no seu sorriso atualmente? \n\nSerá um prazer enorme ouvi-lo e entender como podemos ajudá-lo. 😊 \n\nQuando poderia me enviar esse áudio?",
+      "Olá [primeiro_nome], como você está? \n\nPercebi que não demos continuidade no seu atendimento. \n\nFique à vontade para me enviar um áudio explicando o que o incomoda no seu sorriso atualmente. \n\nSerá um prazer enorme ouvi-lo para buscarmos a melhor solução para você. \n\nPoderia responder-me hoje?",
+      "Olá [primeiro_nome]. \n\nGostaria de verificar se ficou alguma dúvida. \n\nSe preferir, pode me enviar um áudio explicando o que o incomoda no seu sorriso. \n\nEstarei aqui para orientá-lo. \n\nQuando poderia entrar em contato?"
     ],
     templateWithAppointment: null,
     variationsNoShow: [
-      "Olá [primeiro_nome]. \n\nPercebi que você não conseguiu comparecer à sua consulta programada para as [horário]. Aconteceu algum imprevisto? \n\nFique à vontade para me enviar um áudio e nos informar. \n\nPodemos reagendar com prazer.",
+      "Olá [primeiro_nome]. \n\nPercebi que você não conseguiu comparecer à sua consulta programada para as [horário]. Aconteceu algum imprevisto? \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual desses horários funcionaria melhor para você?",
     ],
   },
   {
     stage: "Follow-Up 2",
     template: null,
     variations: [
-      "Olá [primeiro_nome]. \n\nRetornei à nossa conversa e percebi que não a finalizamos adequadamente. \n\nFrequentemente adiar o tratamento dental se torna um hábito. \n\nPoderia me informar qual seria seu próximo passo? Gostaria de entender melhor como ajudá-lo.",
-      "[primeiro_nome], como você está? \n\nAguardei alguns dias para não o incomodar, porém gostaria de ter a oportunidade de ajudá-lo com seu sorriso. \n\nO que ficou faltando esclarecer? \n\nPoderia enviar-me um áudio quando tiver disponibilidade?"
+      "Olá [primeiro_nome]. \n\nRetornei à nossa conversa e percebi que não a finalizamos adequadamente. \n\nFrequentemente adiar o tratamento dental se torna um hábito. \n\nPoderia me informar qual seria seu próximo passo? Gostaria de entender melhor como ajudá-lo. \n\nQuando podemos conversar?",
+      "[primeiro_nome], como você está? \n\nAguardei alguns dias para não o incomodar, porém gostaria de ter a oportunidade de ajudá-lo com seu sorriso. \n\nO que ficou faltando esclarecer? \n\nPoderia enviar-me um áudio quando tiver disponibilidade? Fico no aguardo."
     ],
     templateWithAppointment: null,
     variationsNoShow: [
-      "[primeiro_nome], gostaria de saber se você gostaria que eu reservasse um novo horário para essa semana. \n\nÉ comum surgirem imprevistos de última hora. \n\nPoderia me informar qual horário seria mais adequado para você?",
+      "[primeiro_nome], gostaria de saber se você gostaria que eu reservasse um novo horário para essa semana. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual desses dias funcionaria melhor para você?",
     ],
   },
   {
     stage: "Follow-Up 3",
     template: null,
     variations: [
-      "Olá [primeiro_nome]. \n\nComo estão as coisas? Compreendo que a rotina muitas vezes nos afasta da prioridade de cuidar do sorriso. \n\nAquele incômodo que você mencionou no seu sorriso continua o incomodando? \n\nSe desejar, poderia me enviar um áudio e estar disponível para ajudá-lo.",
-      "[primeiro_nome]. \n\nGostaria de reforçar que continuo disponível. \n\nSe o horário ou a logística são obstáculos, podemos explorar alternativas. Podemos encontrar um horário que se adeque melhor à sua rotina. \n\nQual seria sua preferência? Poderia me enviar um áudio com sua sugestão?"
+      "Olá [primeiro_nome]. \n\nComo estão as coisas? Compreendo que a rotina muitas vezes nos afasta da prioridade de cuidar do sorriso. \n\nAquele incômodo que você mencionou no seu sorriso continua o incomodando? \n\nSe desejar, poderia me enviar um áudio? Estou disponível para ajudá-lo.",
+      "[primeiro_nome]. \n\nGostaria de reforçar que continuo disponível. \n\nSe o horário ou a logística são obstáculos, podemos explorar alternativas. Podemos encontrar um horário que se adeque melhor à sua rotina. \n\nQual seria sua preferência? Poderia me enviar um áudio com sua sugestão hoje?"
     ],
     templateWithAppointment: null,
     variationsNoShow: [
-      "Olá [primeiro_nome]! \n\nPercebo que havia interesse genuíno em resolver a questão do seu sorriso. O que aconteceu? \n\nSe há preocupações sobre o procedimento ou dúvidas, poderia me falar. \n\nEstarei aqui para ouvi-lo e orientá-lo.",
+      "Olá [primeiro_nome]! \n\nPercebo que havia interesse genuíno em resolver a questão do seu sorriso. O que aconteceu? \n\nTemos horários disponíveis em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual funcionaria melhor para você?",
     ],
   },
   {
     stage: "Follow-Up 4",
     template:
-      "[primeiro_nome], gostaria de informar que a agenda do Dr(a). para [serviço] está bem concorrida essa semana. \n\nSe você deseja resolver aquele incômodo que mencionamos, poderia me informar sua preferência entre quarta ou quinta? \n\nPoderia ser por áudio.",
+      "[primeiro_nome], gostaria de informar que a agenda do Dr(a). para [serviço] está bem concorrida essa semana. \n\nSe você deseja resolver aquele incômodo que mencionamos, poderia me informar sua preferência entre [data_sugerida_1] ou [data_sugerida_2]? \n\nPoderia ser por áudio. Aguardo seu retorno.",
     variationsNoShow: [
-      "[primeiro_nome], a agenda do Dr(a). para [serviço] está bem preenchida, mas como você já tinha uma consulta agendada, posso priorizar seu atendimento se você me confirmar até amanhã. \n\nO que acha?",
+      "[primeiro_nome], a agenda do Dr(a). para [serviço] está bem preenchida, mas como você já tinha uma consulta agendada, posso priorizar seu atendimento. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nPoderia me confirmar qual melhor funcionaria para você? Fico no aguardo.",
     ],
   },
   {
     stage: "Follow-Up 5",
     template:
-      "Olá [primeiro_nome]! 🎉 \n\nConsegui uma condição diferenciada com o pessoal do financeiro para sua avaliação, considerando seu interesse demonstrado. \n\nGostaria que você soubesse como ficou. \n\nPoderia me enviar um ✅?",
+      "Olá [primeiro_nome]! 🎉 \n\nConsegui uma condição diferenciada com o pessoal do financeiro para sua avaliação, considerando seu interesse demonstrado. \n\nGostaria que você soubesse como ficou. \n\nTemos horários disponíveis em [data_sugerida_1] ou [data_sugerida_2]. Poderia me informar sua preferência? Fico no aguardo.",
     variationsNoShow: [
-      "Olá [primeiro_nome]! 🎉 \n\nPercebi que você ainda não conseguiu agendar. Para incentivá-lo a priorizar seu cuidado, consegui uma condição especial para sua avaliação. \n\nPoderia me enviar um ✅ se desejar aproveitar?",
+      "Olá [primeiro_nome]! 🎉 \n\nPercebi que você ainda não conseguiu agendar. Para incentivá-lo a priorizar seu cuidado, consegui uma condição especial para sua avaliação. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual funcionaria melhor para você? Poderia me confirmar hoje?",
     ],
   },
   {
     stage: "Follow-Up 6",
     template:
-      "[primeiro_nome], atendemos um caso de [serviço] e o paciente saiu muito satisfeito. Isso me lembrou do seu caso. \n\nÉ outra qualidade de vida, verdade? \n\nQuando tiver um tempo, poderia me informar quais dúvidas ainda persistem?",
+      "[primeiro_nome], atendemos um caso de [serviço] e o paciente saiu muito satisfeito. Isso me lembrou do seu caso. \n\nÉ outra qualidade de vida, verdade? \n\nTemos disponibilidade em [data_sugerida_1] ou [data_sugerida_2]. Qual dia funciona melhor para você agendar sua avaliação?",
     variationsNoShow: [
-      "[primeiro_nome], vi um resultado de [serviço] e seu caso veio à minha mente. \n\nÉ uma pena que você não tenha comparecido, pois os resultados são transformadores! \n\nSe desejar tentar novamente, estou aqui para facilitar.",
+      "[primeiro_nome], vi um resultado de [serviço] e seu caso veio à minha mente. \n\nÉ uma pena que você não tenha comparecido, pois os resultados são transformadores! \n\nTemos horários em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nGostaria de tentar novamente? Poderia me confirmar?",
     ],
   },
   {
     stage: "Follow-Up 7",
     template:
-      "[primeiro_nome], muitas pessoas da sua região visitaram-nos essa semana e estão muito satisfeitas com nosso atendimento. \n\nO que o impede de vir nos conhecer também? \n\nPoderia enviar-me um áudio?",
+      "[primeiro_nome], muitas pessoas da sua região visitaram-nos essa semana e estão muito satisfeitas com nosso atendimento. \n\nO que o impede de vir nos conhecer também? \n\nTemos disponibilidade em [data_sugerida_1] ou [data_sugerida_2]. Qual dia funciona melhor para você? Fico no aguardo.",
     variationsNoShow: [
-      "[primeiro_nome], muitas pessoas da sua região estão vindo e saindo satisfeitas. \n\nNão deixe o medo ou a rotina o impedir de ter o sorriso que você deseja. \n\nPoderia me enviar um áudio para alinharmos um horário que não o sobrecarregue?",
+      "[primeiro_nome], muitas pessoas da sua região estão vindo e saindo satisfeitas. \n\nNão deixe o medo ou a rotina o impedir de ter o sorriso que você deseja. \n\nTemos horários em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nPoderia me informar qual horário funciona melhor para você?",
     ],
   },
   {
     stage: "Follow-Up 8",
     template:
-      "Olá [primeiro_nome]! \n\nApenas para reforçar: a avaliação inicial é simples e sem desconforto. Nos permite compreender seu caso em detalhes. \n\nTeria disponibilidade para um horário breve essa semana?",
+      "Olá [primeiro_nome]! \n\nApenas para reforçar: a avaliação inicial é simples e sem desconforto. Nos permite compreender seu caso em detalhes. \n\nTeria disponibilidade para um horário breve essa semana? Temos datas em [data_sugerida_1] ou [data_sugerida_2].",
     variationsNoShow: [
-      "Olá [primeiro_nome]! \n\nApenas para lembrá-lo: a avaliação é rápida e o ambiente é acolhedor. \n\nSe o horário anterior foi problemático, podemos buscar alternativas. Teria disponibilidade em outro horário?",
+      "Olá [primeiro_nome]! \n\nApenas para lembrá-lo: a avaliação é rápida e o ambiente é acolhedor. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual horário funciona melhor para você? Poderia me confirmar?",
     ],
   },
   {
     stage: "Follow-Up 9",
     template:
-      "[primeiro_nome], temos uma condição especial para implante/prótese/facetas em vigor atualmente. \n\nGostaria que você recebesse uma tabela de valores para ter uma ideia de investimento? \n\nPoderia detalhar tudo por áudio se preferir.",
+      "[primeiro_nome], temos uma condição especial para implante/prótese/facetas em vigor atualmente. \n\nGostaria que você recebesse uma tabela de valores para ter uma ideia de investimento? \n\nTemos horários disponíveis em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. Qual funciona melhor para você?",
     variationsNoShow: [
-      "[primeiro_nome], temos uma promoção disponível para quem agendar essa semana. \n\nComo você já conhece nosso atendimento, gostaria que aproveitasse essa oportunidade. \n\nPoderia receber os detalhes por áudio?",
+      "[primeiro_nome], temos uma promoção disponível para quem agendar essa semana. \n\nComo você já conhece nosso atendimento, gostaria que aproveitasse essa oportunidade. \n\nDisponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual funciona para você? Fico no aguardo.",
     ],
   },
   {
     stage: "Follow-Up 10",
     template:
-      "[primeiro_nome]! \n\nEstou finalizando os pacotes especiais desse mês. Como você já havia demonstrado interesse, não gostaria que perdesse essa oportunidade. \n\nGostaria de conhecer os valores finais? 💰",
+      "[primeiro_nome]! \n\nEstou finalizando os pacotes especiais desse mês. Como você já havia demonstrado interesse, não gostaria que perdesse essa oportunidade. \n\nDisponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual prefere? Fico no aguardo. 💰",
     variationsNoShow: [
-      "[primeiro_nome]! \n\nÚltimos horários disponíveis com a condição especial. \n\nSe ainda tem interesse em cuidar do seu sorriso, gostaria que me contactasse hoje para que eu não disponibilize sua vaga para outro paciente. 💰",
+      "[primeiro_nome]! \n\nÚltimos horários disponíveis com a condição especial. \n\nTemos datas em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nSe ainda tem interesse em cuidar do seu sorriso, poderia me confirmar hoje? 💰",
     ],
   },
   {
     stage: "Follow-Up 11",
     template:
-      "Olá [primeiro_nome], este é meu último contato sobre a condição que consegui para você. \n\nSe em algum momento decidir que é hora de cuidar do seu sorriso, continuarei disponível. \n\nTeremos prazer em recebê-lo! 😊",
+      "Olá [primeiro_nome], este é meu último contato sobre a condição que consegui para você. \n\nSe em algum momento decidir que é hora de cuidar do seu sorriso, continuarei disponível. \n\nTeremos prazer em recebê-lo! 😊 \n\nFique livre para me contactar quando precisar.",
     variationsNoShow: [
-      "Olá [primeiro_nome], este é meu último contato. \n\nCompreendo que nem sempre é o momento ideal. Deixarei seu prontuário ativo, porém não estarei enviando mais mensagens. \n\nSe decidir retomar, entre em contato! 😊",
+      "Olá [primeiro_nome], este é meu último contato. \n\nCompreendo que nem sempre é o momento ideal. Deixarei seu prontuário ativo, porém não estarei enviando mais mensagens. \n\nSe decidir retomar, estarei aqui para ajudá-lo. 😊 \n\nEntre em contato quando estiver pronto!",
     ],
   },
   {
     stage: "Follow-Up 12",
     template:
-      "[primeiro_nome], desejo que tudo esteja bem com você. \n\nEstarei deixando seu atendimento em aberto, mas não enviarei mais comunicações. \n\nSe o incômodo no sorriso se tornar mais urgente, poderei ajudá-lo. Abraços! 🫂",
+      "[primeiro_nome], desejo que tudo esteja bem com você. \n\nEstarei deixando seu atendimento em aberto, mas não enviarei mais comunicações. \n\nSe o incômodo no sorriso se tornar mais urgente, poderei ajudá-lo. \n\nAbraços! 🫂 Fico no aguardo.",
     variationsNoShow: [
-      "[primeiro_nome], espero que tudo esteja bem com você. \n\nSe o incômodo no sorriso se intensificar ou se decidir priorizar sua saúde bucal, estarei à sua disposição. \n\nAbraços! 🫂",
+      "[primeiro_nome], espero que tudo esteja bem com você. \n\nSe o incômodo no sorriso se intensificar ou se decidir priorizar sua saúde bucal, estarei à sua disposição. \n\nPoderia entrar em contato quando precisar? \n\nAbraços! 🫂",
     ],
   },
   {
@@ -233,7 +233,11 @@ export function formatFollowUpMessage(
   leaderName: string,
   service: string = "nossos serviços",
   clinicName: string = "OdontoCompany",
-  horario: string = ""
+  horario: string = "",
+  dataSugerida1: string = "",
+  dataSugerida2: string = "",
+  horaSugerida1: string = "",
+  horaSugerida2: string = ""
 ): string {
   const primeiroNome = leaderName.split(" ")[0]; // Extract first name
   return template
@@ -241,5 +245,9 @@ export function formatFollowUpMessage(
     .replace(/\[primeiro_nome\]/g, primeiroNome)
     .replace(/\[serviço\]/g, service)
     .replace(/\[clínica\]/g, clinicName)
-    .replace(/\[horário\]/g, horario || "horário marcado");
+    .replace(/\[horário\]/g, horario || "horário marcado")
+    .replace(/\[data_sugerida_1\]/g, dataSugerida1 || "segunda-feira")
+    .replace(/\[data_sugerida_2\]/g, dataSugerida2 || "quarta-feira")
+    .replace(/\[hora_sugerida_1\]/g, horaSugerida1 || "14:00")
+    .replace(/\[hora_sugerida_2\]/g, horaSugerida2 || "16:00");
 }
