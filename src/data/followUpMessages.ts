@@ -27,7 +27,7 @@ export const followUpMessages: FollowUpMessage[] = [
       "Olá [primeiro_nome]. \n\nGostaria de verificar se ficou alguma dúvida. \n\nSe preferir, pode me enviar um áudio explicando o que o incomoda no seu sorriso. \n\nEstarei aqui para orientá-lo. Quando poderia entrar em contato?"
     ],
     variationsNoShow: [
-      "Olá [primeiro_nome]. \n\nPercebi que você não conseguiu comparecer à sua consulta programada para as [horário]. Aconteceu algum imprevisto? \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual desses horários funcionaria melhor para você?"
+      "Olá [primeiro_nome]. \n\nPercebi que você não conseguiu comparecer à sua consulta programada para as [horário]. Aconteceu algum imprevisto? \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1]. \n\nFunciona para você?"
     ],
   },
   {
@@ -52,7 +52,7 @@ export const followUpMessages: FollowUpMessage[] = [
     ],
     templateWithAppointment: null,
     variationsNoShow: [
-      "[primeiro_nome], gostaria de saber se você gostaria que eu reservasse um novo horário para essa semana. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual desses dias funcionaria melhor para você?",
+      "[primeiro_nome], gostaria de saber se você gostaria que eu reservasse um novo horário. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1]. \n\nFunciona para você?",
     ],
   },
   {
@@ -64,7 +64,7 @@ export const followUpMessages: FollowUpMessage[] = [
     ],
     templateWithAppointment: null,
     variationsNoShow: [
-      "Olá [primeiro_nome]! \n\nPercebo que havia interesse genuíno em resolver a questão do seu sorriso. O que aconteceu? \n\nTemos horários disponíveis em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual funcionaria melhor para você?",
+      "Olá [primeiro_nome]! \n\nPercebo que havia interesse genuíno em resolver a questão do seu sorriso. O que aconteceu? \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1]. \n\nFunciona para você?",
     ],
   },
   {
@@ -72,7 +72,7 @@ export const followUpMessages: FollowUpMessage[] = [
     template:
       "[primeiro_nome], gostaria de informar que a agenda do Dr(a). para [serviço] está bem concorrida essa semana. \n\nSe você deseja resolver aquele incômodo que mencionamos, poderia me informar sua preferência entre [data_sugerida_1] ou [data_sugerida_2]? \n\nPoderia ser por áudio. Aguardo seu retorno.",
     variationsNoShow: [
-      "[primeiro_nome], a agenda do Dr(a). para [serviço] está bem preenchida, mas como você já tinha uma consulta agendada, posso priorizar seu atendimento. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nPoderia me confirmar qual melhor funcionaria para você? Fico no aguardo.",
+      "[primeiro_nome], a agenda do Dr(a). para [serviço] está bem preenchida, mas como você já tinha uma consulta agendada, posso priorizar seu atendimento. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1]. \n\nPoderia me confirmar? Fico no aguardo.",
     ],
   },
   {
@@ -80,7 +80,7 @@ export const followUpMessages: FollowUpMessage[] = [
     template:
       "Olá [primeiro_nome]! 🎉 \n\nConsegui uma condição diferenciada com o pessoal do financeiro para sua avaliação, considerando seu interesse demonstrado. \n\nGostaria que você soubesse como ficou. \n\nTemos horários disponíveis em [data_sugerida_1] ou [data_sugerida_2]. Poderia me informar sua preferência? Fico no aguardo.",
     variationsNoShow: [
-      "Olá [primeiro_nome]! 🎉 \n\nPercebi que você ainda não conseguiu agendar. Para incentivá-lo a priorizar seu cuidado, consegui uma condição especial para sua avaliação. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual funcionaria melhor para você? Poderia me confirmar hoje?",
+      "Olá [primeiro_nome]! 🎉 \n\nPercebi que você ainda não conseguiu agendar. Para incentivá-lo a priorizar seu cuidado, consegui uma condição especial para sua avaliação. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1]. \n\nPoderia me confirmar hoje?",
     ],
   },
   {
@@ -88,7 +88,7 @@ export const followUpMessages: FollowUpMessage[] = [
     template:
       "[primeiro_nome], atendemos um caso de [serviço] e o paciente saiu muito satisfeito. Isso me lembrou do seu caso. \n\nÉ outra qualidade de vida, verdade? \n\nTemos disponibilidade em [data_sugerida_1] ou [data_sugerida_2]. Qual dia funciona melhor para você agendar sua avaliação?",
     variationsNoShow: [
-      "[primeiro_nome], vi um resultado de [serviço] e seu caso veio à minha mente. \n\nÉ uma pena que você não tenha comparecido, pois os resultados são transformadores! \n\nTemos horários em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nGostaria de tentar novamente? Poderia me confirmar?",
+      "[primeiro_nome], vi um resultado de [serviço] e seu caso veio à minha mente. \n\nÉ uma pena que você não tenha comparecido, pois os resultados são transformadores! \n\nTemos horário em [data_sugerida_1] às [hora_sugerida_1]. \n\nGostaria de tentar novamente? Poderia me confirmar?",
     ],
   },
   {
@@ -96,7 +96,7 @@ export const followUpMessages: FollowUpMessage[] = [
     template:
       "[primeiro_nome], muitas pessoas da sua região visitaram-nos essa semana e estão muito satisfeitas com nosso atendimento. \n\nO que o impede de vir nos conhecer também? \n\nTemos disponibilidade em [data_sugerida_1] ou [data_sugerida_2]. Qual dia funciona melhor para você? Fico no aguardo.",
     variationsNoShow: [
-      "[primeiro_nome], muitas pessoas da sua região estão vindo e saindo satisfeitas. \n\nNão deixe o medo ou a rotina o impedir de ter o sorriso que você deseja. \n\nTemos horários em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nPoderia me informar qual horário funciona melhor para você?",
+      "[primeiro_nome], muitas pessoas da sua região estão vindo e saindo satisfeitas. \n\nNão deixe o medo ou a rotina o impedir de ter o sorriso que você deseja. \n\nTemos horário em [data_sugerida_1] às [hora_sugerida_1]. \n\nFunciona para você?",
     ],
   },
   {
@@ -104,7 +104,7 @@ export const followUpMessages: FollowUpMessage[] = [
     template:
       "Olá [primeiro_nome]! \n\nApenas para reforçar: a avaliação inicial é simples e sem desconforto. Nos permite compreender seu caso em detalhes. \n\nTeria disponibilidade para um horário breve essa semana? Temos datas em [data_sugerida_1] ou [data_sugerida_2].",
     variationsNoShow: [
-      "Olá [primeiro_nome]! \n\nApenas para lembrá-lo: a avaliação é rápida e o ambiente é acolhedor. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual horário funciona melhor para você? Poderia me confirmar?",
+      "Olá [primeiro_nome]! \n\nApenas para lembr·-lo: a avaliação é rápida e o ambiente é acolhedor. \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1]. \n\nFunciona para você? Poderia me confirmar?",
     ],
   },
   {
@@ -112,7 +112,7 @@ export const followUpMessages: FollowUpMessage[] = [
     template:
       "[primeiro_nome], temos uma condição especial para implante/prótese/facetas em vigor atualmente. \n\nGostaria que você recebesse uma tabela de valores para ter uma ideia de investimento? \n\nTemos horários disponíveis em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. Qual funciona melhor para você?",
     variationsNoShow: [
-      "[primeiro_nome], temos uma promoção disponível para quem agendar essa semana. \n\nComo você já conhece nosso atendimento, gostaria que aproveitasse essa oportunidade. \n\nDisponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual funciona para você? Fico no aguardo.",
+      "[primeiro_nome], temos uma promoção disponível para quem agendar essa semana. \n\nComo você já conhece nosso atendimento, gostaria que aproveitasse essa oportunidade. \n\nDisponibilidade em [data_sugerida_1] às [hora_sugerida_1]. \n\nFunciona para você? Fico no aguardo.",
     ],
   },
   {
@@ -120,7 +120,7 @@ export const followUpMessages: FollowUpMessage[] = [
     template:
       "[primeiro_nome]! \n\nEstou finalizando os pacotes especiais desse mês. Como você já havia demonstrado interesse, não gostaria que perdesse essa oportunidade. \n\nDisponibilidade em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nQual prefere? Fico no aguardo. 💰",
     variationsNoShow: [
-      "[primeiro_nome]! \n\nÚltimos horários disponíveis com a condição especial. \n\nTemos datas em [data_sugerida_1] às [hora_sugerida_1] ou [data_sugerida_2] às [hora_sugerida_2]. \n\nSe ainda tem interesse em cuidar do seu sorriso, poderia me confirmar hoje? 💰",
+      "[primeiro_nome]! \n\nÚltimos horários disponíveis com a condição especial. \n\nTemos data em [data_sugerida_1] às [hora_sugerida_1]. \n\nSe ainda tem interesse em cuidar do seu sorriso, poderia me confirmar hoje? 💰",
     ],
   },
   {
@@ -235,9 +235,9 @@ export function formatFollowUpMessage(
   clinicName: string = "OdontoCompany",
   horario: string = "",
   dataSugerida1: string = "",
-  dataSugerida2: string = "",
+  dataSugerida2?: string,
   horaSugerida1: string = "",
-  horaSugerida2: string = ""
+  horaSugerida2?: string
 ): string {
   const primeiroNome = leaderName.split(" ")[0]; // Extract first name
   return template
