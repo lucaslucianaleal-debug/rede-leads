@@ -14,6 +14,24 @@ export interface SlotInfo {
 const DAY_NAMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const CLAREAMENTO_VOUCHER = "1 Sessão de Clareamento (arcada inferior)";
 
+
+// Lista de feriados nacionais fixos (dd/MM)
+const FERIADOS_FIXOS = [
+  "01/01", // Confraternização Universal
+  "21/04", // Tiradentes
+  "01/05", // Dia do Trabalho
+  "07/09", // Independência
+  "12/10", // Nossa Senhora Aparecida
+  "02/11", // Finados
+  "15/11", // Proclamação da República
+  "25/12", // Natal
+];
+
+function isFeriado(date: Date): boolean {
+  const ddmm = format(date, "dd/MM");
+  return FERIADOS_FIXOS.includes(ddmm);
+}
+
 // Returns half-hour slots for a given day-of-week
 function getWorkingSlots(dow: number): { h: number; m: number }[] {
   if (dow === 0) return []; // domingo
@@ -101,9 +119,16 @@ export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0); // início do dia de hoje
 
-  // Itera 10 dias corridos a partir de hoje
+
+  // Itera 10 dias corridos a partir de hoje, pulando feriados e o dia atual
   for (let day = 0; day < 10; day++) {
     const dow = cursor.getDay();
+    const isHoje = day === 0;
+    const isFds = dow === 0;
+    if (isHoje || isFeriado(cursor)) {
+      cursor.setDate(cursor.getDate() + 1);
+      continue;
+    }
     const workSlots = getWorkingSlots(dow);
     const dateStr = format(cursor, "dd/MM/yyyy");
     const dayLabel = `${DAY_NAMES[dow]}, ${dateStr.slice(0, 5)}`;
