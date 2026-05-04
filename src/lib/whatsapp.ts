@@ -117,7 +117,7 @@ export function generateAppointmentConfirmationTextForClinic(
   const clinicAddressFromMeta = clinicMeta?.address;
 
   // Build services text with correct grammar
-  let servicoText = "sua avaliação";
+  let servicoText = "sua consulta";
   if (servicos && servicos.length > 0) {
     const servicoComArtigo = servicos
       .map((s) => `${getArticleForServico(s)} ${s}`)
@@ -126,7 +126,7 @@ export function generateAppointmentConfirmationTextForClinic(
   }
 
   const greeting = clientName ? `Oi ${clientName}!\n\n` : "";
-  const msgHeader = `${greeting}Essa é a confirmação do ${servicoText} na ${clinicName}💚\n\nSua bonificação está agendada para:\n\nData e Horario: ${dataAgendamento}`;
+  const msgHeader = `${greeting}Essa é a confirmação do ${servicoText} na ${clinicName}💚\n\nSeu agendamento está marcado para:\n\nData e Horário: ${dataAgendamento}`;
 
   // If clinic has explicit address, use it
   if (clinicAddressFromMeta) {
