@@ -21,6 +21,7 @@ import {
   MapPin,
   User,
   Calendar,
+  CalendarCheck,
   Trophy,
   AlertTriangle,
   ChevronRight,
@@ -879,9 +880,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
               </button>
             </div>
 
-            {/* Status + Actions — fixos no topo */}
-            <div className="px-4 py-3 border-b space-y-3 shrink-0 bg-background">
-              {/* Status badge */}
+            {/* Status badge — fixo no topo */}
+            <div className="px-4 py-2 border-b shrink-0 bg-background">
               <div className="flex gap-2 items-center">
                 <span className={`text-xs border rounded-full px-2.5 py-1 font-medium ${STATUS_LABELS[selected.status]?.color}`}>
                   {STATUS_LABELS[selected.status]?.label}
@@ -892,57 +892,9 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   </span>
                 )}
               </div>
-
-              {/* WhatsApp */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start gap-2 border-green-500 text-green-700 hover:bg-green-50"
-                onClick={() => handleWhatsApp(selected)}
-              >
-                <MessageSquare className="h-4 w-4" />
-                WhatsApp
-              </Button>
-
-              {/* Ligar */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-start gap-2"
-                onClick={() => handleLigar(selected)}
-              >
-                <Phone className="h-4 w-4" />
-                Ligar
-              </Button>
-
-              {/* Converter em Lead */}
-              {selected.status !== "convertido" && (
-                <Button
-                  size="sm"
-                  className="w-full justify-start gap-2 bg-primary hover:bg-primary/90"
-                  onClick={() => handleConvertLead(selected)}
-                  disabled={converting}
-                >
-                  <UserPlus className="h-4 w-4" />
-                  {converting ? "Convertendo..." : "Converter em Lead"}
-                </Button>
-              )}
-
-              {/* Excluir lead */}
-              {selected.status !== "convertido" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start gap-2 border-red-300 text-red-600 hover:bg-red-50"
-                  onClick={() => setDeleteLeadId(selected.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Excluir Lead
-                </Button>
-              )}
             </div>
 
-            {/* Content — scrollável se precisar */}
+            {/* Content — scrollável */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Info */}
               <div className="space-y-2 text-sm">
@@ -968,6 +920,12 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   <Calendar className="h-4 w-4 shrink-0" />
                   <span>{selected.dataCupom}</span>
                 </div>
+                {selected.dataAgendamento && (
+                  <div className="flex items-center gap-2 font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+                    <CalendarCheck className="h-4 w-4 shrink-0" />
+                    <span>Agendado: {selected.dataAgendamento}</span>
+                  </div>
+                )}
               </div>
 
               {/* Vouchers / Serviços */}
@@ -1012,6 +970,52 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                     {selected.briefing}
                   </p>
                 </div>
+              )}
+            </div>
+
+            {/* Botões — fixos no rodapé */}
+            <div className="px-4 py-3 border-t space-y-2 shrink-0 bg-background">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 justify-center gap-2 border-green-500 text-green-700 hover:bg-green-50"
+                  onClick={() => handleWhatsApp(selected)}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  WhatsApp
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 justify-center gap-2"
+                  onClick={() => handleLigar(selected)}
+                >
+                  <Phone className="h-4 w-4" />
+                  Ligar
+                </Button>
+              </div>
+              {selected.status !== "convertido" && (
+                <Button
+                  size="sm"
+                  className="w-full justify-center gap-2 bg-primary hover:bg-primary/90"
+                  onClick={() => handleConvertLead(selected)}
+                  disabled={converting}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {converting ? "Convertendo..." : "Converter em Lead"}
+                </Button>
+              )}
+              {selected.status !== "convertido" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center gap-2 border-red-300 text-red-600 hover:bg-red-50"
+                  onClick={() => setDeleteLeadId(selected.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir Lead
+                </Button>
               )}
             </div>
           </div>
