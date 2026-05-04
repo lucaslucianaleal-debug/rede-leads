@@ -197,7 +197,7 @@ export async function saveScheduledLead(
     dataContato: now,
     nome: data.nome.trim(),
     telefone: data.telefone.replace(/\D/g, ""),
-    servicoProcurado: data.servicos.length > 0 ? data.servicos.join(", ") : "Avaliação",
+    servicoProcurado: data.servicos.length > 0 ? data.servicos.join(", ") : "Consulta",
     captador: data.abordadora,
     fonteLead: data.fonteLead ?? "Promotora",
     etapaLead: "Avaliação agendada",
