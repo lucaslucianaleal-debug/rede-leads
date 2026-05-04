@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CheckSquare, Square, Briefcase, User, Phone, Plus, Check, Building2, List, AlertTriangle, LogOut, Clock, CalendarCheck, MessageSquare } from "lucide-react";
+import { CheckSquare, Square, Briefcase, User, Phone, Plus, Check, Building2, List, AlertTriangle, LogOut, Clock, CalendarCheck, MessageSquare, X, Trash2 } from "lucide-react";
 import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
+import { db } from "@/lib/firebase";
+import { doc, deleteDoc } from "firebase/firestore";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -71,6 +73,7 @@ export default function VisitaComercial() {
   const [agendadoStep, setAgendadoStep] = useState<{ slot: SlotInfo; nome: string; telefone: string; abordadora: string; local: string; vouchers: string[]; observacao: string } | null>(null);
   const [agendadoCupomId, setAgendadoCupomId] = useState<string | null>(null);
   const [sendingWhats, setSendingWhats] = useState(false);
+  const [selectedContatoDetalhes, setSelectedContatoDetalhes] = useState<typeof cupons[0] | null>(null);
 
   const { cupons, addCupom, updateStatus } = useCupons(sessao?.clinicaId ?? null);
 
@@ -346,7 +349,7 @@ export default function VisitaComercial() {
             <div className="text-center text-white/60 py-10 text-sm">Nenhum lead adicionado ainda.</div>
           ) : (
             meusLeads.map((c) => (
-              <div key={c.id} className={`bg-white rounded-xl px-4 py-3 space-y-1 ${c.status === "agendado" ? "border-2 border-purple-300" : ""}`}>
+              <div key={c.id} onClick={() => setSelectedContatoDetalhes(c)} className={`bg-white rounded-xl px-4 py-3 space-y-1 ${c.status === "agendado" ? "border-2 border-purple-300" : ""} cursor-pointer hover:shadow-lg transition-shadow`}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-semibold text-gray-800 text-sm truncate">{c.nome}</div>
@@ -545,6 +548,163 @@ export default function VisitaComercial() {
                   {agendando ? "Agendando..." : "Confirmar"}
                 </Button>
               </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de detalhes do lead */}
+      <Dialog open={!!selectedContatoDetalhes} onOpenChange={(o) => { if (!o) setSelectedContatoDetalhes(null); }}>
+        <DialogContent className="max-w-sm max-h-[90vh] flex flex-col">
+          {selectedContatoDetalhes && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between w-full">
+                  <DialogTitle className="flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4 text-emerald-600" />
+                    {selectedContatoDetalhes.nome}
+                  </DialogTitle>
+                  <button onClick={() => setSelectedContatoDetalhes(null)} className="text-gray-400 hover:text-gray-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </DialogHeader>
+
+              {/* Conteúdo principal (scrollable) */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-3">
+                {/* Telefone */}
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Telefone</p>
+                  <a href={`tel:${selectedContatoDetalhes.telefone1}`} className="text-sm text-blue-600 hover:underline">
+                    {selectedContatoDetalhes.telefone1}
+                  </a>
+                  {selectedContatoDetalhes.telefone2 && (
+                    <a href={`tel:${selectedContatoDetalhes.telefone2}`} className="block text-sm text-blue-600 hover:underline">
+                      {selectedContatoDetalhes.telefone2}
+                    </a>
+                  )}
+                </div>
+
+                {/* Estabelecimento / Local */}
+                {selectedContatoDetalhes.local && (
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Local</p>
+                    <p className="text-sm text-gray-800">{selectedContatoDetalhes.local}</p>
+                  </div>
+                )}
+
+                {/* Vouchers / Serviços */}
+                {selectedContatoDetalhes.vouchers && selectedContatoDetalhes.vouchers.length > 0 && (
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Serviços</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedContatoDetalhes.vouchers.map((v, idx) => (
+                        <span key={idx} className="inline-block px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs rounded-full font-medium">
+                          {v}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Data e Hora do Agendamento */}
+                {selectedContatoDetalhes.dataAgendamento && (
+                  <div className="bg-purple-50 rounded-lg p-3 space-y-1 border border-purple-200">
+                    <p className="text-xs text-purple-600 font-medium uppercase tracking-wide flex items-center gap-1">
+                      <CalendarCheck className="h-3.5 w-3.5" /> Agendamento
+                    </p>
+                    <p className="text-sm text-purple-900 font-semibold">{selectedContatoDetalhes.dataAgendamento}</p>
+                  </div>
+                )}
+
+                {/* Briefing / Observação */}
+                {selectedContatoDetalhes.briefing && (
+                  <div className="bg-blue-50 rounded-lg p-3 space-y-1 border border-blue-200">
+                    <p className="text-xs text-blue-600 font-medium uppercase tracking-wide flex items-center gap-1">
+                      <MessageSquare className="h-3.5 w-3.5" /> Briefing
+                    </p>
+                    <p className="text-sm text-blue-900">{selectedContatoDetalhes.briefing}</p>
+                  </div>
+                )}
+
+                {/* Abordadora */}
+                {selectedContatoDetalhes.abordadora && (
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Abordadora</p>
+                    <p className="text-sm text-gray-800">{selectedContatoDetalhes.abordadora}</p>
+                  </div>
+                )}
+
+                {/* Data Cupom */}
+                {selectedContatoDetalhes.dataCupom && (
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Data do Cadastro</p>
+                    <p className="text-sm text-gray-800">{selectedContatoDetalhes.dataCupom}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Botões (fixos no rodapé) */}
+              <div className="border-t pt-3 mt-3 space-y-2">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const url = `https://wa.me/55${selectedContatoDetalhes.telefone1.replace(/\D/g, "")}`;
+                      window.open(url, "_blank");
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <MessageSquare className="h-4 w-4" /> WhatsApp
+                  </button>
+                  <button
+                    onClick={() => window.open(`tel:${selectedContatoDetalhes.telefone1}`)}
+                    className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <Phone className="h-4 w-4" /> Ligar
+                  </button>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      await saveScheduledLead(sessao!.clinicaId, {
+                        nome: selectedContatoDetalhes.nome,
+                        telefone: selectedContatoDetalhes.telefone1.replace(/\D/g, ""),
+                        servicos: selectedContatoDetalhes.vouchers || [],
+                        observacao: selectedContatoDetalhes.briefing || "",
+                        abordadora: selectedContatoDetalhes.abordadora || sessao!.vendedor,
+                        local: selectedContatoDetalhes.local || "",
+                        dataAgendamento: selectedContatoDetalhes.dataAgendamento || "",
+                        fonteLead: "Visita Comercial",
+                      });
+                      if (selectedContatoDetalhes.id) {
+                        await updateStatus(sessao!.clinicaId, selectedContatoDetalhes.id, "convertido");
+                      }
+                      toast.success(`Lead enviado para clínica: ${selectedContatoDetalhes.nome}`);
+                      setSelectedContatoDetalhes(null);
+                    } catch (err) {
+                      toast.error("Erro ao converter em lead");
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <Check className="h-4 w-4" /> Converter em Lead
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!window.confirm(`Excluir ${selectedContatoDetalhes.nome}?`)) return;
+                    try {
+                      await deleteDoc(doc(db, "clinics", sessao!.clinicaId, "cupons", selectedContatoDetalhes.id));
+                      toast.success("Lead removido");
+                      setSelectedContatoDetalhes(null);
+                    } catch (err) {
+                      toast.error("Erro ao excluir lead");
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" /> Excluir Lead
+                </button>
+              </div>
             </>
           )}
         </DialogContent>
