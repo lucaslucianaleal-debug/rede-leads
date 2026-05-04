@@ -134,14 +134,15 @@ export function useCupons(clinicaId: string | null) {
     clinicaId: string,
     data: Omit<Cupom, "id" | "timestamp" | "dataCupom" | "status">,
     status: Cupom["status"] = "pendente"
-  ) => {
+  ): Promise<string> => {
     const now = new Date();
-    await addDoc(getRef(clinicaId), {
+    const ref = await addDoc(getRef(clinicaId), {
       ...data,
       dataCupom: format(now, "dd/MM/yyyy HH:mm"),
       timestamp: now.getTime(),
       status,
     });
+    return ref.id;
   };
 
   const updateStatus = async (

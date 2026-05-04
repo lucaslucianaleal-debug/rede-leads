@@ -78,8 +78,10 @@ export default function Promotora() {
   const [selectedSlot, setSelectedSlot] = useState<SlotInfo | null>(null);
   const [agendando, setAgendando] = useState(false);
   const [agendadoStep, setAgendadoStep] = useState<{ slot: SlotInfo; nome: string; telefone: string; abordadora: string; local: string; vouchers: string[]; observacao: string } | null>(null);
+  const [agendadoCupomId, setAgendadoCupomId] = useState<string | null>(null);
+  const [sendingWhats, setSendingWhats] = useState(false);
 
-  const { cupons, addCupom } = useCupons(sessao?.clinicaId ?? null);
+  const { cupons, addCupom, updateStatus } = useCupons(sessao?.clinicaId ?? null);
 
   const meusContatos = useMemo(() =>
     cupons.filter((c) => c.tipo === "promotora" && c.sessaoId === sessao?.sessaoId),
@@ -254,7 +256,8 @@ export default function Promotora() {
       const tel2 = telefone2.replace(/\D/g, "");
       if (tel2) cupomData.telefone2 = tel2;
       if (observacao.trim()) cupomData.briefing = observacao.trim();
-      await addCupom(sessao.clinicaId, cupomData, "agendado");
+      const cupomId = await addCupom(sessao.clinicaId, cupomData, "agendado");
+      setAgendadoCupomId(cupomId);
       setLastAdded(nome.trim());
       updateActivity();
       setAgendadoStep({
@@ -274,7 +277,8 @@ export default function Promotora() {
   };
 
   const handleEnviarWhatsAgendamento = async () => {
-    if (!agendadoStep || !sessao) return;
+    if (!agendadoStep || !sessao || sendingWhats) return;
+    setSendingWhats(true);
     const msg = generateAppointmentConfirmationTextForClinic(
       { id: sessao.clinicaId, name: sessao.clinicaLabel },
       agendadoStep.slot.dateStr,
@@ -295,12 +299,19 @@ export default function Promotora() {
         dataAgendamento: agendadoStep.slot.dateStr,
         fonteLead: "Promotora",
       });
+      // Mark the cupom as convertido so ServicosExternos doesn't create a duplicate CRM lead
+      if (agendadoCupomId) {
+        try { await updateStatus(sessao.clinicaId, agendadoCupomId, "convertido"); } catch {}
+      }
       toast.success(`Lead criado no CRM: ${agendadoStep.nome}`);
     } catch (err) {
       console.error("Erro ao salvar lead no CRM:", err);
       toast.error("Erro ao salvar lead no CRM. Verifique a conexão.");
+    } finally {
+      setSendingWhats(false);
     }
     setAgendadoStep(null);
+    setAgendadoCupomId(null);
     setAgendarOpen(false);
     resetForm();
   };
@@ -702,9 +713,9 @@ export default function Promotora() {
                 <p className="text-sm text-green-700">{agendadoStep.slot.dayLabel} às {agendadoStep.slot.hourLabel}</p>
               </div>
               <p className="text-sm text-gray-500 text-center">Deseja enviar a confirmação por WhatsApp agora?</p>
-              <Button onClick={handleEnviarWhatsAgendamento} className="bg-green-600 hover:bg-green-700 text-white gap-2 w-full">
+              <Button onClick={handleEnviarWhatsAgendamento} disabled={sendingWhats} className="bg-green-600 hover:bg-green-700 text-white gap-2 w-full">
                 <MessageSquare className="h-4 w-4" />
-                Enviar confirmação WhatsApp
+                {sendingWhats ? "Salvando..." : "Enviar confirmação WhatsApp"}
               </Button>
               <button onClick={handlePularWhats} className="text-xs text-gray-400 hover:text-gray-600 text-center">
                 Pular, enviar depois pelo painel

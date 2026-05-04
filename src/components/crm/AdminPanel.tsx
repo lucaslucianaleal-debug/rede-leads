@@ -90,6 +90,7 @@ export function AdminPanel() {
       editor: "bg-blue-100 text-blue-800",
       viewer: "bg-gray-100 text-gray-800",
       recepcao: "bg-green-100 text-green-800",
+      cliente: "bg-purple-100 text-purple-800",
     };
     return colors[role];
   };
@@ -100,6 +101,7 @@ export function AdminPanel() {
       editor: "Editor",
       viewer: "Visualizador",
       recepcao: "Recepção",
+      cliente: "Cliente",
     };
     return labels[role];
   };
@@ -162,6 +164,9 @@ export function AdminPanel() {
                   </SelectItem>
                   <SelectItem value="recepcao">
                     Recepção (Agenda do Dia)
+                  </SelectItem>
+                  <SelectItem value="cliente">
+                    Cliente (Acesso limitado a leads)
                   </SelectItem>
                   <SelectItem value="admin">
                     Administrador (Acesso total)

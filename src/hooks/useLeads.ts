@@ -97,9 +97,11 @@ const ensureDateCriacao = (lead: Lead): Lead => {
   const created = lead.dataCriacao || lead.dataContato || format(new Date(), "dd/MM/yyyy");
   const out: Lead = { ...lead, dataCriacao: created };
   // If there is an appointment but no recorded creation date for that appointment,
-  // use the lead creation date as an estimate for when the appointment was registered.
+  // use the known creation date as an estimate. Never fall back to today — that would
+  // inflate the "agendamentos hoje" count for old leads that simply lack this field.
   if (out.dataAgendamento && (!out.dataAgendamentoCriado || out.dataAgendamentoCriado.trim() === "")) {
-    out.dataAgendamentoCriado = created;
+    const knownCreated = lead.dataCriacao || lead.dataContato;
+    out.dataAgendamentoCriado = knownCreated || out.dataAgendamento.split(" ")[0];
   }
   return out;
 };

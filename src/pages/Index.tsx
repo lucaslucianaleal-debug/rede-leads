@@ -4,6 +4,7 @@ import { ClinicChip } from "@/components/ClinicChip";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useConversations } from "@/hooks/useConversations";
 import { Lead } from "@/types/crm";
+import { CLINICAS } from "@/hooks/useCupons";
 import { StatsCards } from "@/components/crm/StatsCards";
 import { FollowUpQueue } from "@/components/crm/FollowUpQueue";
 import { CallReturnQueue } from "@/components/crm/CallReturnQueue";
@@ -39,13 +40,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { FunnelIcon } from "@/components/FunnelIcon";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 const CRMDashboard = () => {
-  const { user, currentClinic } = useAuth();
-  const { permissions, isReceptionist } = useUserPermissions();
+  const { user, currentClinic, setSelectedClinic } = useAuth();
+  const { permissions, isReceptionist, role } = useUserPermissions();
   const {
     leads,
     loading,
@@ -88,7 +89,22 @@ const CRMDashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newLeadsCount, setNewLeadsCount] = useState(0);
+  const [isClient, setIsClient] = useState(false);
+  const [clientClinicIds, setClientClinicIds] = useState<string[]>([]);
   // ...chat logic removido...
+
+  // Detectar se é cliente e carregar clínicas permitidas
+  useEffect(() => {
+    if (role === "cliente") {
+      setIsClient(true);
+      // Carregar todas as clínicas que o cliente pode acessar
+      const allowedClinicIds = CLINICAS.map((c) => c.id);
+      setClientClinicIds(allowedClinicIds);
+    } else {
+      setIsClient(false);
+      setClientClinicIds([]);
+    }
+  }, [role]);
 
   // Calcular quantidade de duplicatas
   const duplicatesInfo = useMemo(() => {
@@ -349,6 +365,38 @@ const CRMDashboard = () => {
             onExportWeek={exportWeeklyAppointmentsXlsx}
             onUpdateLead={(id, updates) => updateLead(id, updates)}
           />
+        ) : isClient ? (
+          <div className="space-y-4 w-full">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Selecionar Clínica:</label>
+              <select 
+                value={currentClinic || ""} 
+                onChange={(e) => setSelectedClinic(e.target.value || null)}
+                className="border rounded-lg px-3 py-2 text-sm bg-background"
+              >
+                <option value="">Todas as clínicas</option>
+                {CLINICAS.map((clinic) => (
+                  <option key={clinic.id} value={clinic.id}>
+                    {clinic.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <AllLeadsView 
+              leads={leads} 
+              onMarkAttendance={handleMarkAttendance}
+              onUpdateLead={(id, updates) => updateLead(id, updates)}
+              onCreateLead={handleCreateLead}
+              selectedLeads={selectedLeads}
+              onSelectionChange={setSelectedLeads}
+              onDeleteSelected={() => setShowDeleteDialog(true)}
+              onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
+              onExport={exportCSV}
+              onExportRange={exportRangeReport}
+              onRegisterCall={handleRegisterCall}
+              onOpenCall={handleOpenCall}
+            />
+          </div>
         ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="w-full">

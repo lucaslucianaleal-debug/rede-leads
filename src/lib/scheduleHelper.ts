@@ -35,14 +35,32 @@ function isFeriado(date: Date): boolean {
 // Returns half-hour slots for a given day-of-week
 function getWorkingSlots(dow: number): { h: number; m: number }[] {
   if (dow === 0) return []; // domingo
-  // Seg-Sex: 8h às 19h (último slot 18h30). Sáb: 8h às 13h (último slot 12h30)
-  const hours = dow === 6 ? [8, 9, 10, 11, 12] : [8, 9, 10, 11, 14, 15, 16, 17, 18];
-  const slots: { h: number; m: number }[] = [];
-  for (const h of hours) {
-    slots.push({ h, m: 0 });
-    slots.push({ h, m: 30 });
+  
+  if (dow === 6) {
+    // Sábado: 8h às 13h (último slot 12h30)
+    const hours = [8, 9, 10, 11, 12];
+    const slots: { h: number; m: number }[] = [];
+    for (const h of hours) {
+      slots.push({ h, m: 0 });
+      slots.push({ h, m: 30 });
+    }
+    return slots;
   }
-  return slots;
+  
+  // Seg-Sex: apenas 8:30, 9:30, 10:30, 11:30, 12:30, 13:30, 14:30, 15:30, 16:30, 17:30, 18:30
+  return [
+    { h: 8, m: 30 },
+    { h: 9, m: 30 },
+    { h: 10, m: 30 },
+    { h: 11, m: 30 },
+    { h: 12, m: 30 },
+    { h: 13, m: 30 },
+    { h: 14, m: 30 },
+    { h: 15, m: 30 },
+    { h: 16, m: 30 },
+    { h: 17, m: 30 },
+    { h: 18, m: 30 },
+  ];
 }
 
 function slotKey(dateStr: string, h: number, m: number): string {

@@ -1,10 +1,11 @@
-export type UserRole = "admin" | "editor" | "viewer" | "recepcao";
+export type UserRole = "admin" | "editor" | "viewer" | "recepcao" | "cliente";
 
 export interface CRMUser {
   uid: string;
   username: string;
   role: UserRole;
   clinicId?: string | null;
+  clinicIds?: string[]; // Para role 'cliente' que pode ter múltiplas clínicas
   createdAt: string;
   createdBy: string;
 }
@@ -42,6 +43,13 @@ export const rolePermissions: Record<UserRole, UserPermissions> = {
   recepcao: {
     canView: true,
     canEdit: true,
+    canImport: false,
+    canDelete: false,
+    canManageUsers: false,
+  },
+  cliente: {
+    canView: true,
+    canEdit: false,
     canImport: false,
     canDelete: false,
     canManageUsers: false,
