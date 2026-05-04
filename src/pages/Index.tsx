@@ -87,10 +87,12 @@ const CRMDashboard = () => {
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [reportDate, setReportDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [clientTab, setClientTab] = useState("agenda");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [isClient, setIsClient] = useState(false);
   const [clientClinicIds, setClientClinicIds] = useState<string[]>([]);
+
   // ...chat logic removido...
 
   // Detectar se é cliente e carregar clínicas permitidas
@@ -382,20 +384,44 @@ const CRMDashboard = () => {
                 ))}
               </select>
             </div>
-            <AllLeadsView 
-              leads={leads} 
-              onMarkAttendance={handleMarkAttendance}
-              onUpdateLead={(id, updates) => updateLead(id, updates)}
-              onCreateLead={handleCreateLead}
-              selectedLeads={selectedLeads}
-              onSelectionChange={setSelectedLeads}
-              onDeleteSelected={() => setShowDeleteDialog(true)}
-              onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
-              onExport={exportCSV}
-              onExportRange={exportRangeReport}
-              onRegisterCall={handleRegisterCall}
-              onOpenCall={handleOpenCall}
-            />
+            <Tabs value={clientTab} onValueChange={setClientTab} className="w-full">
+              <div className="w-full">
+                <TabsList className="w-full sm:max-w-xs justify-start gap-2">
+                  <TabsTrigger value="agenda" className="flex items-center gap-1.5">
+                    <CalendarCheck className="h-4 w-4 shrink-0" />
+                    <span className="hidden sm:inline">Agenda do Dia</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="all-leads" className="flex items-center gap-1.5">
+                    <Database className="h-4 w-4 shrink-0" />
+                    <span className="hidden sm:inline">Todos os Leads</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="agenda" className="mt-6">
+                <AgendaDoDia
+                  leads={leads}
+                  onMarkAttendance={handleMarkAttendance}
+                  onExportWeek={exportWeeklyAppointmentsXlsx}
+                  onUpdateLead={(id, updates) => updateLead(id, updates)}
+                />
+              </TabsContent>
+              <TabsContent value="all-leads" className="mt-6">
+                <AllLeadsView 
+                  leads={leads} 
+                  onMarkAttendance={handleMarkAttendance}
+                  onUpdateLead={(id, updates) => updateLead(id, updates)}
+                  onCreateLead={handleCreateLead}
+                  selectedLeads={selectedLeads}
+                  onSelectionChange={setSelectedLeads}
+                  onDeleteSelected={() => setShowDeleteDialog(true)}
+                  onClearDuplicates={permissions?.canDelete ? () => setShowClearDuplicatesDialog(true) : undefined}
+                  onExport={exportCSV}
+                  onExportRange={exportRangeReport}
+                  onRegisterCall={handleRegisterCall}
+                  onOpenCall={handleOpenCall}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
