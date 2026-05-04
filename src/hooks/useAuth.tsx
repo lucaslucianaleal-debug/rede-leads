@@ -58,11 +58,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
           const profile = ud.exists() ? ud.data() : null;
           setUserProfile(profile);
           if (profile) {
-            if (profile.role === "admin") {
+            if (profile.role === "admin" || profile.role === "cliente") {
+              // Admin e Cliente podem mudar de clínica via selectedClinic
               const val = selectedClinic || profile.clinicId || null;
               setCurrentClinic(val);
-              console.log("[AuthProvider] admin currentClinic set ->", val, "selectedClinic:", selectedClinic);
+              console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val, "selectedClinic:", selectedClinic);
             } else {
+              // Outros roles (editor, recepcao, viewer) ficam presos à clínica do perfil
               const clinicFromProfile = profile.clinicId || (profile.clinics && profile.clinics[0]);
               setCurrentClinic(clinicFromProfile || null);
               console.log("[AuthProvider] user currentClinic ->", clinicFromProfile);
@@ -117,11 +119,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         setSelectedClinic(profile.clinicId);
       }
       if (profile) {
-        if (profile.role === "admin") {
+        if (profile.role === "admin" || profile.role === "cliente") {
+          // Admin e Cliente podem selecionar qualquer clínica
           const val = clinic ?? selectedClinic ?? profile.clinicId ?? null;
           setCurrentClinic(val);
-          console.log("[AuthProvider][login] admin set currentClinic ->", val);
+          console.log(`[AuthProvider][login] ${profile.role} set currentClinic ->`, val);
         } else {
+          // Outros roles têm restrição à clínica atribuída
           const effective = clinic ?? selectedClinic ?? profile.clinicId ?? null;
           const allowed = profile.clinicId === effective || (Array.isArray(profile.clinics) && profile.clinics.includes(effective));
           if (!allowed) {
