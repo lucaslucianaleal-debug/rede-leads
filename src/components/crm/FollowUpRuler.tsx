@@ -915,10 +915,73 @@ export function FollowUpRuler({
             </table>
           </div>
 
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            * "Agendados" = leads que passaram por essa etapa (followUpCount ≥ N) e depois chegaram a Avaliação Agendada ou Finalizado.
-            "Responderam" = marcados com "RESPONDEU". Dados crescem conforme histórico acumula.
-          </p>
+          {/* Legenda */}
+          <details className="group rounded-lg border border-muted bg-muted/20">
+            <summary className="flex items-center gap-2 cursor-pointer select-none px-3 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors list-none">
+              <HelpCircle className="h-3.5 w-3.5 shrink-0" />
+              Como ler estas métricas?
+              <ChevronDown className="h-3.5 w-3.5 ml-auto group-open:hidden" />
+              <ChevronUp className="h-3.5 w-3.5 ml-auto hidden group-open:block" />
+            </summary>
+            <div className="px-3 pb-3 pt-1 space-y-3 text-[11px] leading-relaxed text-muted-foreground border-t border-muted">
+
+              {/* Cards de resumo */}
+              <div>
+                <p className="font-semibold text-foreground mb-1.5 text-xs">Cards de resumo</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  <div className="flex gap-2">
+                    <span className="w-2 h-2 rounded-full bg-primary/60 mt-0.5 shrink-0" />
+                    <span><strong className="text-foreground">Em andamento</strong> — total de leads que ainda estão no funil de follow-up (excluindo Finalizados e Desistências).</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 mt-0.5 shrink-0" />
+                    <span><strong className="text-foreground">Melhor etapa</strong> — etapa com maior taxa de conversão para Avaliação Agendada (mín. 4 leads).</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 mt-0.5 shrink-0" />
+                    <span><strong className="text-foreground">Taxa média conv.</strong> — média das taxas de conversão de todas as etapas com pelo menos 1 lead.</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="w-2 h-2 rounded-full bg-teal-500 mt-0.5 shrink-0" />
+                    <span><strong className="text-foreground">Comparecimento</strong> — % dos leads que tinham agendamento e <em>efetivamente compareceram</em> à clínica.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Colunas da tabela */}
+              <div>
+                <p className="font-semibold text-foreground mb-1.5 text-xs">Colunas da tabela</p>
+                <div className="space-y-1">
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-foreground w-24 shrink-0">Ativos</span>
+                    <span>Leads que estão hoje nessa etapa do funil.</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-foreground w-24 shrink-0">Agendados</span>
+                    <span>% dos leads que passaram por essa etapa (followUp ≥ N) e chegaram a "Avaliação Agendada" ou "Finalizado". Indica o poder de conversão do script naquele ponto.</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-foreground w-24 shrink-0">Compareceu</span>
+                    <span>% dos leads com agendamento criado que compareceram à clínica. Valor alto = boa qualificação; valor baixo = leads frios ou agendamentos sem confirmação.</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-foreground w-24 shrink-0">Responderam</span>
+                    <span>% dos leads marcados como "RESPONDEU" — mede o engajamento com os contatos enviados.</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-foreground w-24 shrink-0">Desistência</span>
+                    <span>% dos leads que saíram como "Desistência". Valor alto em etapas iniciais pode indicar script inadequado ou leads mal qualificados.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dica */}
+              <div className="flex gap-2 rounded-md bg-primary/5 border border-primary/15 px-2.5 py-2">
+                <TrendingUp className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                <span><strong className="text-foreground">Dica:</strong> o objetivo é ter <span className="text-emerald-600 font-semibold">Agendados ≥ 20%</span>, <span className="text-teal-600 font-semibold">Comparecimento ≥ 70%</span> e <span className="text-destructive font-semibold">Desistência &lt; 20%</span> em cada etapa.</span>
+              </div>
+            </div>
+          </details>
         </div>
       )}
 
