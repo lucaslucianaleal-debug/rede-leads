@@ -35,21 +35,29 @@ import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 // ---------------------------------------------------------------------------
 const PROMOTORA_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
   "Novo": [
-    "Olá [primeiro_nome]! 😊\n\nFoi um prazer te conhecer hoje.\n\nComo combinamos, tenho alguns horários disponíveis para sua avaliação de [serviço].\n\nQual dia funciona melhor para você? Temos opções em [data_sugerida_1] ou [data_sugerida_2].",
-    "Olá [primeiro_nome], tudo bem?\n\nPassei para confirmar nosso contato de hoje. Temos horários disponíveis para sua avaliação de [serviço].\n\nPoderia me confirmar qual dia é melhor para você?",
+    "Oi, [primeiro_nome]! 😊\nGostei muito de falar com você hoje!\nComo combinamos, separei alguns horários pra sua avaliação de [serviço].\n\nTenho [data_sugerida_1] ou [data_sugerida_2] — qual fica melhor?",
+    "Opa, [primeiro_nome]!\nAchei legal demais nosso papo de hoje.\nSeguindo o que conversamos, tenho [data_sugerida_1] e [data_sugerida_2] pra sua avaliação.\n\nQual fica mais tranquilo pra você?",
+    "[primeiro_nome], tudo certo?\nMuito bacana conversar com você hoje. Separei os horários que mencionei:\n[data_sugerida_1] ou [data_sugerida_2].\n\nQual te interessa?",
   ],
   "Em contato": [
-    "Olá [primeiro_nome]! 😊\n\nRetornei para verificar sobre o agendamento da sua avaliação de [serviço].\n\nTemos disponibilidade em [data_sugerida_1] ou [data_sugerida_2]. Qual prefere?",
-    "[primeiro_nome], como você está?\n\nSei que a rotina é corrida, mas queria garantir que você não perca a oportunidade de cuidar do seu sorriso.\n\nPoderia me confirmar um horário? Temos [data_sugerida_1] disponível.",
+    "Oi, [primeiro_nome]! 😊\nPassei aqui porque lembrei de você e da sua avaliação de [serviço].\n\nAinda tenho alguns horários livres — [data_sugerida_1] e [data_sugerida_2].\nQuer garantir algum deles?",
+    "[primeiro_nome], e aí? Tudo bem?\nSeparei os horários que a gente conversou.\n[data_sugerida_1] ou [data_sugerida_2] — qual é?",
+    "E aí, [primeiro_nome]! 😊\nFiquei te devendo esse retorno sobre os horários.\nConsegui encaixar você em [data_sugerida_1] — faz sentido pra você?",
   ],
   "Follow-Up 1": [
-    "Olá [primeiro_nome]! 😊\n\nTentei entrar em contato anteriormente sobre sua avaliação de [serviço].\n\nTemos disponibilidade em [data_sugerida_1] ou [data_sugerida_2]. Qual dia funciona para você?",
+    "[primeiro_nome], tudo bem? 😊\nTentei te chamar mais cedo sobre sua avaliação.\n\nAinda consigo te encaixar em [data_sugerida_1] ou [data_sugerida_2].\nO que acha?",
+    "Opa, [primeiro_nome]!\nSobre aquele horário que a gente conversou — consigo ainda sim encaixar você.\n[data_sugerida_1] funciona?",
+    "[primeiro_nome], só confirmando:\nLembrei do que você comentou. Tenho [data_sugerida_1] ou, se preferir, [data_sugerida_2].\nQual é melhor?",
   ],
   "Follow-Up 2": [
-    "[primeiro_nome], tudo bem?\n\nNão quero perder o contato! Você passou pelo nosso atendimento e demonstrou interesse em [serviço].\n\nConseguimos um horário em [data_sugerida_1]. Funciona para você?",
+    "[primeiro_nome], e aí?\nFiquei pensando no que você comentou quando passou aqui com a gente…\n\nSeparei um horário em [data_sugerida_1].\nSe fizer sentido pra você, me fala que já deixo reservado 😊",
+    "[primeiro_nome]!\nTô com um horário bem legal em [data_sugerida_1].\nQuer que eu reserve pra você?",
+    "Opa, [primeiro_nome]!\nNão quer deixar passar essa chance de cuidar do seu sorriso, né?\nTenho espaço em [data_sugerida_1] — bora confirmar?",
   ],
   "Follow-Up 3": [
-    "Olá [primeiro_nome]!\n\nCompreendo que a agenda pode estar cheia. Se quiser, podemos agendar para o período da tarde ou de manhã — o que for melhor para você.\n\nTemos [data_sugerida_1] disponível. O que acha?",
+    "[primeiro_nome], e aí?\nFiquei pensando no que você comentou quando passou aqui com a gente…\n\nSeparei um horário em [data_sugerida_1].\nSe fizer sentido pra você, me fala que já deixo reservado 😊",
+    "[primeiro_nome]!\nTô com um horário bem legal em [data_sugerida_1].\nQuer que eu reserve pra você?",
+    "Opa, [primeiro_nome]!\nNão quer deixar passar essa chance de cuidar do seu sorriso, né?\nTenho espaço em [data_sugerida_1] — bora confirmar?",
   ],
 };
 

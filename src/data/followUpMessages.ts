@@ -13,18 +13,18 @@ export const followUpMessages: FollowUpMessage[] = [
     stage: "Novo",
     template: null,
     variations: [
-      "Olá [primeiro_nome], tudo bem? \n\nPercebi que você entrou em contato conosco e gostaríamos de ajudá-lo. \n\nPoderia enviar-me um áudio explicando o que mais o incomoda no seu sorriso atualmente? \n\nSerá um prazer enorme ouvi-lo. 😊 \n\nFico no aguardo do seu retorno.",
-      "Olá [primeiro_nome]! \n\nPercebi que você se interessou pelos nossos tratamentos. \n\nPoderia contar-me um pouco sobre o que mais o incomoda no seu sorriso atualmente? \n\nUm áudio é bem prático. Aguardo seu contato.",
-      "Olá [primeiro_nome]! \n\nPercebi que você entrou em contato. Antes de tudo, gostaria de entender melhor o seu caso. \n\nO que o incomoda no sorriso? \n\nPoderia enviar-me um áudio quando tiver disponibilidade? Fico no aguardo."
+      "Oi, [primeiro_nome]! Tudo bem? 😊\nVi que você chamou a gente por aqui e vou te ajudar, pode deixar!\n\nSe puder, me conta (pode ser por áudio mesmo) o que mais te incomoda no seu sorriso hoje.\nQuero entender direitinho pra te orientar melhor.",
+      "[primeiro_nome], tudo certo?\nEntendi que você quer conhecer mais sobre nosso atendimento.\n\nMe conta um pouco sobre o que te traz até aqui — qual é o maior incômodo no seu sorriso?\n(Áudio fica tranquilo demais pra você falar)",
+      "Opa, [primeiro_nome]! 😊\nTudo bem? Vim aqui pra te ajudar.\n\nQual é a principal coisa que te incomoda no seu sorriso? Pode ser por áudio mesmo — fica mais fácil!"
     ],
   },
   {
     stage: "Em contato",
     template: null,
     variations: [
-      "Olá [primeiro_nome], tudo bem? \n\nPercebi que nossa comunicação ficou pausada. \n\nPoderia enviar-me um áudio explicando o que mais o incomoda no seu sorriso atualmente? \n\nSerá um prazer enorme ouvi-lo e entender como podemos ajudá-lo. 😊 \n\nQuando poderia me enviar esse áudio?",
-      "Olá [primeiro_nome], como você está? \n\nFique à vontade para me enviar um áudio explicando o que o incomoda no seu sorriso atualmente. \n\nSerá um prazer enorme ouvi-lo para buscarmos a melhor solução para você. \n\nPoderia responder-me hoje?",
-      "Olá [primeiro_nome]. \n\nGostaria de verificar se ficou alguma dúvida. \n\nSe preferir, pode me enviar um áudio explicando o que o incomoda no seu sorriso. \n\nEstarei aqui para orientá-lo. Quando poderia entrar em contato?"
+      "Oi, [primeiro_nome]! 😊\nPassei aqui porque não consegui te ouvir ainda.\n\nSe puder me mandar um áudio contando o que te incomoda, já consigo te orientar melhor, tá?\nFico te aguardando!",
+      "[primeiro_nome], e aí?\nSei que a rotina aperta mesmo. Mas quando tiver um tempinho, me manda um áudio falando sobre aquele incômodo no sorriso.\nAssim já te direciono certinho.",
+      "E aí, [primeiro_nome]?\nTô aqui esperando aquele áudio sobre o que te incomoda no sorriso.\nQuando consegue mandar? 😊"
     ],
     variationsNoShow: [
       "Olá [primeiro_nome]. \n\nPercebi que você não conseguiu comparecer à sua consulta programada para as [horário]. Aconteceu algum imprevisto? \n\nTemos disponibilidade em [data_sugerida_1] às [hora_sugerida_1]. \n\nFunciona para você?"
@@ -34,9 +34,9 @@ export const followUpMessages: FollowUpMessage[] = [
     stage: "Follow-Up 1",
     template: null,
     variations: [
-      "Olá [primeiro_nome], tudo bem? \n\nPercebi que nossa comunicação ficou pausada. \n\nPoderia enviar-me um áudio explicando o que mais o incomoda no seu sorriso atualmente? \n\nSerá um prazer enorme ouvi-lo e entender como podemos ajudá-lo. 😊 \n\nQuando poderia me enviar esse áudio?",
-      "Olá [primeiro_nome], como você está? \n\nPercebi que não demos continuidade no seu atendimento. \n\nFique à vontade para me enviar um áudio explicando o que o incomoda no seu sorriso atualmente. \n\nSerá um prazer enorme ouvi-lo para buscarmos a melhor solução para você. \n\nPoderia responder-me hoje?",
-      "Olá [primeiro_nome]. \n\nGostaria de verificar se ficou alguma dúvida. \n\nSe preferir, pode me enviar um áudio explicando o que o incomoda no seu sorriso. \n\nEstarei aqui para orientá-lo. \n\nQuando poderia entrar em contato?"
+      "[primeiro_nome], tudo bem? 😊\nQueria te ajudar com isso que você comentou, mas preciso entender um pouquinho melhor.\n\nSe puder, me manda um áudio quando tiver um tempinho.\nAssim já te direciono certinho.",
+      "Opa, [primeiro_nome]!\nFiquei pensando no que você comentou e quero ajudar mesmo.\n\nMe manda um áudio quando tiver um tempo? Aí já te passo as melhores opções pra você.",
+      "[primeiro_nome], tudo ok?\nConseguiu gravar aquele áudio falando sobre o incômodo?\nFico no aguardo!"
     ],
     templateWithAppointment: null,
     variationsNoShow: [
@@ -47,8 +47,9 @@ export const followUpMessages: FollowUpMessage[] = [
     stage: "Follow-Up 2",
     template: null,
     variations: [
-      "Olá [primeiro_nome]. \n\nRetornei à nossa conversa e percebi que não a finalizamos adequadamente. \n\nFrequentemente adiar o tratamento dental se torna um hábito. \n\nPoderia me informar qual seria seu próximo passo? Gostaria de entender melhor como ajudá-lo. \n\nQuando podemos conversar?",
-      "[primeiro_nome], como você está? \n\nAguardei alguns dias para não o incomodar, porém gostaria de ter a oportunidade de ajudá-lo com seu sorriso. \n\nO que ficou faltando esclarecer? \n\nPoderia enviar-me um áudio quando tiver disponibilidade? Fico no aguardo."
+      "[primeiro_nome], tudo bem? 😊\nQueria te ajudar com isso que você comentou, mas preciso entender um pouquinho melhor.\n\nSe puder, me manda um áudio quando tiver um tempinho.\nAssim já te direciono certinho.",
+      "Opa, [primeiro_nome]!\nFiquei pensando no que você comentou e quero ajudar mesmo.\n\nMe manda um áudio quando tiver um tempo? Aí já te passo as melhores opções pra você.",
+      "[primeiro_nome], tudo ok?\nConseguiu gravar aquele áudio falando sobre o incômodo?\nFico no aguardo!"
     ],
     templateWithAppointment: null,
     variationsNoShow: [
@@ -59,8 +60,9 @@ export const followUpMessages: FollowUpMessage[] = [
     stage: "Follow-Up 3",
     template: null,
     variations: [
-      "Olá [primeiro_nome]. \n\nComo estão as coisas? Compreendo que a rotina muitas vezes nos afasta da prioridade de cuidar do sorriso. \n\nAquele incômodo que você mencionou no seu sorriso continua o incomodando? \n\nSe desejar, poderia me enviar um áudio? Estou disponível para ajudá-lo.",
-      "[primeiro_nome]. \n\nGostaria de reforçar que continuo disponível. \n\nSe o horário ou a logística são obstáculos, podemos explorar alternativas. Podemos encontrar um horário que se adeque melhor à sua rotina. \n\nQual seria sua preferência? Poderia me enviar um áudio com sua sugestão hoje?"
+      "[primeiro_nome], tudo bem? 😊\nQueria te ajudar com isso que você comentou, mas preciso entender um pouquinho melhor.\n\nSe puder, me manda um áudio quando tiver um tempinho.\nAssim já te direciono certinho.",
+      "Opa, [primeiro_nome]!\nFiquei pensando no que você comentou e quero ajudar mesmo.\n\nMe manda um áudio quando tiver um tempo? Aí já te passo as melhores opções pra você.",
+      "[primeiro_nome], tudo ok?\nConseguiu gravar aquele áudio falando sobre o incômodo?\nFico no aguardo!"
     ],
     templateWithAppointment: null,
     variationsNoShow: [
