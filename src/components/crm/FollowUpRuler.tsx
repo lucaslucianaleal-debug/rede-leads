@@ -67,6 +67,11 @@ const PROMOTORA_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
 // Lead recebeu indicação de paciente — NÃO pedir áudio, oferecer clareamento (2 sessões) como benefício
 // ---------------------------------------------------------------------------
 const INDICACAO_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
+  "Novo": [
+    "Bom dia, [primeiro_nome]! Como você está?\nAinda consigo te colocar no benefício das 2 sessões de clareamento como benefício da clínica para o dia [data_sugerida_1].\nPosso agendar para você?",
+    "Boa tarde, [primeiro_nome]! Tudo bem?\nPassei aqui vendo a campanha de indicação das 2 sessões de clareamento.\nAinda dá pra te incluir para o dia [data_sugerida_1].\nPosso confirmar?",
+    "[primeiro_nome], como você está?\nAinda consigo colocar você nas 2 sessões de clareamento como benefício para o dia [data_sugerida_1].\nPosso agendar aí?",
+  ],
   "Em contato": [
     "Bom dia, [primeiro_nome]! Como você está?\nAinda consigo te colocar no benefício das 2 sessões de clareamento como benefício da clínica para o dia [data_sugerida_1].\nPosso agendar para você?",
     "Boa tarde, [primeiro_nome]! Tudo bem?\nTô aqui vendo a campanha de indicação das 2 sessões de clareamento.\nAinda dá pra te incluir para o dia [data_sugerida_1].\nPosso confirmar?",
