@@ -68,35 +68,35 @@ const PROMOTORA_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
 // ---------------------------------------------------------------------------
 const INDICACAO_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
   "Novo": [
-    "Bom dia, [primeiro_nome]! Como você está?\nAinda consigo te colocar no benefício das 2 sessões de clareamento como benefício da clínica para o dia [data_sugerida_1].\nPosso agendar para você?",
-    "Boa tarde, [primeiro_nome]! Tudo bem?\nPassei aqui vendo a campanha de indicação das 2 sessões de clareamento.\nAinda dá pra te incluir para o dia [data_sugerida_1].\nPosso confirmar?",
-    "[primeiro_nome], como você está?\nAinda consigo colocar você nas 2 sessões de clareamento como benefício para o dia [data_sugerida_1].\nPosso agendar aí?",
+    "Bom dia, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar no benefício das 2 sessões de clareamento como benefício da clínica para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?",
+    "Boa tarde, [primeiro_nome]! Tudo bem?\n\nPassei aqui vendo a campanha de indicação das 2 sessões de clareamento.\nAinda dá pra te incluir para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso confirmar?",
+    "[primeiro_nome], como você está?\n\nAinda consigo colocar você nas 2 sessões de clareamento como benefício para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar aí?",
   ],
   "Em contato": [
-    "Bom dia, [primeiro_nome]! Como você está?\nAinda consigo te colocar no benefício das 2 sessões de clareamento como benefício da clínica para o dia [data_sugerida_1].\nPosso agendar para você?",
-    "Boa tarde, [primeiro_nome]! Tudo bem?\nTô aqui vendo a campanha de indicação das 2 sessões de clareamento.\nAinda dá pra te incluir para o dia [data_sugerida_1].\nPosso confirmar?",
-    "[primeiro_nome], como você está?\nAinda consigo colocar você nas 2 sessões de clareamento como benefício para o dia [data_sugerida_1].\nPosso agendar aí?",
+    "Bom dia, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar no benefício das 2 sessões de clareamento como benefício da clínica para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?",
+    "Boa tarde, [primeiro_nome]! Tudo bem?\n\nTô aqui vendo a campanha de indicação das 2 sessões de clareamento.\nAinda dá pra te incluir para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso confirmar?",
+    "[primeiro_nome], como você está?\n\nAinda consigo colocar você nas 2 sessões de clareamento como benefício para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar aí?",
   ],
   "Follow-Up 1": [
-    "Boa tarde, [primeiro_nome]! Tudo bem?\nAinda consigo te colocar nas 2 sessões de clareamento (benefício da clínica) para o dia [data_sugerida_1], mas a agenda está apertando.\nPosso agendar para você?",
-    "[primeiro_nome], como você está?\nAinda tenho vaga pra você nas 2 sessões de clareamento para o dia [data_sugerida_1].\nPosso agendar ou você prefere outro dia?",
+    "Boa tarde, [primeiro_nome]! Tudo bem?\n\nAinda consigo te colocar nas 2 sessões de clareamento (benefício da clínica) para o dia [data_sugerida_1] às [hora_sugerida_1], mas a agenda está apertando.\n\nPosso agendar para você?",
+    "[primeiro_nome], como você está?\n\nAinda tenho vaga pra você nas 2 sessões de clareamento para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar ou você prefere outro dia?",
   ],
   "Follow-Up 2": [
-    "Bom dia, [primeiro_nome]! Tudo bem?\nAinda dá tempo de você fazer as 2 sessões de clareamento (benefício) para o dia [data_sugerida_1], mas preciso saber se funciona.\nPosso agendar?",
-    "[primeiro_nome], como você está?\nTenho espaço pra você nas 2 sessões de clareamento da campanha de indicação para o dia [data_sugerida_1].\nPosso agendar você?",
+    "Bom dia, [primeiro_nome]! Tudo bem?\n\nAinda dá tempo de você fazer as 2 sessões de clareamento (benefício) para o dia [data_sugerida_1] às [hora_sugerida_1], mas preciso saber se funciona.\n\nPosso agendar?",
+    "[primeiro_nome], como você está?\n\nTenho espaço pra você nas 2 sessões de clareamento da campanha de indicação para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar você?",
   ],
   "Follow-Up 3": [
-    "Bom dia, [primeiro_nome]! Tudo bem?\nPreciso liberar essa vaga amanhã.\nPosso agendar você para as 2 sessões de clareamento (benefício da clínica) para o dia [data_sugerida_1]?",
-    "[primeiro_nome], como você está?\nFiquei pensando aqui — consigo te colocar nas 2 sessões de clareamento como benefício.\nPreciso confirmar se funciona para o dia [data_sugerida_1].",
+    "Bom dia, [primeiro_nome]! Tudo bem?\n\nPreciso liberar essa vaga amanhã.\n\nPosso agendar você para as 2 sessões de clareamento (benefício da clínica) para o dia [data_sugerida_1] às [hora_sugerida_1]?",
+    "[primeiro_nome], como você está?\n\nFiquei pensando aqui — consigo te colocar nas 2 sessões de clareamento como benefício.\nPreciso confirmar se funciona para o dia [data_sugerida_1] às [hora_sugerida_1].",
   ],
   "Follow-Up 4": [
-    "Bom dia, [primeiro_nome]! Tudo bem?\nPreciso liberar essa vaga amanhã.\nPosso agendar você para as 2 sessões de clareamento (benefício da clínica) para o dia [data_sugerida_1]?",
-    "[primeiro_nome], como você está?\nFiquei pensando aqui — consigo te colocar nas 2 sessões de clareamento como benefício.\nPreciso confirmar se funciona para o dia [data_sugerida_1].",
+    "Bom dia, [primeiro_nome]! Tudo bem?\n\nPreciso liberar essa vaga amanhã.\n\nPosso agendar você para as 2 sessões de clareamento (benefício da clínica) para o dia [data_sugerida_1] às [hora_sugerida_1]?",
+    "[primeiro_nome], como você está?\n\nFiquei pensando aqui — consigo te colocar nas 2 sessões de clareamento como benefício.\nPreciso confirmar se funciona para o dia [data_sugerida_1] às [hora_sugerida_1].",
   ],
   "Follow-Up 5": [
-    "Oi, [primeiro_nome]! Tudo bem?\nAinda consigo te colocar na campanha de indicação das 2 sessões de clareamento, mas as vagas estão terminando.\nTenho para o dia [data_sugerida_1].\nPosso agendar?",
-    "[primeiro_nome], como você está?\nAinda tenho uma vaga pra você nas 2 sessões de clareamento (benefício da clínica), mas tá acabando.\nTenho para o dia [data_sugerida_1].\nPosso agendar você?",
-    "Bom dia, [primeiro_nome]! Tudo bem?\nAinda dá tempo de você fazer as 2 sessões de clareamento como benefício, mas as vagas estão terminando.\nTenho para o dia [data_sugerida_1].\nPosso confirmar?",
+    "Oi, [primeiro_nome]! Tudo bem?\n\nAinda consigo te colocar na campanha de indicação das 2 sessões de clareamento, mas as vagas estão terminando.\n\nTenho para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar?",
+    "[primeiro_nome], como você está?\n\nAinda tenho uma vaga pra você nas 2 sessões de clareamento (benefício da clínica), mas tá acabando.\n\nTenho para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar você?",
+    "Bom dia, [primeiro_nome]! Tudo bem?\n\nAinda dá tempo de você fazer as 2 sessões de clareamento como benefício, mas as vagas estão terminando.\n\nTenho para o dia [data_sugerida_1] às [hora_sugerida_1].\n\nPosso confirmar?",
   ],
 };
 
