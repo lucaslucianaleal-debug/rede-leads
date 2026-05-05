@@ -17,6 +17,8 @@ import {
   MessageSquare,
   Info,
   TrendingUp,
+  UserCheck,
+  Globe,
 } from "lucide-react";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
@@ -28,47 +30,80 @@ import { getAvailableSlots } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 
 // ---------------------------------------------------------------------------
-// Configuração da régua — alinhada com a lógica existente no LeadTable.tsx
-// (FU 1-4: +1 dia, FU 5+: +2 dias)
+// Scripts específicos para leads da Promotora
+// Eles JÁ foram abordados pessoalmente — NÃO pedir áudio, focar em confirmar/agendar
+// ---------------------------------------------------------------------------
+const PROMOTORA_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
+  "Novo": [
+    "Olá [primeiro_nome]! 😊\n\nFoi um prazer te conhecer hoje.\n\nComo combinamos, tenho alguns horários disponíveis para sua avaliação de [serviço].\n\nQual dia funciona melhor para você? Temos opções em [data_sugerida_1] ou [data_sugerida_2].",
+    "Olá [primeiro_nome], tudo bem?\n\nPassei para confirmar nosso contato de hoje. Temos horários disponíveis para sua avaliação de [serviço].\n\nPoderia me confirmar qual dia é melhor para você?",
+  ],
+  "Em contato": [
+    "Olá [primeiro_nome]! 😊\n\nRetornei para verificar sobre o agendamento da sua avaliação de [serviço].\n\nTemos disponibilidade em [data_sugerida_1] ou [data_sugerida_2]. Qual prefere?",
+    "[primeiro_nome], como você está?\n\nSei que a rotina é corrida, mas queria garantir que você não perca a oportunidade de cuidar do seu sorriso.\n\nPoderia me confirmar um horário? Temos [data_sugerida_1] disponível.",
+  ],
+  "Follow-Up 1": [
+    "Olá [primeiro_nome]! 😊\n\nTentei entrar em contato anteriormente sobre sua avaliação de [serviço].\n\nTemos disponibilidade em [data_sugerida_1] ou [data_sugerida_2]. Qual dia funciona para você?",
+  ],
+  "Follow-Up 2": [
+    "[primeiro_nome], tudo bem?\n\nNão quero perder o contato! Você passou pelo nosso atendimento e demonstrou interesse em [serviço].\n\nConseguimos um horário em [data_sugerida_1]. Funciona para você?",
+  ],
+  "Follow-Up 3": [
+    "Olá [primeiro_nome]!\n\nCompreendo que a agenda pode estar cheia. Se quiser, podemos agendar para o período da tarde ou de manhã — o que for melhor para você.\n\nTemos [data_sugerida_1] disponível. O que acha?",
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Configuração completa do funil — inclui Novo, Em contato e Avaliação agendada
 // ---------------------------------------------------------------------------
 interface ReguaEntry {
   stage: LeadStage;
   label: string;
   cadencia: string;
   tipo: string;
-  color: "blue" | "amber" | "orange" | "rose" | "gray";
+  color: "green" | "teal" | "blue" | "amber" | "orange" | "rose" | "gray" | "purple";
   desc: string;
+  descPromo?: string; // descrição alternativa para leads da promotora
 }
 
 const REGUA_CONFIG: ReguaEntry[] = [
-  { stage: "Follow-Up 1",  label: "D1",  cadencia: "Mesmo dia",  tipo: "Primeiro Contato", color: "blue",   desc: "Abordagem inicial suave — perguntar sobre dor/incômodo via áudio" },
-  { stage: "Follow-Up 2",  label: "D2",  cadencia: "+1 dia",     tipo: "Primeiro Contato", color: "blue",   desc: "Reengajar sem pressão — perguntar qual é o próximo passo" },
-  { stage: "Follow-Up 3",  label: "D3",  cadencia: "+1 dia",     tipo: "Primeiro Contato", color: "blue",   desc: "Empatia com a rotina — reforçar disponibilidade" },
-  { stage: "Follow-Up 4",  label: "D4",  cadencia: "+1 dia",     tipo: "Urgência",         color: "amber",  desc: "Criar urgência — agenda concorrida, limitar vagas percebidas" },
-  { stage: "Follow-Up 5",  label: "D5",  cadencia: "+2 dias",    tipo: "Oferta",           color: "amber",  desc: "Condição diferenciada / oferta especial do financeiro" },
-  { stage: "Follow-Up 6",  label: "D6",  cadencia: "+2 dias",    tipo: "Prova Social",     color: "orange", desc: "Case de sucesso de paciente similar ao lead" },
-  { stage: "Follow-Up 7",  label: "D7",  cadencia: "+2 dias",    tipo: "Prova Social",     color: "orange", desc: "Pacientes da região satisfeitos — gerar FOMO" },
-  { stage: "Follow-Up 8",  label: "D8",  cadencia: "+2 dias",    tipo: "Reengajamento",    color: "rose",   desc: "Reposicionar — avaliação rápida e sem desconforto" },
-  { stage: "Follow-Up 9",  label: "D9",  cadencia: "+2 dias",    tipo: "Reengajamento",    color: "rose",   desc: "Tabela de valores + condição especial vigente" },
-  { stage: "Follow-Up 10", label: "D10", cadencia: "+2 dias",    tipo: "Reengajamento",    color: "rose",   desc: "Urgência final — pacotes especiais do mês encerrando" },
-  { stage: "Follow-Up 11", label: "D11", cadencia: "+2 dias",    tipo: "Encerramento",     color: "gray",   desc: "Último contato ativo — canal aberto sem pressão" },
-  { stage: "Follow-Up 12", label: "D12", cadencia: "+2 dias",    tipo: "Encerramento",     color: "gray",   desc: "Mensagem final — manter relacionamento latente" },
+  { stage: "Novo",          label: "NOVO",  cadencia: "Imediato",    tipo: "1º Contato",       color: "green",  desc: "Lead acabou de entrar — primeiro toque, perguntar sobre incômodo via áudio",        descPromo: "Lead abordado pela promotora — confirmar agendamento ou propor data" },
+  { stage: "Em contato",    label: "EC",    cadencia: "+1 dia",      tipo: "Nutrição",          color: "teal",   desc: "Já respondeu mas não agendou — manter conversa e colher informações",               descPromo: "Ainda não agendou — oferecer data concreta e fechar horário" },
+  { stage: "Follow-Up 1",   label: "D1",    cadencia: "Mesmo dia",   tipo: "Primeiro Follow-Up",color: "blue",   desc: "Abordagem inicial suave — perguntar sobre dor/incômodo via áudio",                 descPromo: "Não agendou ainda — oferecer data direta, sem pedir áudio" },
+  { stage: "Follow-Up 2",   label: "D2",    cadencia: "+1 dia",      tipo: "Primeiro Contato",  color: "blue",   desc: "Reengajar sem pressão — perguntar qual é o próximo passo",                         descPromo: "Insistir com data alternativa — tom leve" },
+  { stage: "Follow-Up 3",   label: "D3",    cadencia: "+1 dia",      tipo: "Primeiro Contato",  color: "blue",   desc: "Empatia com a rotina — reforçar disponibilidade",                                  descPromo: "Flexibilizar horário — manhã ou tarde" },
+  { stage: "Follow-Up 4",   label: "D4",    cadencia: "+1 dia",      tipo: "Urgência",          color: "amber",  desc: "Criar urgência — agenda concorrida, limitar vagas percebidas" },
+  { stage: "Follow-Up 5",   label: "D5",    cadencia: "+2 dias",     tipo: "Oferta",            color: "amber",  desc: "Condição diferenciada / oferta especial do financeiro" },
+  { stage: "Follow-Up 6",   label: "D6",    cadencia: "+2 dias",     tipo: "Prova Social",      color: "orange", desc: "Case de sucesso de paciente similar ao lead" },
+  { stage: "Follow-Up 7",   label: "D7",    cadencia: "+2 dias",     tipo: "Prova Social",      color: "orange", desc: "Pacientes da região satisfeitos — gerar FOMO" },
+  { stage: "Follow-Up 8",   label: "D8",    cadencia: "+2 dias",     tipo: "Reengajamento",     color: "rose",   desc: "Reposicionar — avaliação rápida e sem desconforto" },
+  { stage: "Follow-Up 9",   label: "D9",    cadencia: "+2 dias",     tipo: "Reengajamento",     color: "rose",   desc: "Tabela de valores + condição especial vigente" },
+  { stage: "Follow-Up 10",  label: "D10",   cadencia: "+2 dias",     tipo: "Reengajamento",     color: "rose",   desc: "Urgência final — pacotes especiais do mês encerrando" },
+  { stage: "Follow-Up 11",  label: "D11",   cadencia: "+2 dias",     tipo: "Encerramento",      color: "gray",   desc: "Último contato ativo — canal aberto sem pressão" },
+  { stage: "Follow-Up 12",  label: "D12",   cadencia: "+2 dias",     tipo: "Encerramento",      color: "gray",   desc: "Mensagem final — manter relacionamento latente" },
+  { stage: "Avaliação agendada", label: "AGEND", cadencia: "Antes da consulta", tipo: "Confirmação", color: "purple", desc: "Confirmar presença — enviar informações da clínica e horário" },
 ];
 
 const COLOR_BADGE: Record<string, string> = {
+  green:  "bg-emerald-100 text-emerald-700 border-emerald-200",
+  teal:   "bg-teal-100 text-teal-700 border-teal-200",
   blue:   "bg-blue-100 text-blue-700 border-blue-200",
   amber:  "bg-amber-100 text-amber-700 border-amber-200",
   orange: "bg-orange-100 text-orange-700 border-orange-200",
   rose:   "bg-rose-100 text-rose-700 border-rose-200",
   gray:   "bg-slate-100 text-slate-600 border-slate-200",
+  purple: "bg-purple-100 text-purple-700 border-purple-200",
 };
 
 const COLOR_ROW: Record<string, string> = {
+  green:  "border-emerald-200/60",
+  teal:   "border-teal-200/60",
   blue:   "border-blue-200/60",
   amber:  "border-amber-200/60",
   orange: "border-orange-200/60",
   rose:   "border-rose-200/60",
   gray:   "border-slate-200/40",
+  purple: "border-purple-200/60",
 };
 
 // ---------------------------------------------------------------------------
@@ -100,6 +135,10 @@ interface FollowUpRulerProps {
 
 type InnerTab    = "rotina" | "regua" | "metricas";
 type RotinaView  = "vencidos" | "hoje" | "todos";
+type FonteFilter = "todos" | "organico" | "promotora";
+
+const isPromotor = (lead: Lead) =>
+  (lead.fonteLead || "").toLowerCase().trim() === "promotora";
 
 // ---------------------------------------------------------------------------
 
@@ -111,10 +150,11 @@ export function FollowUpRuler({
   onDeleteLead,
 }: FollowUpRulerProps) {
   const [innerTab, setInnerTab] = useState<InnerTab>("rotina");
-  const [selectedStage, setSelectedStage] = useState<string>("Follow-Up 1");
+  const [selectedStage, setSelectedStage] = useState<string>("Novo");
   const [rotinaView, setRotinaView] = useState<RotinaView>("vencidos");
   const [expandedScript, setExpandedScript] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [fonteFilter, setFonteFilter] = useState<FonteFilter>("todos");
 
   // dialogs
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -129,15 +169,22 @@ export function FollowUpRuler({
   const base = allLeads || leads;
   const active = base.filter(l => !(l as any)._deleted);
 
-  // ── counts per stage ──────────────────────────────────────────────────────
+  // ── filtragem por fonte ───────────────────────────────────────────────────
+  const activeFiltered = useMemo(() => {
+    if (fonteFilter === "promotora") return active.filter(isPromotor);
+    if (fonteFilter === "organico")  return active.filter(l => !isPromotor(l));
+    return active;
+  }, [active, fonteFilter]);
+
+  // ── counts per stage (respeitando filtro de fonte) ────────────────────────
   const stageCount = useMemo<Record<string, number>>(() => {
     const c: Record<string, number> = {};
     REGUA_CONFIG.forEach(r => { c[r.stage] = 0; });
-    active
+    activeFiltered
       .filter(l => !["Finalizado", "Desistência", "Fora da região"].includes(l.etapaLead))
       .forEach(l => { if (c[l.etapaLead] !== undefined) c[l.etapaLead]++; });
     return c;
-  }, [active]);
+  }, [activeFiltered]);
 
   const totalEmFU = Object.values(stageCount).reduce((s, n) => s + n, 0);
 
@@ -145,15 +192,15 @@ export function FollowUpRuler({
   const metrics = useMemo(() => {
     return REGUA_CONFIG.map(r => {
       const num = parseInt(r.stage.replace("Follow-Up ", ""), 10);
-      const reached = base.filter(l => (l.followUpCount || 0) >= num);
-      const total     = reached.length;
-      const converted = reached.filter(l =>
+      const pool = isNaN(num) ? activeFiltered : activeFiltered.filter(l => (l.followUpCount || 0) >= num);
+      const total     = pool.length;
+      const converted = pool.filter(l =>
         l.etapaLead === "Finalizado" ||
         l.etapaLead === "Avaliação agendada" ||
         !!l.dataAgendamentoCriado
       ).length;
-      const dropped   = reached.filter(l => l.etapaLead === "Desistência").length;
-      const responded = reached.filter(l => l.respostaLead === "RESPONDEU").length;
+      const dropped   = pool.filter(l => l.etapaLead === "Desistência").length;
+      const responded = pool.filter(l => l.respostaLead === "RESPONDEU").length;
       return {
         ...r,
         active:      stageCount[r.stage] || 0,
@@ -163,11 +210,11 @@ export function FollowUpRuler({
         respondRate: total > 0 ? Math.round((responded / total) * 100) : 0,
       };
     });
-  }, [base, stageCount]);
+  }, [activeFiltered, stageCount]);
 
   // ── leads for rotina diária ───────────────────────────────────────────────
   const stageLeads = useMemo<Lead[]>(() => {
-    let list = active.filter(l => l.etapaLead === selectedStage);
+    let list = activeFiltered.filter(l => l.etapaLead === selectedStage);
 
     if (search.trim()) {
       const t = search.trim().toLowerCase();
@@ -185,42 +232,65 @@ export function FollowUpRuler({
       const db = getDaysSince(b.lastFollowUpDone || b.dataFollowUp);
       return db - da;
     });
-  }, [active, selectedStage, rotinaView, search, today]);
+  }, [activeFiltered, selectedStage, rotinaView, search, today]);
 
   // ── sub-tab counts ────────────────────────────────────────────────────────
   const subCounts = useMemo(() => {
-    const base2 = active.filter(l => l.etapaLead === selectedStage);
+    const base2 = activeFiltered.filter(l => l.etapaLead === selectedStage);
     return {
       vencidos: base2.filter(l => getDaysSince(l.dataFollowUp) >= 1 && l.lastFollowUpDone !== today).length,
       hoje:     base2.filter(l => l.dataFollowUp === today || l.lastFollowUpDone === today).length,
       todos:    base2.length,
     };
-  }, [active, selectedStage, today]);
+  }, [activeFiltered, selectedStage, today]);
 
-  // ── script for selected stage ─────────────────────────────────────────────
+  // ── script for selected stage (varia conforme fonte selecionada) ──────────
   const selectedConfig = REGUA_CONFIG.find(r => r.stage === selectedStage);
   const selectedScript = useMemo(() => {
+    // Se filtro = promotora ou "Avaliação agendada", usa script da promotora quando disponível
+    if (fonteFilter === "promotora" || selectedStage === "Avaliação agendada") {
+      const promo = PROMOTORA_SCRIPTS[selectedStage as LeadStage];
+      if (promo?.[0]) return promo[0];
+    }
     const msg = followUpMessages.find(m => m.stage === selectedStage);
     return msg?.variations?.[0] ?? msg?.template ?? null;
-  }, [selectedStage]);
+  }, [selectedStage, fonteFilter]);
+
+  // helper: resolve mensagem WhatsApp respeitando fonte do lead
+  const resolveWhatsAppMessage = (lead: Lead, data1 = "", hora1 = "") => {
+    const horario = lead.dataAgendamento?.split(" ")[1] ?? "";
+    // Avaliação agendada → sempre usa confirmação de agendamento
+    if (lead.etapaLead === "Avaliação agendada") return null; // sinaliza para usar confirmação
+    // Lead da promotora: usa script promotora se disponível
+    if (isPromotor(lead)) {
+      const scripts = PROMOTORA_SCRIPTS[lead.etapaLead as LeadStage];
+      const tpl = scripts?.[lead.followUpCount ? lead.followUpCount % scripts.length : 0] ?? scripts?.[0];
+      if (tpl) return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, undefined, hora1);
+    }
+    // Lead orgânico: usa sistema existente
+    const hasAppt = !!(lead.dataAgendamentoCriado || lead.dataAgendamentoAlterado);
+    const noShow  = lead.comparecimento === "NÃO COMPARECEU";
+    const tpl     = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppt, noShow);
+    if (!tpl) return "";
+    return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, undefined, hora1);
+  };
 
   // ── action handlers ───────────────────────────────────────────────────────
   const handleWhatsApp = async (lead: Lead) => {
-    const hasAppt  = !!(lead.dataAgendamentoCriado || lead.dataAgendamentoAlterado);
-    const noShow   = lead.comparecimento === "NÃO COMPARECEU";
-    const horario  = lead.dataAgendamento?.split(" ")[1] ?? "";
-    const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppt, noShow);
-    let msg = "";
-    if (template) {
-      let data1 = "", hora1 = "";
-      if (noShow && currentClinic) {
-        try {
-          const slots = await getAvailableSlots(currentClinic);
-          if (slots.length > 0) { data1 = slots[0].dayLabel; hora1 = slots[0].hourLabel; }
-        } catch { /* silent */ }
-      }
-      msg = formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, undefined, hora1);
+    // Avaliação agendada → confirmação de presença
+    if (lead.etapaLead === "Avaliação agendada") {
+      handleConfirmAppt(lead);
+      return;
     }
+    let data1 = "", hora1 = "";
+    const noShow = lead.comparecimento === "NÃO COMPARECEU";
+    if ((noShow || isPromotor(lead)) && currentClinic) {
+      try {
+        const slots = await getAvailableSlots(currentClinic);
+        if (slots.length > 0) { data1 = slots[0].dayLabel; hora1 = slots[0].hourLabel; }
+      } catch { /* silent */ }
+    }
+    const msg = resolveWhatsAppMessage(lead, data1, hora1) ?? "";
     setSuggestedMsg(msg);
     setWhatsLead(lead);
     setShowWhatsApp(true);
@@ -251,18 +321,45 @@ export function FollowUpRuler({
       <div className="flex items-center justify-between">
         <h3 className="font-heading font-semibold text-lg flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
-          Régua de Follow-Up
+          Rotina de Contatos
         </h3>
         <span className="text-sm text-muted-foreground">{totalEmFU} em andamento</span>
+      </div>
+
+      {/* Filtro por fonte */}
+      <div className="flex gap-1.5">
+        {(
+          [
+            { id: "todos",     label: "Todos",      Icon: Globe,      cls: "bg-muted/60 text-foreground border-muted" },
+            { id: "organico",  label: "Orgânicos",  Icon: Globe,      cls: "bg-blue-50 text-blue-700 border-blue-200" },
+            { id: "promotora", label: "Promotora",  Icon: UserCheck,  cls: "bg-pink-50 text-pink-700 border-pink-200" },
+          ] as { id: FonteFilter; label: string; Icon: React.ElementType; cls: string }[]
+        ).map(({ id, label, Icon, cls }) => (
+          <button
+            key={id}
+            onClick={() => setFonteFilter(id)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+              fonteFilter === id ? `${cls} ring-2 ring-offset-1 ring-current shadow` : "bg-muted/40 text-muted-foreground border-muted hover:bg-muted"
+            }`}
+          >
+            <Icon className="h-3 w-3 shrink-0" />
+            {label}
+          </button>
+        ))}
+        {fonteFilter === "promotora" && (
+          <span className="ml-auto text-[11px] text-pink-600 italic self-center hidden sm:inline">
+            Scripts adaptados — sem pedido de áudio
+          </span>
+        )}
       </div>
 
       {/* Inner tabs */}
       <div className="flex gap-1 bg-muted/40 rounded-lg p-1">
         {(
           [
-            { id: "rotina",   label: "Rotina Diária", Icon: Play       },
-            { id: "regua",    label: "Régua",          Icon: BookOpen   },
-            { id: "metricas", label: "Métricas",       Icon: BarChart3  },
+            { id: "rotina",   label: "Rotina Diária", Icon: Play      },
+            { id: "regua",    label: "Cadência",       Icon: BookOpen  },
+            { id: "metricas", label: "Métricas",       Icon: BarChart3 },
           ] as { id: InnerTab; label: string; Icon: React.ElementType }[]
         ).map(({ id, label, Icon }) => (
           <button
@@ -324,7 +421,11 @@ export function FollowUpRuler({
                   <span className="font-bold">{selectedConfig.label}</span>
                   <span className="font-semibold">{selectedConfig.tipo}</span>
                   <span className="opacity-60">• {selectedConfig.cadencia}</span>
-                  <span className="opacity-70 hidden sm:inline">• {selectedConfig.desc}</span>
+                  <span className="opacity-70 hidden sm:inline">
+                    • {fonteFilter === "promotora" && selectedConfig.descPromo
+                        ? selectedConfig.descPromo
+                        : selectedConfig.desc}
+                  </span>
                 </div>
                 <button
                   onClick={() => setExpandedScript(expandedScript === selectedStage ? null : selectedStage)}
@@ -424,6 +525,11 @@ export function FollowUpRuler({
                         lead.status === "MORNO"  ? "bg-warning/15 text-warning" :
                                                    "bg-info/15 text-info"
                       }`}>{lead.status || "–"}</span>
+                      {isPromotor(lead) && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-pink-100 text-pink-700 border border-pink-200">
+                          Promotora
+                        </span>
+                      )}
                       {doneToday && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-700">
                           Feito hoje
@@ -500,19 +606,23 @@ export function FollowUpRuler({
       )}
 
       {/* ================================================================== */}
-      {/* TAB: RÉGUA                                                         */}
+      {/* TAB: CADÊNCIA                                                      */}
       {/* ================================================================== */}
       {innerTab === "regua" && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground mb-3">
-            Visão completa da cadência de contatos, tipo de abordagem e scripts por etapa.
-            Clique em <strong>Trabalhar →</strong> para ir direto à fila daquela etapa.
+            Cadência completa do funil — do primeiro contato ao fechamento.
+            {fonteFilter === "promotora" && <span className="text-pink-600 font-medium"> Scripts adaptados para Promotora visíveis.</span>}
+            {" "}Clique em <strong>Trabalhar →</strong> para ir direto à fila daquela etapa.
           </p>
           <div className="space-y-1.5">
             {REGUA_CONFIG.map(r => {
               const cnt        = stageCount[r.stage] || 0;
+              const promoScript = PROMOTORA_SCRIPTS[r.stage as LeadStage]?.[0];
               const msgData    = followUpMessages.find(m => m.stage === r.stage);
-              const fullScript = msgData?.variations?.[0] ?? msgData?.template ?? "";
+              const fullScript = fonteFilter === "promotora" && promoScript
+                ? promoScript
+                : (msgData?.variations?.[0] ?? msgData?.template ?? "");
               const isExp      = expandedScript === r.stage;
               return (
                 <div
@@ -532,9 +642,13 @@ export function FollowUpRuler({
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-semibold text-foreground">{r.tipo}</span>
                         <span className="text-xs text-muted-foreground">• {r.cadencia}</span>
-                        <span className="text-xs text-muted-foreground hidden sm:inline">• {r.desc}</span>
+                        <span className="text-xs text-muted-foreground hidden sm:inline">
+                          • {fonteFilter === "promotora" && r.descPromo ? r.descPromo : r.desc}
+                        </span>
                       </div>
-                      <p className="text-xs text-muted-foreground sm:hidden mt-0.5">{r.desc}</p>
+                      <p className="text-xs text-muted-foreground sm:hidden mt-0.5">
+                        {fonteFilter === "promotora" && r.descPromo ? r.descPromo : r.desc}
+                      </p>
                     </div>
 
                     {/* Right side */}

@@ -451,7 +451,7 @@ const CRMDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="regua-followup" className="flex items-center gap-1.5">
               <BookOpen className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Régua Follow-Up</span>
+              <span className="hidden sm:inline">Rotina de Contatos</span>
             </TabsTrigger>
             <TabsTrigger value="roi-custos" className="flex items-center gap-1.5">
               <DollarSign className="h-4 w-4 shrink-0" />
