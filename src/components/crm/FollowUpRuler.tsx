@@ -57,9 +57,9 @@ const PROMOTORA_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
     "Opa, [primeiro_nome]!\nNão quer deixar passar essa chance de cuidar do seu sorriso, né?\nTenho espaço em [data_sugerida_1] — bora confirmar?",
   ],
   "Follow-Up 3": [
-    "[primeiro_nome], e aí?\nFiquei pensando no que você comentou quando passou aqui com a gente…\n\nSeparei um horário em [data_sugerida_1].\nSe fizer sentido pra você, me fala que já deixo reservado 😊",
-    "[primeiro_nome]!\nTô com um horário bem legal em [data_sugerida_1].\nQuer que eu reserve pra você?",
-    "Opa, [primeiro_nome]!\nNão quer deixar passar essa chance de cuidar do seu sorriso, né?\nTenho espaço em [data_sugerida_1] — bora confirmar?",
+    "[primeiro_nome], você tem 2 min? 😊\nTô com só um horário ainda livre pra sua avaliação: [data_sugerida_1].\n\nSe não puder, consigo mudar pra [data_sugerida_2] — mas não deixa passar muito tempo, tá?",
+    "[primeiro_nome]!\nÚltima chance de garantir o horário antes que feche a agenda.\n[data_sugerida_1] — posso reservar?",
+    "Opa, [primeiro_nome] — só pra não perder de vista:\nTenho espaço em [data_sugerida_1] (ou [data_sugerida_2] se preferir).\nBora garantir enquanto tem?",
   ],
 };
 
@@ -91,8 +91,8 @@ const INDICACAO_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
     "[primeiro_nome], como você está?\n\nFiquei pensando aqui — consigo te colocar nas 2 sessões de clareamento como benefício.\nPreciso confirmar se funciona para [data_sugerida_1] às [hora_sugerida_1].",
   ],
   "Follow-Up 4": [
-    "Bom dia, [primeiro_nome]! Tudo bem?\n\nPreciso liberar essa vaga amanhã.\n\nPosso agendar você para as 2 sessões de clareamento (benefício da clínica) para [data_sugerida_1] às [hora_sugerida_1]?",
-    "[primeiro_nome], como você está?\n\nFiquei pensando aqui — consigo te colocar nas 2 sessões de clareamento como benefício.\nPreciso confirmar se funciona para [data_sugerida_1] às [hora_sugerida_1].",
+    "Oi, [primeiro_nome], tudo bem?\n\nSei que a rotina é corrida, mas não quis sumir sem dar um retorno.\nAinda tenho uma vaga guardada pra você nas 2 sessões de clareamento, para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso confirmar?",
+    "[primeiro_nome], como você está?\n\nQuis dar uma última chance antes de liberar a vaga.\nConsigo te colocar nas 2 sessões de clareamento (benefício) para [data_sugerida_1] às [hora_sugerida_1].\n\nFaz sentido?",
   ],
   "Follow-Up 5": [
     "Oi, [primeiro_nome]! Tudo bem?\n\nAinda consigo te colocar na campanha de indicação das 2 sessões de clareamento, mas as vagas estão terminando.\n\nTenho para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar?",
@@ -283,7 +283,7 @@ export function FollowUpRuler({
     }
 
     if (rotinaView === "vencidos") {
-      list = list.filter(l => getDaysSince(l.dataFollowUp) >= 1 && l.lastFollowUpDone !== today);
+      list = list.filter(l => (getDaysSince(l.dataFollowUp) >= 1 || !l.dataFollowUp) && l.lastFollowUpDone !== today);
     } else if (rotinaView === "hoje") {
       list = list.filter(l => l.dataFollowUp === today || l.lastFollowUpDone === today);
     }
@@ -299,7 +299,7 @@ export function FollowUpRuler({
   const subCounts = useMemo(() => {
     const base2 = activeFiltered.filter(l => l.etapaLead === selectedStage);
     return {
-      vencidos: base2.filter(l => getDaysSince(l.dataFollowUp) >= 1 && l.lastFollowUpDone !== today).length,
+      vencidos: base2.filter(l => (getDaysSince(l.dataFollowUp) >= 1 || !l.dataFollowUp) && l.lastFollowUpDone !== today).length,
       hoje:     base2.filter(l => l.dataFollowUp === today || l.lastFollowUpDone === today).length,
       todos:    base2.length,
     };
@@ -321,7 +321,7 @@ export function FollowUpRuler({
   }, [selectedStage, fonteFilter]);
 
   // helper: resolve mensagem WhatsApp respeitando fonte do lead
-  const resolveWhatsAppMessage = (lead: Lead, data1 = "", hora1 = "") => {
+  const resolveWhatsAppMessage = (lead: Lead, data1 = "", hora1 = "", data2 = "", hora2 = "") => {
     const horario = lead.dataAgendamento?.split(" ")[1] ?? "";
     // Avaliação agendada → sempre usa confirmação de agendamento
     if (lead.etapaLead === "Avaliação agendada") return null; // sinaliza para usar confirmação
@@ -329,20 +329,20 @@ export function FollowUpRuler({
     if (isIndicacao(lead)) {
       const scripts = INDICACAO_SCRIPTS[lead.etapaLead as LeadStage];
       const tpl = scripts?.[lead.followUpCount ? lead.followUpCount % scripts.length : 0] ?? scripts?.[0];
-      if (tpl) return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, undefined, hora1);
+      if (tpl) return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, data2, hora1, hora2);
     }
     // Lead da promotora: usa script promotora se disponível
     if (isPromotor(lead)) {
       const scripts = PROMOTORA_SCRIPTS[lead.etapaLead as LeadStage];
       const tpl = scripts?.[lead.followUpCount ? lead.followUpCount % scripts.length : 0] ?? scripts?.[0];
-      if (tpl) return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, undefined, hora1);
+      if (tpl) return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, data2, hora1, hora2);
     }
     // Lead orgânico: usa sistema existente
     const hasAppt = !!(lead.dataAgendamentoCriado || lead.dataAgendamentoAlterado);
     const noShow  = lead.comparecimento === "NÃO COMPARECEU";
     const tpl     = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppt, noShow);
     if (!tpl) return "";
-    return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, undefined, hora1);
+    return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, data2, hora1, hora2);
   };
 
   // ── action handlers ───────────────────────────────────────────────────────
@@ -352,15 +352,16 @@ export function FollowUpRuler({
       handleConfirmAppt(lead);
       return;
     }
-    let data1 = "", hora1 = "";
+    let data1 = "", hora1 = "", data2 = "", hora2 = "";
     const noShow = lead.comparecimento === "NÃO COMPARECEU";
     if ((noShow || isPromotor(lead) || isIndicacao(lead)) && currentClinic) {
       try {
         const slots = await getAvailableSlots(currentClinic);
         if (slots.length > 0) { data1 = slots[0].dayLabel; hora1 = slots[0].hourLabel; }
+        if (slots.length > 1) { data2 = slots[1].dayLabel; hora2 = slots[1].hourLabel; }
       } catch { /* silent */ }
     }
-    const msg = resolveWhatsAppMessage(lead, data1, hora1) ?? "";
+    const msg = resolveWhatsAppMessage(lead, data1, hora1, data2, hora2) ?? "";
     setSuggestedMsg(msg);
     setWhatsLead(lead);
     setShowWhatsApp(true);
@@ -958,7 +959,7 @@ export function FollowUpRuler({
                   </div>
                   <div className="flex gap-2">
                     <span className="font-semibold text-foreground w-24 shrink-0">Agendados</span>
-                    <span>% dos leads que passaram por essa etapa (followUp ≥ N) e chegaram a "Avaliação Agendada" ou "Finalizado". Indica o poder de conversão do script naquele ponto.</span>
+                    <span>% dos leads que chegaram <strong className="text-foreground">até esta etapa ou além</strong> (followUp ≥ N) e eventualmente agendaram. É uma visão de funil acumulado — etapas mais avançadas tendem a mostrar taxas maiores, pois os leads que desistiram saíram antes.</span>
                   </div>
                   <div className="flex gap-2">
                     <span className="font-semibold text-foreground w-24 shrink-0">Compareceu</span>
