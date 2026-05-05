@@ -20,6 +20,7 @@ import {
   UserCheck,
   Globe,
   Gift,
+  HelpCircle,
 } from "lucide-react";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
@@ -517,33 +518,43 @@ export function FollowUpRuler({
           )}
 
           {/* Sub-view tabs: Vencidos / Hoje / Todos */}
-          <div className="flex gap-1 bg-muted/40 rounded-lg p-1">
-            {(
-              [
-                { id: "vencidos", label: "Vencidos",  count: subCounts.vencidos, warn: true },
-                { id: "hoje",     label: "Hoje",       count: subCounts.hoje,     warn: false },
-                { id: "todos",    label: "Todos",      count: subCounts.todos,    warn: false },
-              ] as { id: RotinaView; label: string; count: number; warn: boolean }[]
-            ).map(v => (
-              <button
-                key={v.id}
-                onClick={() => setRotinaView(v.id)}
-                className={`flex-1 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
-                  rotinaView === v.id ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {v.label}
-                {v.count > 0 && (
-                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                    rotinaView === v.id
-                      ? v.warn
-                        ? "bg-destructive/15 text-destructive"
-                        : "bg-primary/15 text-primary"
-                      : "bg-muted text-muted-foreground"
-                  }`}>{v.count}</span>
-                )}
-              </button>
-            ))}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1 bg-muted/40 rounded-lg p-1">
+                {(
+                  [
+                    { id: "vencidos", label: "Vencidos",  count: subCounts.vencidos, warn: true,  desc: "Atrasados — fazer agora" },
+                    { id: "hoje",     label: "Hoje",       count: subCounts.hoje,     warn: false, desc: "Rotina de hoje" },
+                    { id: "todos",    label: "Todos",      count: subCounts.todos,    warn: false, desc: "Todos os leads" },
+                  ] as { id: RotinaView; label: string; count: number; warn: boolean; desc: string }[]
+                ).map(v => (
+                  <div key={v.id} className="group relative">
+                    <button
+                      onClick={() => setRotinaView(v.id)}
+                      className={`flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                        rotinaView === v.id ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {v.label}
+                      {v.count > 0 && (
+                        <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                          rotinaView === v.id
+                            ? v.warn
+                              ? "bg-destructive/15 text-destructive"
+                              : "bg-primary/15 text-primary"
+                            : "bg-muted text-muted-foreground"
+                        }`}>{v.count}</span>
+                      )}
+                    </button>
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 left-0 z-10 hidden group-hover:block px-2 py-1 bg-foreground text-background text-xs rounded whitespace-nowrap shadow-lg">
+                      {v.desc}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <span className="text-[10px] text-muted-foreground italic hidden sm:inline">Passe o mouse para saber mais</span>
+            </div>
           </div>
 
           {/* Search */}
