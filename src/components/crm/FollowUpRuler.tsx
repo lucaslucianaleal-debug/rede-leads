@@ -249,20 +249,26 @@ export function FollowUpRuler({
       const num = parseInt(r.stage.replace("Follow-Up ", ""), 10);
       const pool = isNaN(num) ? activeFiltered : activeFiltered.filter(l => (l.followUpCount || 0) >= num);
       const total     = pool.length;
-      const converted = pool.filter(l =>
+      const converted  = pool.filter(l =>
         l.etapaLead === "Finalizado" ||
         l.etapaLead === "Avaliação agendada" ||
         !!l.dataAgendamentoCriado
       ).length;
-      const dropped   = pool.filter(l => l.etapaLead === "Desistência").length;
-      const responded = pool.filter(l => l.respostaLead === "RESPONDEU").length;
+      const dropped    = pool.filter(l => l.etapaLead === "Desistência").length;
+      const responded  = pool.filter(l => l.respostaLead === "RESPONDEU").length;
+      const showed     = pool.filter(l => l.comparecimento === "COMPARECEU").length;
+      const noShowed   = pool.filter(l => l.comparecimento === "NÃO COMPARECEU").length;
+      const hadAppt    = pool.filter(l => !!l.dataAgendamentoCriado || !!l.dataAgendamentoAlterado).length;
       return {
         ...r,
         active:      stageCount[r.stage] || 0,
         total,
-        convRate:    total > 0 ? Math.round((converted / total) * 100) : 0,
-        dropRate:    total > 0 ? Math.round((dropped   / total) * 100) : 0,
-        respondRate: total > 0 ? Math.round((responded / total) * 100) : 0,
+        convRate:    total > 0    ? Math.round((converted / total) * 100)   : 0,
+        dropRate:    total > 0    ? Math.round((dropped   / total) * 100)   : 0,
+        respondRate: total > 0    ? Math.round((responded / total) * 100)   : 0,
+        showRate:    hadAppt > 0  ? Math.round((showed    / hadAppt) * 100) : null,
+        noShowRate:  hadAppt > 0  ? Math.round((noShowed  / hadAppt) * 100) : null,
+        showed, noShowed, hadAppt,
       };
     });
   }, [activeFiltered, stageCount]);
@@ -793,9 +799,9 @@ export function FollowUpRuler({
       {innerTab === "metricas" && (
         <div className="space-y-4">
           {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-center">
-              <p className="text-[11px] text-muted-foreground mb-0.5">Total em Follow-Up</p>
+              <p className="text-[11px] text-muted-foreground mb-0.5">Em andamento</p>
               <p className="text-2xl font-bold text-primary">{totalEmFU}</p>
             </div>
             <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-center">
@@ -818,6 +824,18 @@ export function FollowUpRuler({
                 })()}
               </p>
             </div>
+            <div className="p-3 rounded-lg bg-teal-50 border border-teal-200 text-center">
+              <p className="text-[11px] text-muted-foreground mb-0.5">Comparecimento</p>
+              <p className="text-2xl font-bold text-teal-700">
+                {(() => {
+                  const totalHad  = metrics.reduce((s, m) => s + m.hadAppt, 0);
+                  const totalShow = metrics.reduce((s, m) => s + m.showed, 0);
+                  if (!totalHad) return "–";
+                  return Math.round((totalShow / totalHad) * 100) + "%";
+                })()}
+              </p>
+              <p className="text-[10px] text-muted-foreground">dos que agendaram</p>
+            </div>
           </div>
 
           {/* Per-stage table */}
@@ -829,6 +847,7 @@ export function FollowUpRuler({
                   <th className="text-left p-2.5 font-semibold hidden sm:table-cell">Tipo</th>
                   <th className="text-center p-2.5 font-semibold">Ativos</th>
                   <th className="text-center p-2.5 font-semibold">Agendados</th>
+                  <th className="text-center p-2.5 font-semibold hidden sm:table-cell">Compareceu</th>
                   <th className="text-center p-2.5 font-semibold hidden sm:table-cell">Responderam</th>
                   <th className="text-center p-2.5 font-semibold hidden sm:table-cell">Desistência</th>
                   <th className="text-center p-2.5 font-semibold">Ação</th>
@@ -853,6 +872,20 @@ export function FollowUpRuler({
                             {m.convRate}%
                           </span>
                           {m.convRate >= 20 && <TrendingUp className="h-3 w-3 text-emerald-500 mt-0.5" />}
+                        </div>
+                      ) : <span className="text-muted-foreground">–</span>}
+                    </td>
+                    <td className="p-2.5 text-center hidden sm:table-cell">
+                      {m.showRate !== null ? (
+                        <div className="flex flex-col items-center">
+                          <span className={`font-semibold ${
+                            m.showRate >= 70 ? "text-emerald-600" :
+                            m.showRate >= 40 ? "text-amber-600" :
+                            "text-destructive"
+                          }`}>{m.showRate}%</span>
+                          {m.noShowRate !== null && m.noShowRate > 0 && (
+                            <span className="text-[10px] text-destructive/70">{m.noShowRate}% faltou</span>
+                          )}
                         </div>
                       ) : <span className="text-muted-foreground">–</span>}
                     </td>
