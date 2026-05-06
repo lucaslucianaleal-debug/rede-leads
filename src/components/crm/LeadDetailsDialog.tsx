@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useLeads } from "@/hooks/useLeads";
 import { formatPhoneNumber } from "@/lib/phone";
 import React from "react";
 
@@ -47,6 +48,13 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
   }, [lead, open]);
 
   const { isReceptionist } = useUserPermissions();
+  const { updateLead } = useLeads();
+
+  const STATUS_OPTIONS = [
+    { value: "QUENTE", label: "🔥 Quente" },
+    { value: "MORNO", label: "🟡 Morno" },
+    { value: "FRIO", label: "🧊 Frio" },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -82,11 +90,27 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
                 <p className="text-xs text-muted-foreground font-medium">Etapa</p>
                 <p className="text-sm font-medium">{lead.etapaLead}</p>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <p className="text-xs text-muted-foreground font-medium">Status</p>
-                <Badge variant="outline" className={`badge-stage ${statusColor[lead.status]} w-fit`}>
-                  {lead.status || "—"}
-                </Badge>
+                <div className="flex flex-col gap-1.5">
+                  {STATUS_OPTIONS.map((s) => (
+                    <button
+                      key={s.value}
+                      onClick={() => {
+                        if (updateLead && lead.status !== s.value) {
+                          updateLead(lead.id, { status: s.value as any });
+                        }
+                      }}
+                      className={`px-2 py-1.5 rounded text-xs font-medium border transition-colors ${
+                        lead.status === s.value
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-border hover:bg-muted"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Resposta</p>
