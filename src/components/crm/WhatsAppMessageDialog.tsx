@@ -92,13 +92,10 @@ export function WhatsAppMessageDialog({
   if (!lead) return null;
 
   const handleSend = async () => {
-    // Atualiza status e etapa do lead se mudou
+    // Atualiza etapa do lead se mudou (status já foi atualizado instantaneamente)
     if (updateLead && lead) {
-      const updates: any = {};
-      if (status && lead.status !== status) updates.status = status as any;
-      if (etapa && lead.etapaLead !== etapa) updates.etapaLead = etapa;
-      if (Object.keys(updates).length > 0) {
-        updateLead(lead.id, updates);
+      if (etapa && lead.etapaLead !== etapa) {
+        updateLead(lead.id, { etapaLead: etapa });
       }
     }
     if (!message.trim()) {
@@ -300,7 +297,12 @@ export function WhatsAppMessageDialog({
               {STATUS_OPTIONS.map((s) => (
                 <button
                   key={s.value}
-                  onClick={() => setStatus(s.value)}
+                  onClick={() => {
+                    setStatus(s.value);
+                    if (updateLead && lead && lead.status !== s.value) {
+                      updateLead(lead.id, { status: s.value as any });
+                    }
+                  }}
                   className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center whitespace-normal break-words ${
                     status === s.value
                       ? "bg-primary text-primary-foreground border-primary"
@@ -322,6 +324,9 @@ export function WhatsAppMessageDialog({
                 onClick={() => {
                   setEtapa("Desistência");
                   setStatus("FRIO");
+                  if (updateLead && lead) {
+                    updateLead(lead.id, { status: "FRIO" as any });
+                  }
                 }}
                 className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition font-medium"
               >
