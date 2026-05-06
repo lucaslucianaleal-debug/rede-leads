@@ -13,7 +13,7 @@ export const followUpMessages: FollowUpMessage[] = [
     stage: "Novo",
     template: null,
     variations: [
-      "Oi, [primeiro_nome]! Tudo bem? 😊\nVi que você chamou a gente por aqui e vou te ajudar, pode deixar!\n\nSe puder, me conta (pode ser por áudio mesmo) o que mais te incomoda no seu sorriso hoje.\nQuero entender direitinho pra te orientar melhor.",
+      "Oi, [primeiro_nome]! Tudo bem? 😊\n\nVi que você chamou a gente por aqui e vou te ajudar, pode deixar!\n\nSe puder, me conta (pode ser por áudio mesmo) o que mais te incomoda no seu sorriso hoje.\n\nQuero entender direitinho pra te orientar melhor.",
       "[primeiro_nome], tudo certo?\nEntendi que você quer conhecer mais sobre nosso atendimento.\n\nMe conta um pouco sobre o que te traz até aqui — qual é o maior incômodo no seu sorriso?\n(Áudio fica tranquilo demais pra você falar)",
       "Opa, [primeiro_nome]! 😊\nTudo bem? Vim aqui pra te ajudar.\n\nQual é a principal coisa que te incomoda no seu sorriso? Pode ser por áudio mesmo — fica mais fácil!"
     ],
