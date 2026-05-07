@@ -37,7 +37,7 @@ import { LeadDetailsDialog } from "./LeadDetailsDialog";
 import { followUpMessages, getFollowUpMessageForLead, formatFollowUpMessage } from "@/data/followUpMessages";
 import { useAuth } from "@/hooks/useAuth";
 import { getAvailableSlots } from "@/lib/scheduleHelper";
-import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
+import { generateAppointmentConfirmationTextForClinic, generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
 import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
@@ -1222,11 +1222,10 @@ export function FollowUpRuler({
               <Button
                 onClick={async () => {
                   if (currentCampaignLead) {
-                    handleWhatsApp(currentCampaignLead);
-                    // Pequeno atraso antes de passar para próximo
-                    setTimeout(() => {
-                      handleCampaignNext();
-                    }, 1000);
+                    const msg = await getCampaignMessage(currentCampaignLead);
+                    const link = generateFollowUpWhatsAppLink(currentCampaignLead.telefone, currentCampaignLead.nome, msg);
+                    window.open(link, "_blank");
+                    handleCampaignNext();
                   }
                 }}
                 className="bg-green-600 hover:bg-green-700 text-white"
