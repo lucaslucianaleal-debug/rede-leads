@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   BookOpen,
   Play,
   BarChart3,
@@ -224,6 +231,11 @@ export function FollowUpRuler({
   const [editingStage, setEditingStage]   = useState<string | null>(null);
   const [editingScript, setEditingScript] = useState<string>("");
 
+  // modo campanha (envio em lote)
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [campaignCurrentIndex, setCampaignCurrentIndex] = useState(0);
+
   const { clinicMeta, currentClinic } = useAuth();
   const today = todayStr();
   const base = allLeads || leads;
@@ -389,6 +401,48 @@ export function FollowUpRuler({
   const handleConfirmCall = (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: LeadStage) => {
     onRegisterCall?.(leadId, outcome, obs, returnDate, nextStage);
     setCallLead(null);
+  };
+
+  // ── campaign helpers ───────────────────────────────────────────────────────
+  const toggleLeadSelection = (leadId: string) => {
+    const newSelected = new Set(selectedLeadIds);
+    if (newSelected.has(leadId)) {
+      newSelected.delete(leadId);
+    } else {
+      newSelected.add(leadId);
+    }
+    setSelectedLeadIds(newSelected);
+  };
+
+  const campaignLeads = stageLeads.filter(l => selectedLeadIds.has(l.id));
+  const currentCampaignLead = campaignLeads[campaignCurrentIndex];
+
+  const getCampaignMessage = async (lead: Lead) => {
+    let data1 = "", hora1 = "";
+    if (currentClinic) {
+      try {
+        const slots = await getAvailableSlots(currentClinic);
+        if (slots.length > 0) { data1 = slots[0].dayLabel; hora1 = slots[0].hourLabel; }
+      } catch { /* silent */ }
+    }
+    
+    const msgTemplate = "Bom dia, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?";
+    return formatFollowUpMessage(msgTemplate, lead.nome, lead.servicoProcurado, "OdontoCompany", "", data1, "", hora1, "");
+  };
+
+  const handleOpenCampaignModal = () => {
+    setCampaignCurrentIndex(0);
+    setShowCampaignModal(true);
+  };
+
+  const handleCampaignNext = () => {
+    if (campaignCurrentIndex < campaignLeads.length - 1) {
+      setCampaignCurrentIndex(campaignCurrentIndex + 1);
+    } else {
+      toast.success(`Campanha enviada para ${campaignLeads.length} leads! ✓`);
+      setShowCampaignModal(false);
+      setSelectedLeadIds(new Set());
+    }
   };
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -586,6 +640,27 @@ export function FollowUpRuler({
             )}
           </div>
 
+          {/* Campaign button */}
+          {selectedLeadIds.size > 0 && (
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setSelectedLeadIds(new Set())}
+                variant="outline"
+                size="sm"
+                className="flex-1"
+              >
+                Cancelar seleção ({selectedLeadIds.size})
+              </Button>
+              <Button
+                onClick={handleOpenCampaignModal}
+                size="sm"
+                className="flex-1 bg-primary hover:bg-primary/90"
+              >
+                📤 Enviar Campanha ({selectedLeadIds.size})
+              </Button>
+            </div>
+          )}
+
           {/* Lead list */}
           <div className="space-y-2 max-h-[420px] overflow-y-auto pr-0.5">
             {stageLeads.length === 0 && (
@@ -607,6 +682,12 @@ export function FollowUpRuler({
                       : "bg-background/50 hover:bg-muted/50 border-transparent"
                   }`}
                 >
+                  <input
+                    type="checkbox"
+                    checked={selectedLeadIds.has(lead.id)}
+                    onChange={() => toggleLeadSelection(lead.id)}
+                    className="h-4 w-4 cursor-pointer shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <button
@@ -1069,6 +1150,94 @@ export function FollowUpRuler({
         open={!!detailLead}
         onClose={() => setDetailLead(null)}
       />
+
+      {/* Campaign Modal */}
+      {showCampaignModal && currentCampaignLead && (
+        <Dialog open={showCampaignModal} onOpenChange={(open) => {
+          if (!open) {
+            setShowCampaignModal(false);
+            setSelectedLeadIds(new Set());
+            setCampaignCurrentIndex(0);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <span>📤 Campanha: {campaignCurrentIndex + 1}/{campaignLeads.length}</span>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Lead card */}
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-sm font-semibold text-blue-900">{currentCampaignLead.nome}</p>
+                <p className="text-xs text-blue-700 mt-1">{currentCampaignLead.telefone}</p>
+              </div>
+
+              {/* Message preview - use getCampaignMessage if available, else fallback */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground">📝 Preview da mensagem:</p>
+                <div className="p-3 rounded-lg bg-muted/40 border text-xs whitespace-pre-line leading-relaxed">
+                  {(() => {
+                    const msg = "Bom dia, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?";
+                    const previewMsg = msg
+                      .replace("[primeiro_nome]", currentCampaignLead.nome.split(" ")[0] || "você")
+                      .replace("[data_sugerida_1]", "Quinta, 07/05")
+                      .replace("[hora_sugerida_1]", "8h30");
+                    return previewMsg;
+                  })()}
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 space-y-2">
+                <p className="text-xs font-semibold text-amber-900">⚠️ Próximos passos:</p>
+                <ol className="text-xs text-amber-800 space-y-1 list-decimal list-inside">
+                  <li>Clique em "Abrir no WhatsApp"</li>
+                  <li>Insira a imagem do voucher</li>
+                  <li>Clique em "→ Próximo" para continuar</li>
+                </ol>
+              </div>
+
+              {/* Progress */}
+              <div className="flex h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="bg-blue-500 transition-all" 
+                  style={{width: `${((campaignCurrentIndex + 1) / campaignLeads.length) * 100}%`}}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCampaignModal(false);
+                  setSelectedLeadIds(new Set());
+                  setCampaignCurrentIndex(0);
+                }}
+              >
+                Cancelar tudo
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (currentCampaignLead) {
+                    handleWhatsApp(currentCampaignLead);
+                    // Pequeno atraso antes de passar para próximo
+                    setTimeout(() => {
+                      handleCampaignNext();
+                    }, 1000);
+                  }
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                ✓ Abrir no WhatsApp → Próximo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
+
