@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Lead, LeadStage } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   BookOpen,
   Play,
@@ -30,6 +31,7 @@ import { followUpMessages, getFollowUpMessageForLead, formatFollowUpMessage } fr
 import { useAuth } from "@/hooks/useAuth";
 import { getAvailableSlots } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Scripts específicos para leads da Promotora
@@ -217,6 +219,10 @@ export function FollowUpRuler({
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [suggestedMsg, setSuggestedMsg] = useState<string>("");
   const [detailLead, setDetailLead]     = useState<Lead | null>(null);
+
+  // edição de scripts na cadência
+  const [editingStage, setEditingStage]   = useState<string | null>(null);
+  const [editingScript, setEditingScript] = useState<string>("");
 
   const { clinicMeta, currentClinic } = useAuth();
   const today = todayStr();
@@ -783,8 +789,53 @@ export function FollowUpRuler({
                   </div>
 
                   {isExp && fullScript && (
-                    <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs whitespace-pre-line leading-relaxed font-mono border border-muted">
-                      {fullScript}
+                    <div className="mt-3 space-y-2">
+                      {editingStage === r.stage ? (
+                        <>
+                          <Textarea
+                            value={editingScript}
+                            onChange={(e) => setEditingScript(e.target.value)}
+                            className="text-xs resize-none"
+                            rows={6}
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingStage(null)}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setEditingStage(null);
+                                toast.success(`Script atualizado para ${r.label}`);
+                              }}
+                              className="bg-primary hover:bg-primary/90"
+                            >
+                              Salvar
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-3 bg-muted/30 rounded-lg text-xs whitespace-pre-line leading-relaxed font-mono border border-muted">
+                            {fullScript}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingStage(r.stage);
+                              setEditingScript(fullScript);
+                            }}
+                            className="w-full"
+                          >
+                            ✏️ Editar script
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
