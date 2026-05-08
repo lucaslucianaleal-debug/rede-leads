@@ -442,7 +442,13 @@ export function FollowUpRuler({
     if (offerType === "clareamento") {
       msgTemplate = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
     } else {
-      msgTemplate = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo você em nossa promoção — cupom de R$${discountValue} para sua próxima visita!\n\nVale para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
+      // Calcular validade: 7 dias a partir de hoje
+      const validade = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        return d.toLocaleDateString();
+      })();
+      msgTemplate = `Olá [primeiro_nome], tudo bem? 💚✨\n\nVocê ganhou um cupom de desconto de R$${discountValue} para seu tratamento de [serviço].\n\nPara garantir, responda EUQUERO até ${validade}.\n\nAproveite essa oportunidade! 💚💚`;
     }
     
     return formatFollowUpMessage(msgTemplate, lead.nome, lead.servicoProcurado, "OdontoCompany", "", data1, "", hora1, "");
@@ -1288,10 +1294,17 @@ export function FollowUpRuler({
                     if (campaignOfferType === "clareamento") {
                       msg = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
                     } else {
-                      msg = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo você em nossa promoção — cupom de R$${campaignDiscount} para sua próxima visita!\n\nVale para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
+                      // Calcular validade: 7 dias a partir de hoje
+                      const validade = (() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 7);
+                        return d.toLocaleDateString();
+                      })();
+                      msg = `Olá [primeiro_nome], tudo bem? 💚✨\n\nVocê ganhou um cupom de desconto de R$${campaignDiscount} para seu tratamento de [serviço].\n\nPara garantir, responda EUQUERO até ${validade}.\n\nAproveite essa oportunidade! 💚💚`;
                     }
                     const previewMsg = msg
                       .replace("[primeiro_nome]", currentCampaignLead.nome.split(" ")[0] || "você")
+                      .replace("[serviço]", currentCampaignLead.servicoProcurado || "seu procedimento")
                       .replace("[data_sugerida_1]", "Quinta, 07/05")
                       .replace("[hora_sugerida_1]", "8h30");
                     return previewMsg;
