@@ -181,6 +181,24 @@ const todayStr = () => {
   return `${String(n.getDate()).padStart(2, "0")}/${String(n.getMonth() + 1).padStart(2, "0")}/${n.getFullYear()}`;
 };
 
+// Calcula o valor automático do cupom baseado no tempo que o lead está "parado"
+const getCupomAmount = (lead: Lead): number => {
+  const allowedServices = ["implante", "implantes", "faceta", "facetas", "protocolo", "protocolos", "prótese", "próteses", "protese", "proteses"];
+  const servico = (lead.servicoProcurado || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+  const isAllowed = allowedServices.some(s => {
+    const sNorm = s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+    return servico.includes(sNorm);
+  });
+  
+  if (!isAllowed) return 0;
+  
+  const days = getDaysSince(lead.lastFollowUpDone || lead.dataFollowUp);
+  if (days >= 90) return 500;
+  if (days >= 60) return 300;
+  if (days >= 30) return 200;
+  return 0;
+};
+
 // ---------------------------------------------------------------------------
 
 interface FollowUpRulerProps {
@@ -237,7 +255,6 @@ export function FollowUpRuler({
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [campaignCurrentIndex, setCampaignCurrentIndex] = useState(0);
   const [campaignOfferType, setCampaignOfferType] = useState<"clareamento" | "cupom">("clareamento");
-  const [campaignDiscount, setCampaignDiscount] = useState<string>("50");
 
   const { clinicMeta, currentClinic } = useAuth();
   const today = todayStr();
@@ -427,7 +444,7 @@ export function FollowUpRuler({
     return "Boa noite";
   };
 
-  const getCampaignMessage = async (lead: Lead, offerType: "clareamento" | "cupom" = "clareamento", discountValue: string = "50") => {
+  const getCampaignMessage = async (lead: Lead, offerType: "clareamento" | "cupom" = "clareamento") => {
     let data1 = "", hora1 = "";
     if (currentClinic) {
       try {
@@ -448,7 +465,8 @@ export function FollowUpRuler({
         d.setDate(d.getDate() + 7);
         return d.toLocaleDateString();
       })();
-      msgTemplate = `Olá [primeiro_nome], tudo bem? 💚✨\n\nVocê ganhou um cupom de desconto de R$${discountValue} para seu tratamento de [serviço].\n\nPara garantir, responda EUQUERO até ${validade}.\n\nAproveite essa oportunidade! 💚💚`;
+      const cupomAmount = getCupomAmount(lead);
+      msgTemplate = `Olá [primeiro_nome], tudo bem? 💚✨\n\nVocê ganhou um cupom de desconto de R$${cupomAmount} para seu tratamento de [serviço].\n\nPara garantir, responda EUQUERO até ${validade}.\n\nAproveite essa oportunidade! 💚💚`;
     }
     
     return formatFollowUpMessage(msgTemplate, lead.nome, lead.servicoProcurado, "OdontoCompany", "", data1, "", hora1, "");
@@ -1220,21 +1238,18 @@ export function FollowUpRuler({
                     <div className="text-2xl">💳</div>
                     <div>
                       <p className="font-semibold text-sm">Cupom de Desconto</p>
-                      <p className="text-xs text-muted-foreground">Valor configurável para o cliente</p>
+                      <p className="text-xs text-muted-foreground">Automático: R$200/300/500 conforme tempo do lead</p>
                     </div>
                   </div>
                 </div>
                 {campaignOfferType === "cupom" && (
-                  <div className="ml-9">
-                    <label className="text-xs font-semibold text-muted-foreground">Valor do cupom (R$):</label>
-                    <input
-                      type="number"
-                      value={campaignDiscount}
-                      onChange={(e) => setCampaignDiscount(e.target.value)}
-                      className="w-full mt-1 px-2 py-1.5 border rounded text-sm"
-                      min="10"
-                      max="500"
-                    />
+                  <div className="ml-9 p-2 rounded bg-emerald-50 border border-emerald-200">
+                    <p className="text-xs text-emerald-700">
+                      ℹ️ Cada lead receberá um cupom automático:<br/>
+                      • 30-59 dias = R$200<br/>
+                      • 60-89 dias = R$300<br/>
+                      • 90+ dias = R$500
+                    </p>
                   </div>
                 )}
               </div>
@@ -1300,7 +1315,8 @@ export function FollowUpRuler({
                         d.setDate(d.getDate() + 7);
                         return d.toLocaleDateString();
                       })();
-                      msg = `Olá [primeiro_nome], tudo bem? 💚✨\n\nVocê ganhou um cupom de desconto de R$${campaignDiscount} para seu tratamento de [serviço].\n\nPara garantir, responda EUQUERO até ${validade}.\n\nAproveite essa oportunidade! 💚💚`;
+                      const cupomAmount = getCupomAmount(currentCampaignLead);
+                      msg = `Olá [primeiro_nome], tudo bem? 💚✨\n\nVocê ganhou um cupom de desconto de R$${cupomAmount} para seu tratamento de [serviço].\n\nPara garantir, responda EUQUERO até ${validade}.\n\nAproveite essa oportunidade! 💚💚`;
                     }
                     const previewMsg = msg
                       .replace("[primeiro_nome]", currentCampaignLead.nome.split(" ")[0] || "você")
@@ -1345,7 +1361,7 @@ export function FollowUpRuler({
               <Button
                 onClick={async () => {
                   if (currentCampaignLead) {
-                    const msg = await getCampaignMessage(currentCampaignLead, campaignOfferType, campaignDiscount);
+                    const msg = await getCampaignMessage(currentCampaignLead, campaignOfferType);
                     const link = generateFollowUpWhatsAppLink(currentCampaignLead.telefone, currentCampaignLead.nome, msg);
                     window.open(link, "_blank");
                     handleCampaignNext();
