@@ -233,8 +233,11 @@ export function FollowUpRuler({
 
   // modo campanha (envio em lote)
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [showCampaignTypeModal, setShowCampaignTypeModal] = useState(false);
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [campaignCurrentIndex, setCampaignCurrentIndex] = useState(0);
+  const [campaignOfferType, setCampaignOfferType] = useState<"clareamento" | "cupom">("clareamento");
+  const [campaignDiscount, setCampaignDiscount] = useState<string>("50");
 
   const { clinicMeta, currentClinic } = useAuth();
   const today = todayStr();
@@ -424,7 +427,7 @@ export function FollowUpRuler({
     return "Boa noite";
   };
 
-  const getCampaignMessage = async (lead: Lead) => {
+  const getCampaignMessage = async (lead: Lead, offerType: "clareamento" | "cupom" = "clareamento", discountValue: string = "50") => {
     let data1 = "", hora1 = "";
     if (currentClinic) {
       try {
@@ -434,12 +437,24 @@ export function FollowUpRuler({
     }
     
     const greeting = getGreeting();
-    const msgTemplate = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
+    
+    let msgTemplate: string;
+    if (offerType === "clareamento") {
+      msgTemplate = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
+    } else {
+      msgTemplate = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo você em nossa promoção — cupom de R$${discountValue} para sua próxima visita!\n\nVale para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
+    }
+    
     return formatFollowUpMessage(msgTemplate, lead.nome, lead.servicoProcurado, "OdontoCompany", "", data1, "", hora1, "");
   };
 
   const handleOpenCampaignModal = () => {
     setCampaignCurrentIndex(0);
+    setShowCampaignTypeModal(true);
+  };
+
+  const handleStartCampaign = () => {
+    setShowCampaignTypeModal(false);
     setShowCampaignModal(true);
   };
 
@@ -1159,6 +1174,87 @@ export function FollowUpRuler({
         onClose={() => setDetailLead(null)}
       />
 
+      {/* Campaign Type Selection Modal */}
+      {showCampaignTypeModal && (
+        <Dialog open={showCampaignTypeModal} onOpenChange={setShowCampaignTypeModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>🎯 Qual tipo de oferta?</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Escolha qual benefício você quer oferecer nesta campanha:</p>
+
+              {/* Clareamento Option */}
+              <div
+                onClick={() => {
+                  setCampaignOfferType("clareamento");
+                  handleStartCampaign();
+                }}
+                className="p-4 rounded-lg border-2 cursor-pointer transition-all hover:border-blue-500 hover:bg-blue-50"
+                style={{borderColor: campaignOfferType === "clareamento" ? "#3b82f6" : "#e5e7eb"}}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="text-2xl">🎁</div>
+                  <div>
+                    <p className="font-semibold text-sm">2 Sessões de Clareamento</p>
+                    <p className="text-xs text-muted-foreground">Benefício da clínica sem custo</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cupom Option */}
+              <div className="space-y-2">
+                <div
+                  onClick={() => setCampaignOfferType("cupom")}
+                  className="p-4 rounded-lg border-2 cursor-pointer transition-all hover:border-emerald-500 hover:bg-emerald-50"
+                  style={{borderColor: campaignOfferType === "cupom" ? "#10b981" : "#e5e7eb"}}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="text-2xl">💳</div>
+                    <div>
+                      <p className="font-semibold text-sm">Cupom de Desconto</p>
+                      <p className="text-xs text-muted-foreground">Valor configurável para o cliente</p>
+                    </div>
+                  </div>
+                </div>
+                {campaignOfferType === "cupom" && (
+                  <div className="ml-9">
+                    <label className="text-xs font-semibold text-muted-foreground">Valor do cupom (R$):</label>
+                    <input
+                      type="number"
+                      value={campaignDiscount}
+                      onChange={(e) => setCampaignDiscount(e.target.value)}
+                      className="w-full mt-1 px-2 py-1.5 border rounded text-sm"
+                      min="10"
+                      max="500"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCampaignTypeModal(false);
+                  setSelectedLeadIds(new Set());
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleStartCampaign}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Continuar →
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Campaign Modal */}
       {showCampaignModal && currentCampaignLead && (
         <Dialog open={showCampaignModal} onOpenChange={(open) => {
@@ -1171,7 +1267,7 @@ export function FollowUpRuler({
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <span>📤 Campanha: {campaignCurrentIndex + 1}/{campaignLeads.length}</span>
+                <span>📤 Campanha {campaignOfferType === "clareamento" ? "🎁" : "💳"}: {campaignCurrentIndex + 1}/{campaignLeads.length}</span>
               </DialogTitle>
             </DialogHeader>
 
@@ -1188,7 +1284,12 @@ export function FollowUpRuler({
                 <div className="p-3 rounded-lg bg-muted/40 border text-xs whitespace-pre-line leading-relaxed">
                   {(() => {
                     const greeting = getGreeting();
-                    const msg = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
+                    let msg: string;
+                    if (campaignOfferType === "clareamento") {
+                      msg = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
+                    } else {
+                      msg = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo você em nossa promoção — cupom de R$${campaignDiscount} para sua próxima visita!\n\nVale para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
+                    }
                     const previewMsg = msg
                       .replace("[primeiro_nome]", currentCampaignLead.nome.split(" ")[0] || "você")
                       .replace("[data_sugerida_1]", "Quinta, 07/05")
@@ -1231,7 +1332,7 @@ export function FollowUpRuler({
               <Button
                 onClick={async () => {
                   if (currentCampaignLead) {
-                    const msg = await getCampaignMessage(currentCampaignLead);
+                    const msg = await getCampaignMessage(currentCampaignLead, campaignOfferType, campaignDiscount);
                     const link = generateFollowUpWhatsAppLink(currentCampaignLead.telefone, currentCampaignLead.nome, msg);
                     window.open(link, "_blank");
                     handleCampaignNext();
