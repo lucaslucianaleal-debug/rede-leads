@@ -417,6 +417,13 @@ export function FollowUpRuler({
   const campaignLeads = stageLeads.filter(l => selectedLeadIds.has(l.id));
   const currentCampaignLead = campaignLeads[campaignCurrentIndex];
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Bom dia";
+    if (hour < 19) return "Boa tarde";
+    return "Boa noite";
+  };
+
   const getCampaignMessage = async (lead: Lead) => {
     let data1 = "", hora1 = "";
     if (currentClinic) {
@@ -426,7 +433,8 @@ export function FollowUpRuler({
       } catch { /* silent */ }
     }
     
-    const msgTemplate = "Bom dia, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?";
+    const greeting = getGreeting();
+    const msgTemplate = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
     return formatFollowUpMessage(msgTemplate, lead.nome, lead.servicoProcurado, "OdontoCompany", "", data1, "", hora1, "");
   };
 
@@ -1179,7 +1187,8 @@ export function FollowUpRuler({
                 <p className="text-xs font-semibold text-muted-foreground">📝 Preview da mensagem:</p>
                 <div className="p-3 rounded-lg bg-muted/40 border text-xs whitespace-pre-line leading-relaxed">
                   {(() => {
-                    const msg = "Bom dia, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?";
+                    const greeting = getGreeting();
+                    const msg = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
                     const previewMsg = msg
                       .replace("[primeiro_nome]", currentCampaignLead.nome.split(" ")[0] || "você")
                       .replace("[data_sugerida_1]", "Quinta, 07/05")
