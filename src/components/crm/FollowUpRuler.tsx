@@ -461,7 +461,7 @@ export function FollowUpRuler({
     
     let msgTemplate: string;
     if (offerType === "clareamento") {
-      msgTemplate = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?`;
+      msgTemplate = `${greeting}, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nSó preciso do seu nome completo para agendar.\n\nPosso agendar para você?`;
     } else {
       // Calcular validade: 7 dias a partir de hoje
       const validade = (() => {
@@ -470,7 +470,7 @@ export function FollowUpRuler({
         return d.toLocaleDateString();
       })();
       const cupomAmount = getCupomAmount(lead);
-      msgTemplate = `Olá [primeiro_nome], tudo bem? 💚✨\n\nVocê ganhou um cupom de desconto de R$${cupomAmount} para seu tratamento de [serviço].\n\nPara garantir, responda EUQUERO até ${validade}.\n\nAproveite essa oportunidade! 💚💚`;
+      msgTemplate = `Olá [primeiro_nome], tudo bem? 💚✨\n\nVocê ganhou um cupom de desconto de R$${cupomAmount} para seu tratamento de [serviço].\n\nPara garantir, responda EUQUERO até ${validade}.\n\nSó preciso do seu nome completo para confirmar.\n\nAproveite essa oportunidade! 💚💚`;
     }
     
     return formatFollowUpMessage(msgTemplate, lead.nome, lead.servicoProcurado, "OdontoCompany", "", data1, "", hora1, "");
