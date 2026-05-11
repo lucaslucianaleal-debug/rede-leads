@@ -325,7 +325,12 @@ export function FollowUpRuler({
     }
 
     if (rotinaView === "vencidos") {
-      list = list.filter(l => (getDaysSince(l.dataFollowUp) >= 1 || !l.dataFollowUp) && l.lastFollowUpDone !== today);
+      list = list.filter(l => {
+        // Only show leads with overdue follow-up date (not future dates, not undefined)
+        if (!l.dataFollowUp) return false;
+        const daysSince = getDaysSince(l.dataFollowUp);
+        return daysSince >= 1 && l.lastFollowUpDone !== today;
+      });
     } else if (rotinaView === "hoje") {
       list = list.filter(l => l.dataFollowUp === today || l.lastFollowUpDone === today);
     }
@@ -341,7 +346,11 @@ export function FollowUpRuler({
   const subCounts = useMemo(() => {
     const base2 = activeFiltered.filter(l => l.etapaLead === selectedStage);
     return {
-      vencidos: base2.filter(l => (getDaysSince(l.dataFollowUp) >= 1 || !l.dataFollowUp) && l.lastFollowUpDone !== today).length,
+      vencidos: base2.filter(l => {
+        if (!l.dataFollowUp) return false;
+        const daysSince = getDaysSince(l.dataFollowUp);
+        return daysSince >= 1 && l.lastFollowUpDone !== today;
+      }).length,
       hoje:     base2.filter(l => l.dataFollowUp === today || l.lastFollowUpDone === today).length,
       todos:    base2.length,
     };
