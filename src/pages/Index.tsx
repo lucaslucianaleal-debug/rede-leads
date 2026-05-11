@@ -543,6 +543,7 @@ const CRMDashboard = () => {
               onSendFollowUp={handleFollowUp}
               onRegisterCall={handleRegisterCall}
               onDeleteLead={deleteLead}
+              onUpdateLead={(id, updates) => updateLead(id, updates)}
             />
           </TabsContent>
 

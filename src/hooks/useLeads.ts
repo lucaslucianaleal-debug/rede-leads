@@ -1335,6 +1335,60 @@ export function useLeads() {
     }));
   };
 
+  // ── Auto-promote leads in "Avaliação agendada" whose appointment date has passed ──
+  useEffect(() => {
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+
+    const toPromote = leads.filter(l => {
+      if (l.etapaLead !== "Avaliação agendada") return false;
+      if (!l.dataAgendamento) return false;
+      if (l.comparecimento === "COMPARECEU") return false;
+      // Parse "dd/MM/yyyy HH:mm" → get the date part
+      const datePart = l.dataAgendamento.split(" ")[0];
+      const parts = datePart.split("/");
+      if (parts.length < 3) return false;
+      const apptDate = new Date(+parts[2], +parts[1] - 1, +parts[0]);
+      apptDate.setHours(0, 0, 0, 0);
+      return todayDate > apptDate;
+    });
+
+    if (toPromote.length === 0) return;
+
+    const todayStr = format(todayDate, "dd/MM/yyyy");
+
+    setLeads(prev => prev.map(l => {
+      const lead = toPromote.find(tp => tp.id === l.id);
+      if (!lead) return l;
+      const nextCount = (l.followUpCount || 0) + 1;
+      const nextStage = `Follow-Up ${Math.min(nextCount, 12)}` as LeadStage;
+      return {
+        ...l,
+        etapaLead: nextStage,
+        followUpCount: nextCount,
+        lastFollowUpDone: todayStr,
+        dataFollowUp: calcNextFollowUpDate(nextCount),
+        comparecimento: "NÃO COMPARECEU" as LeadComparecimento,
+      };
+    }));
+
+    // Sync each promoted lead to Firestore
+    toPromote.forEach(lead => {
+      const nextCount = (lead.followUpCount || 0) + 1;
+      const nextStage = `Follow-Up ${Math.min(nextCount, 12)}` as LeadStage;
+      const updated = {
+        ...lead,
+        etapaLead: nextStage,
+        followUpCount: nextCount,
+        lastFollowUpDone: todayStr,
+        dataFollowUp: calcNextFollowUpDate(nextCount),
+        comparecimento: "NÃO COMPARECEU" as LeadComparecimento,
+      };
+      saveLeadWithSync(db, updated, { previousPhone: lead.telefone })
+        .catch(err => console.error("Erro ao auto-promover lead:", err));
+    });
+  }, [leads]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return {
     leads: filteredLeads,
     allLeads: leads,

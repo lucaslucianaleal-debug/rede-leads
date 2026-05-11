@@ -34,6 +34,7 @@ import { FollowUpDialog } from "./FollowUpDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import { LeadDetailsDialog } from "./LeadDetailsDialog";
+import { EditLeadDialog } from "./EditLeadDialog";
 import { followUpMessages, getFollowUpMessageForLead, formatFollowUpMessage } from "@/data/followUpMessages";
 import { useAuth } from "@/hooks/useAuth";
 import { getAvailableSlots } from "@/lib/scheduleHelper";
@@ -207,6 +208,7 @@ interface FollowUpRulerProps {
   onSendFollowUp: (leadId: string, observacao?: string, etapa?: LeadStage) => void;
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: LeadStage) => void;
   onDeleteLead?: (leadId: string) => void;
+  onUpdateLead?: (leadId: string, updates: Partial<Lead>) => void;
 }
 
 type InnerTab    = "rotina" | "regua" | "metricas";
@@ -229,6 +231,7 @@ export function FollowUpRuler({
   onSendFollowUp,
   onRegisterCall,
   onDeleteLead,
+  onUpdateLead,
 }: FollowUpRulerProps) {
   const [innerTab, setInnerTab] = useState<InnerTab>("rotina");
   const [selectedStage, setSelectedStage] = useState<string>("Novo");
@@ -244,6 +247,7 @@ export function FollowUpRuler({
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [suggestedMsg, setSuggestedMsg] = useState<string>("");
   const [detailLead, setDetailLead]     = useState<Lead | null>(null);
+  const [editingLead, setEditingLead]   = useState<Lead | null>(null);
 
   // edição de scripts na cadência
   const [editingStage, setEditingStage]   = useState<string | null>(null);
@@ -1196,6 +1200,14 @@ export function FollowUpRuler({
         lead={detailLead}
         open={!!detailLead}
         onClose={() => setDetailLead(null)}
+        onEdit={onUpdateLead ? (lead) => { setDetailLead(null); setEditingLead(lead); } : undefined}
+      />
+
+      <EditLeadDialog
+        lead={editingLead}
+        open={!!editingLead}
+        onClose={() => setEditingLead(null)}
+        onSave={(id, updates) => { onUpdateLead?.(id, updates); setEditingLead(null); }}
       />
 
       {/* Campaign Type Selection Modal */}
