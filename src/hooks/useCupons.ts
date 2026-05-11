@@ -19,11 +19,12 @@ export const CLINICAS = [
 ];
 
 export const VOUCHERS = [
-  "Limpeza (jato de bicarbonato e aplicação de flúor)",
-  "Aparelho Fixo",
-  "Isenção da taxa ODC",
-  "Raio-X Panorâmico",
-  "1 Sessão de Clareamento (arcada inferior)",
+  "Avaliação",
+  "Limpeza Profilaxia",
+  "Clareamento",
+  "Ortodontia",
+  "Implante",
+  "Outro",
 ];
 
 export interface Cupom {
