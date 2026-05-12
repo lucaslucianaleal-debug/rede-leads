@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Send, Wifi, WifiOff } from "lucide-react";
+import { Check, Send, Wifi, WifiOff, Copy } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
@@ -73,6 +73,7 @@ export function WhatsAppMessageDialog({
   const [voucherPreviewUrl, setVoucherPreviewUrl] = useState<string | null>(null);
   const [foundVoucherId, setFoundVoucherId] = useState<string | null>(null);
   const [hasVoucherAvailable, setHasVoucherAvailable] = useState(false);
+  const [voucherCopied, setVoucherCopied] = useState(false);
 
   useEffect(() => {
     if (suggestedMessage) {
@@ -85,6 +86,7 @@ export function WhatsAppMessageDialog({
     setIncludeVoucher(false);
     setVoucherPreviewUrl(null);
     setFoundVoucherId(null);
+    setVoucherCopied(false);
     setStatus(lead?.status || "MORNO");
     setEtapa(lead?.etapaLead || "Novo");
   }, [suggestedMessage, open, lead?.status]);
@@ -239,6 +241,23 @@ export function WhatsAppMessageDialog({
 
   const canSendDirect = onSend && serverConnected !== false;
 
+  const handleCopyVoucher = async () => {
+    if (!voucherPreviewUrl) return;
+    try {
+      const response = await fetch(voucherPreviewUrl);
+      const blob = await response.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ]);
+      setVoucherCopied(true);
+      toast.success("Imagem copiada! Cole no WhatsApp quando abrir.");
+      setTimeout(() => setVoucherCopied(false), 2000);
+    } catch (e) {
+      console.error('Erro ao copiar imagem:', e);
+      toast.error("Não consegui copiar. Tenta salvar a imagem manualmente.");
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
@@ -321,13 +340,37 @@ export function WhatsAppMessageDialog({
           </div>
 
           {(lead.voucherPending || hasVoucherAvailable) && (
-            <div className="flex items-center gap-2">
+            <div className="space-y-2">
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={includeVoucher} onChange={(e) => setIncludeVoucher(e.target.checked)} />
-                <span className="text-sm">Incluir Voucher</span>
+                <span className="text-sm font-medium">Incluir Voucher</span>
               </label>
-              {voucherPreviewUrl && (
-                <img src={voucherPreviewUrl} alt="voucher" className="h-10 rounded shadow-sm" />
+              
+              {includeVoucher && voucherPreviewUrl && (
+                <div className="space-y-2">
+                  {/* Preview expandido */}
+                  <img 
+                    src={voucherPreviewUrl} 
+                    alt="voucher" 
+                    className="w-full rounded-lg shadow-md border border-border"
+                  />
+                  
+                  {/* Botão copiar */}
+                  <Button
+                    onClick={handleCopyVoucher}
+                    variant={voucherCopied ? "default" : "outline"}
+                    className="w-full"
+                    size="sm"
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    {voucherCopied ? "✓ Copiada!" : "Copiar Imagem"}
+                  </Button>
+                  
+                  {/* Instruções */}
+                  <p className="text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded px-2 py-1.5">
+                    💡 Clique em "Enviar" abaixo. Quando o WhatsApp abrir, cole a imagem com <span className="font-mono bg-blue-100 px-1 rounded">Ctrl+V</span>
+                  </p>
+                </div>
               )}
             </div>
           )}
