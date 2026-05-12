@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CheckSquare, Square, Briefcase, User, Phone, Plus, Check, Building2, List, AlertTriangle, LogOut, Clock, CalendarCheck, MessageSquare, X, Trash2, Pencil } from "lucide-react";
+import { CheckSquare, Square, Briefcase, User, Phone, Plus, Check, Building2, List, AlertTriangle, LogOut, Clock, CalendarCheck, MessageSquare, X, Trash2, Pencil, Copy } from "lucide-react";
 import { getAvailableSlotsForVisita, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
@@ -752,6 +752,17 @@ export default function VisitaComercial() {
                     className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
                   >
                     <Phone className="h-4 w-4" /> Ligar
+                  </button>
+                  <button
+                    onClick={() => {
+                      const cardText = `👤 ${selectedContatoDetalhes.nome}\n📱 ${selectedContatoDetalhes.telefone1}${selectedContatoDetalhes.telefone2 ? `\n📱 ${selectedContatoDetalhes.telefone2}` : ""}${selectedContatoDetalhes.vouchers?.length ? `\n🏥 ${selectedContatoDetalhes.vouchers.join(", ")}` : ""}${selectedContatoDetalhes.local ? `\n📍 ${selectedContatoDetalhes.local}` : ""}${selectedContatoDetalhes.dataAgendamento ? `\n📅 ${selectedContatoDetalhes.dataAgendamento}` : ""}${selectedContatoDetalhes.briefing ? `\n💬 ${selectedContatoDetalhes.briefing}` : ""}`;
+                      navigator.clipboard.writeText(cardText);
+                      toast.success("Card copiado!");
+                    }}
+                    className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    title="Copiar card para enviar no WhatsApp"
+                  >
+                    <Copy className="h-4 w-4" /> Copiar
                   </button>
                 </div>
                 {selectedContatoDetalhes.dataAgendamento && (
