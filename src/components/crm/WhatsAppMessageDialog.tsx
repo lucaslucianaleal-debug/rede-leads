@@ -147,9 +147,10 @@ export function WhatsAppMessageDialog({
       return;
     }
 
-    // Tenta abrir o WhatsApp, mas NÃO fecha o diálogo automaticamente
-    const webLink = generateFollowUpWhatsAppLink(lead.telefone, lead.nome, message);
-    window.open(webLink, "_blank");
+    // Abre o app do WhatsApp diretamente via protocolo nativo (evita corrupção de emojis no wa.me)
+    const phone = lead.telefone.replace(/[^0-9]/g, "");
+    const appLink = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
+    window.open(appLink, "_blank");
     toast.success(`Abrindo WhatsApp para ${lead.nome}`);
     // NÃO fecha o diálogo aqui
   };

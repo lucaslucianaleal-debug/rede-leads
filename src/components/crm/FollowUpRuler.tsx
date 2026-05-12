@@ -1383,8 +1383,9 @@ export function FollowUpRuler({
                 onClick={async () => {
                   if (currentCampaignLead) {
                     const msg = await getCampaignMessage(currentCampaignLead, campaignOfferType);
-                    const link = generateFollowUpWhatsAppLink(currentCampaignLead.telefone, currentCampaignLead.nome, msg);
-                    window.open(link, "_blank");
+                    const phone = currentCampaignLead.telefone.replace(/[^0-9]/g, "");
+                    const appLink = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(msg)}`;
+                    window.open(appLink, "_blank");
                     handleCampaignNext();
                   }
                 }}
