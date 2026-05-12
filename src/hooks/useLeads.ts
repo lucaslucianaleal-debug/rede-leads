@@ -8,6 +8,7 @@ import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection } from "firebase
 import { attachLastWriter } from '../lib/crmGuard';
 import { saveLeadWithSync } from '@/lib/crmSync';
 import { useAuth } from "./useAuth";
+import { saveTimelineActivity } from "./useTimeline";
 
 // Use per-clinic and per-user localStorage key to avoid mixing caches between clinics and users
 const getStorageKey = (clinicId?: string | null, userId?: string | null) => {
@@ -1267,6 +1268,20 @@ export function useLeads() {
         etapaLead: stageToUse,
       };
     }));
+
+    // Registrar na timeline
+    const clinicId = currentClinic || selectedClinic;
+    if (clinicId) {
+      const lead = leads.find(l => l.id === leadId);
+      const stageToUse = nextStage || getNextLeadStage(lead?.etapaLead || "Novo");
+      saveTimelineActivity(
+        clinicId,
+        leadId,
+        "FOLLOW_UP",
+        { etapa: stageToUse, observacao },
+        userId
+      );
+    }
   };
 
   // Função para marcar lembrete
@@ -1298,6 +1313,27 @@ export function useLeads() {
     const syncData = { ...leadToUpdate, ...finalUpdates };
     saveLeadWithSync(db, syncData, { previousPhone: leadToUpdate.telefone })
       .catch((err) => console.error('Erro ao sincronizar lead com Firestore:', err));
+
+    // Registrar agendamento/reagendamento na timeline
+    const clinicId = currentClinic || selectedClinic;
+    if (clinicId && "dataAgendamento" in updates && updates.dataAgendamento) {
+      const isReschedule = !!leadToUpdate.dataAgendamento && leadToUpdate.dataAgendamento !== updates.dataAgendamento;
+      saveTimelineActivity(
+        clinicId,
+        leadId,
+        isReschedule ? "APPOINTMENT_EDIT" : "APPOINTMENT",
+        {
+          dataAgendamento: updates.dataAgendamento,
+          briefing: (updates as any).briefingRecepcao || leadToUpdate.briefingRecepcao,
+        },
+        userId
+      );
+    }
+
+    // Registrar não-comparecimento na timeline
+    if (clinicId && "comparecimento" in updates && updates.comparecimento === "NÃO COMPARECEU") {
+      saveTimelineActivity(clinicId, leadId, "NO_SHOW", {}, userId);
+    }
   };
 
   // Função para criar lead
@@ -1333,6 +1369,24 @@ export function useLeads() {
         etapaLead: stageToUse,
       };
     }));
+
+    // Registrar na timeline
+    const clinicId = currentClinic || selectedClinic;
+    if (clinicId) {
+      const lead = leads.find(l => l.id === leadId);
+      saveTimelineActivity(
+        clinicId,
+        leadId,
+        "CALL_LOG",
+        {
+          resultado: outcome,
+          observacao: obs,
+          statusLead: lead?.status,
+          retornoAgendado: returnDate,
+        },
+        userId
+      );
+    }
   };
 
   // ── Auto-promote leads in "Avaliação agendada" whose appointment date has passed ──
