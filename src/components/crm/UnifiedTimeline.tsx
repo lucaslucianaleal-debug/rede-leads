@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTimeline } from "@/hooks/useTimeline";
-import { TimelineActivity, TimelineActivityType } from "@/types/crm";
+import { Lead, TimelineActivity, TimelineActivityType } from "@/types/crm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { hasLegacyCallLogs } from "@/lib/legacyObservacaoParser";
 
 interface UnifiedTimelineProps {
   leadId: string;
   leadTelefone?: string;
+  lead?: Lead;
 }
 
 type FilterType = TimelineActivityType | "ALL";
@@ -109,11 +111,30 @@ function formatDateTime(iso: string): string {
   }
 }
 
-export function UnifiedTimeline({ leadId, leadTelefone }: UnifiedTimelineProps) {
-  const { activities, loading } = useTimeline(leadId, leadTelefone);
+export function UnifiedTimeline({ leadId, leadTelefone, lead }: UnifiedTimelineProps) {
+  const { activities, loading, migrateFromObservacao } = useTimeline(leadId, leadTelefone);
   const [filter, setFilter] = useState<FilterType>("ALL");
   const [showAll, setShowAll] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
   const PAGE_SIZE = 20;
+
+  // ─── Lazy migration: detecta quando timeline está vazia e lead tem dados antigos ─
+  useEffect(() => {
+    // Só migra se:
+    // 1. Não está carregando dados principais
+    // 2. Timeline está vazia (nenhuma atividade Firestore)
+    // 3. Lead tem dados legados
+    // 4. Não está já migrando
+    if (loading || activities.length > 0 || !lead || isMigrating) return;
+
+    const hasLegacy = hasLegacyCallLogs(lead.observacao);
+    if (!hasLegacy) return;
+
+    // Iniciar migração silenciosamente
+    setIsMigrating(true);
+    migrateFromObservacao(lead.observacao)
+      .finally(() => setIsMigrating(false));
+  }, [loading, activities.length, lead?.observacao, isMigrating, migrateFromObservacao]);
 
   const filtered = filter === "ALL"
     ? activities
@@ -125,11 +146,13 @@ export function UnifiedTimeline({ leadId, leadTelefone }: UnifiedTimelineProps) 
   const presentTypes = Array.from(new Set(activities.map((a) => a.type)));
   const filterOptions: FilterType[] = ["ALL", ...presentTypes];
 
-  if (loading) {
+  if (loading || isMigrating) {
     return (
       <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
         <Loader2 className="animate-spin w-4 h-4" />
-        <span className="text-sm">Carregando histórico…</span>
+        <span className="text-sm">
+          {isMigrating ? "Convertendo histórico antigo…" : "Carregando histórico…"}
+        </span>
       </div>
     );
   }
@@ -138,7 +161,7 @@ export function UnifiedTimeline({ leadId, leadTelefone }: UnifiedTimelineProps) 
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
         <span className="text-3xl">🗂️</span>
-        <p className="text-sm">Nenhuma atividade registrada ainda.</p>
+        <p className="text-sm">Nenhuma atividade registrada.</p>
         <p className="text-xs">Ligações, follow-ups e mensagens aparecerão aqui.</p>
       </div>
     );

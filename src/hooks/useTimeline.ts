@@ -7,11 +7,13 @@ import {
   addDoc,
   serverTimestamp,
   Timestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "./useAuth";
 import { TimelineActivity, TimelineActivityType } from "@/types/crm";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
+import { parseObservacaoToActivities } from "@/lib/legacyObservacaoParser";
 
 // Converte Timestamp Firestore ou string ISO para string ISO
 function toISOString(ts: any): string {
@@ -132,7 +134,45 @@ export function useTimeline(leadId: string | null, leadTelefone?: string) {
     [leadId, clinicId, user?.uid]
   );
 
-  return { activities: allActivities, loading, addActivity };
+  // ─── Migrar atividades legadas de observacao ──────────────────────────────
+  // Lazy migration: chamado quando timeline está vazia e lead tem dados antigos
+  const migrateFromObservacao = useCallback(
+    async (observacao: string | null | undefined) => {
+      if (!leadId || !clinicId || !observacao) return;
+
+      try {
+        const legacyActivities = parseObservacaoToActivities(observacao, leadId);
+        if (legacyActivities.length === 0) return;
+
+        // Usar batch para evitar múltiplas writes
+        const batch = writeBatch(db);
+        const timelineRef = collection(
+          db,
+          "clinics", clinicId,
+          "timelines", leadId,
+          "activities"
+        );
+
+        for (const activity of legacyActivities) {
+          const docRef = addDoc(timelineRef, {
+            type: activity.type,
+            timestamp: new Date(activity.timestamp), // Firestore vai converter para Timestamp
+            createdBy: null, // Legacy data doesn't have user info
+            createdByName: null,
+            data: activity.data,
+          }).catch(() => null); // Ignore individual failures
+        }
+
+        console.log(`[useTimeline] Migrated ${legacyActivities.length} legacy activities for lead ${leadId}`);
+      } catch (err) {
+        console.warn("[useTimeline] migrateFromObservacao failed:", err);
+        // Fail silently — migration is optional
+      }
+    },
+    [leadId, clinicId]
+  );
+
+  return { activities: allActivities, loading, addActivity, migrateFromObservacao };
 }
 
 // ─── Helper exportado para registrar atividade sem montar o hook ────────────

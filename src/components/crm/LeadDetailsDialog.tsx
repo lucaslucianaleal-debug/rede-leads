@@ -84,7 +84,7 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
 
         {activeTab === "timeline" ? (
           <div className="py-4">
-            <UnifiedTimeline leadId={lead.id} leadTelefone={lead.telefone} />
+            <UnifiedTimeline leadId={lead.id} leadTelefone={lead.telefone} lead={lead} />
           </div>
         ) : (
         <div className="space-y-6 py-4">
