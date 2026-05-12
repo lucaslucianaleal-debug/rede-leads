@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Lead, LeadStage } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ import {
   Globe,
   Gift,
   HelpCircle,
+  Copy,
 } from "lucide-react";
 import { FollowUpDialog } from "./FollowUpDialog";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
@@ -40,6 +41,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { getAvailableSlots } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic, generateFollowUpWhatsAppLink } from "@/lib/whatsapp";
 import { toast } from "sonner";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 // ---------------------------------------------------------------------------
 // Scripts específicos para leads da Promotora
@@ -259,6 +262,8 @@ export function FollowUpRuler({
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [campaignCurrentIndex, setCampaignCurrentIndex] = useState(0);
   const [campaignOfferType, setCampaignOfferType] = useState<"clareamento" | "cupom">("clareamento");
+  const [campaignVoucherPreviewUrl, setCampaignVoucherPreviewUrl] = useState<string | null>(null);
+  const [campaignVoucherCopied, setCampaignVoucherCopied] = useState(false);
 
   const { clinicMeta, currentClinic } = useAuth();
   const today = todayStr();
@@ -456,6 +461,56 @@ export function FollowUpRuler({
     if (hour < 19) return "Boa tarde";
     return "Boa noite";
   };
+
+  const handleCopyCampaignVoucher = async () => {
+    if (!campaignVoucherPreviewUrl) return;
+    try {
+      const response = await fetch(campaignVoucherPreviewUrl);
+      const blob = await response.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ]);
+      setCampaignVoucherCopied(true);
+      toast.success("Imagem copiada! Cole no WhatsApp quando abrir.");
+      setTimeout(() => setCampaignVoucherCopied(false), 2000);
+    } catch (e) {
+      console.error('Erro ao copiar imagem:', e);
+      toast.error("Não consegui copiar. Tenta salvar a imagem manualmente.");
+    }
+  };
+
+  // Busca imagem do voucher quando o lead da campanha muda
+  useEffect(() => {
+    let mounted = true;
+    async function findCampaignVoucher() {
+      setCampaignVoucherPreviewUrl(null);
+      if (!currentCampaignLead) return;
+      try {
+        const q = query(collection(db, 'vouchers'), where('leadId', '==', currentCampaignLead.id || ''), where('status', '==', 'issued'));
+        const snap = await getDocs(q);
+        if (!mounted) return;
+        if (!snap.empty) {
+          const doc0 = snap.docs[0];
+          const data = doc0.data() as any;
+          let img = data.imageUrl || data.imageLocalPath || '';
+          let fileName = '';
+          if (img) {
+            if (img.indexOf('C:\\') === 0 || img.indexOf('/') === -1) {
+              fileName = img.split('\\').pop() || img.split('/').pop() || '';
+              img = `/Voucher/${fileName}`;
+            } else if (img.startsWith('/Voucher/')) {
+              fileName = img.split('/').pop() || '';
+            }
+          }
+          setCampaignVoucherPreviewUrl(img || null);
+        }
+      } catch (e) {
+        console.error('Error finding campaign voucher', e);
+      }
+    }
+    findCampaignVoucher();
+    return () => { mounted = false; };
+  }, [currentCampaignLead]);
 
   const getCampaignMessage = async (lead: Lead, offerType: "clareamento" | "cupom" = "clareamento") => {
     let data1 = "", hora1 = "";
@@ -1349,12 +1404,34 @@ export function FollowUpRuler({
                 </div>
               </div>
 
+              {/* Voucher Preview - se for cupom */}
+              {campaignOfferType === "cupom" && campaignVoucherPreviewUrl && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground">🎫 Voucher:</p>
+                  <img 
+                    src={campaignVoucherPreviewUrl} 
+                    alt="voucher" 
+                    className="w-full rounded-lg shadow-md border border-border"
+                  />
+                  <Button
+                    onClick={handleCopyCampaignVoucher}
+                    variant={campaignVoucherCopied ? "default" : "outline"}
+                    className="w-full"
+                    size="sm"
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    {campaignVoucherCopied ? "✓ Copiada!" : "Copiar Imagem"}
+                  </Button>
+                </div>
+              )}
+
               {/* Instructions */}
               <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 space-y-2">
                 <p className="text-xs font-semibold text-amber-900">⚠️ Próximos passos:</p>
                 <ol className="text-xs text-amber-800 space-y-1 list-decimal list-inside">
                   <li>Clique em "Abrir no WhatsApp"</li>
-                  <li>Insira a imagem do voucher</li>
+                  {campaignOfferType === "cupom" && <li>Clique "Copiar Imagem" primeiro</li>}
+                  <li>Cole a imagem com <span className="font-mono bg-amber-100 px-1">Ctrl+V</span></li>
                   <li>Clique em "→ Próximo" para continuar</li>
                 </ol>
               </div>
