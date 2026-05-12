@@ -148,36 +148,10 @@ export function WhatsAppMessageDialog({
     }
 
     // Tenta abrir o WhatsApp, mas NÃO fecha o diálogo automaticamente
-    const phone = lead.telefone.replace(/[^0-9]/g, "");
-    const appLink = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
     const webLink = generateFollowUpWhatsAppLink(lead.telefone, lead.nome, message);
-
-    let fallbackFired = false;
-    const fallbackTimer = window.setTimeout(() => {
-      fallbackFired = true;
-      window.open(webLink, "_blank");
-      toast.success(`Abrindo WhatsApp Web para ${lead.nome}`);
-      // NÃO fecha o diálogo aqui
-    }, 900);
-
-    try {
-      const opened = window.open(appLink);
-      if (!opened) {
-        clearTimeout(fallbackTimer);
-        window.open(webLink, "_blank");
-        toast.success(`Abrindo WhatsApp Web para ${lead.nome}`);
-        // NÃO fecha o diálogo aqui
-        return;
-      }
-    } catch (e) {
-      clearTimeout(fallbackTimer);
-      window.open(webLink, "_blank");
-      toast.success(`Abrindo WhatsApp Web para ${lead.nome}`);
-      // NÃO fecha o diálogo aqui
-      return;
-    }
-
-    // NÃO fecha o diálogo automaticamente
+    window.open(webLink, "_blank");
+    toast.success(`Abrindo WhatsApp para ${lead.nome}`);
+    // NÃO fecha o diálogo aqui
   };
 
   // If user toggles includeVoucher and lead has pending voucher, try find voucher doc
