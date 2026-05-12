@@ -244,11 +244,23 @@ export function WhatsAppMessageDialog({
   const handleCopyVoucher = async () => {
     if (!voucherPreviewUrl) return;
     try {
-      const response = await fetch(voucherPreviewUrl);
-      const blob = await response.blob();
-      await navigator.clipboard.write([
-        new ClipboardItem({ [blob.type]: blob })
-      ]);
+      // Converte para PNG via canvas (único formato aceito pelo clipboard)
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = voucherPreviewUrl;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      const pngBlob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png")
+      );
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
       setVoucherCopied(true);
       toast.success("Imagem copiada! Cole no WhatsApp quando abrir.");
       setTimeout(() => setVoucherCopied(false), 2000);
@@ -352,7 +364,7 @@ export function WhatsAppMessageDialog({
                   <img 
                     src={voucherPreviewUrl} 
                     alt="voucher" 
-                    className="w-full rounded-lg shadow-md border border-border"
+                    className="w-full max-h-48 object-contain rounded-lg shadow-md border border-border"
                   />
                   
                   {/* Botão copiar */}

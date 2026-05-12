@@ -462,14 +462,30 @@ export function FollowUpRuler({
     return "Boa noite";
   };
 
+  const copyImageToClipboard = async (url: string) => {
+    // Carrega a imagem e converte para PNG (único formato aceito pelo clipboard)
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+      img.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const pngBlob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob failed")), "image/png")
+    );
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+  };
+
   const handleCopyCampaignVoucher = async () => {
     if (!campaignVoucherPreviewUrl) return;
     try {
-      const response = await fetch(campaignVoucherPreviewUrl);
-      const blob = await response.blob();
-      await navigator.clipboard.write([
-        new ClipboardItem({ [blob.type]: blob })
-      ]);
+      await copyImageToClipboard(campaignVoucherPreviewUrl);
       setCampaignVoucherCopied(true);
       toast.success("Imagem copiada! Cole no WhatsApp quando abrir.");
       setTimeout(() => setCampaignVoucherCopied(false), 2000);
@@ -482,43 +498,29 @@ export function FollowUpRuler({
   // Busca imagem do voucher quando o lead da campanha muda
   useEffect(() => {
     let mounted = true;
+    function getClarVoucherUrl(): string {
+      const id = (currentClinic || "").toLowerCase();
+      if (id.includes("bady")) return "/Voucher/Voucher - Clareamento Bady.png";
+      if (id.includes("novohorizonte") || id.includes("novo")) return "/Voucher/Voucher clareamento - Novo Horizonte.png";
+      return "/Voucher/Voucher - Clareamento Olimpia.png"; // default olimpia
+    }
+
     async function findCampaignVoucher() {
       setCampaignVoucherPreviewUrl(null);
-      if (!currentCampaignLead || campaignOfferType !== "cupom") return;
-      try {
-        // Tenta encontrar voucher já issued no Firestore
-        const q = query(collection(db, 'vouchers'), where('leadId', '==', currentCampaignLead.id || ''), where('status', '==', 'issued'));
-        const snap = await getDocs(q);
-        if (!mounted) return;
-        
-        if (!snap.empty) {
-          // Achou voucher issued
-          const doc0 = snap.docs[0];
-          const data = doc0.data() as any;
-          let img = data.imageUrl || data.imageLocalPath || '';
-          let fileName = '';
-          if (img) {
-            if (img.indexOf('C:\\') === 0 || img.indexOf('/') === -1) {
-              fileName = img.split('\\').pop() || img.split('/').pop() || '';
-              img = `/Voucher/${fileName}`;
-            } else if (img.startsWith('/Voucher/')) {
-              fileName = img.split('/').pop() || '';
-            }
-          }
-          setCampaignVoucherPreviewUrl(img || null);
-        } else {
-          // Não encontrou voucher issued, calcula qual deveria ser baseado no cupom amount
-          const cupomAmount = getCupomAmount(currentCampaignLead);
-          const voucherFileName = `Voucher cupom de ${cupomAmount}.jpeg`;
-          setCampaignVoucherPreviewUrl(`/Voucher/${voucherFileName}`);
-        }
-      } catch (e) {
-        console.error('Error finding campaign voucher', e);
+      if (!currentCampaignLead) return;
+
+      if (campaignOfferType === "clareamento") {
+        setCampaignVoucherPreviewUrl(getClarVoucherUrl());
+        return;
       }
+
+      // cupom: calcula pelo valor
+      const cupomAmount = getCupomAmount(currentCampaignLead);
+      setCampaignVoucherPreviewUrl(`/Voucher/Voucher cupom de ${cupomAmount}.jpeg`);
     }
     findCampaignVoucher();
     return () => { mounted = false; };
-  }, [currentCampaignLead, campaignOfferType]);
+  }, [currentCampaignLead, campaignOfferType, currentClinic]);
 
   const getCampaignMessage = async (lead: Lead, offerType: "clareamento" | "cupom" = "clareamento") => {
     let data1 = "", hora1 = "";
@@ -1413,13 +1415,13 @@ export function FollowUpRuler({
               </div>
 
               {/* Voucher Preview - se for cupom */}
-              {campaignOfferType === "cupom" && campaignVoucherPreviewUrl && (
+              {campaignVoucherPreviewUrl && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground">🎫 Voucher:</p>
                   <img 
                     src={campaignVoucherPreviewUrl} 
                     alt="voucher" 
-                    className="w-full rounded-lg shadow-md border border-border"
+                    className="w-full max-h-48 object-contain rounded-lg shadow-md border border-border"
                   />
                   <Button
                     onClick={handleCopyCampaignVoucher}
@@ -1438,7 +1440,7 @@ export function FollowUpRuler({
                 <p className="text-xs font-semibold text-amber-900">⚠️ Próximos passos:</p>
                 <ol className="text-xs text-amber-800 space-y-1 list-decimal list-inside">
                   <li>Clique em "Abrir no WhatsApp"</li>
-                  {campaignOfferType === "cupom" && <li>Clique "Copiar Imagem" primeiro</li>}
+                  {campaignVoucherPreviewUrl && <li>Clique "Copiar Imagem" primeiro</li>}
                   <li>Cole a imagem com <span className="font-mono bg-amber-100 px-1">Ctrl+V</span></li>
                   <li>Clique em "→ Próximo" para continuar</li>
                 </ol>
