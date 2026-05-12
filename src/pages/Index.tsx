@@ -20,7 +20,6 @@ import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { NewLeadsTab } from "@/components/crm/NewLeadsTab";
 import { ROIAnalysisView } from "@/components/crm/ROIAnalysisView";
 import { ServicosExternos } from "@/components/crm/ServicosExternos";
-import { FollowUpRuler } from "@/components/crm/FollowUpRuler";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -35,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign, Ticket, BookOpen } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign, Ticket } from "lucide-react";
 import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
@@ -427,7 +426,7 @@ const CRMDashboard = () => {
         ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="w-full">
-            <TabsList className="w-full sm:max-w-[1100px] justify-start gap-2">
+            <TabsList className="w-full sm:max-w-[900px] justify-start gap-2">
             <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
               <LayoutDashboard className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -448,10 +447,6 @@ const CRMDashboard = () => {
                   {newLeadsCount}
                 </span>
               )}
-            </TabsTrigger>
-            <TabsTrigger value="regua-followup" className="flex items-center gap-1.5">
-              <BookOpen className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Rotina de Contatos</span>
             </TabsTrigger>
             <TabsTrigger value="roi-custos" className="flex items-center gap-1.5">
               <DollarSign className="h-4 w-4 shrink-0" />
@@ -534,17 +529,6 @@ const CRMDashboard = () => {
 
           <TabsContent value="novos-leads" className="mt-6">
             <NewLeadsTab onCreateLead={handleCreateLead} onCountChange={setNewLeadsCount} />
-          </TabsContent>
-
-          <TabsContent value="regua-followup" className="mt-6">
-            <FollowUpRuler
-              leads={leads}
-              allLeads={allLeads}
-              onSendFollowUp={handleFollowUp}
-              onRegisterCall={handleRegisterCall}
-              onDeleteLead={deleteLead}
-              onUpdateLead={(id, updates) => updateLead(id, updates)}
-            />
           </TabsContent>
 
           <TabsContent value="roi-custos" className="mt-6">

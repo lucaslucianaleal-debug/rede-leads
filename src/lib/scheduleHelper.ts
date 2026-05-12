@@ -63,6 +63,30 @@ function getWorkingSlots(dow: number): { h: number; m: number }[] {
   ];
 }
 
+// Returns full-hour slots for VisitaComercial (external visits)
+function getWorkingSlotsForVisita(dow: number): { h: number; m: number }[] {
+  if (dow === 0) return []; // domingo
+  
+  if (dow === 6) {
+    // Sábado: apenas 10h e 11h
+    return [
+      { h: 10, m: 0 },
+      { h: 11, m: 0 },
+    ];
+  }
+  
+  // Seg-Sex: apenas 10, 11, 14, 15, 16, 17, 18 (pula 12-13 almoço)
+  return [
+    { h: 10, m: 0 },
+    { h: 11, m: 0 },
+    { h: 14, m: 0 },
+    { h: 15, m: 0 },
+    { h: 16, m: 0 },
+    { h: 17, m: 0 },
+    { h: 18, m: 0 },
+  ];
+}
+
 function slotKey(dateStr: string, h: number, m: number): string {
   // Zero-pad hours to match CRM format ("09:00" not "9:00")
   return `${dateStr} ${String(h).padStart(2, "0")}:${m === 0 ? "00" : "30"}`;
@@ -148,6 +172,114 @@ export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
       continue;
     }
     const workSlots = getWorkingSlots(dow);
+    const dateStr = format(cursor, "dd/MM/yyyy");
+    const dayLabel = `${DAY_NAMES[dow]}, ${dateStr.slice(0, 5)}`;
+
+    for (const { h, m } of workSlots) {
+      const slotDate = new Date(cursor);
+      slotDate.setHours(h, m, 0, 0);
+      // Pula slots que já passaram (com 1h de antecedência mínima)
+      if (slotDate.getTime() < minTime) continue;
+      if (!occupied.has(slotKey(dateStr, h, m))) {
+        const hh = String(h).padStart(2, "0");
+        const mm = m === 0 ? "00" : "30";
+        slots.push({
+          date: slotDate,
+          hour: h,
+          minute: m,
+          dateStr: `${dateStr} ${hh}:${mm}`,
+          dayLabel,
+          hourLabel: m === 0 ? `${h}h` : `${h}h30`,
+        });
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return slots;
+}
+
+// Same as getAvailableSlots but uses full-hour slots for VisitaComercial
+export async function getAvailableSlotsForVisita(clinicId: string): Promise<SlotInfo[]> {
+  // 1. Lê cupons agendados pelas captadoras (coleção cupons)
+  const cuponRef = collection(db, "clinics", clinicId, "cupons");
+  const cuponSnap = await getDocs(query(cuponRef, where("status", "==", "agendado")));
+
+  // 2. Lê leads já agendados no CRM (shared/shared)
+  const sharedRef = doc(db, "clinics", clinicId, "shared", "shared");
+  const sharedSnap = await getDoc(sharedRef);
+  const rawLeads = sharedSnap.exists() ? (sharedSnap.data()?.leads ?? null) : null;
+  // Defensive: Firestore might return an object keyed by index instead of a real array
+  const crmLeads: any[] = Array.isArray(rawLeads)
+    ? rawLeads
+    : rawLeads && typeof rawLeads === "object"
+    ? Object.values(rawLeads)
+    : [];
+  // --- DEBUG (check browser console when opening booking modal) ---
+  console.group(`[scheduleHelper] getAvailableSlotsForVisita clinic=${clinicId}`);
+  console.log("shared/shared exists:", sharedSnap.exists());
+  console.log("raw leads type:", Array.isArray(rawLeads) ? "array" : typeof rawLeads, "| count:", crmLeads.length);
+  const leadsComAgendamento = crmLeads.filter((l) => l?.dataAgendamento && l.dataAgendamento.includes("/"));
+  console.log("leads com dataAgendamento:", leadsComAgendamento.map((l) => `${l.nome ?? "?"}: ${l.dataAgendamento}`));
+  console.groupEnd();
+
+  // Build set of occupied slots
+  const occupied = new Set<string>();
+
+  const addOccupied = (dataAgendamento: string, vouchers?: string[]) => {
+    const parts = dataAgendamento.split(" ");
+    if (parts.length < 2) return;
+    const dateStr = parts[0];
+    const [hStr, mStr] = parts[1].split(":");
+    const h = parseInt(hStr);
+    const m = parseInt(mStr) || 0;
+    occupied.add(slotKey(dateStr, h, m));
+    // Clareamento = 1h → bloqueia slot seguinte também
+    const isClareamento = vouchers?.some((v) => v.toLowerCase().includes("clareamento"))
+      || false;
+    if (isClareamento) {
+      const nextM = m === 0 ? 30 : 0;
+      const nextH = m === 0 ? h : h + 1;
+      occupied.add(slotKey(dateStr, nextH, nextM));
+    }
+  };
+
+  // Dos cupons (captadoras na rua)
+  cuponSnap.forEach((d) => {
+    const data = d.data();
+    if (data.dataAgendamento) addOccupied(data.dataAgendamento, data.vouchers);
+  });
+
+  // Dos leads do CRM
+  for (const lead of crmLeads) {
+    if (!lead || lead._deleted) continue;
+    if (lead.dataAgendamento) {
+      // CRM usa servicoProcurado em vez de vouchers
+      const vouchers = lead.servicoProcurado
+        ? [lead.servicoProcurado]
+        : [];
+      addOccupied(lead.dataAgendamento, vouchers);
+    }
+  }
+
+  const slots: SlotInfo[] = [];
+  // Começa de hoje, filtrando slots que já passaram (+ 1h de buffer)
+  const now = new Date();
+  const minTime = now.getTime() + 60 * 60 * 1000; // pelo menos 1h a partir de agora
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0); // início do dia de hoje
+
+
+  // Itera 10 dias corridos a partir de hoje, pulando feriados e o dia atual
+  for (let day = 0; day < 10; day++) {
+    const dow = cursor.getDay();
+    const isHoje = day === 0;
+    const isFds = dow === 0;
+    if (isHoje || isFeriado(cursor)) {
+      cursor.setDate(cursor.getDate() + 1);
+      continue;
+    }
+    const workSlots = getWorkingSlotsForVisita(dow);
     const dateStr = format(cursor, "dd/MM/yyyy");
     const dayLabel = `${DAY_NAMES[dow]}, ${dateStr.slice(0, 5)}`;
 

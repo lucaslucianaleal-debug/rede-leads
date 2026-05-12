@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { CheckSquare, Square, Briefcase, User, Phone, Plus, Check, Building2, List, AlertTriangle, LogOut, Clock, CalendarCheck, MessageSquare, X, Trash2 } from "lucide-react";
-import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
+import { getAvailableSlotsForVisita, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
 import { doc, deleteDoc } from "firebase/firestore";
@@ -182,7 +182,7 @@ export default function VisitaComercial() {
     setAgendarOpen(true);
     setSlotsLoading(true);
     try {
-      const available = await getAvailableSlots(sessao.clinicaId);
+      const available = await getAvailableSlotsForVisita(sessao.clinicaId);
       setSlots(available);
     } catch {
       toast.error("Erro ao buscar horários. Tente novamente.");

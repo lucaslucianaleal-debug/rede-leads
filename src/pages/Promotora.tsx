@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { CLINICAS, VOUCHERS, useCupons, startSessao, endSessao } from "@/hooks/useCupons";
+import { CLINICAS, useCupons, startSessao, endSessao } from "@/hooks/useCupons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,7 +64,7 @@ export default function Promotora() {
   const [telefone2, setTelefone2] = useState("");
   const [observacao, setObservacao] = useState("");
   const [servicosSelecionados, setServicosSelecionados] = useState<string[]>([]);
-  const SERVICOS_PROMOTORA = VOUCHERS;
+  const SERVICOS_PROMOTORA = ["Avaliação", "Limpeza Profilaxia", "Clareamento", "Ortodontia", "Implante", "Outro"];
   const toggleServico = (s: string) => setServicosSelecionados((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
   const [saving, setSaving] = useState(false);
   const [lastAdded, setLastAdded] = useState<string | null>(null);
