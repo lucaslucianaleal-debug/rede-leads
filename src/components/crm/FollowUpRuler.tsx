@@ -484,12 +484,15 @@ export function FollowUpRuler({
     let mounted = true;
     async function findCampaignVoucher() {
       setCampaignVoucherPreviewUrl(null);
-      if (!currentCampaignLead) return;
+      if (!currentCampaignLead || campaignOfferType !== "cupom") return;
       try {
+        // Tenta encontrar voucher já issued no Firestore
         const q = query(collection(db, 'vouchers'), where('leadId', '==', currentCampaignLead.id || ''), where('status', '==', 'issued'));
         const snap = await getDocs(q);
         if (!mounted) return;
+        
         if (!snap.empty) {
+          // Achou voucher issued
           const doc0 = snap.docs[0];
           const data = doc0.data() as any;
           let img = data.imageUrl || data.imageLocalPath || '';
@@ -503,6 +506,11 @@ export function FollowUpRuler({
             }
           }
           setCampaignVoucherPreviewUrl(img || null);
+        } else {
+          // Não encontrou voucher issued, calcula qual deveria ser baseado no cupom amount
+          const cupomAmount = getCupomAmount(currentCampaignLead);
+          const voucherFileName = `Voucher cupom de ${cupomAmount}.jpeg`;
+          setCampaignVoucherPreviewUrl(`/Voucher/${voucherFileName}`);
         }
       } catch (e) {
         console.error('Error finding campaign voucher', e);
@@ -510,7 +518,7 @@ export function FollowUpRuler({
     }
     findCampaignVoucher();
     return () => { mounted = false; };
-  }, [currentCampaignLead]);
+  }, [currentCampaignLead, campaignOfferType]);
 
   const getCampaignMessage = async (lead: Lead, offerType: "clareamento" | "cupom" = "clareamento") => {
     let data1 = "", hora1 = "";
