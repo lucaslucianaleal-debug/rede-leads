@@ -1371,14 +1371,14 @@ export function FollowUpRuler({
             setCampaignCurrentIndex(0);
           }
         }}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <span>📤 Campanha {campaignOfferType === "clareamento" ? "🎁" : "💳"}: {campaignCurrentIndex + 1}/{campaignLeads.length}</span>
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto pr-3 flex-1">
               {/* Lead card */}
               <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
                 <p className="text-sm font-semibold text-blue-900">{currentCampaignLead.nome}</p>
