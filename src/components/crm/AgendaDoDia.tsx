@@ -11,11 +11,12 @@ import {
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CheckCircle2, XCircle, Clock, User, Stethoscope, CalendarCheck, Phone, Share2, ChevronRight, ChevronLeft, CalendarDays } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, User, Stethoscope, CalendarCheck, Phone, Share2, ChevronRight, ChevronLeft, CalendarDays, Copy } from "lucide-react";
 import { format, addDays, subDays, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { toast } from "sonner";
 
 interface AgendaDoDiaProps {
   leads: Lead[];
@@ -404,6 +405,18 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
               </div>
 
               <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    const cardText = `👤 ${selectedLead.nome}\n📱 ${selectedLead.telefone}${selectedLead.servicoProcurado ? `\n🏥 ${selectedLead.servicoProcurado}` : ""}${selectedLead.dataAgendamento ? `\n📅 ${selectedLead.dataAgendamento}` : ""}${selectedLead.briefingRecepcao ? `\n💬 ${selectedLead.briefingRecepcao}` : ""}`;
+                    navigator.clipboard.writeText(cardText);
+                    toast.success("Card copiado!");
+                  }}
+                  variant="outline"
+                  title="Copiar card para enviar no WhatsApp"
+                >
+                  <Copy className="h-4 w-4 mr-1" /> Copiar
+                </Button>
                 <Button className="flex-1" onClick={() => setSelectedLead(null)}>
                   Fechar
                 </Button>
