@@ -6,11 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CheckSquare, Square, Briefcase, User, Phone, Plus, Check, Building2, List, AlertTriangle, LogOut, Clock, CalendarCheck, MessageSquare, X, Trash2 } from "lucide-react";
+import { CheckSquare, Square, Briefcase, User, Phone, Plus, Check, Building2, List, AlertTriangle, LogOut, Clock, CalendarCheck, MessageSquare, X, Trash2, Pencil } from "lucide-react";
 import { getAvailableSlotsForVisita, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
-import { doc, deleteDoc } from "firebase/firestore";
+import { doc, deleteDoc, updateDoc } from "firebase/firestore";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -74,6 +74,14 @@ export default function VisitaComercial() {
   const [agendadoCupomId, setAgendadoCupomId] = useState<string | null>(null);
   const [sendingWhats, setSendingWhats] = useState(false);
   const [selectedContatoDetalhes, setSelectedContatoDetalhes] = useState<typeof cupons[0] | null>(null);
+  
+  // Edit appointment
+  const [editingAgendamentoId, setEditingAgendamentoId] = useState<string | null>(null);
+  const [editAgendamentoOpen, setEditAgendamentoOpen] = useState(false);
+  const [editSlots, setEditSlots] = useState<SlotInfo[]>([]);
+  const [editSlotsLoading, setEditSlotsLoading] = useState(false);
+  const [editSelectedSlot, setEditSelectedSlot] = useState<SlotInfo | null>(null);
+  const [editAgendandoFlag, setEditAgendandoFlag] = useState(false);
 
   const { cupons, addCupom, updateStatus } = useCupons(sessao?.clinicaId ?? null);
 
@@ -268,6 +276,45 @@ export default function VisitaComercial() {
     setAgendadoCupomId(null);
     setAgendarOpen(false);
     resetForm();
+  };
+
+  const handleAbrirEditarAgendamento = async (cupomId: string) => {
+    if (!sessao) return;
+    setEditingAgendamentoId(cupomId);
+    setEditAgendamentoOpen(true);
+    setEditSlotsLoading(true);
+    try {
+      const available = await getAvailableSlotsForVisita(sessao.clinicaId);
+      setEditSlots(available);
+    } catch {
+      toast.error("Erro ao buscar horários. Tente novamente.");
+      setEditAgendamentoOpen(false);
+    } finally {
+      setEditSlotsLoading(false);
+    }
+  };
+
+  const handleConfirmarEditarAgendamento = async () => {
+    if (!editSelectedSlot || !sessao || !editingAgendamentoId) return;
+    setEditAgendandoFlag(true);
+    try {
+      const cupomRef = doc(db, "clinics", sessao.clinicaId, "cupons", editingAgendamentoId);
+      await updateDoc(cupomRef, {
+        dataAgendamento: editSelectedSlot.dateStr,
+        status: "agendado",
+      });
+      toast.success("Agendamento atualizado com sucesso!");
+      setEditAgendamentoOpen(false);
+      setEditingAgendamentoId(null);
+      setEditSelectedSlot(null);
+      setEditSlots([]);
+      setSelectedContatoDetalhes(null);
+    } catch (err) {
+      console.error("Erro ao atualizar agendamento:", err);
+      toast.error("Erro ao atualizar agendamento. Tente novamente.");
+    } finally {
+      setEditAgendandoFlag(false);
+    }
   };
 
   const handlePularWhats = () => {
@@ -553,6 +600,50 @@ export default function VisitaComercial() {
         </DialogContent>
       </Dialog>
 
+      {/* Modal para editar agendamento */}
+      <Dialog open={editAgendamentoOpen} onOpenChange={(o) => { if (!o) { setEditAgendamentoOpen(false); setEditSelectedSlot(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarCheck className="h-4 w-4 text-orange-600" />
+              Alterar Agendamento
+            </DialogTitle>
+          </DialogHeader>
+
+          {editSlotsLoading ? (
+            <div className="text-center text-gray-500 text-sm py-8">Buscando horários disponíveis...</div>
+          ) : editSlots.length === 0 ? (
+            <div className="text-center text-gray-500 text-sm py-8">Nenhum horário disponível nos próximos dias.</div>
+          ) : (
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-3">
+              {editSlots.map((slot) => (
+                <button
+                  key={`${slot.dateStr}-${slot.hour}-${slot.minute}`}
+                  onClick={() => setEditSelectedSlot(slot)}
+                  className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
+                    editSelectedSlot?.dateStr === slot.dateStr
+                      ? "border-orange-500 bg-orange-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="font-medium text-sm text-gray-800">{slot.dayLabel}</div>
+                  <div className="text-sm text-gray-600 mt-1">{slot.hourLabel}</div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 mt-3">
+            <Button variant="outline" size="sm" onClick={() => setEditAgendamentoOpen(false)}>Cancelar</Button>
+            <Button size="sm" disabled={!editSelectedSlot || editAgendandoFlag} onClick={handleConfirmarEditarAgendamento}
+              className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
+              <CalendarCheck className="h-4 w-4" />
+              {editAgendandoFlag ? "Atualizando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal de detalhes do lead */}
       <Dialog open={!!selectedContatoDetalhes} onOpenChange={(o) => { if (!o) setSelectedContatoDetalhes(null); }}>
         <DialogContent className="max-w-sm max-h-[90vh] flex flex-col">
@@ -663,6 +754,14 @@ export default function VisitaComercial() {
                     <Phone className="h-4 w-4" /> Ligar
                   </button>
                 </div>
+                {selectedContatoDetalhes.dataAgendamento && (
+                  <button
+                    onClick={() => handleAbrirEditarAgendamento(selectedContatoDetalhes.id)}
+                    className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <Pencil className="h-4 w-4" /> Editar Agendamento
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     try {
