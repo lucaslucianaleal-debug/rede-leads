@@ -1422,7 +1422,6 @@ export function useLeads() {
         followUpCount: nextCount,
         lastFollowUpDone: todayStr,
         dataFollowUp: calcNextFollowUpDate(nextCount),
-        comparecimento: "NÃO COMPARECEU" as LeadComparecimento,
       };
     }));
 
@@ -1436,7 +1435,6 @@ export function useLeads() {
         followUpCount: nextCount,
         lastFollowUpDone: todayStr,
         dataFollowUp: calcNextFollowUpDate(nextCount),
-        comparecimento: "NÃO COMPARECEU" as LeadComparecimento,
       };
       saveLeadWithSync(db, updated, { previousPhone: lead.telefone })
         .catch(err => console.error("Erro ao auto-promover lead:", err));
