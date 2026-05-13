@@ -196,10 +196,25 @@ export async function getAvailableSlots(clinicId: string): Promise<SlotInfo[]> {
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  return slots;
-}
+  // ── SEGURANÇA: Filtrar qualquer slot que seja de hoje ou passado
+  // Garante que nunca oferecemos datas retroativas, mesmo com bugs na lógica acima
+  const todayAtMidnight = new Date();
+  todayAtMidnight.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(todayAtMidnight);
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
-// Same as getAvailableSlots but uses full-hour slots for VisitaComercial
+  const safeSlots = slots.filter(slot => slot.date >= tomorrow);
+  
+  if (safeSlots.length < slots.length) {
+    console.warn(
+      `[scheduleHelper] Filtrou ${slots.length - safeSlots.length} slots retroativos em getAvailableSlots!`,
+      `Slots removidos:`,
+      slots.filter(slot => slot.date < tomorrow).map(s => `${s.dayLabel} ${s.hourLabel}`)
+    );
+  }
+
+  return safeSlots;
+}
 export async function getAvailableSlotsForVisita(clinicId: string): Promise<SlotInfo[]> {
   // 1. Lê cupons agendados pelas captadoras (coleção cupons)
   const cuponRef = collection(db, "clinics", clinicId, "cupons");
@@ -304,7 +319,24 @@ export async function getAvailableSlotsForVisita(clinicId: string): Promise<Slot
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  return slots;
+  // ── SEGURANÇA: Filtrar qualquer slot que seja de hoje ou passado
+  // Garante que nunca oferecemos datas retroativas, mesmo com bugs na lógica acima
+  const todayAtMidnight = new Date();
+  todayAtMidnight.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(todayAtMidnight);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const safeSlots = slots.filter(slot => slot.date >= tomorrow);
+  
+  if (safeSlots.length < slots.length) {
+    console.warn(
+      `[scheduleHelper] Filtrou ${slots.length - safeSlots.length} slots retroativos em getAvailableSlotsForVisita!`,
+      `Slots removidos:`,
+      slots.filter(slot => slot.date < tomorrow).map(s => `${s.dayLabel} ${s.hourLabel}`)
+    );
+  }
+
+  return safeSlots;
 }
 
 export async function saveScheduledLead(
