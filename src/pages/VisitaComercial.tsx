@@ -11,7 +11,7 @@ import { getAvailableSlotsForVisita, saveScheduledLead, type SlotInfo } from "@/
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
 import { doc, deleteDoc, updateDoc } from "firebase/firestore";
-import html2canvas from "html2canvas";
+import { captureCardAsImage } from "@/lib/captureCard";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -20,28 +20,6 @@ function maskPhone(value: string): string {
   if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
   if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-}
-
-async function captureCardAsImage(element: HTMLElement): Promise<void> {
-  try {
-    const canvas = await html2canvas(element, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      allowTaint: true,
-      useCORS: true,
-      logging: false,
-    });
-    canvas.toBlob((blob) => {
-      if (blob) {
-        navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
-        ]);
-        toast.success("Screenshot copiado!");
-      }
-    });
-  } catch (err) {
-    toast.error("Erro ao capturar imagem");
-  }
 }
 
 const SESSION_KEY = "visita_sessao";
@@ -789,10 +767,15 @@ export default function VisitaComercial() {
                     <Copy className="h-4 w-4" /> Copiar
                   </button>
                   <button
-                    onClick={() => {
-                      if (!contatoDetailsRef.current) return;
-                      captureCardAsImage(contatoDetailsRef.current);
-                    }}
+                    onClick={() => captureCardAsImage({
+                      nome: selectedContatoDetalhes.nome,
+                      telefone: selectedContatoDetalhes.telefone1,
+                      telefone2: selectedContatoDetalhes.telefone2,
+                      servico: selectedContatoDetalhes.vouchers?.join(", "),
+                      local: selectedContatoDetalhes.local,
+                      agendamento: selectedContatoDetalhes.dataAgendamento,
+                      briefing: selectedContatoDetalhes.briefing,
+                    })}
                     className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
                     title="Copiar screenshot para enviar no WhatsApp"
                   >

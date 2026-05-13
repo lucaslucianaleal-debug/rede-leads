@@ -3,30 +3,8 @@ import { Lead } from "@/types/crm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import html2canvas from "html2canvas";
+import { captureCardAsImage } from "@/lib/captureCard";
 import { toast } from "sonner";
-
-async function captureCardAsImage(element: HTMLElement): Promise<void> {
-  try {
-    const canvas = await html2canvas(element, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      allowTaint: true,
-      useCORS: true,
-      logging: false,
-    });
-    canvas.toBlob((blob) => {
-      if (blob) {
-        navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
-        ]);
-        toast.success("Screenshot copiado!");
-      }
-    });
-  } catch (err) {
-    toast.error("Erro ao capturar imagem");
-  }
-}
 import {
   Dialog,
   DialogContent,
@@ -40,7 +18,6 @@ import { format, addDays, subDays, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
-import { toast } from "sonner";
 
 interface AgendaDoDiaProps {
   leads: Lead[];
@@ -444,10 +421,14 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
                 </Button>
                 <Button
                   className="flex-1"
-                  onClick={() => {
-                    if (!detailsRef.current) return;
-                    captureCardAsImage(detailsRef.current);
-                  }}
+                  onClick={() => captureCardAsImage({
+                    nome: selectedLead.nome,
+                    telefone: selectedLead.telefone,
+                    servico: selectedLead.servicoProcurado,
+                    fonte: selectedLead.fonteLead,
+                    agendamento: selectedLead.dataAgendamento,
+                    briefing: selectedLead.briefingRecepcao,
+                  })}
                   variant="outline"
                   title="Copiar screenshot para enviar no WhatsApp"
                 >
