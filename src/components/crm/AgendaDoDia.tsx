@@ -52,9 +52,14 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
       if (!datePart) return false;
       
       if (dataInicio || dataFim) {
-        const leadDate = datePart; // dd/MM/yyyy
-        if (dataInicio && leadDate < format(dataInicio, "dd/MM/yyyy")) return false;
-        if (dataFim && leadDate > format(dataFim, "dd/MM/yyyy")) return false;
+        // Converter dd/MM/yyyy para yyyy-MM-dd para comparação correta
+        const [d, m, y] = datePart.split("/");
+        const leadDateISO = `${y}-${m}-${d}`;
+        const startISO = dataInicio ? format(dataInicio, "yyyy-MM-dd") : "";
+        const endISO = dataFim ? format(dataFim, "yyyy-MM-dd") : "";
+        
+        if (dataInicio && leadDateISO < startISO) return false;
+        if (dataFim && leadDateISO > endISO) return false;
       } else {
         // Se não há filtro, mostrar apenas a data selecionada
         if (!lead.dataAgendamento.startsWith(dateStr)) return false;
@@ -62,10 +67,22 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
       
       return true;
     }).sort((a, b) => {
-      // Ordena por horário se disponível
-      const timeA = a.dataAgendamento.split(" ")[1] || "00:00";
-      const timeB = b.dataAgendamento.split(" ")[1] || "00:00";
-      return timeA.localeCompare(timeB);
+      // Ordena por data e depois por horário
+      const [dateA, timeA] = a.dataAgendamento.split(" ");
+      const [dateB, timeB] = b.dataAgendamento.split(" ");
+      
+      // Converter dd/MM/yyyy para yyyy-MM-dd para comparação
+      const [dA, mA, yA] = dateA.split("/");
+      const [dB, mB, yB] = dateB.split("/");
+      const isoA = `${yA}-${mA}-${dA}`;
+      const isoB = `${yB}-${mB}-${dB}`;
+      
+      // Compara datas primeiro (do mais antigo para o mais novo)
+      const dateComp = isoA.localeCompare(isoB);
+      if (dateComp !== 0) return dateComp;
+      
+      // Se mesma data, ordena por horário
+      return (timeA || "00:00").localeCompare(timeB || "00:00");
     });
   }, [leads, dateStr, dataInicio, dataFim]);
 
