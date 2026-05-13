@@ -388,16 +388,28 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
               {/* Variação vs mês anterior na lista */}
               {variation && (
                 <div className="flex items-center gap-1 mb-1.5">
-                  {variation.diff > 0 ? (
-                    <TrendingUp className="w-3 h-3 text-emerald-400" />
-                  ) : variation.diff < 0 ? (
-                    <TrendingDown className="w-3 h-3 text-red-400" />
-                  ) : (
-                    <Minus className="w-3 h-3 text-gray-500" />
-                  )}
+                  {/* Lógica invertida para "Não Compareceu": mais = ruim (vermelho) */}
+                  {metric === "nao_compareceu"
+                    ? variation.diff > 0
+                      ? <TrendingUp className="w-3 h-3 text-red-400" />
+                      : variation.diff < 0
+                      ? <TrendingDown className="w-3 h-3 text-emerald-400" />
+                      : <Minus className="w-3 h-3 text-gray-500" />
+                    : variation.diff > 0
+                    ? <TrendingUp className="w-3 h-3 text-emerald-400" />
+                    : variation.diff < 0
+                    ? <TrendingDown className="w-3 h-3 text-red-400" />
+                    : <Minus className="w-3 h-3 text-gray-500" />
+                  }
                   <span
                     className={`text-xs font-medium ${
-                      variation.diff > 0
+                      metric === "nao_compareceu"
+                        ? variation.diff > 0
+                          ? "text-red-400"
+                          : variation.diff < 0
+                          ? "text-emerald-400"
+                          : "text-gray-500"
+                        : variation.diff > 0
                         ? "text-emerald-400"
                         : variation.diff < 0
                         ? "text-red-400"
@@ -430,17 +442,26 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                     {currentMonthAnalytics && (
                       <>
                         {" "}
-                        {currentMonthAnalytics.totalUpToToday > a.totalUpToSameDay ? (
-                          <span className="text-emerald-400">
-                            (+{currentMonthAnalytics.totalUpToToday - a.totalUpToSameDay} acima)
-                          </span>
-                        ) : currentMonthAnalytics.totalUpToToday < a.totalUpToSameDay ? (
-                          <span className="text-red-400">
-                            ({currentMonthAnalytics.totalUpToToday - a.totalUpToSameDay} abaixo)
-                          </span>
-                        ) : (
-                          <span className="text-gray-500">(igual)</span>
-                        )}
+                        {metric === "nao_compareceu"
+                          ? currentMonthAnalytics.totalUpToToday < a.totalUpToSameDay
+                            ? <span className="text-emerald-400">
+                                ({currentMonthAnalytics.totalUpToToday - a.totalUpToSameDay} melhor)
+                              </span>
+                            : currentMonthAnalytics.totalUpToToday > a.totalUpToSameDay
+                            ? <span className="text-red-400">
+                                (+{currentMonthAnalytics.totalUpToToday - a.totalUpToSameDay} pior)
+                              </span>
+                            : <span className="text-gray-500">(igual)</span>
+                          : currentMonthAnalytics.totalUpToToday > a.totalUpToSameDay
+                          ? <span className="text-emerald-400">
+                              (+{currentMonthAnalytics.totalUpToToday - a.totalUpToSameDay} acima)
+                            </span>
+                          : currentMonthAnalytics.totalUpToToday < a.totalUpToSameDay
+                          ? <span className="text-red-400">
+                              ({currentMonthAnalytics.totalUpToToday - a.totalUpToSameDay} abaixo)
+                            </span>
+                          : <span className="text-gray-500">(igual)</span>
+                        }
                       </>
                     )}
                   </span>
@@ -484,17 +505,22 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
           </span>
           <span className="mx-1 text-gray-700">·</span>
           <span className="text-xs">
-            {currentMonthAnalytics.totalUpToToday >= avgAcrossMonths ? (
-              <span className="text-emerald-400 font-medium">
-                ↑ Mês atual acima da média (+
-                {currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
-              </span>
-            ) : (
-              <span className="text-red-400 font-medium">
-                ↓ Mês atual abaixo da média (
-                {currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
-              </span>
-            )}
+            {metric === "nao_compareceu"
+              ? currentMonthAnalytics.totalUpToToday <= avgAcrossMonths
+                ? <span className="text-emerald-400 font-medium">
+                    ↓ Mês atual abaixo da média (melhor) ({currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
+                  </span>
+                : <span className="text-red-400 font-medium">
+                    ↑ Mês atual acima da média (pior) (+{currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
+                  </span>
+              : currentMonthAnalytics.totalUpToToday >= avgAcrossMonths
+              ? <span className="text-emerald-400 font-medium">
+                  ↑ Mês atual acima da média (+{currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
+                </span>
+              : <span className="text-red-400 font-medium">
+                  ↓ Mês atual abaixo da média ({currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
+                </span>
+            }
           </span>
           {currentMonthAnalytics.projection !== null && (
             <>
@@ -502,11 +528,14 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
               <span className="text-xs text-amber-400">
                 Projeção de fechamento:{" "}
                 <strong>~{currentMonthAnalytics.projection}</strong>
-                {currentMonthAnalytics.projection >= avgAcrossMonths ? (
-                  <span className="text-emerald-400 ml-1">(acima da média)</span>
-                ) : (
-                  <span className="text-red-400 ml-1">(abaixo da média)</span>
-                )}
+                {metric === "nao_compareceu"
+                  ? currentMonthAnalytics.projection <= avgAcrossMonths
+                    ? <span className="text-emerald-400 ml-1">(abaixo da média - melhor)</span>
+                    : <span className="text-red-400 ml-1">(acima da média - pior)</span>
+                  : currentMonthAnalytics.projection >= avgAcrossMonths
+                  ? <span className="text-emerald-400 ml-1">(acima da média)</span>
+                  : <span className="text-red-400 ml-1">(abaixo da média)</span>
+                }
               </span>
             </>
           )}
