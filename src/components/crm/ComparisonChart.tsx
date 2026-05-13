@@ -418,49 +418,79 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
               className="bg-gray-900 rounded-lg p-3 border border-gray-800"
               style={{ borderLeftColor: color, borderLeftWidth: 3 }}
             >
-              {/* Linha topo: nome do mês + total */}
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-white uppercase tracking-wide">
-                  {getMonthLabel(a.month)}
-                  <span className="ml-1 text-[10px] text-indigo-400 normal-case">
-                    (até dia {todayDay})
+              {/* Cabeçalho: Mês + Realizado */}
+              <div className="mb-2">
+                <div className="flex items-baseline justify-between mb-1">
+                  <span className="text-xs font-semibold text-white uppercase tracking-wide">
+                    {getMonthLabel(a.month)} <span className="text-[10px] text-indigo-400 normal-case">(até dia {todayDay})</span>
                   </span>
-                </span>
-                <span className="text-lg font-bold text-white">{displayVal}</span>
+                  <span className="text-2xl font-bold text-white">{displayVal}</span>
+                </div>
               </div>
 
-              {/* Barra de progresso em relação à meta */}
+              {/* Seção: Realizado / Meta período + Barra */}
               {metric === "leads_novos" || metric === "agendamentos" || metric === "compareceu" ? (
-                <div className="mb-2">
+                <div className="mb-3 pb-3 border-b border-gray-700">
                   {(() => {
                     const goal = MONTHLY_GOALS[metric];
                     const daysInMonth = a.daysInMonth;
-                    // Projetar meta até o dia atual para mês em andamento
                     const projectedGoal = a.isCurrentMonth ? Math.round((goal / daysInMonth) * todayDay) : goal;
                     const progress = Math.min((displayVal / projectedGoal) * 100, 100);
-                    const isBelow = displayVal < projectedGoal * 0.9; // Alerta se 10% abaixo
+                    const isBelow = displayVal < projectedGoal * 0.9;
 
                     return (
                       <div>
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-xs text-gray-500">
-                            Meta: <strong>{projectedGoal}</strong>
+                        {/* Linha: Realizado / Meta + Progresso % */}
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs text-gray-400">
+                            Realizado: <strong className="text-white">{displayVal}</strong> / <strong>{projectedGoal}</strong> (meta até hoje)
                           </span>
-                          <span className={`text-xs font-bold ${progress >= 100 ? "text-emerald-400" : isBelow ? "text-red-400" : "text-amber-400"}`}>
+                          <span className={`text-sm font-bold ${progress >= 100 ? "text-emerald-400" : isBelow ? "text-red-400" : "text-amber-400"}`}>
                             {Math.round(progress)}%
                           </span>
                         </div>
-                        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                        {/* Barra de progresso */}
+                        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden mb-1.5">
                           <div
                             className={`h-full transition-all ${progress >= 100 ? "bg-emerald-500" : isBelow ? "bg-red-500" : "bg-amber-500"}`}
                             style={{ width: `${progress}%` }}
                           />
+                        </div>
+                        {/* Linha: Meta mês + Projeção */}
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>Meta mês: <strong className="text-gray-300">{goal}</strong></span>
+                          <span>Projeção: <strong className="text-gray-300">~{a.projection ?? Math.round((displayVal / todayDay) * daysInMonth)}</strong></span>
                         </div>
                       </div>
                     );
                   })()}
                 </div>
               ) : null}
+
+              {/* Breakdown por fonte (apenas leads_novos) - DESTAQUE */}
+              {metric === "leads_novos" && a.isCurrentMonth && (
+                <div className="mb-3 pb-3 border-b border-gray-700">
+                  <p className="text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-wide">📊 Por Fonte:</p>
+                  {(() => {
+                    const breakdown = getSourceBreakdown(leads, a.month, todayDay);
+                    const sorted = Object.entries(breakdown)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 3);
+                    return (
+                      <div className="space-y-1">
+                        {sorted.map(([fonte, count]) => (
+                          <div key={fonte} className="flex justify-between items-center">
+                            <span className="text-xs text-gray-400">{fonte}</span>
+                            <span className="text-sm font-bold text-emerald-400">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Variação vs mês anterior na lista */}
               {variation && (
                 <div className="flex items-center gap-1 mb-1.5">
                   {/* Lógica invertida para "Não Compareceu": mais = ruim (vermelho) */}
@@ -563,29 +593,6 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                     Conversão para agendamento:{" "}
                     <strong>{a.conversionRate}%</strong>
                   </span>
-                </div>
-              )}
-
-              {/* Breakdown por fonte (apenas leads_novos) */}
-              {metric === "leads_novos" && a.isCurrentMonth && (
-                <div className="mt-1.5 mb-1.5 pt-1.5 border-t border-gray-700">
-                  <p className="text-xs text-gray-500 mb-1 font-semibold uppercase">Por fonte:</p>
-                  {(() => {
-                    const breakdown = getSourceBreakdown(leads, a.month, todayDay);
-                    const sorted = Object.entries(breakdown)
-                      .sort((a, b) => b[1] - a[1])
-                      .slice(0, 3);
-                    return (
-                      <div className="space-y-0.5">
-                        {sorted.map(([fonte, count]) => (
-                          <div key={fonte} className="flex justify-between text-xs text-gray-400">
-                            <span>{fonte}</span>
-                            <span className="text-emerald-400 font-medium">{count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
                 </div>
               )}
 
