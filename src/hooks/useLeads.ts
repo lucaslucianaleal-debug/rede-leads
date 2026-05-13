@@ -1391,14 +1391,18 @@ export function useLeads() {
     if (clinicId && "dataAgendamento" in updates && updates.dataAgendamento) {
       const leadToUpdate = leads.find(l => l.id === leadId);
       const isReschedule = !!leadToUpdate?.dataAgendamento && leadToUpdate.dataAgendamento !== updates.dataAgendamento;
+      const timelineData: any = {
+        dataAgendamento: updates.dataAgendamento,
+      };
+      const briefingValue = (updates as any).briefingRecepcao || leadToUpdate?.briefingRecepcao;
+      if (briefingValue) {
+        timelineData.briefing = briefingValue;
+      }
       saveTimelineActivity(
         clinicId,
         leadId,
         isReschedule ? "APPOINTMENT_EDIT" : "APPOINTMENT",
-        {
-          dataAgendamento: updates.dataAgendamento,
-          briefing: (updates as any).briefingRecepcao || leadToUpdate?.briefingRecepcao,
-        },
+        timelineData,
         userId
       );
     }
@@ -1447,16 +1451,17 @@ export function useLeads() {
     const clinicId = currentClinic || selectedClinic;
     if (clinicId) {
       const lead = leads.find(l => l.id === leadId);
+      const timelineData: any = {
+        resultado: outcome,
+      };
+      if (obs) timelineData.observacao = obs;
+      if (lead?.status) timelineData.statusLead = lead.status;
+      if (returnDate) timelineData.retornoAgendado = returnDate;
       saveTimelineActivity(
         clinicId,
         leadId,
         "CALL_LOG",
-        {
-          resultado: outcome,
-          observacao: obs,
-          statusLead: lead?.status,
-          retornoAgendado: returnDate,
-        },
+        timelineData,
         userId
       );
     }
