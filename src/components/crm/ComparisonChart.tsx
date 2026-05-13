@@ -441,21 +441,23 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                     return (
                       <div>
                         {/* Linha: Realizado / Meta + Progresso % */}
-                        <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center justify-between mb-2">
                           <span className="text-xs text-gray-400">
-                            Realizado: <strong className="text-white">{displayVal}</strong> / <strong>{projectedGoal}</strong> (meta até hoje)
+                            Realizado: <strong className="text-white">{displayVal}</strong> / <strong>{projectedGoal}</strong> <span className="text-indigo-400">(até dia {todayDay})</span>
                           </span>
                           <span className={`text-sm font-bold ${progress >= 100 ? "text-emerald-400" : isBelow ? "text-red-400" : "text-amber-400"}`}>
                             {Math.round(progress)}%
                           </span>
                         </div>
                         {/* Barra de progresso */}
-                        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden mb-1.5">
+                        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden mb-2.5">
                           <div
                             className={`h-full transition-all ${progress >= 100 ? "bg-emerald-500" : isBelow ? "bg-red-500" : "bg-amber-500"}`}
                             style={{ width: `${progress}%` }}
                           />
                         </div>
+                        {/* Divisor visual */}
+                        <div className="h-px bg-gray-800 mb-2"></div>
                         {/* Linha: Meta mês + Projeção */}
                         <div className="flex items-center justify-between text-xs text-gray-500">
                           <span>Meta mês: <strong className="text-gray-300">{goal}</strong></span>
@@ -469,19 +471,19 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
 
               {/* Breakdown por fonte (apenas leads_novos) - DESTAQUE */}
               {metric === "leads_novos" && (
-                <div className="mb-3 pb-3 border-b border-gray-700">
-                  <p className="text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-wide">📊 Por Fonte:</p>
+                <div className="mt-3 pt-2.5 pb-2.5">
+                  <p className="text-xs text-gray-400 mb-2 font-bold uppercase tracking-widest opacity-75">📊 Fonte:</p>
                   {(() => {
                     const breakdown = getSourceBreakdown(leads, a.month, todayDay);
                     const sorted = Object.entries(breakdown)
                       .sort((a, b) => b[1] - a[1])
                       .slice(0, 3);
                     return (
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         {sorted.map(([fonte, count]) => (
-                          <div key={fonte} className="flex justify-between items-center">
+                          <div key={fonte} className="flex justify-between items-center px-1">
                             <span className="text-xs text-gray-400">{fonte}</span>
-                            <span className="text-sm font-bold text-emerald-400">{count}</span>
+                            <span className="text-base font-bold text-teal-400">{count}</span>
                           </div>
                         ))}
                       </div>
