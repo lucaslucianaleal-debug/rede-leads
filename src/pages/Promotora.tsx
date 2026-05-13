@@ -24,6 +24,28 @@ function maskPhone(value: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
+async function captureCardAsImage(element: HTMLElement): Promise<void> {
+  try {
+    const canvas = await html2canvas(element, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      allowTaint: true,
+      useCORS: true,
+      logging: false,
+    });
+    canvas.toBlob((blob) => {
+      if (blob) {
+        navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        toast.success("Screenshot copiado!");
+      }
+    });
+  } catch (err) {
+    toast.error("Erro ao capturar imagem");
+  }
+}
+
 const SESSION_KEY = "promotora_sessao";
 
 interface SessaoLocal {
@@ -781,7 +803,7 @@ export default function Promotora() {
 
       {/* Modal de detalhes do contato */}
       <Dialog open={!!selectedContatoDetalhes} onOpenChange={(o) => { if (!o) setSelectedContatoDetalhes(null); }}>
-        <DialogContent className="max-w-sm max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-sm max-h-[90vh] flex flex-col" ref={contatoDetailsRef}>
           {selectedContatoDetalhes && (
             <>
               <DialogHeader>
@@ -797,7 +819,7 @@ export default function Promotora() {
               </DialogHeader>
 
               {/* Conteúdo principal (scrollable) */}
-              <div className="flex-1 overflow-y-auto space-y-3 pr-3" ref={contatoDetailsRef}>
+              <div className="flex-1 overflow-y-auto space-y-3 pr-3">
                 {/* Telefone */}
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Telefone</p>
@@ -900,24 +922,9 @@ export default function Promotora() {
                     <Copy className="h-4 w-4" /> Copiar
                   </button>
                   <button
-                    onClick={async () => {
+                    onClick={() => {
                       if (!contatoDetailsRef.current) return;
-                      try {
-                        const canvas = await html2canvas(contatoDetailsRef.current, {
-                          backgroundColor: '#ffffff',
-                          scale: 2,
-                        });
-                        canvas.toBlob((blob) => {
-                          if (blob) {
-                            navigator.clipboard.write([
-                              new ClipboardItem({ 'image/png': blob })
-                            ]);
-                            toast.success("Screenshot copiado!");
-                          }
-                        });
-                      } catch (err) {
-                        toast.error("Erro ao capturar imagem");
-                      }
+                      captureCardAsImage(contatoDetailsRef.current);
                     }}
                     className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
                     title="Copiar screenshot para enviar no WhatsApp"

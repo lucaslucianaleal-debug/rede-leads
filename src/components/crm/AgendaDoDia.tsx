@@ -4,6 +4,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import html2canvas from "html2canvas";
+import { toast } from "sonner";
+
+async function captureCardAsImage(element: HTMLElement): Promise<void> {
+  try {
+    const canvas = await html2canvas(element, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      allowTaint: true,
+      useCORS: true,
+      logging: false,
+    });
+    canvas.toBlob((blob) => {
+      if (blob) {
+        navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        toast.success("Screenshot copiado!");
+      }
+    });
+  } catch (err) {
+    toast.error("Erro ao capturar imagem");
+  }
+}
 import {
   Dialog,
   DialogContent,
@@ -321,7 +344,7 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
 
       {/* Detail dialog */}
       <Dialog open={!!selectedLead} onOpenChange={(open) => !open && setSelectedLead(null)}>
-        <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto" ref={detailsRef}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-4 w-4 text-primary" />
@@ -421,24 +444,9 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
                 </Button>
                 <Button
                   className="flex-1"
-                  onClick={async () => {
+                  onClick={() => {
                     if (!detailsRef.current) return;
-                    try {
-                      const canvas = await html2canvas(detailsRef.current, {
-                        backgroundColor: '#ffffff',
-                        scale: 2,
-                      });
-                      canvas.toBlob((blob) => {
-                        if (blob) {
-                          navigator.clipboard.write([
-                            new ClipboardItem({ 'image/png': blob })
-                          ]);
-                          toast.success("Screenshot copiado!");
-                        }
-                      });
-                    } catch (err) {
-                      toast.error("Erro ao capturar imagem");
-                    }
+                    captureCardAsImage(detailsRef.current);
                   }}
                   variant="outline"
                   title="Copiar screenshot para enviar no WhatsApp"
