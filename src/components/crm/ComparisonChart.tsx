@@ -434,7 +434,7 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                   {(() => {
                     const goal = MONTHLY_GOALS[metric];
                     const daysInMonth = a.daysInMonth;
-                    const projectedGoal = a.isCurrentMonth ? Math.round((goal / daysInMonth) * todayDay) : goal;
+                    const projectedGoal = Math.round((goal / daysInMonth) * todayDay);
                     const progress = Math.min((displayVal / projectedGoal) * 100, 100);
                     const isBelow = displayVal < projectedGoal * 0.9;
 
