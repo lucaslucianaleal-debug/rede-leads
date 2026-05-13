@@ -16,6 +16,7 @@ import { AllLeadsView } from "@/components/crm/AllLeadsView";
 import { AgendaDoDia } from "@/components/crm/AgendaDoDia";
 import { ChatView } from "@/components/crm/ChatView";
 import { PerformanceChart } from "@/components/crm/PerformanceChart";
+import { ComparisonChart } from "@/components/crm/ComparisonChart";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { NewLeadsTab } from "@/components/crm/NewLeadsTab";
 import { ROIAnalysisView } from "@/components/crm/ROIAnalysisView";
@@ -507,6 +508,7 @@ const CRMDashboard = () => {
 
             {/* Gráfico de performance */}
             <PerformanceChart leads={allLeads} />
+            <ComparisonChart leads={allLeads} />
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6">
