@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CheckCircle2, XCircle, Clock, User, Stethoscope, CalendarCheck, Phone, Share2, ChevronRight, ChevronLeft, CalendarDays, Copy } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, User, Stethoscope, CalendarCheck, Phone, Share2, ChevronRight, ChevronLeft, CalendarDays, Copy, Filter } from "lucide-react";
 import { format, addDays, subDays, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -38,18 +38,31 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
   const [editBriefing, setEditBriefing] = useState<string>("");
   const [appendToObs, setAppendToObs] = useState<boolean>(false);
   const detailsRef = useRef<HTMLDivElement>(null);
+  
+  // Filtro por período
+  const [horaInicio, setHoraInicio] = useState<string>("");
+  const [horaFim, setHoraFim] = useState<string>("");
 
   const leadsHoje = useMemo(() => {
     return leads.filter((lead) => {
       if (!lead.dataAgendamento) return false;
-      return lead.dataAgendamento.startsWith(dateStr);
+      if (!lead.dataAgendamento.startsWith(dateStr)) return false;
+      
+      // Filtro por período de horas
+      if (horaInicio || horaFim) {
+        const timeStr = lead.dataAgendamento.split(" ")[1] || "00:00";
+        if (horaInicio && timeStr < horaInicio) return false;
+        if (horaFim && timeStr > horaFim) return false;
+      }
+      
+      return true;
     }).sort((a, b) => {
       // Ordena por horário se disponível
       const timeA = a.dataAgendamento.split(" ")[1] || "00:00";
       const timeB = b.dataAgendamento.split(" ")[1] || "00:00";
       return timeA.localeCompare(timeB);
     });
-  }, [leads, dateStr]);
+  }, [leads, dateStr, horaInicio, horaFim]);
 
   // Para slots extras na agenda lateral
   const totalSlots = 10;
@@ -196,6 +209,52 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
           </div>
         </div>
       )}
+
+      {/* Filtro por período */}
+      <div className={`flex flex-wrap gap-2 items-end px-1 p-3 rounded-lg ${(horaInicio || horaFim) ? 'bg-blue-50 border border-blue-200' : 'bg-muted'}`}>
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground">Filtrar por período:</span>
+        </div>
+        <div className="flex gap-2 items-end flex-1 min-w-[200px]">
+          <div className="flex-1 min-w-[100px]">
+            <label className="block text-xs font-medium text-muted-foreground mb-1">De</label>
+            <input
+              type="time"
+              value={horaInicio}
+              onChange={(e) => setHoraInicio(e.target.value)}
+              className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
+              placeholder="09:00"
+            />
+          </div>
+          <div className="text-xs text-muted-foreground">até</div>
+          <div className="flex-1 min-w-[100px]">
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Até</label>
+            <input
+              type="time"
+              value={horaFim}
+              onChange={(e) => setHoraFim(e.target.value)}
+              className="w-full px-2 py-1 text-sm border border-gray-300 rounded bg-white"
+              placeholder="18:00"
+            />
+          </div>
+          {(horaInicio || horaFim) && (
+            <>
+              <Badge className="bg-blue-600 text-white text-xs px-2 py-1">
+                {horaInicio && horaFim ? `${horaInicio}-${horaFim}` : horaInicio ? `a partir de ${horaInicio}` : `até ${horaFim}`}
+              </Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setHoraInicio(""); setHoraFim(""); }}
+                className="text-xs h-8 px-2"
+              >
+                ✕ Limpar
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Lista de agendamentos do dia */}
       {variant === "sidepanel" ? (
