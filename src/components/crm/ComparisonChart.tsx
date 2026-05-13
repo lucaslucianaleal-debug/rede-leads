@@ -167,6 +167,9 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
       const totalUpToToday = countForMonth(leads, metric, month, effectiveDays);
       const dailyCounts = dailyCountsForMonth(leads, metric, month);
 
+      // Para comparação justa, contar sempre até o dia 13 (ou dia atual se for mês atual)
+      const totalUpToSameDay = countForMonth(leads, metric, month, todayDay);
+
       // Projeção: só faz sentido para mês atual
       const projection = isCurrentMonth && todayDay > 0
         ? Math.round((totalUpToToday / todayDay) * daysInMonth)
@@ -184,16 +187,6 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
       const worstDay = daysWithData.length > 0
         ? daysWithData.reduce((a, b) => (a.count <= b.count ? a : b))
         : null;
-
-      // Ritmo no mesmo dia que hoje
-      const countOnSameDay = isCurrentMonth
-        ? null
-        : countForMonth(leads, metric, month, todayDay) - countForMonth(leads, metric, month, todayDay - 1);
-
-      // Comparação até o mesmo dia (ritmo justo)
-      const totalUpToSameDay = isCurrentMonth
-        ? null
-        : countForMonth(leads, metric, month, todayDay);
 
       // Taxa de conversão: apenas para leads_novos
       let conversionRate: number | null = null;
