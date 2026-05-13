@@ -138,6 +138,7 @@ function getSourceBreakdown(
       breakdown[fonte] = (breakdown[fonte] || 0) + 1;
     });
 
+  console.debug(`[getSourceBreakdown] ${mmYYYY} até dia ${upToDay}: `, breakdown);
   return breakdown;
 }
 
