@@ -239,10 +239,11 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
     });
   }, [analytics]);
 
-  // Média dos meses selecionados (para 3+)
+  // Média dos meses selecionados (para 3+) - comparação justa até o mesmo dia
   const avgAcrossMonths = useMemo(() => {
     if (selectedMonths.length < 3) return null;
-    const vals = analytics.map((a) => (a.isCurrentMonth ? a.totalUpToToday : a.total));
+    // Pega totalUpToSameDay (até dia 13 de cada mês), ou totalUpToToday para o atual
+    const vals = analytics.map((a) => a.totalUpToSameDay ?? a.totalUpToToday);
     return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
   }, [analytics]);
 
@@ -372,7 +373,8 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
         {analytics.map((a, idx) => {
           const variation = variations[idx];
           const color = LINE_COLORS[idx % LINE_COLORS.length];
-          const displayVal = a.isCurrentMonth ? a.totalUpToToday : a.total;
+          // Comparação justa: até mesmo dia (dia 13 do mês atual ou do outro mês)
+          const displayVal = a.totalUpToSameDay ?? a.totalUpToToday;
 
           return (
             <div
@@ -384,11 +386,9 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-white uppercase tracking-wide">
                   {getMonthLabel(a.month)}
-                  {a.isCurrentMonth && (
-                    <span className="ml-1 text-[10px] text-indigo-400 normal-case">
-                      (até dia {todayDay})
-                    </span>
-                  )}
+                  <span className="ml-1 text-[10px] text-indigo-400 normal-case">
+                    (até dia {todayDay})
+                  </span>
                 </span>
                 <span className="text-lg font-bold text-white">{displayVal}</span>
               </div>
