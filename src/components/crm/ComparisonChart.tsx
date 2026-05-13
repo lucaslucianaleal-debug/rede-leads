@@ -209,7 +209,6 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
         projection,
         bestDay,
         worstDay,
-        countOnSameDay,
         conversionRate,
         daysInMonth,
         effectiveDays,
