@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { Lead } from "@/types/crm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import html2canvas from "html2canvas";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
   const [editTime, setEditTime] = useState<string>("09:00");
   const [editBriefing, setEditBriefing] = useState<string>("");
   const [appendToObs, setAppendToObs] = useState<boolean>(false);
+  const detailsRef = useRef<HTMLDivElement>(null);
 
   const leadsHoje = useMemo(() => {
     return leads.filter((lead) => {
@@ -327,7 +329,7 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
             </DialogTitle>
           </DialogHeader>
           {selectedLead && (
-            <div className="space-y-4 pt-1">
+            <div className="space-y-4 pt-1" ref={detailsRef}>
               {/* Edit button */}
               <div className="flex justify-end">
                 {!isReceptionist && (
@@ -416,6 +418,32 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
                   title="Copiar card para enviar no WhatsApp"
                 >
                   <Copy className="h-4 w-4 mr-1" /> Copiar
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={async () => {
+                    if (!detailsRef.current) return;
+                    try {
+                      const canvas = await html2canvas(detailsRef.current, {
+                        backgroundColor: '#ffffff',
+                        scale: 2,
+                      });
+                      canvas.toBlob((blob) => {
+                        if (blob) {
+                          navigator.clipboard.write([
+                            new ClipboardItem({ 'image/png': blob })
+                          ]);
+                          toast.success("Screenshot copiado!");
+                        }
+                      });
+                    } catch (err) {
+                      toast.error("Erro ao capturar imagem");
+                    }
+                  }}
+                  variant="outline"
+                  title="Copiar screenshot para enviar no WhatsApp"
+                >
+                  📸 Imagem
                 </Button>
                 <Button className="flex-1" onClick={() => setSelectedLead(null)}>
                   Fechar

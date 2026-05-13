@@ -54,6 +54,7 @@
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",
     "framer-motion": "^12.34.5",
+    "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
     "leaflet": "^1.9.4",
     "leaflet-control-geocoder": "^3.3.1",

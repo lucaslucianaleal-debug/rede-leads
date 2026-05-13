@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { CLINICAS, useCupons, startSessao, endSessao } from "@/hooks/useCupons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { MapaRota } from "@/components/MapaRota";
 import { format } from "date-fns";
+import html2canvas from "html2canvas";
 
 function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
@@ -81,6 +82,7 @@ export default function Promotora() {
   const [agendadoCupomId, setAgendadoCupomId] = useState<string | null>(null);
   const [sendingWhats, setSendingWhats] = useState(false);
   const [selectedContatoDetalhes, setSelectedContatoDetalhes] = useState<typeof cupons[0] | null>(null);
+  const contatoDetailsRef = useRef<HTMLDivElement>(null);
 
   const { cupons, addCupom, updateStatus } = useCupons(sessao?.clinicaId ?? null);
 
@@ -795,7 +797,7 @@ export default function Promotora() {
               </DialogHeader>
 
               {/* Conteúdo principal (scrollable) */}
-              <div className="flex-1 overflow-y-auto space-y-3 pr-3">
+              <div className="flex-1 overflow-y-auto space-y-3 pr-3" ref={contatoDetailsRef}>
                 {/* Telefone */}
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Telefone</p>
@@ -896,6 +898,31 @@ export default function Promotora() {
                     title="Copiar card para enviar no WhatsApp"
                   >
                     <Copy className="h-4 w-4" /> Copiar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!contatoDetailsRef.current) return;
+                      try {
+                        const canvas = await html2canvas(contatoDetailsRef.current, {
+                          backgroundColor: '#ffffff',
+                          scale: 2,
+                        });
+                        canvas.toBlob((blob) => {
+                          if (blob) {
+                            navigator.clipboard.write([
+                              new ClipboardItem({ 'image/png': blob })
+                            ]);
+                            toast.success("Screenshot copiado!");
+                          }
+                        });
+                      } catch (err) {
+                        toast.error("Erro ao capturar imagem");
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                    title="Copiar screenshot para enviar no WhatsApp"
+                  >
+                    📸 Imagem
                   </button>
                 </div>
                 <button
