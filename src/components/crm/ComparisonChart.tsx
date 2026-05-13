@@ -32,7 +32,7 @@ const METRIC_OPTIONS: { key: MetricKey; label: string }[] = [
 const MONTHLY_GOALS = {
   leads_novos: 200,           // 200 leads novos/mês
   agendamentos: 80,           // 40% de conversão = 80 agendamentos dos 200 leads
-  compareceu: 32,             // 40% de comparecimento dos 80 agendamentos
+  compareceu: 40,             // 50% de comparecimento dos 80 agendamentos
 };
 
 const LINE_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#06b6d4"];
