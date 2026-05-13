@@ -70,6 +70,7 @@ const CRMDashboard = () => {
     exportRangeReport,
     exportWeeklyAppointments,
     exportWeeklyAppointmentsXlsx,
+    exportFilteredAppointmentsXlsx,
     importCSV,
     deleteLeads,
     deleteLead,
@@ -366,6 +367,7 @@ const CRMDashboard = () => {
             leads={leads}
             onMarkAttendance={handleMarkAttendance}
             onExportWeek={exportWeeklyAppointmentsXlsx}
+            onExportFiltered={exportFilteredAppointmentsXlsx}
             onUpdateLead={(id, updates) => updateLead(id, updates)}
           />
         ) : isClient ? (
@@ -403,6 +405,7 @@ const CRMDashboard = () => {
                   leads={leads}
                   onMarkAttendance={handleMarkAttendance}
                   onExportWeek={exportWeeklyAppointmentsXlsx}
+                  onExportFiltered={exportFilteredAppointmentsXlsx}
                   onUpdateLead={(id, updates) => updateLead(id, updates)}
                 />
               </TabsContent>
@@ -511,6 +514,7 @@ const CRMDashboard = () => {
               leads={leads}
               onMarkAttendance={handleMarkAttendance}
               onExportWeek={exportWeeklyAppointmentsXlsx}
+              onExportFiltered={exportFilteredAppointmentsXlsx}
               onUpdateLead={(id, updates) => updateLead(id, updates)}
             />
           </TabsContent>

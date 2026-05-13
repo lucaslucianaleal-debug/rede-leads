@@ -23,11 +23,12 @@ interface AgendaDoDiaProps {
   leads: Lead[];
   onMarkAttendance: (id: string, value: "COMPARECEU" | "NÃO COMPARECEU" | "") => void;
   onExportWeek?: (date?: Date) => void;
+  onExportFiltered?: (startDate: Date, endDate: Date) => void;
   onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
   variant?: "default" | "sidepanel";
 }
 
-export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLead, variant = "default" }: AgendaDoDiaProps) {
+export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onExportFiltered, onUpdateLead, variant = "default" }: AgendaDoDiaProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const dateStr = format(selectedDate, "dd/MM/yyyy");
@@ -224,8 +225,18 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onUpdateLea
               </div>
             )}
             <div>
-              <Button size="sm" variant="outline" onClick={() => onExportWeek?.(selectedDate)}>
-                Exportar Semana
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => {
+                  if (dataInicio && dataFim) {
+                    onExportFiltered?.(dataInicio, dataFim);
+                  } else {
+                    onExportWeek?.(selectedDate);
+                  }
+                }}
+              >
+                {dataInicio && dataFim ? "Exportar Período" : "Exportar Semana"}
               </Button>
             </div>
           </div>

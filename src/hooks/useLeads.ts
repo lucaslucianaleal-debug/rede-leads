@@ -488,6 +488,87 @@ export function useLeads() {
     URL.revokeObjectURL(url);
   };
 
+  const exportFilteredAppointmentsXlsx = async (startDate: Date, endDate: Date) => {
+    // Filtrar agendamentos no período
+    const agendamentosPeríodo = leads.filter(l => {
+      if (l.etapaLead === "Fora da região") return false;
+      if (!l.dataAgendamento) return false;
+      
+      const [datePart] = l.dataAgendamento.split(" ");
+      if (!datePart) return false;
+      
+      const [d, m, y] = datePart.split("/");
+      const leadDateISO = `${y}-${m}-${d}`;
+      const startISO = format(startDate, "yyyy-MM-dd");
+      const endISO = format(endDate, "yyyy-MM-dd");
+      
+      return leadDateISO >= startISO && leadDateISO <= endISO;
+    }).sort((a, b) => {
+      const [dateA, timeA] = a.dataAgendamento.split(" ");
+      const [dateB, timeB] = b.dataAgendamento.split(" ");
+      
+      const [dA, mA, yA] = dateA.split("/");
+      const [dB, mB, yB] = dateB.split("/");
+      const isoA = `${yA}-${mA}-${dA}`;
+      const isoB = `${yB}-${mB}-${dB}`;
+      
+      const dateComp = isoA.localeCompare(isoB);
+      if (dateComp !== 0) return dateComp;
+      
+      return (timeA || "00:00").localeCompare(timeB || "00:00");
+    });
+
+    const ExcelJS = (await import("exceljs")).default;
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Agendamentos");
+
+    ws.columns = [
+      { width: 30 },
+      { width: 12 },
+      { width: 12 },
+      { width: 14 },
+      { width: 18 },
+    ];
+
+    const headerRow = ws.addRow(["NOME", "DATA", "DIA", "HORÁRIO", "COMPARECIMENTO"]);
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB8B8B8" } };
+    });
+
+    agendamentosPeríodo.forEach(l => {
+      const [datePart, timePart] = l.dataAgendamento.split(" ");
+      const [d, m, y] = datePart.split("/");
+      const leadDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+      const dayNames = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+      const dayName = dayNames[leadDate.getDay()];
+      
+      const comparecimento = l.comparecimento || "Pendente";
+      const comparecimentoColor = l.comparecimento === "COMPARECEU" ? "FFC6EFCE" : l.comparecimento === "NÃO COMPARECEU" ? "FFFFC7CE" : "FFFFFF";
+      
+      const row = ws.addRow([
+        l.nome,
+        datePart,
+        dayName,
+        timePart || "—",
+        comparecimento,
+      ]);
+      
+      row.eachCell(cell => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: comparecimentoColor } };
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Rede_Leads_Agendamentos_${format(startDate, "yyyy-MM-dd")}_a_${format(endDate, "yyyy-MM-dd")}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportDailyReport = async (date: Date = new Date()) => {
     const ExcelJS = (await import("exceljs")).default;
     const formatted = format(date, "dd/MM/yyyy");
@@ -1458,6 +1539,7 @@ export function useLeads() {
     exportRangeReport,
     exportWeeklyAppointments,
     exportWeeklyAppointmentsXlsx,
+    exportFilteredAppointmentsXlsx,
     deleteLeads,
     deleteLead,
     clearAllLeads,
