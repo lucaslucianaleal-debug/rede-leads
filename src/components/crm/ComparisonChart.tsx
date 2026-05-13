@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Lead } from "@/types/crm";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Target, Zap, BarChart2 } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -11,6 +11,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 
@@ -60,45 +61,88 @@ function getDateField(lead: Lead, metric: MetricKey): string | undefined {
 }
 
 function matchesMetric(lead: Lead, metric: MetricKey): boolean {
-  if (metric === "compareceu")    return lead.comparecimento === "COMPARECEU";
+  if (metric === "compareceu")     return lead.comparecimento === "COMPARECEU";
   if (metric === "nao_compareceu") return lead.comparecimento === "NÃO COMPARECEU";
   return true;
 }
 
+// Conta leads para um mês inteiro (ou até um dia específico)
+function countForMonth(
+  leads: Lead[],
+  metric: MetricKey,
+  mmYYYY: string,
+  upToDay?: number
+): number {
+  const [mm, yyyy] = mmYYYY.split("/");
+  return leads.filter((lead) => {
+    const dateField = getDateField(lead, metric);
+    if (!dateField) return false;
+    if (!matchesMetric(lead, metric)) return false;
+    // formato dd/MM/yyyy
+    const parts = dateField.split("/");
+    if (parts.length < 3) return false;
+    const d = parseInt(parts[0], 10);
+    const m = parts[1];
+    const y = parts[2].slice(0, 4);
+    if (m !== mm || y !== yyyy) return false;
+    if (upToDay !== undefined && d > upToDay) return false;
+    return true;
+  }).length;
+}
+
+// Conta por dia de um mês (retorna array[0..daysInMonth-1])
+function dailyCountsForMonth(leads: Lead[], metric: MetricKey, mmYYYY: string): number[] {
+  const daysInMonth = getDaysInMonthStr(mmYYYY);
+  const [mm, yyyy] = mmYYYY.split("/");
+  return Array.from({ length: daysInMonth }, (_, i) => {
+    const day = i + 1;
+    const dayStr = `${String(day).padStart(2, "0")}/${mm}/${yyyy}`;
+    return leads.filter((lead) => {
+      const dateField = getDateField(lead, metric);
+      if (!dateField) return false;
+      return dateField.startsWith(dayStr) && matchesMetric(lead, metric);
+    }).length;
+  });
+}
+
 export function ComparisonChart({ leads }: ComparisonChartProps) {
   const availableMonths = useMemo(() => getAvailableMonths(12), []);
+  const currentMonthStr = availableMonths[0]; // "MM/yyyy" do mês atual
+  const today = new Date();
+  const todayDay = today.getDate(); // ex: 13
 
   const [metric, setMetric] = useState<MetricKey>("leads_novos");
   const [selectedMonths, setSelectedMonths] = useState<string[]>([
-    availableMonths[0], // mês atual
-    availableMonths[1], // mês anterior
+    availableMonths[0],
+    availableMonths[1],
   ]);
 
   function toggleMonth(month: string) {
     setSelectedMonths((prev) => {
       if (prev.includes(month)) {
-        if (prev.length <= 1) return prev; // mínimo 1 mês
+        if (prev.length <= 1) return prev;
         return prev.filter((m) => m !== month);
       }
-      if (prev.length >= 5) return prev; // máximo 5 meses
+      if (prev.length >= 5) return prev;
       return [...prev, month];
     });
   }
 
-  // Gera os dados do gráfico: X = dia do mês, uma série por mês selecionado
+  // Dados do gráfico por dia
   const chartData = useMemo(() => {
     const maxDays = Math.max(...selectedMonths.map((m) => getDaysInMonthStr(m)));
-
     return Array.from({ length: maxDays }, (_, i) => {
       const day = i + 1;
       const point: Record<string, number | string | null> = { dia: day };
-
       for (const month of selectedMonths) {
         const [mm, yyyy] = month.split("/");
         const dayStr = `${String(day).padStart(2, "0")}/${mm}/${yyyy}`;
         const daysInMonth = getDaysInMonthStr(month);
-
-        if (day > daysInMonth) {
+        const isCurrentMonth = month === currentMonthStr;
+        // não renderiza dias futuros do mês atual
+        if (isCurrentMonth && day > todayDay) {
+          point[month] = null;
+        } else if (day > daysInMonth) {
           point[month] = null;
         } else {
           point[month] = leads.filter((lead) => {
@@ -108,24 +152,102 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
           }).length;
         }
       }
-
       return point;
     });
-  }, [leads, metric, selectedMonths]);
+  }, [leads, metric, selectedMonths, currentMonthStr, todayDay]);
 
-  // Totais por mês selecionado para exibir no rodapé
-  const totals = useMemo(() => {
+  // Analytics completos por mês
+  const analytics = useMemo(() => {
     return selectedMonths.map((month) => {
-      const [mm, yyyy] = month.split("/");
-      const prefix = `/${mm}/${yyyy}`;
-      const count = leads.filter((lead) => {
-        const dateField = getDateField(lead, metric);
-        if (!dateField) return false;
-        return dateField.includes(prefix) && matchesMetric(lead, metric);
-      }).length;
-      return { month, count };
+      const isCurrentMonth = month === currentMonthStr;
+      const daysInMonth = getDaysInMonthStr(month);
+      const effectiveDays = isCurrentMonth ? todayDay : daysInMonth;
+
+      const total = countForMonth(leads, metric, month);
+      const totalUpToToday = countForMonth(leads, metric, month, effectiveDays);
+      const dailyCounts = dailyCountsForMonth(leads, metric, month);
+
+      // Projeção: só faz sentido para mês atual
+      const projection = isCurrentMonth && todayDay > 0
+        ? Math.round((totalUpToToday / todayDay) * daysInMonth)
+        : null;
+
+      // Melhor e pior dia (apenas dias com dados, dentro dos dias efetivos)
+      const daysWithData = dailyCounts
+        .slice(0, effectiveDays)
+        .map((count, i) => ({ day: i + 1, count }))
+        .filter((d) => d.count > 0);
+
+      const bestDay = daysWithData.length > 0
+        ? daysWithData.reduce((a, b) => (a.count >= b.count ? a : b))
+        : null;
+      const worstDay = daysWithData.length > 0
+        ? daysWithData.reduce((a, b) => (a.count <= b.count ? a : b))
+        : null;
+
+      // Ritmo no mesmo dia que hoje
+      const countOnSameDay = isCurrentMonth
+        ? null
+        : countForMonth(leads, metric, month, todayDay) - countForMonth(leads, metric, month, todayDay - 1);
+
+      // Comparação até o mesmo dia (ritmo justo)
+      const totalUpToSameDay = isCurrentMonth
+        ? null
+        : countForMonth(leads, metric, month, todayDay);
+
+      // Taxa de conversão: apenas para leads_novos
+      let conversionRate: number | null = null;
+      if (metric === "leads_novos" && total > 0) {
+        const agendados = leads.filter((lead) => {
+          const dataCriacao = lead.dataCriacao || "";
+          const [mm, yyyy] = month.split("/");
+          if (!dataCriacao.includes(`/${mm}/${yyyy}`)) return false;
+          return !!lead.dataAgendamentoCriado;
+        }).length;
+        conversionRate = Math.round((agendados / total) * 100);
+      }
+
+      return {
+        month,
+        isCurrentMonth,
+        total,
+        totalUpToToday,
+        totalUpToSameDay,
+        projection,
+        bestDay,
+        worstDay,
+        countOnSameDay,
+        conversionRate,
+        daysInMonth,
+        effectiveDays,
+      };
     });
-  }, [leads, metric, selectedMonths]);
+  }, [leads, metric, selectedMonths, currentMonthStr, todayDay]);
+
+  // Variação vs mês anterior na seleção
+  const variations = useMemo(() => {
+    return analytics.map((curr, idx) => {
+      if (idx === analytics.length - 1) return null; // último não tem anterior
+      const prev = analytics[idx + 1];
+      // Para comparação justa: mês atual vs "até o mesmo dia" dos outros
+      const currVal = curr.isCurrentMonth ? curr.totalUpToToday : curr.total;
+      const prevVal = curr.isCurrentMonth ? (prev.totalUpToSameDay ?? prev.total) : prev.total;
+      if (prevVal === 0) return null;
+      const diff = currVal - prevVal;
+      const pct = Math.round((diff / prevVal) * 100);
+      return { diff, pct };
+    });
+  }, [analytics]);
+
+  // Média dos meses selecionados (para 3+)
+  const avgAcrossMonths = useMemo(() => {
+    if (selectedMonths.length < 3) return null;
+    const vals = analytics.map((a) => (a.isCurrentMonth ? a.totalUpToToday : a.total));
+    return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+  }, [analytics]);
+
+  // Mês atual em relação à posição no mês
+  const currentMonthAnalytics = analytics.find((a) => a.isCurrentMonth);
 
   return (
     <div className="bg-[#1C1C1E] rounded-xl border border-gray-800 p-6 mt-6">
@@ -137,7 +259,6 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
 
       {/* Controles */}
       <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:flex-wrap">
-        {/* Seletor de métrica */}
         <div>
           <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Métrica</p>
           <div className="flex gap-2 flex-wrap">
@@ -157,10 +278,10 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
           </div>
         </div>
 
-        {/* Seletor de meses */}
         <div>
           <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">
-            Meses para comparar <span className="normal-case text-gray-600">(máx. 5)</span>
+            Meses para comparar{" "}
+            <span className="normal-case text-gray-600">(máx. 5)</span>
           </p>
           <div className="flex gap-2 flex-wrap">
             {availableMonths.slice(0, 8).map((month) => {
@@ -224,6 +345,13 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
             formatter={(value) => getMonthLabel(value as string)}
             wrapperStyle={{ color: "#9ca3af", fontSize: "12px" }}
           />
+          {/* Linha vertical no dia atual */}
+          <ReferenceLine
+            x={todayDay}
+            stroke="#4b5563"
+            strokeDasharray="4 4"
+            label={{ value: "Hoje", fill: "#6b7280", fontSize: 10, position: "top" }}
+          />
           {selectedMonths.map((month, idx) => (
             <Line
               key={month}
@@ -239,21 +367,159 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
         </LineChart>
       </ResponsiveContainer>
 
-      {/* Totais por mês */}
-      <div className="flex gap-4 mt-4 flex-wrap">
-        {totals.map(({ month, count }, idx) => (
-          <div key={month} className="flex items-center gap-2">
+      {/* Cards de análise por mês */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
+        {analytics.map((a, idx) => {
+          const variation = variations[idx];
+          const color = LINE_COLORS[idx % LINE_COLORS.length];
+          const displayVal = a.isCurrentMonth ? a.totalUpToToday : a.total;
+
+          return (
             <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: LINE_COLORS[idx % LINE_COLORS.length] }}
-            />
-            <span className="text-xs text-gray-400">
-              {getMonthLabel(month)}:{" "}
-              <span className="text-white font-semibold">{count}</span>
-            </span>
-          </div>
-        ))}
+              key={a.month}
+              className="bg-gray-900 rounded-lg p-3 border border-gray-800"
+              style={{ borderLeftColor: color, borderLeftWidth: 3 }}
+            >
+              {/* Linha topo: nome do mês + total */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-white uppercase tracking-wide">
+                  {getMonthLabel(a.month)}
+                  {a.isCurrentMonth && (
+                    <span className="ml-1 text-[10px] text-indigo-400 normal-case">
+                      (até dia {todayDay})
+                    </span>
+                  )}
+                </span>
+                <span className="text-lg font-bold text-white">{displayVal}</span>
+              </div>
+
+              {/* Variação vs mês anterior na lista */}
+              {variation && (
+                <div className="flex items-center gap-1 mb-1.5">
+                  {variation.diff > 0 ? (
+                    <TrendingUp className="w-3 h-3 text-emerald-400" />
+                  ) : variation.diff < 0 ? (
+                    <TrendingDown className="w-3 h-3 text-red-400" />
+                  ) : (
+                    <Minus className="w-3 h-3 text-gray-500" />
+                  )}
+                  <span
+                    className={`text-xs font-medium ${
+                      variation.diff > 0
+                        ? "text-emerald-400"
+                        : variation.diff < 0
+                        ? "text-red-400"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {variation.diff > 0 ? "+" : ""}
+                    {variation.diff} ({variation.pct > 0 ? "+" : ""}
+                    {variation.pct}%) vs {getMonthLabel(analytics[idx + 1]?.month ?? "")}
+                  </span>
+                </div>
+              )}
+
+              {/* Projeção para fim do mês (só mês atual) */}
+              {a.projection !== null && (
+                <div className="flex items-center gap-1 mb-1.5">
+                  <Target className="w-3 h-3 text-amber-400" />
+                  <span className="text-xs text-amber-400">
+                    Projeção fim do mês: ~<strong>{a.projection}</strong>
+                  </span>
+                </div>
+              )}
+
+              {/* Ritmo no dia atual comparado com os outros meses */}
+              {a.totalUpToSameDay !== null && (
+                <div className="flex items-center gap-1 mb-1.5">
+                  <Zap className="w-3 h-3 text-sky-400" />
+                  <span className="text-xs text-sky-400">
+                    Até dia {todayDay}: <strong>{a.totalUpToSameDay}</strong>
+                    {currentMonthAnalytics && (
+                      <>
+                        {" "}
+                        {currentMonthAnalytics.totalUpToToday > a.totalUpToSameDay ? (
+                          <span className="text-emerald-400">
+                            (+{currentMonthAnalytics.totalUpToToday - a.totalUpToSameDay} acima)
+                          </span>
+                        ) : currentMonthAnalytics.totalUpToToday < a.totalUpToSameDay ? (
+                          <span className="text-red-400">
+                            ({currentMonthAnalytics.totalUpToToday - a.totalUpToSameDay} abaixo)
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">(igual)</span>
+                        )}
+                      </>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {/* Melhor e pior dia */}
+              {a.bestDay && (
+                <div className="flex items-center gap-2 mb-1">
+                  <BarChart2 className="w-3 h-3 text-gray-500" />
+                  <span className="text-xs text-gray-500">
+                    Pico: dia {a.bestDay.day} ({a.bestDay.count})
+                    {a.worstDay && a.worstDay.day !== a.bestDay.day && (
+                      <> · Mín: dia {a.worstDay.day} ({a.worstDay.count})</>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {/* Taxa de conversão (leads_novos) */}
+              {a.conversionRate !== null && (
+                <div className="mt-1">
+                  <span className="text-xs text-purple-400">
+                    Conversão para agendamento:{" "}
+                    <strong>{a.conversionRate}%</strong>
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Linha de insights globais (3+ meses) */}
+      {avgAcrossMonths !== null && currentMonthAnalytics && (
+        <div className="mt-4 flex items-center gap-2 bg-gray-900 rounded-lg px-4 py-2.5 border border-gray-800">
+          <BarChart2 className="w-4 h-4 text-gray-400 shrink-0" />
+          <span className="text-xs text-gray-400">
+            Média dos {selectedMonths.length} meses selecionados:{" "}
+            <strong className="text-white">{avgAcrossMonths}</strong>
+          </span>
+          <span className="mx-1 text-gray-700">·</span>
+          <span className="text-xs">
+            {currentMonthAnalytics.totalUpToToday >= avgAcrossMonths ? (
+              <span className="text-emerald-400 font-medium">
+                ↑ Mês atual acima da média (+
+                {currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
+              </span>
+            ) : (
+              <span className="text-red-400 font-medium">
+                ↓ Mês atual abaixo da média (
+                {currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
+              </span>
+            )}
+          </span>
+          {currentMonthAnalytics.projection !== null && (
+            <>
+              <span className="mx-1 text-gray-700">·</span>
+              <span className="text-xs text-amber-400">
+                Projeção de fechamento:{" "}
+                <strong>~{currentMonthAnalytics.projection}</strong>
+                {currentMonthAnalytics.projection >= avgAcrossMonths ? (
+                  <span className="text-emerald-400 ml-1">(acima da média)</span>
+                ) : (
+                  <span className="text-red-400 ml-1">(abaixo da média)</span>
+                )}
+              </span>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
