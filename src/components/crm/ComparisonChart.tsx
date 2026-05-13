@@ -468,7 +468,7 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
               ) : null}
 
               {/* Breakdown por fonte (apenas leads_novos) - DESTAQUE */}
-              {metric === "leads_novos" && a.isCurrentMonth && (
+              {metric === "leads_novos" && (
                 <div className="mb-3 pb-3 border-b border-gray-700">
                   <p className="text-xs text-gray-500 mb-1.5 font-bold uppercase tracking-wide">📊 Por Fonte:</p>
                   {(() => {
