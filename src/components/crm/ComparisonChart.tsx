@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Lead } from "@/types/crm";
-import { TrendingUp, TrendingDown, Minus, Target, Zap, BarChart2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Target, Zap, BarChart2, AlertCircle, Lightbulb } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -27,6 +27,15 @@ const METRIC_OPTIONS: { key: MetricKey; label: string }[] = [
   { key: "compareceu", label: "Compareceu" },
   { key: "nao_compareceu", label: "Não Compareceu" },
 ];
+
+// Metas mensais para tomada de decisão
+const MONTHLY_GOALS = {
+  leads_novos: 200,           // 200 leads novos/mês
+  agendamentos: 80,           // 40% de conversão = 80 agendamentos dos 200 leads
+  compareceu: 310,            // 10 agendamentos/dia * 31 dias
+};
+
+const DAILY_GOAL_APPOINTMENTS = 10; // 10 agendamentos por dia
 
 const LINE_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#06b6d4"];
 
@@ -103,6 +112,43 @@ function dailyCountsForMonth(leads: Lead[], metric: MetricKey, mmYYYY: string): 
       return dateField.startsWith(dayStr) && matchesMetric(lead, metric);
     }).length;
   });
+}
+
+// Breakdown de leads novos por fonte (fonteLead)
+function getSourceBreakdown(
+  leads: Lead[],
+  mmYYYY: string,
+  upToDay?: number
+): { [key: string]: number } {
+  const [mm, yyyy] = mmYYYY.split("/");
+  const breakdown: { [key: string]: number } = {};
+
+  leads
+    .filter((lead) => {
+      const dataCriacao = lead.dataCriacao || "";
+      const parts = dataCriacao.split("/");
+      if (parts.length < 3) return false;
+      const d = parseInt(parts[0], 10);
+      const m = parts[1];
+      const y = parts[2].slice(0, 4);
+      if (m !== mm || y !== yyyy) return false;
+      if (upToDay !== undefined && d > upToDay) return false;
+      return true;
+    })
+    .forEach((lead) => {
+      const fonte = lead.fonteLead || "Outro";
+      breakdown[fonte] = (breakdown[fonte] || 0) + 1;
+    });
+
+  return breakdown;
+}
+
+// Calcular tendência (queda/crescimento %) entre 3 meses
+function calculateTrend(vals: number[]): number | null {
+  if (vals.length < 2) return null;
+  const [current, prev] = vals;
+  if (prev === 0) return null;
+  return Math.round(((current - prev) / prev) * 100);
 }
 
 export function ComparisonChart({ leads }: ComparisonChartProps) {
@@ -385,7 +431,38 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                 <span className="text-lg font-bold text-white">{displayVal}</span>
               </div>
 
-              {/* Variação vs mês anterior na lista */}
+              {/* Barra de progresso em relação à meta */}
+              {metric === "leads_novos" || metric === "agendamentos" || metric === "compareceu" ? (
+                <div className="mb-2">
+                  {(() => {
+                    const goal = MONTHLY_GOALS[metric];
+                    const daysInMonth = a.daysInMonth;
+                    // Projetar meta até o dia atual para mês em andamento
+                    const projectedGoal = a.isCurrentMonth ? Math.round((goal / daysInMonth) * todayDay) : goal;
+                    const progress = Math.min((displayVal / projectedGoal) * 100, 100);
+                    const isBelow = displayVal < projectedGoal * 0.9; // Alerta se 10% abaixo
+
+                    return (
+                      <div>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-xs text-gray-500">
+                            Meta: <strong>{projectedGoal}</strong>
+                          </span>
+                          <span className={`text-xs font-bold ${progress >= 100 ? "text-emerald-400" : isBelow ? "text-red-400" : "text-amber-400"}`}>
+                            {Math.round(progress)}%
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all ${progress >= 100 ? "bg-emerald-500" : isBelow ? "bg-red-500" : "bg-amber-500"}`}
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : null}
               {variation && (
                 <div className="flex items-center gap-1 mb-1.5">
                   {/* Lógica invertida para "Não Compareceu": mais = ruim (vermelho) */}
@@ -483,12 +560,83 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
 
               {/* Taxa de conversão (leads_novos) */}
               {a.conversionRate !== null && (
-                <div className="mt-1">
+                <div className="mt-1 mb-1.5">
                   <span className="text-xs text-purple-400">
                     Conversão para agendamento:{" "}
                     <strong>{a.conversionRate}%</strong>
                   </span>
                 </div>
+              )}
+
+              {/* Breakdown por fonte (apenas leads_novos) */}
+              {metric === "leads_novos" && a.isCurrentMonth && (
+                <div className="mt-1.5 mb-1.5 pt-1.5 border-t border-gray-700">
+                  <p className="text-xs text-gray-500 mb-1 font-semibold uppercase">Por fonte:</p>
+                  {(() => {
+                    const breakdown = getSourceBreakdown(leads, a.month, todayDay);
+                    const sorted = Object.entries(breakdown)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 3);
+                    return (
+                      <div className="space-y-0.5">
+                        {sorted.map(([fonte, count]) => (
+                          <div key={fonte} className="flex justify-between text-xs text-gray-400">
+                            <span>{fonte}</span>
+                            <span className="text-emerald-400 font-medium">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Alerta de tendência (queda > 10%) */}
+              {a.isCurrentMonth && (
+                (() => {
+                  const trend = calculateTrend([displayVal, variations[0]?.diff ? displayVal + variations[0].diff : null].filter(Boolean) as number[]);
+                  const comparingWithPrev = variations[0];
+                  if (comparingWithPrev && metric !== "nao_compareceu" && comparingWithPrev.pct < -10) {
+                    return (
+                      <div className="mt-1.5 p-2 bg-red-950 rounded border border-red-800">
+                        <div className="flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+                          <span className="text-xs text-red-300">
+                            <strong>⚠️ Queda de {Math.abs(comparingWithPrev.pct)}%</strong> vs mês anterior
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()
+              )}
+
+              {/* Recomendação de ação (para mês atual apenas) */}
+              {a.isCurrentMonth && metric === "leads_novos" && (
+                (() => {
+                  const goal = MONTHLY_GOALS.leads_novos;
+                  const projectedGoal = Math.round((goal / a.daysInMonth) * todayDay);
+                  const gap = projectedGoal - displayVal;
+
+                  if (gap > 0 && gap <= projectedGoal * 0.3) {
+                    const breakdown = getSourceBreakdown(leads, a.month, todayDay);
+                    const topSource = Object.entries(breakdown).sort((a, b) => b[1] - a[1])[1]?.[0];
+
+                    return (
+                      <div className="mt-1.5 p-2 bg-amber-950 rounded border border-amber-800">
+                        <div className="flex items-center gap-1">
+                          <Lightbulb className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span className="text-xs text-amber-300">
+                            <strong>+{gap} leads faltam</strong>. Reforce{" "}
+                            {topSource ? topSource : "outras fontes"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()
               )}
             </div>
           );
