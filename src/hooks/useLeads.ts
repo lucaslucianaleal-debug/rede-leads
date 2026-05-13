@@ -272,7 +272,7 @@ export function useLeads() {
     if (!canWrite) return;
     // Salva localmente imediatamente (por clínica e usuário)
     try { localStorage.setItem(getStorageKey(currentClinic || selectedClinic, userId), JSON.stringify(leads)); } catch {}
-    // Salva no Firebase com debounce de 1,5s, normalizando fontes e garantindo dataCriacao
+    // Salva no Firebase com debounce de 3s, normalizando fontes e garantindo dataCriacao
     const timer = setTimeout(async () => {
       try {
         // Verificação dupla dentro do callback async — previne escritas obsoletas
@@ -294,7 +294,7 @@ export function useLeads() {
       } catch (error) {
         // Falha silenciosa — dados ainda estão no localStorage
       }
-    }, 1500);
+    }, 3000);
     return () => clearTimeout(timer);
   }, [leads, canWrite, currentClinic, selectedClinic, userId]);
 
@@ -1335,32 +1335,26 @@ export function useLeads() {
 
   // Função para registrar follow-up
   const sendFollowUp = (leadId: string, observacao: string = "", nextStage?: LeadStage) => {
-    // Encontra o lead antes de atualizar
-    const leadToUpdate = leads.find(l => l.id === leadId);
-    if (!leadToUpdate) return;
-
-    const newCount = (leadToUpdate.followUpCount || 0) + 1;
-    // Use provided stage or auto-calculate next
-    const stageToUse = nextStage || getNextLeadStage(leadToUpdate.etapaLead);
-    
-    const updatedLead: Lead = {
-      ...leadToUpdate,
-      lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
-      observacao,
-      followUpCount: newCount,
-      dataFollowUp: calcNextFollowUpDate(newCount),
-      etapaLead: stageToUse,
-    };
-
-    setLeads(prev => prev.map(l => l.id === leadId ? updatedLead : l));
-
-    // Sincronizar com Firestore
-    saveLeadWithSync(db, updatedLead, { previousPhone: leadToUpdate.telefone })
-      .catch((err) => console.error('Erro ao sincronizar follow-up com Firestore:', err));
+    setLeads(prev => prev.map(l => {
+      if (l.id !== leadId) return l;
+      const newCount = (l.followUpCount || 0) + 1;
+      // Use provided stage or auto-calculate next
+      const stageToUse = nextStage || getNextLeadStage(l.etapaLead);
+      return {
+        ...l,
+        lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
+        observacao,
+        followUpCount: newCount,
+        dataFollowUp: calcNextFollowUpDate(newCount),
+        etapaLead: stageToUse,
+      };
+    }));
 
     // Registrar na timeline
     const clinicId = currentClinic || selectedClinic;
     if (clinicId) {
+      const lead = leads.find(l => l.id === leadId);
+      const stageToUse = nextStage || getNextLeadStage(lead?.etapaLead || "Novo");
       saveTimelineActivity(
         clinicId,
         leadId,
@@ -1373,22 +1367,9 @@ export function useLeads() {
 
   // Função para marcar lembrete
   const markReminder = (leadId: string, type: "h24" | "today") => {
-    // Encontra o lead antes de atualizar
-    const leadToUpdate = leads.find(l => l.id === leadId);
-    if (!leadToUpdate) return;
-
-    const updatedLead: Lead = {
-      ...leadToUpdate,
-      lembretes: { ...leadToUpdate.lembretes, [type]: true }
-    };
-
     setLeads(prev => prev.map(l =>
-      l.id === leadId ? updatedLead : l
+      l.id === leadId ? { ...l, lembretes: { ...l.lembretes, [type]: true } } : l
     ));
-
-    // Sincronizar com Firestore
-    saveLeadWithSync(db, updatedLead, { previousPhone: leadToUpdate.telefone })
-      .catch((err) => console.error('Erro ao sincronizar lembrete com Firestore:', err));
   };
 
   // Função para atualizar lead
@@ -1400,31 +1381,23 @@ export function useLeads() {
       finalUpdates.comparecimento = "AGUARDANDO DATA";
     }
     
-    // Find the lead to get current data for sync
-    const leadToUpdate = leads.find(l => l.id === leadId);
-    if (!leadToUpdate) return;
-    
-    // Update local state immediately
+    // Update local state immediately (hook will sync to Firestore via debounce)
     setLeads(prev => prev.map(l =>
       l.id === leadId ? { ...l, ...finalUpdates } : l
     ));
-    
-    // Sync to Firestore asynchronously (fire-and-forget to not block UI)
-    const syncData = { ...leadToUpdate, ...finalUpdates };
-    saveLeadWithSync(db, syncData, { previousPhone: leadToUpdate.telefone })
-      .catch((err) => console.error('Erro ao sincronizar lead com Firestore:', err));
 
     // Registrar agendamento/reagendamento na timeline
     const clinicId = currentClinic || selectedClinic;
     if (clinicId && "dataAgendamento" in updates && updates.dataAgendamento) {
-      const isReschedule = !!leadToUpdate.dataAgendamento && leadToUpdate.dataAgendamento !== updates.dataAgendamento;
+      const leadToUpdate = leads.find(l => l.id === leadId);
+      const isReschedule = !!leadToUpdate?.dataAgendamento && leadToUpdate.dataAgendamento !== updates.dataAgendamento;
       saveTimelineActivity(
         clinicId,
         leadId,
         isReschedule ? "APPOINTMENT_EDIT" : "APPOINTMENT",
         {
           dataAgendamento: updates.dataAgendamento,
-          briefing: (updates as any).briefingRecepcao || leadToUpdate.briefingRecepcao,
+          briefing: (updates as any).briefingRecepcao || leadToUpdate?.briefingRecepcao,
         },
         userId
       );
@@ -1445,56 +1418,35 @@ export function useLeads() {
 
   // Função para limpar retorno de ligação
   const clearCallReturn = (leadId: string) => {
-    // Encontra o lead antes de atualizar
-    const leadToUpdate = leads.find(l => l.id === leadId);
-    if (!leadToUpdate) return;
-
-    const updatedLead: Lead = {
-      ...leadToUpdate,
-      dataRetornoLigacao: ""
-    };
-
     setLeads(prev => prev.map(l =>
-      l.id === leadId ? updatedLead : l
+      l.id === leadId ? { ...l, dataRetornoLigacao: "" } : l
     ));
-
-    // Sincronizar com Firestore
-    saveLeadWithSync(db, updatedLead, { previousPhone: leadToUpdate.telefone })
-      .catch((err) => console.error('Erro ao limpar retorno de ligação em Firestore:', err));
   };
 
   // Função para registrar ligação — funciona igual a sendFollowUp + salva resultado
   const registerCall = (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: LeadStage) => {
-    // Encontra o lead antes de atualizar
-    const leadToUpdate = leads.find(l => l.id === leadId);
-    if (!leadToUpdate) return;
-
-    const timestamp = format(new Date(), "dd/MM/yyyy HH:mm");
-    const entry = `[${timestamp}] ${outcome}${obs ? ` — ${obs}` : ""}`;
-    const newObs = leadToUpdate.observacao ? `${leadToUpdate.observacao} | ${entry}` : entry;
-    const newCount = (leadToUpdate.followUpCount || 0) + 1;
-    const stageToUse = nextStage || getNextLeadStage(leadToUpdate.etapaLead);
-
-    // Atualizar estado local
-    const updatedLead: Lead = {
-      ...leadToUpdate,
-      observacao: newObs,
-      dataRetornoLigacao: returnDate || "",
-      lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
-      followUpCount: newCount,
-      dataFollowUp: calcNextFollowUpDate(newCount),
-      etapaLead: stageToUse,
-    };
-
-    setLeads(prev => prev.map(l => l.id === leadId ? updatedLead : l));
-
-    // Sincronizar com Firestore
-    saveLeadWithSync(db, updatedLead, { previousPhone: leadToUpdate.telefone })
-      .catch((err) => console.error('Erro ao sincronizar ligação com Firestore:', err));
+    setLeads(prev => prev.map(l => {
+      if (l.id !== leadId) return l;
+      const timestamp = format(new Date(), "dd/MM/yyyy HH:mm");
+      const entry = `[${timestamp}] ${outcome}${obs ? ` — ${obs}` : ""}`;
+      const newObs = l.observacao ? `${l.observacao} | ${entry}` : entry;
+      const newCount = (l.followUpCount || 0) + 1;
+      const stageToUse = nextStage || getNextLeadStage(l.etapaLead);
+      return {
+        ...l,
+        observacao: newObs,
+        dataRetornoLigacao: returnDate || "",
+        lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
+        followUpCount: newCount,
+        dataFollowUp: calcNextFollowUpDate(newCount),
+        etapaLead: stageToUse,
+      };
+    }));
 
     // Registrar na timeline
     const clinicId = currentClinic || selectedClinic;
     if (clinicId) {
+      const lead = leads.find(l => l.id === leadId);
       saveTimelineActivity(
         clinicId,
         leadId,
@@ -1502,7 +1454,7 @@ export function useLeads() {
         {
           resultado: outcome,
           observacao: obs,
-          statusLead: leadToUpdate.status,
+          statusLead: lead?.status,
           retornoAgendado: returnDate,
         },
         userId
