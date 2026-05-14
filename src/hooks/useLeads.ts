@@ -8,7 +8,6 @@ import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection } from "firebase
 import { attachLastWriter } from '../lib/crmGuard';
 import { saveLeadWithSync } from '@/lib/crmSync';
 import { useAuth } from "./useAuth";
-import { saveTimelineActivity } from "./useTimeline";
 
 // Use per-clinic and per-user localStorage key to avoid mixing caches between clinics and users
 const getStorageKey = (clinicId?: string | null, userId?: string | null) => {
@@ -272,7 +271,7 @@ export function useLeads() {
     if (!canWrite) return;
     // Salva localmente imediatamente (por clínica e usuário)
     try { localStorage.setItem(getStorageKey(currentClinic || selectedClinic, userId), JSON.stringify(leads)); } catch {}
-    // Salva no Firebase com debounce de 3s, normalizando fontes e garantindo dataCriacao
+    // Salva no Firebase com debounce de 1,5s, normalizando fontes e garantindo dataCriacao
     const timer = setTimeout(async () => {
       try {
         // Verificação dupla dentro do callback async — previne escritas obsoletas
@@ -294,7 +293,7 @@ export function useLeads() {
       } catch (error) {
         // Falha silenciosa — dados ainda estão no localStorage
       }
-    }, 3000);
+    }, 1500);
     return () => clearTimeout(timer);
   }, [leads, canWrite, currentClinic, selectedClinic, userId]);
 
@@ -484,87 +483,6 @@ export function useLeads() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `Rede_Leads_Relatorio_Semanal_${format(date, "yyyy-MM-dd")}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportFilteredAppointmentsXlsx = async (startDate: Date, endDate: Date) => {
-    // Filtrar agendamentos no período
-    const agendamentosPeríodo = leads.filter(l => {
-      if (l.etapaLead === "Fora da região") return false;
-      if (!l.dataAgendamento) return false;
-      
-      const [datePart] = l.dataAgendamento.split(" ");
-      if (!datePart) return false;
-      
-      const [d, m, y] = datePart.split("/");
-      const leadDateISO = `${y}-${m}-${d}`;
-      const startISO = format(startDate, "yyyy-MM-dd");
-      const endISO = format(endDate, "yyyy-MM-dd");
-      
-      return leadDateISO >= startISO && leadDateISO <= endISO;
-    }).sort((a, b) => {
-      const [dateA, timeA] = a.dataAgendamento.split(" ");
-      const [dateB, timeB] = b.dataAgendamento.split(" ");
-      
-      const [dA, mA, yA] = dateA.split("/");
-      const [dB, mB, yB] = dateB.split("/");
-      const isoA = `${yA}-${mA}-${dA}`;
-      const isoB = `${yB}-${mB}-${dB}`;
-      
-      const dateComp = isoA.localeCompare(isoB);
-      if (dateComp !== 0) return dateComp;
-      
-      return (timeA || "00:00").localeCompare(timeB || "00:00");
-    });
-
-    const ExcelJS = (await import("exceljs")).default;
-    const workbook = new ExcelJS.Workbook();
-    const ws = workbook.addWorksheet("Agendamentos");
-
-    ws.columns = [
-      { width: 30 },
-      { width: 12 },
-      { width: 12 },
-      { width: 14 },
-      { width: 18 },
-    ];
-
-    const headerRow = ws.addRow(["NOME", "DATA", "DIA", "HORÁRIO", "COMPARECIMENTO"]);
-    headerRow.eachCell(cell => {
-      cell.font = { bold: true };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB8B8B8" } };
-    });
-
-    agendamentosPeríodo.forEach(l => {
-      const [datePart, timePart] = l.dataAgendamento.split(" ");
-      const [d, m, y] = datePart.split("/");
-      const leadDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-      const dayNames = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
-      const dayName = dayNames[leadDate.getDay()];
-      
-      const comparecimento = l.comparecimento || "Pendente";
-      const comparecimentoColor = l.comparecimento === "COMPARECEU" ? "FFC6EFCE" : l.comparecimento === "NÃO COMPARECEU" ? "FFFFC7CE" : "FFFFFF";
-      
-      const row = ws.addRow([
-        l.nome,
-        datePart,
-        dayName,
-        timePart || "—",
-        comparecimento,
-      ]);
-      
-      row.eachCell(cell => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: comparecimentoColor } };
-      });
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Rede_Leads_Agendamentos_${format(startDate, "yyyy-MM-dd")}_a_${format(endDate, "yyyy-MM-dd")}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1122,7 +1040,9 @@ export function useLeads() {
                 comparecimento: get(row, col.comparecimento) as any,
                 dataFollowUp: get(row, col.dataFollowUp),
                 dataAgendamento: get(row, col.dataAgendamento),
-                dataAgendamentoCriado: get(row, col.dataAgendamento) ? (get(row, col.dataCriacao) || format(new Date(), "dd/MM/yyyy")) : "",
+                // FIXED: never fall back to today — use the appointment date itself as estimate
+                // to avoid inflating "agendamentos hoje" for imported leads lacking a creation date.
+                dataAgendamentoCriado: get(row, col.dataAgendamento) ? (get(row, col.dataCriacao) || (get(row, col.dataAgendamento) as string).split(" ")[0]) : "",
                 dataRetornoLigacao: "",
                 observacao: get(row, col.observacao),
                 followUpCount: parseInt(etapaRaw?.match(/\d+/)?.[0] || "0", 10),
@@ -1349,20 +1269,6 @@ export function useLeads() {
         etapaLead: stageToUse,
       };
     }));
-
-    // Registrar na timeline
-    const clinicId = currentClinic || selectedClinic;
-    if (clinicId) {
-      const lead = leads.find(l => l.id === leadId);
-      const stageToUse = nextStage || getNextLeadStage(lead?.etapaLead || "Novo");
-      saveTimelineActivity(
-        clinicId,
-        leadId,
-        "FOLLOW_UP",
-        { etapa: stageToUse, observacao },
-        userId
-      );
-    }
   };
 
   // Função para marcar lembrete
@@ -1381,36 +1287,19 @@ export function useLeads() {
       finalUpdates.comparecimento = "AGUARDANDO DATA";
     }
     
-    // Update local state immediately (hook will sync to Firestore via debounce)
+    // Find the lead to get current data for sync
+    const leadToUpdate = leads.find(l => l.id === leadId);
+    if (!leadToUpdate) return;
+    
+    // Update local state immediately
     setLeads(prev => prev.map(l =>
       l.id === leadId ? { ...l, ...finalUpdates } : l
     ));
-
-    // Registrar agendamento/reagendamento na timeline
-    const clinicId = currentClinic || selectedClinic;
-    if (clinicId && "dataAgendamento" in updates && updates.dataAgendamento) {
-      const leadToUpdate = leads.find(l => l.id === leadId);
-      const isReschedule = !!leadToUpdate?.dataAgendamento && leadToUpdate.dataAgendamento !== updates.dataAgendamento;
-      const timelineData: any = {
-        dataAgendamento: updates.dataAgendamento,
-      };
-      const briefingValue = (updates as any).briefingRecepcao || leadToUpdate?.briefingRecepcao;
-      if (briefingValue) {
-        timelineData.briefing = briefingValue;
-      }
-      saveTimelineActivity(
-        clinicId,
-        leadId,
-        isReschedule ? "APPOINTMENT_EDIT" : "APPOINTMENT",
-        timelineData,
-        userId
-      );
-    }
-
-    // Registrar não-comparecimento na timeline
-    if (clinicId && "comparecimento" in updates && updates.comparecimento === "NÃO COMPARECEU") {
-      saveTimelineActivity(clinicId, leadId, "NO_SHOW", {}, userId);
-    }
+    
+    // Sync to Firestore asynchronously (fire-and-forget to not block UI)
+    const syncData = { ...leadToUpdate, ...finalUpdates };
+    saveLeadWithSync(db, syncData, { previousPhone: leadToUpdate.telefone })
+      .catch((err) => console.error('Erro ao sincronizar lead com Firestore:', err));
   };
 
   // Função para criar lead
@@ -1446,78 +1335,7 @@ export function useLeads() {
         etapaLead: stageToUse,
       };
     }));
-
-    // Registrar na timeline
-    const clinicId = currentClinic || selectedClinic;
-    if (clinicId) {
-      const lead = leads.find(l => l.id === leadId);
-      const timelineData: any = {
-        resultado: outcome,
-      };
-      if (obs) timelineData.observacao = obs;
-      if (lead?.status) timelineData.statusLead = lead.status;
-      if (returnDate) timelineData.retornoAgendado = returnDate;
-      saveTimelineActivity(
-        clinicId,
-        leadId,
-        "CALL_LOG",
-        timelineData,
-        userId
-      );
-    }
   };
-
-  // ── Auto-promote leads in "Avaliação agendada" whose appointment date has passed ──
-  useEffect(() => {
-    const todayDate = new Date();
-    todayDate.setHours(0, 0, 0, 0);
-
-    const toPromote = leads.filter(l => {
-      if (l.etapaLead !== "Avaliação agendada") return false;
-      if (!l.dataAgendamento) return false;
-      if (l.comparecimento === "COMPARECEU") return false;
-      // Parse "dd/MM/yyyy HH:mm" → get the date part
-      const datePart = l.dataAgendamento.split(" ")[0];
-      const parts = datePart.split("/");
-      if (parts.length < 3) return false;
-      const apptDate = new Date(+parts[2], +parts[1] - 1, +parts[0]);
-      apptDate.setHours(0, 0, 0, 0);
-      return todayDate > apptDate;
-    });
-
-    if (toPromote.length === 0) return;
-
-    const todayStr = format(todayDate, "dd/MM/yyyy");
-
-    setLeads(prev => prev.map(l => {
-      const lead = toPromote.find(tp => tp.id === l.id);
-      if (!lead) return l;
-      const nextCount = (l.followUpCount || 0) + 1;
-      const nextStage = `Follow-Up ${Math.min(nextCount, 12)}` as LeadStage;
-      return {
-        ...l,
-        etapaLead: nextStage,
-        followUpCount: nextCount,
-        lastFollowUpDone: todayStr,
-        dataFollowUp: calcNextFollowUpDate(nextCount),
-      };
-    }));
-
-    // Sync each promoted lead to Firestore
-    toPromote.forEach(lead => {
-      const nextCount = (lead.followUpCount || 0) + 1;
-      const nextStage = `Follow-Up ${Math.min(nextCount, 12)}` as LeadStage;
-      const updated = {
-        ...lead,
-        etapaLead: nextStage,
-        followUpCount: nextCount,
-        lastFollowUpDone: todayStr,
-        dataFollowUp: calcNextFollowUpDate(nextCount),
-      };
-      saveLeadWithSync(db, updated, { previousPhone: lead.telefone })
-        .catch(err => console.error("Erro ao auto-promover lead:", err));
-    });
-  }, [leads]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     leads: filteredLeads,
@@ -1536,7 +1354,6 @@ export function useLeads() {
     exportRangeReport,
     exportWeeklyAppointments,
     exportWeeklyAppointmentsXlsx,
-    exportFilteredAppointmentsXlsx,
     deleteLeads,
     deleteLead,
     clearAllLeads,

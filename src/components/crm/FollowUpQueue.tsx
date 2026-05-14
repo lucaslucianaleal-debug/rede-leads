@@ -14,7 +14,6 @@ import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { CallLogDialog } from "./CallLogDialog";
 import ExcelJS from 'exceljs';
 import { getFollowUpMessage, getFollowUpMessageForLead, formatFollowUpMessage } from "@/data/followUpMessages";
-import { getAvailableSlots } from "@/lib/scheduleHelper";
 import { useAuth } from "@/hooks/useAuth";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { ProgressWithLabel } from "@/components/ui/progress-with-label";
@@ -306,7 +305,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
     setCallLead(null);
   };
 
-  const handleWhatsAppClick = async (lead: Lead) => {
+  const handleWhatsAppClick = (lead: Lead) => {
     // Serviços elegíveis (com e sem acento, singular/plural, case-insensitive)
     const allowed = [
       "implante", "implantes",
@@ -344,28 +343,13 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
       }
       setSuggestedMessage(msg);
     } else {
+      // prefills with follow-up template (with variation + noShow support)
       const hasAppointment = !!(lead.dataAgendamentoCriado || lead.dataAgendamentoAlterado);
       const noShow = lead.comparecimento === "NÃO COMPARECEU";
       const horario = lead.dataAgendamento ? lead.dataAgendamento.split(" ")[1] || "" : "";
       const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppointment, noShow);
-      if (template) {
-        let dataSugerida1 = "";
-        let horaSugerida1 = "";
-        if (noShow && currentClinic) {
-          try {
-            const slots = await getAvailableSlots(currentClinic);
-            if (slots.length > 0) {
-              dataSugerida1 = slots[0].dayLabel;   // ex: "Segunda, 05/05"
-              horaSugerida1 = slots[0].hourLabel;  // ex: "14h"
-            }
-          } catch {
-            // silently fallback to placeholder
-          }
-        }
-        setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, dataSugerida1, undefined, horaSugerida1));
-      } else {
-        setSuggestedMessage("");
-      }
+      if (template) setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", horario));
+      else setSuggestedMessage("");
     }
     setShowWhatsAppDialog(true);
   };

@@ -325,6 +325,11 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   };
 
   const handleLigar = async (cupom: Cupom) => {
+    // Guard: cupom already converted — creating another lead would inflate the chart
+    if (cupom.status === "convertido") {
+      toast.info("Este cupom já foi convertido em lead no CRM.");
+      return;
+    }
     try {
       const leadData = buildLeadFromCupom(cupom);
       const newLead = createLead(leadData);

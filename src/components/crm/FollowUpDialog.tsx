@@ -99,13 +99,7 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete }: Fol
 
   const handleConfirm = () => {
     const finalStage = useAutoStage ? nextAutoStage : manualStage;
-    
-    // Prepend today's date in DD/MM format to observation
-    const today = new Date();
-    const dateString = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}`;
-    const observacaoComData = observacao ? `${dateString} - ${observacao}` : dateString;
-    
-    onConfirm(lead.id, observacaoComData, finalStage);
+    onConfirm(lead.id, observacao, finalStage);
     toast.success(`Follow-Up registrado: ${lead.nome} → ${finalStage}`);
     setObservacao("");
     setUseAutoStage(true);

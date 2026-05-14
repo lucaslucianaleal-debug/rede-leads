@@ -50,23 +50,27 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       // - Follow-ups realizados = dataFollowUp
       // - Agendamentos feitos = subset de follow-ups com dataAgendamento e agendamento >= follow-up
       const newLeads = leads.filter((l) => {
+        if ((l as any)._deleted) return false;
         const dc = l.dataContato || "";
         return dc.startsWith(dayStr);
       });
 
       const followUpsDone = leads.filter((l) => {
+        if ((l as any)._deleted) return false;
         const df = l.lastFollowUpDone || "";
         return df.startsWith(dayStr);
       });
 
       // Agendamentos: contar apenas agendamentos CRIADOS nesse dia (dataAgendamentoCriado)
       const appointmentsMade = leads.filter((l) => {
+        if ((l as any)._deleted) return false;
         const dac = l.dataAgendamentoCriado || "";
         return dac.startsWith(dayStr);
       });
 
       // Reagendamentos: contar alterações de agendamento feitas nesse dia
       const reschedulesMade = leads.filter((l) => {
+        if ((l as any)._deleted) return false;
         const daa = l.dataAgendamentoAlterado || "";
         return daa.startsWith(dayStr);
       });
@@ -105,10 +109,10 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
 
   // Métricas do dia de hoje para as barras de progresso
   const todayStr = format(new Date(), "dd/MM/yyyy");
-  const newLeadsToday = leads.filter((l) => (l.dataContato || "").startsWith(todayStr));
-  const followUpsDoneToday = leads.filter((l) => (l.lastFollowUpDone || "").startsWith(todayStr));
-  const appointmentsMadeToday = leads.filter((l) => (l.dataAgendamentoCriado || "").startsWith(todayStr));
-  const reschedulesToday = leads.filter((l) => (l.dataAgendamentoAlterado || "").startsWith(todayStr));
+  const newLeadsToday = leads.filter((l) => !(l as any)._deleted && (l.dataContato || "").startsWith(todayStr));
+  const followUpsDoneToday = leads.filter((l) => !(l as any)._deleted && (l.lastFollowUpDone || "").startsWith(todayStr));
+  const appointmentsMadeToday = leads.filter((l) => !(l as any)._deleted && (l.dataAgendamentoCriado || "").startsWith(todayStr));
+  const reschedulesToday = leads.filter((l) => !(l as any)._deleted && (l.dataAgendamentoAlterado || "").startsWith(todayStr));
   // IDs for debugging
   const newLeadsTodayIds = newLeadsToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
   const followUpsDoneTodayIds = followUpsDoneToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
