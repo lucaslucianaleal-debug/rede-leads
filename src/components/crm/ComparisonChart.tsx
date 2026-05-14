@@ -363,47 +363,56 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
     return getConversionFunnelByFonte(leads, funnelMonth, todayDay);
   }, [leads, funnelMonth, todayDay]);
 
-  // Insights automáticos de diagnóstico
-  const diagnosticoInsights = useMemo(() => {
-    const insights: { type: "good" | "bad" | "tip"; text: string }[] = [];
-    const significant = funnelByFonte.filter(f => f.leads >= 2);
-    if (significant.length === 0) return insights;
+// Insights automáticos de diagnóstico com ações concretas
+    const diagnosticoInsights = useMemo(() => {
+      const insights: { type: "good" | "bad" | "tip"; text: string }[] = [];
+      const significant = funnelByFonte.filter(f => f.leads >= 2);
+      if (significant.length === 0) return insights;
 
-    // Melhor taxa de conversão L→A
-    const bestConv = [...significant].sort((a, b) => b.convRate - a.convRate)[0];
-    if (bestConv.convRate >= 75) {
-      insights.push({ type: "good", text: `${bestConv.fonte}: ${bestConv.convRate}% de conversão leads→agendamento — melhor canal` });
-    }
-
-    // Pior taxa de comparecimento
-    const withAppts = significant.filter(f => f.agendamentos >= 2);
-    if (withAppts.length > 0) {
-      const worstShow = [...withAppts].sort((a, b) => a.showRate - b.showRate)[0];
-      if (worstShow.showRate < 40) {
-        insights.push({ type: "bad", text: `${worstShow.fonte}: apenas ${worstShow.showRate}% de comparecimento — reforçar confirmações e lembretes` });
+      // Melhor taxa de conversão L→A (melhor canal)
+      const bestConv = [...significant].sort((a, b) => b.convRate - a.convRate)[0];
+      if (bestConv.convRate >= 70) {
+        insights.push({ type: "good", text: `${bestConv.fonte}: ${bestConv.convRate}% conversão — aumentar investimento aqui` });
       }
-      const bestShow = [...withAppts].sort((a, b) => b.showRate - a.showRate)[0];
-      if (bestShow.showRate >= 60 && bestShow.fonte !== worstShow.fonte) {
-        insights.push({ type: "good", text: `${bestShow.fonte}: ${bestShow.showRate}% de comparecimento — leads de maior qualidade` });
+
+      // Melhor taxa de comparecimento (qualidade de lead)
+      const withAppts = significant.filter(f => f.agendamentos >= 2);
+      if (withAppts.length > 0) {
+        const bestShow = [...withAppts].sort((a, b) => b.showRate - a.showRate)[0];
+        if (bestShow.showRate >= 60) {
+          insights.push({ type: "good", text: `${bestShow.fonte}: ${bestShow.showRate}% comparecimento — leads de alta qualidade` });
+        }
+        const worstShow = [...withAppts].sort((a, b) => a.showRate - b.showRate)[0];
+        if (worstShow.showRate < 40) {
+          insights.push({ type: "bad", text: `${worstShow.fonte}: ${worstShow.showRate}% comparecimento — reforçar lembretes e confirmação` });
+        }
       }
-    }
 
-    // Alto volume mas baixa conversão
-    const highVolLowConv = significant.filter(f => f.leads >= 5 && f.convRate < 40);
-    if (highVolLowConv.length > 0) {
-      insights.push({ type: "tip", text: `${highVolLowConv[0].fonte}: ${highVolLowConv[0].leads} leads mas só ${highVolLowConv[0].convRate}% convertem → revisar abordagem de agendamento` });
-    }
+      // Alto volume mas baixa conversão (diagnóstico de funil)
+      const highVolLowConv = significant.filter(f => f.leads >= 5 && f.convRate < 40);
+      if (highVolLowConv.length > 0) {
+        const row = highVolLowConv[0];
+        const gap = Math.round((40 - row.convRate) * row.leads / 100);
+        insights.push({ type: "tip", text: `${row.fonte}: ${row.leads} leads mas só ${row.convRate}% agendamentos — revisar copy/timing (ganho: ~${gap} agend se 40%)` });
+      }
 
-    // Taxa geral
-    const totalLeads = funnelByFonte.reduce((s, f) => s + f.leads, 0);
-    const totalAgend = funnelByFonte.reduce((s, f) => s + f.agendamentos, 0);
-    const totalComp = funnelByFonte.reduce((s, f) => s + f.compareceu, 0);
-    if (totalLeads > 0) {
-      const gConv = Math.round((totalAgend / totalLeads) * 100);
-      const gShow = totalAgend > 0 ? Math.round((totalComp / totalAgend) * 100) : 0;
-      insights.push({
-        type: gConv >= 40 && gShow >= 40 ? "good" : gConv < 30 || gShow < 30 ? "bad" : "tip",
-        text: `Taxa geral: ${gConv}% leads→agendamento | ${gShow}% agendamento→compareceu`
+      // Fontes sem agendamento (aviso)
+      const noAppts = funnelByFonte.filter(f => f.agendamentos === 0 && f.leads >= 1);
+      if (noAppts.length > 0) {
+        insights.push({ type: "bad", text: `${noAppts.map(f => f.fonte).join(", ")}: sem agendamentos — revisar redirecionamento ou valor da oferta` });
+      }
+
+      // Taxa geral do mês
+      const totalLeads = funnelByFonte.reduce((s, f) => s + f.leads, 0);
+      const totalAgend = funnelByFonte.reduce((s, f) => s + f.agendamentos, 0);
+      const totalComp = funnelByFonte.reduce((s, f) => s + f.compareceu, 0);
+      if (totalLeads > 0) {
+        const gConv = Math.round((totalAgend / totalLeads) * 100);
+        const gShow = totalAgend > 0 ? Math.round((totalComp / totalAgend) * 100) : 0;
+        const statusText = gConv >= 40 && gShow >= 50 ? "excelente" : gConv >= 30 && gShow >= 35 ? "dentro do alvo" : "precisa melhorar";
+        insights.push({
+          type: gConv >= 40 && gShow >= 50 ? "good" : gConv < 25 || gShow < 30 ? "bad" : "tip",
+          text: `Funil geral ${statusText}: ${gConv}% leads→agendamento, ${gShow}% agendamento→compareceu`
       });
     }
 
@@ -859,16 +868,25 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
               <thead>
                 <tr className="text-gray-500 border-b border-gray-800 bg-gray-950/50">
                   <th className="text-left px-4 py-2.5 font-medium">Fonte</th>
-                  <th className="text-center px-3 py-2.5 font-medium">Leads</th>
-                  <th className="text-center px-3 py-2.5 font-medium">Agend.</th>
-                  <th className="text-center px-3 py-2.5 font-medium">Comp.</th>
                   <th className="text-center px-3 py-2.5 font-medium">
-                    L→A
-                    <span className="block text-[9px] font-normal text-gray-600">conversão</span>
+                    ✨ Leads
+                    <span className="block text-[9px] font-normal text-gray-600">novos</span>
                   </th>
                   <th className="text-center px-3 py-2.5 font-medium">
-                    A→C
-                    <span className="block text-[9px] font-normal text-gray-600">compareceu</span>
+                    📞 Agend.
+                    <span className="block text-[9px] font-normal text-gray-600">marcados</span>
+                  </th>
+                  <th className="text-center px-3 py-2.5 font-medium">
+                    ✔ Comp.
+                    <span className="block text-[9px] font-normal text-gray-600">vieram</span>
+                  </th>
+                  <th className="text-center px-3 py-2.5 font-medium">
+                    Conversão
+                    <span className="block text-[9px] font-normal text-gray-600">leads→agend</span>
+                  </th>
+                  <th className="text-center px-3 py-2.5 font-medium">
+                    Compareceu
+                    <span className="block text-[9px] font-normal text-gray-600">agend→virou</span>
                   </th>
                 </tr>
               </thead>
@@ -885,9 +903,13 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                       </span>
                     </td>
                     <td className="text-center px-3 py-2.5">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${row.agendamentos === 0 ? "text-gray-600" : row.showRate >= 50 ? "bg-emerald-900 text-emerald-300" : row.showRate >= 30 ? "bg-amber-900 text-amber-300" : "bg-red-900 text-red-300"}`}>
-                        {row.agendamentos > 0 ? `${row.showRate}%` : "—"}
-                      </span>
+                      {row.agendamentos === 0 ? (
+                        <span className="text-gray-600 text-[10px] font-bold">—</span>
+                      ) : (
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${row.showRate >= 60 ? "bg-emerald-900 text-emerald-300" : row.showRate >= 40 ? "bg-amber-900 text-amber-300" : "bg-red-900 text-red-300"}`}>
+                          {row.showRate}%
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -923,15 +945,46 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
             </table>
           </div>
 
-          {/* Insights automáticos */}
+          {/* Ranking de ROI */}
+          {funnelByFonte.length > 1 && (() => {
+            const ranked = [...funnelByFonte].sort((a, b) => {
+              const roiA = a.convRate >= 60 && a.showRate >= 60 ? 3 : a.convRate >= 40 && a.showRate >= 40 ? 2 : 1;
+              const roiB = b.convRate >= 60 && b.showRate >= 60 ? 3 : b.convRate >= 40 && b.showRate >= 40 ? 2 : 1;
+              return roiB - roiA || b.leads - a.leads;
+            }).slice(0, 3);
+            return (
+              <div className="px-4 py-3 border-t border-gray-800 bg-gradient-to-r from-emerald-950/30 to-amber-950/30">
+                <p className="text-xs font-bold text-gray-400 uppercase mb-2.5">🎯 Ranking de eficiência (ROI)</p>
+                <div className="space-y-2">
+                  {ranked.map((row, idx) => (
+                    <div key={row.fonte} className="flex items-center gap-2 text-xs">
+                      <span className="font-bold text-amber-400 w-4">{idx + 1}️⃣</span>
+                      <span className="text-gray-300 flex-1">
+                        <strong>{row.fonte}</strong> — {row.leads} leads
+                      </span>
+                      <span className="text-emerald-400 font-bold">
+                        {row.convRate}% conv
+                      </span>
+                      <span className="text-blue-400 font-bold">
+                        {row.agendamentos > 0 ? `${row.showRate}% comp` : "—"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Insights automáticos com ações */}
           {diagnosticoInsights.length > 0 && (
-            <div className="px-4 py-3 space-y-2 border-t border-gray-800 bg-gray-950/30">
+            <div className="px-4 py-3 space-y-2.5 border-t border-gray-800 bg-gray-950/30">
+              <p className="text-xs font-bold text-gray-400 uppercase">💡 Recomendações</p>
               {diagnosticoInsights.map((insight, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <span className="mt-0.5 shrink-0 text-sm">
+                <div key={i} className="flex items-start gap-2.5 text-xs">
+                  <span className="mt-0.5 shrink-0 text-sm leading-none">
                     {insight.type === "good" ? "✅" : insight.type === "bad" ? "⚠️" : "💡"}
                   </span>
-                  <span className={`text-xs leading-relaxed ${insight.type === "good" ? "text-emerald-400" : insight.type === "bad" ? "text-red-400" : "text-amber-400"}`}>
+                  <span className={`leading-relaxed flex-1 ${insight.type === "good" ? "text-emerald-400" : insight.type === "bad" ? "text-red-400" : "text-amber-400"}`}>
                     {insight.text}
                   </span>
                 </div>
