@@ -311,23 +311,49 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onExportFil
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="flex flex-row flex-wrap gap-2 mt-2">
-                    {lead.comparecimento === "COMPARECEU" && (
-                      <div className="flex items-center gap-1 text-xs text-success font-medium">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Compareceu
-                      </div>
+                    {!isReceptionist && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "COMPARECEU" ? "" : "COMPARECEU")}
+                          variant={lead.comparecimento === "COMPARECEU" ? "default" : "outline"}
+                          className={lead.comparecimento === "COMPARECEU" ? "bg-green-600 text-white" : ""}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Compareceu
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "NÃO COMPARECEU" ? "" : "NÃO COMPARECEU")}
+                          variant={lead.comparecimento === "NÃO COMPARECEU" ? "default" : "outline"}
+                          className={lead.comparecimento === "NÃO COMPARECEU" ? "bg-red-600 text-white" : ""}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Não Veio
+                        </Button>
+                      </>
                     )}
-                    {lead.comparecimento === "NÃO COMPARECEU" && (
-                      <div className="flex items-center gap-1 text-xs text-destructive font-medium">
-                        <XCircle className="h-4 w-4" />
-                        Não compareceu
-                      </div>
-                    )}
-                    {!lead.comparecimento && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        Pendente
-                      </div>
+                    {isReceptionist && (
+                      <>
+                        {lead.comparecimento === "COMPARECEU" && (
+                          <div className="flex items-center gap-1 text-xs text-success font-medium">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Compareceu
+                          </div>
+                        )}
+                        {lead.comparecimento === "NÃO COMPARECEU" && (
+                          <div className="flex items-center gap-1 text-xs text-destructive font-medium">
+                            <XCircle className="h-4 w-4" />
+                            Não compareceu
+                          </div>
+                        )}
+                        {!lead.comparecimento && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            Pendente
+                          </div>
+                        )}
+                      </>
                     )}
                     <Button size="sm" variant="ghost" onClick={() => setSelectedLead(lead)} className="ml-auto">
                       Detalhes
@@ -381,23 +407,49 @@ export function AgendaDoDia({ leads, onMarkAttendance, onExportWeek, onExportFil
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="flex flex-row flex-wrap gap-2 mt-2">
-                      {lead.comparecimento === "COMPARECEU" && (
-                        <div className="flex items-center gap-1 text-xs text-success font-medium">
-                          <CheckCircle2 className="h-4 w-4" />
-                          Compareceu
-                        </div>
+                      {!isReceptionist && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "COMPARECEU" ? "" : "COMPARECEU")}
+                            variant={lead.comparecimento === "COMPARECEU" ? "default" : "outline"}
+                            className={lead.comparecimento === "COMPARECEU" ? "bg-green-600 text-white" : ""}
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                            Compareceu
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => onMarkAttendance(lead.id, lead.comparecimento === "NÃO COMPARECEU" ? "" : "NÃO COMPARECEU")}
+                            variant={lead.comparecimento === "NÃO COMPARECEU" ? "default" : "outline"}
+                            className={lead.comparecimento === "NÃO COMPARECEU" ? "bg-red-600 text-white" : ""}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Não Veio
+                          </Button>
+                        </>
                       )}
-                      {lead.comparecimento === "NÃO COMPARECEU" && (
-                        <div className="flex items-center gap-1 text-xs text-destructive font-medium">
-                          <XCircle className="h-4 w-4" />
-                          Não compareceu
-                        </div>
-                      )}
-                      {!lead.comparecimento && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          Pendente
-                        </div>
+                      {isReceptionist && (
+                        <>
+                          {lead.comparecimento === "COMPARECEU" && (
+                            <div className="flex items-center gap-1 text-xs text-success font-medium">
+                              <CheckCircle2 className="h-4 w-4" />
+                              Compareceu
+                            </div>
+                          )}
+                          {lead.comparecimento === "NÃO COMPARECEU" && (
+                            <div className="flex items-center gap-1 text-xs text-destructive font-medium">
+                              <XCircle className="h-4 w-4" />
+                              Não compareceu
+                            </div>
+                          )}
+                          {!lead.comparecimento && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              Pendente
+                            </div>
+                          )}
+                        </>
                       )}
                       <Button size="sm" variant="ghost" onClick={() => setSelectedLead(lead)} className="ml-auto">
                         Detalhes
