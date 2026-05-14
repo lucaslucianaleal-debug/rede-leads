@@ -112,9 +112,10 @@ function dailyCountsForMonth(leads: Lead[], metric: MetricKey, mmYYYY: string): 
   });
 }
 
-// Breakdown de leads novos por fonte (fonteLead)
-function getSourceBreakdown(
+// ─── Helper: Fonte breakdown para qualquer métrica ────────────────────────
+function getSourceBreakdownForMetric(
   leads: Lead[],
+  metric: MetricKey,
   mmYYYY: string,
   upToDay?: number
 ): { [key: string]: number } {
@@ -123,8 +124,10 @@ function getSourceBreakdown(
 
   leads
     .filter((lead) => {
-      const dataCriacao = lead.dataCriacao || "";
-      const parts = dataCriacao.split("/");
+      const dateField = getDateField(lead, metric);
+      if (!dateField) return false;
+      if (!matchesMetric(lead, metric)) return false;
+      const parts = dateField.split("/");
       if (parts.length < 3) return false;
       const d = parseInt(parts[0], 10);
       const m = parts[1];
@@ -138,8 +141,74 @@ function getSourceBreakdown(
       breakdown[fonte] = (breakdown[fonte] || 0) + 1;
     });
 
-  console.debug(`[getSourceBreakdown] ${mmYYYY} até dia ${upToDay}: `, breakdown);
   return breakdown;
+}
+
+// ─── Helper: Status dos agendados (compareceu / aguardando / não veio) ─────
+function getAgendamentoStatusBreakdown(
+  leads: Lead[],
+  mmYYYY: string,
+  upToDay?: number
+): { compareceu: number; nao_compareceu: number; aguardando: number; total: number } {
+  const [mm, yyyy] = mmYYYY.split("/");
+  const agendados = leads.filter((lead) => {
+    const dc = lead.dataAgendamentoCriado || "";
+    const parts = dc.split("/");
+    if (parts.length < 3) return false;
+    const d = parseInt(parts[0], 10);
+    const m = parts[1];
+    const y = parts[2].slice(0, 4);
+    if (m !== mm || y !== yyyy) return false;
+    if (upToDay !== undefined && d > upToDay) return false;
+    return true;
+  });
+  return {
+    compareceu: agendados.filter(l => l.comparecimento === "COMPARECEU").length,
+    nao_compareceu: agendados.filter(l => l.comparecimento === "NÃO COMPARECEU").length,
+    aguardando: agendados.filter(l => !l.comparecimento || l.comparecimento === "AGUARDANDO DATA").length,
+    total: agendados.length,
+  };
+}
+
+// ─── Helper: Funil de conversão por fonte ─────────────────────────────────
+function getConversionFunnelByFonte(
+  leads: Lead[],
+  mmYYYY: string,
+  upToDay?: number
+): Array<{ fonte: string; leads: number; agendamentos: number; compareceu: number; convRate: number; showRate: number }> {
+  const [mm, yyyy] = mmYYYY.split("/");
+  const createdInMonth = leads.filter((lead) => {
+    const dc = lead.dataCriacao || "";
+    const parts = dc.split("/");
+    if (parts.length < 3) return false;
+    const d = parseInt(parts[0], 10);
+    const m = parts[1];
+    const y = parts[2].slice(0, 4);
+    if (m !== mm || y !== yyyy) return false;
+    if (upToDay !== undefined && d > upToDay) return false;
+    return true;
+  });
+
+  const fonteMap = new Map<string, { leads: number; agendamentos: number; compareceu: number }>();
+  for (const lead of createdInMonth) {
+    const fonte = lead.fonteLead || "Outro";
+    if (!fonteMap.has(fonte)) fonteMap.set(fonte, { leads: 0, agendamentos: 0, compareceu: 0 });
+    const entry = fonteMap.get(fonte)!;
+    entry.leads++;
+    if (lead.dataAgendamentoCriado) entry.agendamentos++;
+    if (lead.comparecimento === "COMPARECEU") entry.compareceu++;
+  }
+
+  return Array.from(fonteMap.entries())
+    .map(([fonte, v]) => ({
+      fonte,
+      leads: v.leads,
+      agendamentos: v.agendamentos,
+      compareceu: v.compareceu,
+      convRate: v.leads > 0 ? Math.round((v.agendamentos / v.leads) * 100) : 0,
+      showRate: v.agendamentos > 0 ? Math.round((v.compareceu / v.agendamentos) * 100) : 0,
+    }))
+    .sort((a, b) => b.leads - a.leads);
 }
 
 // Calcular tendência (queda/crescimento %) entre 3 meses
@@ -286,6 +355,60 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
 
   // Mês atual em relação à posição no mês
   const currentMonthAnalytics = analytics.find((a) => a.isCurrentMonth);
+
+  // Funil de conversão por fonte (mês atual ou 1º mês selecionado)
+  const funnelMonth = selectedMonths.includes(currentMonthStr) ? currentMonthStr : selectedMonths[0];
+  const funnelMonthLabel = getMonthLabel(funnelMonth);
+  const funnelByFonte = useMemo(() => {
+    return getConversionFunnelByFonte(leads, funnelMonth, todayDay);
+  }, [leads, funnelMonth, todayDay]);
+
+  // Insights automáticos de diagnóstico
+  const diagnosticoInsights = useMemo(() => {
+    const insights: { type: "good" | "bad" | "tip"; text: string }[] = [];
+    const significant = funnelByFonte.filter(f => f.leads >= 2);
+    if (significant.length === 0) return insights;
+
+    // Melhor taxa de conversão L→A
+    const bestConv = [...significant].sort((a, b) => b.convRate - a.convRate)[0];
+    if (bestConv.convRate >= 75) {
+      insights.push({ type: "good", text: `${bestConv.fonte}: ${bestConv.convRate}% de conversão leads→agendamento — melhor canal` });
+    }
+
+    // Pior taxa de comparecimento
+    const withAppts = significant.filter(f => f.agendamentos >= 2);
+    if (withAppts.length > 0) {
+      const worstShow = [...withAppts].sort((a, b) => a.showRate - b.showRate)[0];
+      if (worstShow.showRate < 40) {
+        insights.push({ type: "bad", text: `${worstShow.fonte}: apenas ${worstShow.showRate}% de comparecimento — reforçar confirmações e lembretes` });
+      }
+      const bestShow = [...withAppts].sort((a, b) => b.showRate - a.showRate)[0];
+      if (bestShow.showRate >= 60 && bestShow.fonte !== worstShow.fonte) {
+        insights.push({ type: "good", text: `${bestShow.fonte}: ${bestShow.showRate}% de comparecimento — leads de maior qualidade` });
+      }
+    }
+
+    // Alto volume mas baixa conversão
+    const highVolLowConv = significant.filter(f => f.leads >= 5 && f.convRate < 40);
+    if (highVolLowConv.length > 0) {
+      insights.push({ type: "tip", text: `${highVolLowConv[0].fonte}: ${highVolLowConv[0].leads} leads mas só ${highVolLowConv[0].convRate}% convertem → revisar abordagem de agendamento` });
+    }
+
+    // Taxa geral
+    const totalLeads = funnelByFonte.reduce((s, f) => s + f.leads, 0);
+    const totalAgend = funnelByFonte.reduce((s, f) => s + f.agendamentos, 0);
+    const totalComp = funnelByFonte.reduce((s, f) => s + f.compareceu, 0);
+    if (totalLeads > 0) {
+      const gConv = Math.round((totalAgend / totalLeads) * 100);
+      const gShow = totalAgend > 0 ? Math.round((totalComp / totalAgend) * 100) : 0;
+      insights.push({
+        type: gConv >= 40 && gShow >= 40 ? "good" : gConv < 30 || gShow < 30 ? "bad" : "tip",
+        text: `Taxa geral: ${gConv}% leads→agendamento | ${gShow}% agendamento→compareceu`
+      });
+    }
+
+    return insights;
+  }, [funnelByFonte]);
 
   return (
     <div className="bg-[#1C1C1E] rounded-xl border border-gray-800 p-6 mt-6">
@@ -470,15 +593,16 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                 </div>
               ) : null}
 
-              {/* Breakdown por fonte (apenas leads_novos) - DESTAQUE */}
-              {metric === "leads_novos" && (
+              {/* Breakdown por fonte - para todas as métricas exceto nao_compareceu */}
+              {metric !== "nao_compareceu" && (
                 <div className="mt-3 pt-2.5 pb-2.5">
                   <p className="text-xs text-gray-400 mb-2 font-bold uppercase tracking-widest opacity-75">📊 Fonte:</p>
                   {(() => {
-                    const breakdown = getSourceBreakdown(leads, a.month, todayDay);
+                    const breakdown = getSourceBreakdownForMetric(leads, metric, a.month, todayDay);
                     const sorted = Object.entries(breakdown)
                       .sort((a, b) => b[1] - a[1])
-                      .slice(0, 3);
+                      .slice(0, 4);
+                    if (sorted.length === 0) return <p className="text-xs text-gray-600 px-1">Sem dados</p>;
                     return (
                       <div className="space-y-1.5">
                         {sorted.map(([fonte, count]) => (
@@ -487,6 +611,34 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                             <span className="text-base font-bold text-teal-400">{count}</span>
                           </div>
                         ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Status dos agendados (apenas métrica agendamentos) */}
+              {metric === "agendamentos" && (
+                <div className="mt-2 pt-2.5 border-t border-gray-800">
+                  {(() => {
+                    const st = getAgendamentoStatusBreakdown(leads, a.month, todayDay);
+                    if (st.total === 0) return null;
+                    const compPct = Math.round((st.compareceu / st.total) * 100);
+                    const naoPct = Math.round((st.nao_compareceu / st.total) * 100);
+                    const agPct = 100 - compPct - naoPct;
+                    return (
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Status dos agendados:</p>
+                        <div className="flex h-2 rounded-full overflow-hidden mb-2 gap-px bg-gray-800">
+                          {st.compareceu > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${compPct}%` }} title={`Compareceu: ${st.compareceu}`} />}
+                          {st.aguardando > 0 && <div className="bg-amber-500 transition-all" style={{ width: `${agPct}%` }} title={`Aguardando: ${st.aguardando}`} />}
+                          {st.nao_compareceu > 0 && <div className="bg-red-500 transition-all" style={{ width: `${naoPct}%` }} title={`Não veio: ${st.nao_compareceu}`} />}
+                        </div>
+                        <div className="flex gap-3 text-xs flex-wrap">
+                          <span className="text-emerald-400">✔ <strong>{st.compareceu}</strong> compareceu</span>
+                          <span className="text-amber-400">⏳ <strong>{st.aguardando}</strong> aguardando</span>
+                          <span className="text-red-400">✘ <strong>{st.nao_compareceu}</strong> não veio</span>
+                        </div>
                       </div>
                     );
                   })()}
@@ -653,7 +805,7 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
 
       {/* Linha de insights globais (3+ meses) */}
       {avgAcrossMonths !== null && currentMonthAnalytics && (
-        <div className="mt-4 flex items-center gap-2 bg-gray-900 rounded-lg px-4 py-2.5 border border-gray-800">
+        <div className="mt-4 flex items-center gap-2 bg-gray-900 rounded-lg px-4 py-2.5 border border-gray-800 flex-wrap">
           <BarChart2 className="w-4 h-4 text-gray-400 shrink-0" />
           <span className="text-xs text-gray-400">
             Média dos {selectedMonths.length} meses selecionados:{" "}
@@ -663,27 +815,18 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
           <span className="text-xs">
             {metric === "nao_compareceu"
               ? currentMonthAnalytics.totalUpToToday <= avgAcrossMonths
-                ? <span className="text-emerald-400 font-medium">
-                    ↓ Mês atual abaixo da média (melhor) ({currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
-                  </span>
-                : <span className="text-red-400 font-medium">
-                    ↑ Mês atual acima da média (pior) (+{currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
-                  </span>
+                ? <span className="text-emerald-400 font-medium">↓ Mês atual abaixo da média (melhor) ({currentMonthAnalytics.totalUpToToday - avgAcrossMonths})</span>
+                : <span className="text-red-400 font-medium">↑ Mês atual acima da média (pior) (+{currentMonthAnalytics.totalUpToToday - avgAcrossMonths})</span>
               : currentMonthAnalytics.totalUpToToday >= avgAcrossMonths
-              ? <span className="text-emerald-400 font-medium">
-                  ↑ Mês atual acima da média (+{currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
-                </span>
-              : <span className="text-red-400 font-medium">
-                  ↓ Mês atual abaixo da média ({currentMonthAnalytics.totalUpToToday - avgAcrossMonths})
-                </span>
+              ? <span className="text-emerald-400 font-medium">↑ Mês atual acima da média (+{currentMonthAnalytics.totalUpToToday - avgAcrossMonths})</span>
+              : <span className="text-red-400 font-medium">↓ Mês atual abaixo da média ({currentMonthAnalytics.totalUpToToday - avgAcrossMonths})</span>
             }
           </span>
           {currentMonthAnalytics.projection !== null && (
             <>
               <span className="mx-1 text-gray-700">·</span>
               <span className="text-xs text-amber-400">
-                Projeção de fechamento:{" "}
-                <strong>~{currentMonthAnalytics.projection}</strong>
+                Projeção de fechamento: <strong>~{currentMonthAnalytics.projection}</strong>
                 {metric === "nao_compareceu"
                   ? currentMonthAnalytics.projection <= avgAcrossMonths
                     ? <span className="text-emerald-400 ml-1">(abaixo da média - melhor)</span>
@@ -694,6 +837,106 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                 }
               </span>
             </>
+          )}
+        </div>
+      )}
+
+      {/* ═══ Diagnóstico: Funil de Conversão por Fonte ═══ */}
+      {funnelByFonte.length > 0 && (
+        <div className="mt-5 bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2 flex-wrap">
+            <Lightbulb className="w-4 h-4 text-amber-400 shrink-0" />
+            <h4 className="text-sm font-semibold text-white">Diagnóstico — Funil por Fonte</h4>
+            <span className="text-xs text-gray-500">
+              {funnelMonthLabel} · até dia {todayDay}
+            </span>
+          </div>
+
+          {/* Tabela do funil */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-500 border-b border-gray-800 bg-gray-950/50">
+                  <th className="text-left px-4 py-2.5 font-medium">Fonte</th>
+                  <th className="text-center px-3 py-2.5 font-medium">Leads</th>
+                  <th className="text-center px-3 py-2.5 font-medium">Agend.</th>
+                  <th className="text-center px-3 py-2.5 font-medium">Comp.</th>
+                  <th className="text-center px-3 py-2.5 font-medium">
+                    L→A
+                    <span className="block text-[9px] font-normal text-gray-600">conversão</span>
+                  </th>
+                  <th className="text-center px-3 py-2.5 font-medium">
+                    A→C
+                    <span className="block text-[9px] font-normal text-gray-600">compareceu</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {funnelByFonte.map((row) => (
+                  <tr key={row.fonte} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+                    <td className="px-4 py-2.5 text-gray-300 font-medium">{row.fonte}</td>
+                    <td className="text-center px-3 py-2.5 text-white font-bold">{row.leads}</td>
+                    <td className="text-center px-3 py-2.5 text-blue-400 font-bold">{row.agendamentos}</td>
+                    <td className="text-center px-3 py-2.5 text-emerald-400 font-bold">{row.compareceu}</td>
+                    <td className="text-center px-3 py-2.5">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${row.convRate >= 60 ? "bg-emerald-900 text-emerald-300" : row.convRate >= 35 ? "bg-amber-900 text-amber-300" : "bg-red-900 text-red-300"}`}>
+                        {row.convRate}%
+                      </span>
+                    </td>
+                    <td className="text-center px-3 py-2.5">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${row.agendamentos === 0 ? "text-gray-600" : row.showRate >= 50 ? "bg-emerald-900 text-emerald-300" : row.showRate >= 30 ? "bg-amber-900 text-amber-300" : "bg-red-900 text-red-300"}`}>
+                        {row.agendamentos > 0 ? `${row.showRate}%` : "—"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {/* Totais */}
+              {funnelByFonte.length > 1 && (() => {
+                const tL = funnelByFonte.reduce((s, f) => s + f.leads, 0);
+                const tA = funnelByFonte.reduce((s, f) => s + f.agendamentos, 0);
+                const tC = funnelByFonte.reduce((s, f) => s + f.compareceu, 0);
+                const tConv = tL > 0 ? Math.round((tA / tL) * 100) : 0;
+                const tShow = tA > 0 ? Math.round((tC / tA) * 100) : 0;
+                return (
+                  <tfoot>
+                    <tr className="bg-gray-800/50 text-gray-300 font-semibold">
+                      <td className="px-4 py-2 text-gray-400 text-xs uppercase">Total</td>
+                      <td className="text-center px-3 py-2 text-white">{tL}</td>
+                      <td className="text-center px-3 py-2 text-blue-400">{tA}</td>
+                      <td className="text-center px-3 py-2 text-emerald-400">{tC}</td>
+                      <td className="text-center px-3 py-2">
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${tConv >= 60 ? "bg-emerald-900 text-emerald-300" : tConv >= 35 ? "bg-amber-900 text-amber-300" : "bg-red-900 text-red-300"}`}>
+                          {tConv}%
+                        </span>
+                      </td>
+                      <td className="text-center px-3 py-2">
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${tShow >= 50 ? "bg-emerald-900 text-emerald-300" : tShow >= 30 ? "bg-amber-900 text-amber-300" : "bg-red-900 text-red-300"}`}>
+                          {tShow}%
+                        </span>
+                      </td>
+                    </tr>
+                  </tfoot>
+                );
+              })()}
+            </table>
+          </div>
+
+          {/* Insights automáticos */}
+          {diagnosticoInsights.length > 0 && (
+            <div className="px-4 py-3 space-y-2 border-t border-gray-800 bg-gray-950/30">
+              {diagnosticoInsights.map((insight, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="mt-0.5 shrink-0 text-sm">
+                    {insight.type === "good" ? "✅" : insight.type === "bad" ? "⚠️" : "💡"}
+                  </span>
+                  <span className={`text-xs leading-relaxed ${insight.type === "good" ? "text-emerald-400" : insight.type === "bad" ? "text-red-400" : "text-amber-400"}`}>
+                    {insight.text}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
