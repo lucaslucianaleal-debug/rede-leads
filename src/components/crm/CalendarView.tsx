@@ -167,14 +167,15 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   };
 
   return (
-    <div className="glass-card rounded-xl p-5">
+    <div className="glass-card rounded-xl p-5 flex flex-col h-full">
       {/* Título — idêntico ao FollowUpQueue */}
-      <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2">
+      <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2 shrink-0">
         <Bell className="h-5 w-5 text-primary" />
         Lembretes de Agendamento
         <span className="ml-auto text-sm font-body text-muted-foreground">{relevantLeads.length} agendamentos</span>
       </h3>
 
+      <div className="flex-1 overflow-y-auto space-y-0 min-h-0">
       {/* HOJE */}
       {todayLeads.length > 0 && (
         <div className="mb-5">
@@ -198,6 +199,7 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
           </div>
         </div>
       )}
+      </div>
 
       {whatsLead && showWhatsDialog && (
         <WhatsAppMessageDialog
