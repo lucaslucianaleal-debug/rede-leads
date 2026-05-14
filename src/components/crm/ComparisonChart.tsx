@@ -171,32 +171,39 @@ function getAgendamentoStatusBreakdown(
 }
 
 // ─── Helper: Funil de conversão por fonte ─────────────────────────────────
+// Usa os mesmos campos de data que os cards para garantir consistência de números.
+// leads      → dataCriacao no período
+// agendamentos → dataAgendamentoCriado no período
+// compareceu → dataAgendamento no período + comparecimento === "COMPARECEU"
 function getConversionFunnelByFonte(
   leads: Lead[],
-  mmYYYY: string,
-  upToDay?: number
+  periods: Array<{ mmYYYY: string; upToDay?: number }>
 ): Array<{ fonte: string; leads: number; agendamentos: number; compareceu: number; convRate: number; showRate: number }> {
-  const [mm, yyyy] = mmYYYY.split("/");
-  const createdInMonth = leads.filter((lead) => {
-    const dc = lead.dataCriacao || "";
-    const parts = dc.split("/");
+  function inPeriod(dateStr: string | undefined, mm: string, yyyy: string, upToDay?: number): boolean {
+    if (!dateStr) return false;
+    const parts = dateStr.split("/");
     if (parts.length < 3) return false;
     const d = parseInt(parts[0], 10);
-    const m = parts[1];
-    const y = parts[2].slice(0, 4);
-    if (m !== mm || y !== yyyy) return false;
+    if (parts[1] !== mm || parts[2].slice(0, 4) !== yyyy) return false;
     if (upToDay !== undefined && d > upToDay) return false;
     return true;
-  });
+  }
 
   const fonteMap = new Map<string, { leads: number; agendamentos: number; compareceu: number }>();
-  for (const lead of createdInMonth) {
-    const fonte = lead.fonteLead || "Outro";
+
+  function inc(fonte: string, field: "leads" | "agendamentos" | "compareceu") {
     if (!fonteMap.has(fonte)) fonteMap.set(fonte, { leads: 0, agendamentos: 0, compareceu: 0 });
-    const entry = fonteMap.get(fonte)!;
-    entry.leads++;
-    if (lead.dataAgendamentoCriado) entry.agendamentos++;
-    if (lead.comparecimento === "COMPARECEU") entry.compareceu++;
+    fonteMap.get(fonte)![field]++;
+  }
+
+  for (const lead of leads) {
+    const fonte = lead.fonteLead || "Outro";
+    for (const { mmYYYY, upToDay } of periods) {
+      const [mm, yyyy] = mmYYYY.split("/");
+      if (inPeriod(lead.dataCriacao, mm, yyyy, upToDay))           inc(fonte, "leads");
+      if (inPeriod(lead.dataAgendamentoCriado, mm, yyyy, upToDay)) inc(fonte, "agendamentos");
+      if (lead.comparecimento === "COMPARECEU" && inPeriod(lead.dataAgendamento, mm, yyyy, upToDay)) inc(fonte, "compareceu");
+    }
   }
 
   return Array.from(fonteMap.entries())
@@ -356,12 +363,25 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
   // Mês atual em relação à posição no mês
   const currentMonthAnalytics = analytics.find((a) => a.isCurrentMonth);
 
-  // Funil de conversão por fonte (mês atual ou 1º mês selecionado)
-  const funnelMonth = selectedMonths.includes(currentMonthStr) ? currentMonthStr : selectedMonths[0];
-  const funnelMonthLabel = getMonthLabel(funnelMonth);
+  // Funil de conversão por fonte — agrega TODOS os meses selecionados
+  const funnelPeriods = useMemo(() =>
+    selectedMonths.map((mmYYYY) => ({
+      mmYYYY,
+      upToDay: mmYYYY === currentMonthStr ? todayDay : undefined,
+    })),
+  [selectedMonths, currentMonthStr, todayDay]);
+
+  const funnelLabel = useMemo(() => {
+    if (selectedMonths.length === 1) {
+      return `${getMonthLabel(selectedMonths[0])} · até dia ${todayDay}`;
+    }
+    const sorted = [...selectedMonths].reverse();
+    return `${getMonthLabel(sorted[0])} → ${getMonthLabel(sorted[sorted.length - 1])} · acumulado`;
+  }, [selectedMonths, todayDay]);
+
   const funnelByFonte = useMemo(() => {
-    return getConversionFunnelByFonte(leads, funnelMonth, todayDay);
-  }, [leads, funnelMonth, todayDay]);
+    return getConversionFunnelByFonte(leads, funnelPeriods);
+  }, [leads, funnelPeriods]);
 
 // Insights automáticos de diagnóstico com ações concretas
     const diagnosticoInsights = useMemo(() => {
@@ -858,7 +878,7 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
             <Lightbulb className="w-4 h-4 text-amber-400 shrink-0" />
             <h4 className="text-sm font-semibold text-white">Diagnóstico — Funil por Fonte</h4>
             <span className="text-xs text-gray-500">
-              {funnelMonthLabel} · até dia {todayDay}
+              {funnelLabel}
             </span>
           </div>
 
