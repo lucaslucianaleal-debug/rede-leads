@@ -483,7 +483,7 @@ const CRMDashboard = () => {
               <StatsCards stats={stats} />
             </motion.div>
 
-            <div className="grid lg:grid-cols-2 gap-4 items-stretch">
+            <div className="grid lg:grid-cols-2 gap-4 items-start">
               <div className="space-y-4">
                 <FollowUpQueue 
                   leads={followUpQueue}
@@ -503,7 +503,7 @@ const CRMDashboard = () => {
                   />
                 )}
               </div>
-              <div className="h-full"><CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} /></div>
+              <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} />
             </div>
 
             {/* Gráfico de performance */}
