@@ -646,34 +646,36 @@ export default function Promotora() {
             </div>
           ) : percursoSalvo ? (
             /* ── RESUMO PÓS-GRAVAÇÃO ── */
-            <div className="bg-white rounded-2xl shadow-2xl p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-green-100 p-2.5 rounded-xl">
-                  <Activity className="h-5 w-5 text-green-700" />
+            <>
+              <div className="bg-white rounded-2xl shadow-2xl p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-100 p-2.5 rounded-xl">
+                    <Activity className="h-5 w-5 text-green-700" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Percurso salvo!</p>
+                    <p className="font-bold text-gray-800">{percursoSalvo.horaInicio} → {percursoSalvo.horaFim}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Percurso salvo!</p>
-                  <p className="font-bold text-gray-800">{percursoSalvo.horaInicio} → {percursoSalvo.horaFim}</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-around bg-gray-50 rounded-xl py-3">
-                <div className="text-center">
-                  <div className="text-xl font-bold text-gray-800">{(percursoSalvo.distanciaM / 1000).toFixed(2)} km</div>
-                  <div className="text-xs text-gray-400">distância</div>
-                </div>
-                <div className="w-px h-8 bg-gray-200" />
-                <div className="text-center">
-                  <div className="text-xl font-bold text-gray-800">{percursoSalvo.pontos}</div>
-                  <div className="text-xs text-gray-400">pontos GPS</div>
+                <div className="flex items-center justify-around bg-gray-50 rounded-xl py-3">
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-gray-800">{(percursoSalvo.distanciaM / 1000).toFixed(2)} km</div>
+                    <div className="text-xs text-gray-400">distância</div>
+                  </div>
+                  <div className="w-px h-8 bg-gray-200" />
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-gray-800">{percursoSalvo.pontos}</div>
+                    <div className="text-xs text-gray-400">pontos GPS</div>
+                  </div>
                 </div>
               </div>
               <button
                 onClick={handleIniciarPercurso}
-                className="w-full bg-pink-700 hover:bg-pink-800 text-white font-semibold rounded-xl py-3 transition-colors flex items-center justify-center gap-2 text-sm"
+                className="w-full bg-pink-700 hover:bg-pink-800 text-white font-semibold rounded-xl py-3 transition-colors flex items-center justify-center gap-2 text-sm mt-3"
               >
                 <Activity className="h-4 w-4" /> Novo Percurso
               </button>
-            </div>
+            </>
           ) : rotaDoDia ? (
             /* ── ROTA PLANEJADA + BOTÃO GRAVAR ── */
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">

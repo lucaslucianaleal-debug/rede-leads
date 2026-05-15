@@ -115,6 +115,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
 
   // Encerrar sessão
   const [encerrando, setEncerrando] = useState<string | null>(null);
+  const [deletandoSessao, setDeletandoSessao] = useState<string | null>(null);
 
   // Rota modal
   const [rotaModal, setRotaModal] = useState<{ clinicId: string; sessaoId: string; abordadora: string } | null>(null);
@@ -390,6 +391,18 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
       toast.error("Erro ao encerrar sessão.");
     } finally {
       setEncerrando(null);
+    }
+  };
+
+  const handleDeleteSessao = async (sessaoId: string) => {
+    setDeletandoSessao(sessaoId);
+    try {
+      await deleteDoc(doc(db, "clinics", clinicaId, "sessoes", sessaoId));
+      toast.success("Sessão deletada com sucesso!");
+    } catch {
+      toast.error("Erro ao deletar sessão.");
+    } finally {
+      setDeletandoSessao(null);
     }
   };
 
@@ -710,6 +723,15 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                                 className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium border border-red-200 rounded-full px-2 py-0.5 hover:bg-red-50 transition-colors disabled:opacity-50"
                               >
                                 <X className="h-3 w-3" /> {encerrando === s.id ? "..." : "Encerrar"}
+                              </button>
+                            )}
+                            {!ativa && (
+                              <button
+                                onClick={() => handleDeleteSessao(s.id)}
+                                disabled={deletandoSessao === s.id}
+                                className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-700 font-medium border border-gray-200 rounded-full px-2 py-0.5 hover:bg-red-50 transition-colors disabled:opacity-50"
+                              >
+                                <Trash2 className="h-3 w-3" /> {deletandoSessao === s.id ? "..." : "Deletar"}
                               </button>
                             )}
                           </div>

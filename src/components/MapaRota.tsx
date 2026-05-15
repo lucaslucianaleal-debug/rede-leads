@@ -283,22 +283,7 @@ export function MapaRota({
         </div>
       )}
 
-      {/* Waiting overlay */}
-      {!hasContent && !error && !onMapClick && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[999]">
-          <div className="bg-white/90 backdrop-blur text-gray-600 text-sm rounded-xl px-4 py-3 shadow text-center space-y-1">
-            <div className="text-2xl">📍</div>
-            <div>
-              {abordadora
-                ? `Aguardando localização de ${abordadora}…`
-                : "Aguardando sinal de GPS…"}
-            </div>
-            <div className="text-xs text-gray-400">
-              Mantenha a aba aberta com a tela ligada
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Waiting overlay — removed to reduce UI clutter */}
 
       {/* Stats badge */}
       {hasContent && (
