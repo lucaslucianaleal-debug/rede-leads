@@ -53,10 +53,10 @@ export function StatsCards({ stats }: StatsCardsProps) {
             <div className={`inline-flex p-2 rounded-lg mb-2 ${colorMap[card.color]}`}>
               <Icon className="h-4 w-4" />
             </div>
-            <div className="flex items-baseline gap-2">
-              <p className="text-2xl font-heading font-bold text-foreground">{stats[card.key]}</p>
+            <div className="flex items-baseline gap-1 flex-wrap">
+              <p className="text-xl sm:text-2xl font-heading font-bold text-foreground">{stats[card.key]}</p>
               {percentage && (
-                <span className="text-sm font-semibold text-muted-foreground">({percentage})</span>
+                <span className="text-xs font-semibold text-muted-foreground">({percentage})</span>
               )}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">{card.label}</p>
