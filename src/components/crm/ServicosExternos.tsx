@@ -43,10 +43,9 @@ import { formatPhoneNumber } from "@/lib/phone";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { MapaRota } from "@/components/MapaRota";
 import { db } from "@/lib/firebase";
-import { doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, deleteDoc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { RotasTab } from "@/components/crm/RotasTab";
 import { MapaGeralRotas } from "@/components/crm/MapaGeralRotas";
-import { PercursosTab } from "@/components/crm/PercursosTab";
 import type { GeoPoint } from "@/hooks/useGeoTracking";
 
 const STATUS_LABELS: Record<Cupom["status"], { label: string; color: string }> = {
@@ -61,7 +60,16 @@ interface ServicosExternosProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
-type MainTab = "cupom" | "visita" | "promotora" | "sessoes" | "rotas" | "mapa-geral" | "percursos";
+interface SessaoPercurso {
+  id: string;
+  horaInicio: string;
+  horaFim: string;
+  distanciaM: number;
+  pontos: { lat: number; lng: number; ts: number }[];
+  criadoEm: number;
+}
+
+type MainTab = "cupom" | "visita" | "promotora" | "sessoes" | "rotas" | "mapa-geral";
 
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
@@ -73,7 +81,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { cupons, loading, updateStatus } = useCupons(clinicaId);
 
   const [mainTab, setMainTab] = useState<MainTab>("cupom");
-  const servicoTab = (mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && mainTab !== "percursos") ? mainTab : "cupom";
+  const servicoTab = (mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral") ? mainTab : "cupom";
 
   // State for sessões tab
   const todayInput = format(new Date(), "yyyy-MM-dd");
@@ -113,21 +121,38 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const [rotaDrawMode, setRotaDrawMode] = useState(false);
   const [draftWaypoints, setDraftWaypoints] = useState<GeoPoint[]>([]);
   const [savingRota, setSavingRota] = useState(false);
+  const [sessaoPercursos, setSessaoPercursos] = useState<SessaoPercurso[]>([]);
+  const [sessaoPercursosLoading, setSessaoPercursosLoading] = useState(false);
+  const [rotaModalInnerTab, setRotaModalInnerTab] = useState<"rota" | "percursos">("rota");
+  const [selectedPercursoMap, setSelectedPercursoMap] = useState<SessaoPercurso | null>(null);
 
-  // Load existing rotaDefinida when modal opens
+  // Load existing rotaDefinida + percursos when modal opens
   useEffect(() => {
     if (!rotaModal) {
       setRotaDrawMode(false);
       setDraftWaypoints([]);
+      setSessaoPercursos([]);
+      setRotaModalInnerTab("rota");
+      setSelectedPercursoMap(null);
       return;
     }
     getDoc(doc(db, "clinics", rotaModal.clinicId, "sessoes", rotaModal.sessaoId))
       .then((snap) => {
-        if (snap.exists()) {
-          setDraftWaypoints((snap.data()?.rotaDefinida as GeoPoint[]) ?? []);
-        }
+        if (snap.exists()) setDraftWaypoints((snap.data()?.rotaDefinida as GeoPoint[]) ?? []);
       })
       .catch(() => {});
+    setSessaoPercursosLoading(true);
+    getDocs(query(
+      collection(db, "clinics", rotaModal.clinicId, "percursos"),
+      where("sessaoId", "==", rotaModal.sessaoId)
+    ))
+      .then((snap) => {
+        const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as SessaoPercurso));
+        data.sort((a, b) => (a.criadoEm ?? 0) - (b.criadoEm ?? 0));
+        setSessaoPercursos(data);
+        setSessaoPercursosLoading(false);
+      })
+      .catch(() => setSessaoPercursosLoading(false));
   }, [rotaModal]);
 
   async function handleSaveRota() {
@@ -476,7 +501,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           </div>
         </div>
         <div className="flex gap-2 sm:ml-auto flex-wrap">
-          {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && mainTab !== "percursos" && (
+          {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && (
             <>
               <Badge variant="outline" className="bg-yellow-50 border-yellow-300 text-yellow-800">
                 {pendingCount} pendente{pendingCount !== 1 ? "s" : ""}
@@ -566,18 +591,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           <Map className="h-4 w-4" />
           Mapa Geral
         </button>
-        <button
-          onClick={() => { setMainTab("percursos"); setSelected(null); }}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            mainTab === "percursos"
-              ? "border-pink-600 text-pink-700"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Activity className="h-4 w-4" />
-          Percursos
-        </button>
-        {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && mainTab !== "percursos" && (
+        {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && (
           <div className={`ml-auto flex items-center gap-2 mb-1 px-3 py-1.5 rounded-lg text-xs border self-center ${
             servicoTab === "cupom"
               ? "bg-blue-50 border-blue-200 text-blue-700"
@@ -720,13 +734,8 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         <MapaGeralRotas clinicId={clinicaId} />
       )}
 
-      {/* ===== ABA PERCURSOS ===== */}
-      {mainTab === "percursos" && (
-        <PercursosTab clinicId={clinicaId} />
-      )}
-
       {/* ===== ABAS CUPOM / VISITA ===== */}
-      {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && mainTab !== "percursos" && <>
+      {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && <>
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">
         {mainTab === "promotora" && (
@@ -1200,97 +1209,187 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         </DialogContent>
       </Dialog>
 
-      {/* ===== MODAL ROTA PROMOTORA ===== */}
-      <Dialog open={!!rotaModal} onOpenChange={(o) => { if (!o) setRotaModal(null); }}>
+      {/* ===== MODAL ROTA / PERCURSOS PROMOTORA ===== */}
+      <Dialog open={!!rotaModal} onOpenChange={(o) => { if (!o) { setRotaModal(null); setSelectedPercursoMap(null); } }}>
         <DialogContent className="max-w-2xl w-full p-0 overflow-hidden">
           <DialogHeader className="px-4 pt-4 pb-2">
             <DialogTitle className="flex items-center gap-2 text-base">
               <Map className="h-4 w-4 text-pink-700" />
-              Rota — {rotaModal?.abordadora}
+              {rotaModal?.abordadora}
             </DialogTitle>
           </DialogHeader>
 
-          {/* Toolbar */}
-          <div className="px-4 pb-2 flex items-center gap-2 flex-wrap">
-            {!rotaDrawMode ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
-                onClick={() => setRotaDrawMode(true)}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                {draftWaypoints.length > 0 ? "Editar Rota" : "Definir Rota"}
-              </Button>
-            ) : (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => setDraftWaypoints((prev) => prev.slice(0, -1))}
-                  disabled={draftWaypoints.length === 0}
-                >
-                  <Undo2 className="h-3.5 w-3.5" />
-                  Desfazer
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50"
-                  onClick={() => setDraftWaypoints([])}
-                  disabled={draftWaypoints.length === 0}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Limpar
-                </Button>
-                <Button
-                  size="sm"
-                  className="gap-1.5 bg-blue-600 hover:bg-blue-700"
-                  onClick={handleSaveRota}
-                  disabled={savingRota || draftWaypoints.length === 0}
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  {savingRota ? "Salvando…" : "Salvar Rota"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setRotaDrawMode(false);
-                    // Reload from Firestore by re-triggering the effect
-                    if (rotaModal) {
-                      getDoc(doc(db, "clinics", rotaModal.clinicId, "sessoes", rotaModal.sessaoId))
-                        .then((snap) => {
-                          if (snap.exists()) setDraftWaypoints((snap.data()?.rotaDefinida as GeoPoint[]) ?? []);
-                        })
-                        .catch(() => {});
-                    }
-                  }}
-                >
-                  Cancelar
-                </Button>
-              </>
-            )}
-            {!rotaDrawMode && draftWaypoints.length > 0 && (
-              <span className="text-xs text-gray-500 ml-auto">
-                {draftWaypoints.length} pontos definidos
-              </span>
-            )}
+          {/* Inner tabs */}
+          <div className="flex border-b px-2">
+            <button
+              onClick={() => { setRotaModalInnerTab("rota"); setSelectedPercursoMap(null); }}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                rotaModalInnerTab === "rota" ? "border-blue-600 text-blue-700" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Navigation className="h-3.5 w-3.5" /> Rota Planejada
+            </button>
+            <button
+              onClick={() => { setRotaModalInnerTab("percursos"); setSelectedPercursoMap(null); }}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                rotaModalInnerTab === "percursos" ? "border-pink-600 text-pink-700" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Activity className="h-3.5 w-3.5" /> Percursos
+              {sessaoPercursos.length > 0 && (
+                <span className="ml-1 bg-pink-100 text-pink-700 text-xs rounded-full px-1.5 font-semibold">
+                  {sessaoPercursos.length}
+                </span>
+              )}
+            </button>
           </div>
 
-          <div style={{ height: "65vh" }}>
-            {rotaModal && (
-              <MapaRota
-                clinicId={rotaModal.clinicId}
-                sessaoId={rotaModal.sessaoId}
-                abordadora={rotaModal.abordadora}
-                plannedRoute={rotaDrawMode ? draftWaypoints : undefined}
-                onMapClick={rotaDrawMode ? (pt) => setDraftWaypoints((prev) => [...prev, pt]) : undefined}
-                height="100%"
-              />
-            )}
-          </div>
+          {/* Tab: Rota Planejada */}
+          {rotaModalInnerTab === "rota" && (
+            <>
+              <div className="px-4 pt-2 pb-2 flex items-center gap-2 flex-wrap">
+                {!rotaDrawMode ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
+                    onClick={() => setRotaDrawMode(true)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    {draftWaypoints.length > 0 ? "Editar Rota" : "Definir Rota"}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => setDraftWaypoints((prev) => prev.slice(0, -1))}
+                      disabled={draftWaypoints.length === 0}
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                      Desfazer
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50"
+                      onClick={() => setDraftWaypoints([])}
+                      disabled={draftWaypoints.length === 0}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Limpar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="gap-1.5 bg-blue-600 hover:bg-blue-700"
+                      onClick={handleSaveRota}
+                      disabled={savingRota || draftWaypoints.length === 0}
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      {savingRota ? "Salvando…" : "Salvar Rota"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setRotaDrawMode(false);
+                        if (rotaModal) {
+                          getDoc(doc(db, "clinics", rotaModal.clinicId, "sessoes", rotaModal.sessaoId))
+                            .then((snap) => {
+                              if (snap.exists()) setDraftWaypoints((snap.data()?.rotaDefinida as GeoPoint[]) ?? []);
+                            })
+                            .catch(() => {});
+                        }
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </>
+                )}
+                {!rotaDrawMode && draftWaypoints.length > 0 && (
+                  <span className="text-xs text-gray-500 ml-auto">
+                    {draftWaypoints.length} pontos definidos
+                  </span>
+                )}
+              </div>
+              <div style={{ height: "60vh" }}>
+                {rotaModal && (
+                  <MapaRota
+                    clinicId={rotaModal.clinicId}
+                    sessaoId={rotaModal.sessaoId}
+                    abordadora={rotaModal.abordadora}
+                    plannedRoute={rotaDrawMode ? draftWaypoints : undefined}
+                    onMapClick={rotaDrawMode ? (pt) => setDraftWaypoints((prev) => [...prev, pt]) : undefined}
+                    height="100%"
+                  />
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Tab: Percursos */}
+          {rotaModalInnerTab === "percursos" && (
+            <div style={{ height: "65vh", overflowY: "auto" }}>
+              {selectedPercursoMap ? (
+                <div className="flex flex-col h-full">
+                  <div className="px-4 py-2 border-b flex items-center gap-3 shrink-0 bg-muted/30">
+                    <button
+                      onClick={() => setSelectedPercursoMap(null)}
+                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                      ← Voltar
+                    </button>
+                    <span className="text-xs text-gray-700 font-medium">
+                      {selectedPercursoMap.horaInicio} → {selectedPercursoMap.horaFim}
+                    </span>
+                    <span className="text-xs text-gray-400 ml-auto">
+                      {selectedPercursoMap.distanciaM >= 1000
+                        ? `${(selectedPercursoMap.distanciaM / 1000).toFixed(2)} km`
+                        : `${Math.round(selectedPercursoMap.distanciaM)} m`}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <MapaRota points={selectedPercursoMap.pontos} height="100%" />
+                  </div>
+                </div>
+              ) : sessaoPercursosLoading ? (
+                <div className="flex items-center justify-center h-full text-sm text-muted-foreground animate-pulse py-20">
+                  Carregando...
+                </div>
+              ) : sessaoPercursos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground py-20">
+                  <Activity className="h-8 w-8 opacity-30" />
+                  <span className="text-sm">Nenhum percurso gravado nesta sessão</span>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {sessaoPercursos.map((p, i) => (
+                    <div key={p.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40">
+                      <div className="bg-pink-100 p-2 rounded-lg shrink-0">
+                        <Activity className="h-4 w-4 text-pink-700" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-800">Percurso {i + 1}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.horaInicio} → {p.horaFim} ·{" "}
+                          {p.distanciaM >= 1000
+                            ? `${(p.distanciaM / 1000).toFixed(2)} km`
+                            : `${Math.round(p.distanciaM)} m`}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedPercursoMap(p)}
+                        className="text-xs text-pink-700 border border-pink-200 rounded-full px-3 py-1 hover:bg-pink-50 transition-colors font-medium shrink-0"
+                      >
+                        Ver mapa
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
