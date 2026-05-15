@@ -7,7 +7,7 @@ import "leaflet-rotate";
 import * as LGeocode from "leaflet-control-geocoder";
 import { geocoders } from "leaflet-control-geocoder";
 import "leaflet-control-geocoder/dist/Control.Geocoder.css";
-import { Route, User, CalendarDays, Eye, EyeOff, Navigation } from "lucide-react";
+import { Route, User, CalendarDays, Eye, EyeOff, Navigation, Activity } from "lucide-react";
 
 const COLORS = [
   "#ec4899", // pink
@@ -33,6 +33,17 @@ interface RotaDoc {
   criadoEm: number;
 }
 
+interface PercursoDoc {
+  id: string;
+  abordadora: string;
+  data: string;
+  horaInicio: string;
+  horaFim: string;
+  pontos: { lat: number; lng: number; ts: number }[];
+  distanciaM: number;
+  criadoEm: number;
+}
+
 interface MapaGeralRotasProps {
   clinicId: string;
 }
@@ -42,10 +53,13 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const layersRef = useRef<Record<string, { poly: L.Polyline; markers: L.Marker[] }>>({});
+  const percursoLayersRef = useRef<Record<string, { poly: L.Polyline; markers: L.Marker[] }>>({});
 
   const [rotas, setRotas] = useState<RotaDoc[]>([]);
+  const [percursos, setPercursos] = useState<PercursoDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [hiddenPercursos, setHiddenPercursos] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [filterAbordadora, setFilterAbordadora] = useState("");
 
@@ -56,6 +70,16 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
     const unsub = onSnapshot(q, (snap) => {
       setRotas(snap.docs.map((d) => ({ id: d.id, ...d.data() } as RotaDoc)));
       setLoading(false);
+    });
+    return () => unsub();
+  }, [clinicId]);
+
+  // Firestore: recorded percursos
+  useEffect(() => {
+    if (!clinicId) return;
+    const q = query(collection(db, "clinics", clinicId, "percursos"), orderBy("criadoEm", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setPercursos(snap.docs.map((d) => ({ id: d.id, ...d.data() } as PercursoDoc)));
     });
     return () => unsub();
   }, [clinicId]);
@@ -128,8 +152,9 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
       }
     }
 
-    rotas.forEach((rota, idx) => {
-      const color = COLORS[idx % COLORS.length];
+    rotas.forEach((rota) => {
+      const abssSorted = [...new Set([...rotas.map((r) => r.abordadora), ...percursos.map((p) => p.abordadora)])].sort();
+      const color = COLORS[abssSorted.indexOf(rota.abordadora) % COLORS.length];
       const isHidden = hidden.has(rota.id);
       const isSelected = selected === rota.id;
       const pts = rota.waypoints.map((w) => [w.lat, w.lng] as [number, number]);
@@ -171,30 +196,95 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
       layersRef.current[rota.id] = { poly, markers };
     });
 
-    // Fit map to all visible routes on first load
-    const allPts = rotas
-      .filter((r) => !hidden.has(r.id) && r.waypoints.length > 1)
-      .flatMap((r) => r.waypoints.map((w) => [w.lat, w.lng] as [number, number]));
+    // Fit map to all visible content
+    const allPts = [
+      ...rotas.filter((r) => !hidden.has(r.id) && r.waypoints.length > 1).flatMap((r) => r.waypoints.map((w) => [w.lat, w.lng] as [number, number])),
+      ...percursos.filter((p) => !hiddenPercursos.has(p.id) && p.pontos.length > 1).flatMap((p) => p.pontos.map((pt) => [pt.lat, pt.lng] as [number, number])),
+    ];
     if (allPts.length > 1) {
       map.fitBounds(L.latLngBounds(allPts), { padding: [30, 30] });
     }
-  }, [rotas, hidden, selected]);
+  }, [rotas, percursos, hidden, hiddenPercursos, selected]);
 
-  const abordadoras = useMemo(
-    () => [...new Set(rotas.map((r) => r.abordadora))].sort(),
-    [rotas]
+  // Draw / update percurso (recorded GPS) layers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const abssSorted = [...new Set([...rotas.map((r) => r.abordadora), ...percursos.map((p) => p.abordadora)])].sort();
+    const currentIds = new Set(percursos.map((p) => p.id));
+
+    for (const id of Object.keys(percursoLayersRef.current)) {
+      if (!currentIds.has(id)) {
+        percursoLayersRef.current[id].poly.remove();
+        percursoLayersRef.current[id].markers.forEach((m) => m.remove());
+        delete percursoLayersRef.current[id];
+      }
+    }
+
+    percursos.forEach((percurso) => {
+      const color = COLORS[abssSorted.indexOf(percurso.abordadora) % COLORS.length];
+      const isHidden = hiddenPercursos.has(percurso.id);
+      const pts = percurso.pontos.map((p) => [p.lat, p.lng] as [number, number]);
+
+      if (percursoLayersRef.current[percurso.id]) {
+        percursoLayersRef.current[percurso.id].poly.remove();
+        percursoLayersRef.current[percurso.id].markers.forEach((m) => m.remove());
+      }
+
+      if (isHidden || pts.length < 2) {
+        percursoLayersRef.current[percurso.id] = { poly: L.polyline([]), markers: [] };
+        return;
+      }
+
+      const poly = L.polyline(pts, { color, weight: 5, opacity: 0.9, dashArray: "8 5" }).addTo(map);
+
+      const first = percurso.pontos[0];
+      const last = percurso.pontos[percurso.pontos.length - 1];
+      const dot = (bg: string, title: string) =>
+        L.divIcon({
+          className: "",
+          html: `<div style="width:14px;height:14px;background:${bg};border:2.5px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.5)" title="${title}"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        });
+
+      const markers = [
+        L.marker([first.lat, first.lng], { icon: dot("#22c55e", `${percurso.abordadora} — início`) }).addTo(map),
+        L.marker([last.lat, last.lng], { icon: dot("#ef4444", `${percurso.abordadora} — fim`) }).addTo(map),
+      ];
+
+      percursoLayersRef.current[percurso.id] = { poly, markers };
+    });
+  }, [percursos, rotas, hiddenPercursos]);
+
+  const allAbordadoras = useMemo(
+    () => [...new Set([...rotas.map((r) => r.abordadora), ...percursos.map((p) => p.abordadora)])].sort(),
+    [rotas, percursos]
   );
 
   const filtered = useMemo(
-    () =>
-      filterAbordadora
-        ? rotas.filter((r) => r.abordadora === filterAbordadora)
-        : rotas,
+    () => (filterAbordadora ? rotas.filter((r) => r.abordadora === filterAbordadora) : rotas),
     [rotas, filterAbordadora]
   );
 
+  const filteredPercursos = useMemo(
+    () => (filterAbordadora ? percursos.filter((p) => p.abordadora === filterAbordadora) : percursos),
+    [percursos, filterAbordadora]
+  );
+
+  const getColor = (abordadora: string) =>
+    COLORS[allAbordadoras.indexOf(abordadora) % COLORS.length];
+
   const toggleHide = (id: string) =>
     setHidden((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const toggleHidePercurso = (id: string) =>
+    setHiddenPercursos((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -221,31 +311,31 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
       <div className="flex items-center gap-2 flex-wrap">
         <Route className="h-4 w-4 text-pink-500 shrink-0" />
         <span className="text-sm font-medium text-gray-700">
-          {rotas.length} rota{rotas.length !== 1 ? "s" : ""} no total
+          {rotas.length} rota{rotas.length !== 1 ? "s" : ""} · {percursos.length} percurso{percursos.length !== 1 ? "s" : ""} gravado{percursos.length !== 1 ? "s" : ""}
         </span>
-        {abordadoras.length > 1 && (
+        {allAbordadoras.length > 1 && (
           <select
             value={filterAbordadora}
             onChange={(e) => setFilterAbordadora(e.target.value)}
             className="ml-auto text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-pink-400"
           >
             <option value="">Todas as promotoras</option>
-            {abordadoras.map((a) => (
+            {allAbordadoras.map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
         )}
       </div>
 
-      {/* Route list */}
+      {/* Route + Percurso list */}
       {loading ? (
         <div className="text-center py-6 text-sm text-gray-400 animate-pulse">Carregando rotas…</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-8 text-sm text-gray-400">Nenhuma rota encontrada.</div>
+      ) : filtered.length === 0 && filteredPercursos.length === 0 ? (
+        <div className="text-center py-8 text-sm text-gray-400">Nenhuma rota ou percurso encontrado.</div>
       ) : (
         <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: 280 }}>
-          {filtered.map((rota, idx) => {
-            const color = COLORS[rotas.indexOf(rota) % COLORS.length];
+          {filtered.map((rota) => {
+            const color = getColor(rota.abordadora);
             const isHidden = hidden.has(rota.id);
             const isSelected = selected === rota.id;
             const wps = rota.waypoints.length > 25
@@ -309,6 +399,59 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
               </div>
             );
           })}
+
+          {/* Percursos gravados */}
+          {filteredPercursos.length > 0 && (
+            <div className="pt-1 mt-1 border-t border-dashed border-gray-200">
+              <div className="flex items-center gap-1.5 px-1 py-1">
+                <Activity className="h-3.5 w-3.5 text-pink-400" />
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Percursos gravados</span>
+              </div>
+              {filteredPercursos.map((percurso) => {
+                const color = getColor(percurso.abordadora);
+                const isHidden = hiddenPercursos.has(percurso.id);
+                const distKm = (percurso.distanciaM / 1000).toFixed(2);
+                return (
+                  <div
+                    key={percurso.id}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border cursor-pointer transition-all border-gray-200 hover:border-gray-300 hover:bg-gray-50 ${
+                      isHidden ? "opacity-40" : ""
+                    }`}
+                  >
+                    {/* Dashed color indicator */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                      <div className="w-4 h-px border-t-2 border-dashed" style={{ borderColor: color }} />
+                      <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-800 text-sm">{percurso.data}</div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3 shrink-0" />{percurso.abordadora}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <CalendarDays className="h-3 w-3 shrink-0" />{percurso.horaInicio} → {percurso.horaFim}
+                        </span>
+                        <span className="text-gray-400">{distKm} km · {percurso.pontos.length} pts</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => toggleHidePercurso(percurso.id)}
+                        title={isHidden ? "Mostrar no mapa" : "Ocultar no mapa"}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                      >
+                        {isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
