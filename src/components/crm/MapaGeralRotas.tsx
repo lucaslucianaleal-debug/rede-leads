@@ -68,7 +68,7 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
   // Firestore: all rotas
   useEffect(() => {
     if (!clinicId) return;
-    const q = query(collection(db, "clinics", clinicId, "rotas"), orderBy("criadoEm", "desc"));
+    const q = query(collection(db, "clinics", clinicId, "rotas"), orderBy("criadoEm", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       setRotas(snap.docs.map((d) => ({ id: d.id, ...d.data() } as RotaDoc)));
       setLoading(false);
@@ -79,7 +79,7 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
   // Firestore: recorded percursos
   useEffect(() => {
     if (!clinicId) return;
-    const q = query(collection(db, "clinics", clinicId, "percursos"), orderBy("criadoEm", "desc"));
+    const q = query(collection(db, "clinics", clinicId, "percursos"), orderBy("criadoEm", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       setPercursos(snap.docs.map((d) => ({ id: d.id, ...d.data() } as PercursoDoc)));
     });
