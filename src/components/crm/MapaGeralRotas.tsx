@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-rotate";
 import * as LGeocode from "leaflet-control-geocoder";
 import { geocoders } from "leaflet-control-geocoder";
 import "leaflet-control-geocoder/dist/Control.Geocoder.css";
-import { Route, User, CalendarDays, Eye, EyeOff, Navigation, Activity } from "lucide-react";
+import { Route, User, CalendarDays, Eye, EyeOff, Navigation, Activity, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 const COLORS = [
   "#ec4899", // pink
@@ -62,6 +63,7 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
   const [hiddenPercursos, setHiddenPercursos] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
   const [filterAbordadora, setFilterAbordadora] = useState("");
+  const [deletingPercurso, setDeletingPercurso] = useState<string | null>(null);
 
   // Firestore: all rotas
   useEffect(() => {
@@ -298,6 +300,18 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
     map.fitBounds(L.latLngBounds(pts), { padding: [40, 40] });
   };
 
+  const handleDeletePercurso = async (percursoId: string) => {
+    setDeletingPercurso(percursoId);
+    try {
+      await deleteDoc(doc(db, "clinics", clinicId, "percursos", percursoId));
+      toast.success("Percurso deletado!");
+    } catch {
+      toast.error("Erro ao deletar percurso.");
+    } finally {
+      setDeletingPercurso(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3 h-full">
       {/* Map */}
@@ -438,13 +452,21 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => toggleHidePercurso(percurso.id)}
                         title={isHidden ? "Mostrar no mapa" : "Ocultar no mapa"}
                         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
                       >
                         {isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => handleDeletePercurso(percurso.id)}
+                        disabled={deletingPercurso === percurso.id}
+                        title="Deletar percurso"
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                      >
+                        {deletingPercurso === percurso.id ? "..." : <Trash2 className="h-3.5 w-3.5" />}
                       </button>
                     </div>
                   </div>
