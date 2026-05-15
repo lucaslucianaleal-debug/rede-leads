@@ -476,7 +476,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           </div>
         </div>
         <div className="flex gap-2 sm:ml-auto flex-wrap">
-          {mainTab !== "sessoes" && (
+          {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && mainTab !== "percursos" && (
             <>
               <Badge variant="outline" className="bg-yellow-50 border-yellow-300 text-yellow-800">
                 {pendingCount} pendente{pendingCount !== 1 ? "s" : ""}
@@ -543,6 +543,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
             <span className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
           )}
         </button>
+        <div className="w-px self-stretch bg-border mx-1 my-1" />
         <button
           onClick={() => { setMainTab("rotas"); setSelected(null); }}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -552,7 +553,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           }`}
         >
           <Navigation className="h-4 w-4" />
-          Rotas Ativas
+          Rotas
         </button>
         <button
           onClick={() => { setMainTab("mapa-geral"); setSelected(null); }}
