@@ -603,13 +603,90 @@ export default function Promotora() {
                 </a>
               </div>
             </div>
+          ) : gravando ? (
+            <div className="w-full space-y-3">
+              <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+                <div className="bg-red-600 px-4 py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                    <span className="text-white text-xs font-bold tracking-wide">GRAVANDO PERCURSO</span>
+                  </div>
+                  <span className="text-white/90 text-sm font-mono font-semibold">{formatDuracao(duracaoSeg)}</span>
+                </div>
+                <div style={{ height: 300 }}>
+                  <MapaRota
+                    points={gpsPoints}
+                    currentPosition={gpsPosition}
+                    error={gpsError}
+                    height="300px"
+                  />
+                </div>
+                <div className="px-4 py-3 flex items-center justify-around border-t bg-gray-50">
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-gray-800">{(distanciaAtualM / 1000).toFixed(2)}</div>
+                    <div className="text-xs text-gray-400">km</div>
+                  </div>
+                  <div className="w-px h-8 bg-gray-200" />
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-gray-800">{gpsPoints.length}</div>
+                    <div className="text-xs text-gray-400">pontos</div>
+                  </div>
+                  <div className="w-px h-8 bg-gray-200" />
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-gray-800">{formatDuracao(duracaoSeg)}</div>
+                    <div className="text-xs text-gray-400">tempo</div>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleEncerrarPercurso}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl py-4 transition-colors flex items-center justify-center gap-2 text-base shadow-lg"
+              >
+                <Square className="h-4 w-4 fill-white" /> Encerrar Percurso
+              </button>
+            </div>
+          ) : percursoSalvo ? (
+            <div className="bg-white rounded-2xl shadow-2xl p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-green-100 p-2.5 rounded-xl">
+                  <Activity className="h-5 w-5 text-green-700" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Percurso salvo!</p>
+                  <p className="font-bold text-gray-800">{percursoSalvo.horaInicio} → {percursoSalvo.horaFim}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-around bg-gray-50 rounded-xl py-3">
+                <div className="text-center">
+                  <div className="text-xl font-bold text-gray-800">{(percursoSalvo.distanciaM / 1000).toFixed(2)} km</div>
+                  <div className="text-xs text-gray-400">distância</div>
+                </div>
+                <div className="w-px h-8 bg-gray-200" />
+                <div className="text-center">
+                  <div className="text-xl font-bold text-gray-800">{percursoSalvo.pontos}</div>
+                  <div className="text-xs text-gray-400">pontos GPS</div>
+                </div>
+              </div>
+              <button
+                onClick={handleIniciarPercurso}
+                className="w-full bg-pink-700 hover:bg-pink-800 text-white font-semibold rounded-xl py-3 transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <Activity className="h-4 w-4" /> Novo Percurso
+              </button>
+            </div>
           ) : (
-            <div className="bg-white/10 rounded-2xl px-5 py-10 text-center space-y-2">
-              <MapPin className="h-8 w-8 mx-auto text-white/30" />
-              <p className="text-white/70 text-sm font-medium">Nenhuma rota para hoje</p>
-              <p className="text-white/40 text-xs">
-                Peça para o administrador criar uma rota para <strong className="text-white/60">{sessao?.abordadora}</strong> com a data de hoje
-              </p>
+            <div className="bg-white/10 rounded-2xl px-5 py-10 text-center space-y-4">
+              <Activity className="h-10 w-10 mx-auto text-white/40" />
+              <div>
+                <p className="text-white/80 text-sm font-semibold">Nenhuma rota para hoje</p>
+                <p className="text-white/40 text-xs mt-1">Grave seu percurso ou peça ao administrador para criar uma rota</p>
+              </div>
+              <button
+                onClick={handleIniciarPercurso}
+                className="mx-auto flex items-center justify-center gap-2 bg-white text-pink-700 font-bold rounded-xl px-8 py-3.5 transition-all shadow-lg hover:shadow-xl active:scale-95 text-sm"
+              >
+                <Activity className="h-4 w-4" /> Gravar Percurso
+              </button>
             </div>
           )}
         </div>

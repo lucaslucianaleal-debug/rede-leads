@@ -37,6 +37,7 @@ import {
   Undo2,
   Save,
   Navigation,
+  Activity,
 } from "lucide-react";
 import { formatPhoneNumber } from "@/lib/phone";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
@@ -45,6 +46,7 @@ import { db } from "@/lib/firebase";
 import { doc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
 import { RotasTab } from "@/components/crm/RotasTab";
 import { MapaGeralRotas } from "@/components/crm/MapaGeralRotas";
+import { PercursosTab } from "@/components/crm/PercursosTab";
 import type { GeoPoint } from "@/hooks/useGeoTracking";
 
 const STATUS_LABELS: Record<Cupom["status"], { label: string; color: string }> = {
@@ -59,7 +61,7 @@ interface ServicosExternosProps {
   onRegisterCall?: (leadId: string, outcome: string, obs: string, returnDate?: string) => void;
 }
 
-type MainTab = "cupom" | "visita" | "promotora" | "sessoes" | "rotas" | "mapa-geral";
+type MainTab = "cupom" | "visita" | "promotora" | "sessoes" | "rotas" | "mapa-geral" | "percursos";
 
 export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { currentClinic } = useAuth();
@@ -71,7 +73,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
   const { cupons, loading, updateStatus } = useCupons(clinicaId);
 
   const [mainTab, setMainTab] = useState<MainTab>("cupom");
-  const servicoTab = (mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral") ? mainTab : "cupom";
+  const servicoTab = (mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && mainTab !== "percursos") ? mainTab : "cupom";
 
   // State for sessões tab
   const todayInput = format(new Date(), "yyyy-MM-dd");
@@ -563,7 +565,18 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           <Map className="h-4 w-4" />
           Mapa Geral
         </button>
-        {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && (
+        <button
+          onClick={() => { setMainTab("percursos"); setSelected(null); }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            mainTab === "percursos"
+              ? "border-pink-600 text-pink-700"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Activity className="h-4 w-4" />
+          Percursos
+        </button>
+        {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && mainTab !== "percursos" && (
           <div className={`ml-auto flex items-center gap-2 mb-1 px-3 py-1.5 rounded-lg text-xs border self-center ${
             servicoTab === "cupom"
               ? "bg-blue-50 border-blue-200 text-blue-700"
@@ -706,8 +719,13 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
         <MapaGeralRotas clinicId={clinicaId} />
       )}
 
+      {/* ===== ABA PERCURSOS ===== */}
+      {mainTab === "percursos" && (
+        <PercursosTab clinicId={clinicaId} />
+      )}
+
       {/* ===== ABAS CUPOM / VISITA ===== */}
-      {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && <>
+      {mainTab !== "sessoes" && mainTab !== "rotas" && mainTab !== "mapa-geral" && mainTab !== "percursos" && <>
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">
         {mainTab === "promotora" && (
