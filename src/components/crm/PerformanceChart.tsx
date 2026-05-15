@@ -173,15 +173,15 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       )}
 
       {/* Cards de resumo com barras de progresso */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-4 gap-3 mb-5">
         {/* Atendimentos do período + Barra Hoje */}
-        <div className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-50/50 border border-green-200/50">
+        <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-50/50 border border-green-200/50">
           <div className="mb-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
               Atendimentos
             </p>
-            <p className="text-xl sm:text-2xl font-bold text-green-600">{totalAtendimentos}</p>
-            <p className="text-[10px] text-muted-foreground">Meta {META_ATENDIMENTOS}/dia</p>
+            <p className="text-2xl font-bold text-green-600">{totalAtendimentos}</p>
+            <p className="text-[10px] text-muted-foreground">Período: meta {META_ATENDIMENTOS}/dia</p>
           </div>
           <ProgressWithLabel
             label="Hoje"
@@ -192,13 +192,13 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </div>
 
         {/* Agendamentos do período + Barra Hoje + 🏆 */}
-        <div className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-200/50">
-          <div className="mb-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+        <div className="p-2 sm:p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-200/50">
+          <div className="mb-2 sm:mb-3">
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
               Agendamentos
             </p>
-            <p className="text-xl sm:text-2xl font-bold text-blue-600">{totalAgendamentos}</p>
-            <p className="text-[10px] text-muted-foreground">Meta {META_AGENDAMENTOS}/dia</p>
+            <p className="text-lg sm:text-2xl font-bold text-blue-600">{totalAgendamentos}</p>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground">Meta {META_AGENDAMENTOS}/dia</p>
           </div>
           <ProgressWithLabel
             label="Hoje"
@@ -210,13 +210,13 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </div>
 
         {/* Reagendamentos do período + Barra Hoje */}
-        <div className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
-          <div className="mb-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+        <div className="p-2 sm:p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
+          <div className="mb-2 sm:mb-3">
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
               Reagendamentos
             </p>
-            <p className="text-xl sm:text-2xl font-bold text-amber-600">{totalReagendamentos}</p>
-            <p className="text-[10px] text-muted-foreground">Reagendamentos no período</p>
+            <p className="text-lg sm:text-2xl font-bold text-amber-600">{totalReagendamentos}</p>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground">Reagendamentos no período</p>
           </div>
           <ProgressWithLabel
             label="Hoje"
@@ -227,14 +227,14 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </div>
 
         {/* Taxa de conversão do dia */}
-        <div className="p-3 sm:p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-1 flex items-center gap-1">
+        <div className="p-2 sm:p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
+          <p className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-1 flex items-center gap-1">
             <TrendingUp className="h-3 w-3" />
-            Conversão Hoje
+            Conversão
           </p>
-          <p className="text-xl sm:text-2xl font-bold text-amber-600">{taxaHoje}%</p>
-          <p className="text-[10px] text-muted-foreground mt-3">
-            {agendamentosHoje} agend. / {atendimentosHoje} atend.
+          <p className="text-lg sm:text-2xl font-bold text-amber-600">{taxaHoje}%</p>
+          <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-2">
+            {agendamentosHoje}/{atendimentosHoje}
           </p>
         </div>
       </div>
@@ -242,7 +242,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       {/* Gráfico - Mostrar apenas se não for "Hoje" */}
       {period !== "today" && (
         <>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={180}>
             <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis

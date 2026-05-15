@@ -440,11 +440,11 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
   }, [funnelByFonte]);
 
   return (
-    <div className="bg-[#1C1C1E] rounded-xl border border-gray-800 p-3 sm:p-6 mt-6 overflow-hidden">
+    <div className="bg-[#1C1C1E] rounded-xl border border-gray-800 p-2 sm:p-6 mt-6 overflow-hidden">
       {/* Cabeçalho */}
-      <div className="flex items-center gap-2 mb-5">
-        <TrendingUp className="w-5 h-5 text-indigo-400" />
-        <h3 className="text-white font-semibold text-base">Comparação de Períodos</h3>
+      <div className="flex items-center gap-2 mb-3 sm:mb-5">
+        <TrendingUp className="w-4 sm:w-5 h-4 sm:h-5 text-indigo-400" />
+        <h3 className="text-white font-semibold text-sm sm:text-base">Comparação de Períodos</h3>
       </div>
 
       {/* Controles */}
@@ -504,7 +504,7 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
       </div>
 
       {/* Gráfico */}
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={220}>
         <LineChart data={chartData} margin={{ top: 5, right: 10, left: -15, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#2d2d30" />
           <XAxis
@@ -558,7 +558,7 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
       </ResponsiveContainer>
 
       {/* Cards de análise por mês */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 mt-4">
         {analytics.map((a, idx) => {
           const variation = variations[idx];
           const color = LINE_COLORS[idx % LINE_COLORS.length];

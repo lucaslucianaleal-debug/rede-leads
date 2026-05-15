@@ -1040,9 +1040,7 @@ export function useLeads() {
                 comparecimento: get(row, col.comparecimento) as any,
                 dataFollowUp: get(row, col.dataFollowUp),
                 dataAgendamento: get(row, col.dataAgendamento),
-                // FIXED: never fall back to today — use the appointment date itself as estimate
-                // to avoid inflating "agendamentos hoje" for imported leads lacking a creation date.
-                dataAgendamentoCriado: get(row, col.dataAgendamento) ? (get(row, col.dataCriacao) || (get(row, col.dataAgendamento) as string).split(" ")[0]) : "",
+                dataAgendamentoCriado: get(row, col.dataAgendamento) ? (get(row, col.dataCriacao) || format(new Date(), "dd/MM/yyyy")) : "",
                 dataRetornoLigacao: "",
                 observacao: get(row, col.observacao),
                 followUpCount: parseInt(etapaRaw?.match(/\d+/)?.[0] || "0", 10),

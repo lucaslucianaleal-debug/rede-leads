@@ -13,8 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { formatPhoneNumber } from "@/lib/phone";
-import React, { useState } from "react";
-import { UnifiedTimeline } from "./UnifiedTimeline";
+import React from "react";
 
 interface LeadDetailsDialogProps {
   lead: Lead | null;
@@ -48,7 +47,6 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
   }, [lead, open]);
 
   const { isReceptionist } = useUserPermissions();
-  const [activeTab, setActiveTab] = useState<"dados" | "timeline">("dados");
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -58,35 +56,6 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
           <DialogDescription className="text-sm text-muted-foreground">Informações completas do lead</DialogDescription>
         </DialogHeader>
 
-        {/* Tabs */}
-        <div className="flex gap-1 border-b border-border pb-0 -mb-2">
-          <button
-            onClick={() => setActiveTab("dados")}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              activeTab === "dados"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            📋 Dados
-          </button>
-          <button
-            onClick={() => setActiveTab("timeline")}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              activeTab === "timeline"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            🕐 Histórico
-          </button>
-        </div>
-
-        {activeTab === "timeline" ? (
-          <div className="py-4">
-            <UnifiedTimeline leadId={lead.id} leadTelefone={lead.telefone} lead={lead} />
-          </div>
-        ) : (
         <div className="space-y-6 py-4">
           {/* Contato */}
           <div>
@@ -229,7 +198,6 @@ export function LeadDetailsDialog({ lead, open, onClose, onEdit }: LeadDetailsDi
             </div>
           )}
         </div>
-        )} {/* end activeTab === "dados" */}
 
         <DialogFooter>
           {onEdit && !isReceptionist && (

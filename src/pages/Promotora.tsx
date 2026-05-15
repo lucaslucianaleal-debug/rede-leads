@@ -6,12 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X, CalendarCheck, Map, Navigation, Route, Pencil, Trash2 } from "lucide-react";
+import { UserCheck, MapPin, User, Phone, Plus, Check, List, AlertTriangle, LogOut, Clock, MessageSquare, X, CalendarCheck, Map, Navigation, Route, Pencil, Trash2, Square, Activity } from "lucide-react";
 import { getAvailableSlots, saveScheduledLead, type SlotInfo } from "@/lib/scheduleHelper";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, deleteDoc, updateDoc, addDoc } from "firebase/firestore";
 import { MapaRota } from "@/components/MapaRota";
+import { useGeoTracking, type GeoPoint } from "@/hooks/useGeoTracking";
 import { format } from "date-fns";
 
 function maskPhone(value: string): string {
@@ -105,6 +106,19 @@ export default function Promotora() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // GPS recording state
+  const [gravando, setGravando] = useState(false);
+  const [horaInicioGravacao, setHoraInicioGravacao] = useState<string | null>(null);
+  const [percursoSalvo, setPercursoSalvo] = useState<{ pontos: number; distanciaM: number; horaFim: string; horaInicio: string } | null>(null);
+  const [duracaoSeg, setDuracaoSeg] = useState(0);
+
+  // GPS tracking hook — active only while recording
+  const { points: gpsPoints, currentPosition: gpsPosition, error: gpsError } = useGeoTracking({
+    clinicId: gravando ? (sessao?.clinicaId ?? null) : null,
+    sessaoId: gravando ? (sessao?.sessaoId ?? null) : null,
+    enabled: gravando,
+  });
+
   useEffect(() => {
     if (!sessao) { setRotaDoDia(null); return; }
     setRotaLoading(true);
@@ -141,6 +155,13 @@ export default function Promotora() {
       setDupWarning(null);
     }
   }, [telefone1, cupons]);
+
+  // Recording duration counter
+  useEffect(() => {
+    if (!gravando) { setDuracaoSeg(0); return; }
+    const t = setInterval(() => setDuracaoSeg((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [gravando]);
 
   const handleComeçar = async () => {
     if (!abordadora.trim()) { toast.error("Informe seu nome"); return; }
@@ -352,6 +373,53 @@ export default function Promotora() {
       toast.error("Erro ao excluir.");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // GPS helpers
+  const haversineM = (a: GeoPoint, b: GeoPoint): number => {
+    const R = 6371000;
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLng = (b.lng - a.lng) * Math.PI / 180;
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+  };
+  const formatDuracao = (secs: number) => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
+  const distanciaAtualM = gpsPoints.reduce((acc, pt, i) => i === 0 ? 0 : acc + haversineM(gpsPoints[i - 1], pt), 0);
+
+  const handleIniciarPercurso = () => {
+    setPercursoSalvo(null);
+    setGravando(true);
+    setHoraInicioGravacao(format(new Date(), "HH:mm"));
+  };
+
+  const handleEncerrarPercurso = async () => {
+    const horaFim = format(new Date(), "HH:mm");
+    const dist = gpsPoints.reduce((acc, pt, i) => i === 0 ? 0 : acc + haversineM(gpsPoints[i - 1], pt), 0);
+    setGravando(false);
+    setPercursoSalvo({ pontos: gpsPoints.length, distanciaM: dist, horaFim, horaInicio: horaInicioGravacao ?? "" });
+    if (sessao && gpsPoints.length > 1) {
+      try {
+        await addDoc(collection(db, "clinics", sessao.clinicaId, "percursos"), {
+          abordadora: sessao.abordadora,
+          sessaoId: sessao.sessaoId,
+          data: format(new Date(), "dd/MM/yyyy"),
+          horaInicio: horaInicioGravacao ?? "",
+          horaFim,
+          pontos: gpsPoints,
+          distanciaM: dist,
+          criadoEm: Date.now(),
+        });
+        toast.success("Percurso salvo!");
+      } catch {
+        toast.error("Erro ao salvar percurso.");
+      }
     }
   };
 
