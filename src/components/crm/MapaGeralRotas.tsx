@@ -265,10 +265,16 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
     [rotas, percursos]
   );
 
+  const parseData = (data: string) => {
+    // data is DD/MM/YYYY
+    const [d, m, y] = data.split("/");
+    return new Date(Number(y), Number(m) - 1, Number(d)).getTime();
+  };
+
   const filtered = useMemo(
     () => {
       const list = filterAbordadora ? rotas.filter((r) => r.abordadora === filterAbordadora) : rotas;
-      return [...list].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+      return [...list].sort((a, b) => parseData(a.data) - parseData(b.data));
     },
     [rotas, filterAbordadora]
   );
@@ -276,7 +282,7 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
   const filteredPercursos = useMemo(
     () => {
       const list = filterAbordadora ? percursos.filter((p) => p.abordadora === filterAbordadora) : percursos;
-      return [...list].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+      return [...list].sort((a, b) => parseData(a.data) - parseData(b.data));
     },
     [percursos, filterAbordadora]
   );
