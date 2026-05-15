@@ -12,7 +12,6 @@ import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, deleteDoc, updateDoc, addDoc } from "firebase/firestore";
 import { MapaRota } from "@/components/MapaRota";
-import { useGeoTracking, type GeoPoint } from "@/hooks/useGeoTracking";
 import { format } from "date-fns";
 
 function maskPhone(value: string): string {
@@ -111,13 +110,9 @@ export default function Promotora() {
   const [horaInicioGravacao, setHoraInicioGravacao] = useState<string | null>(null);
   const [percursoSalvo, setPercursoSalvo] = useState<{ pontos: number; distanciaM: number; horaFim: string; horaInicio: string } | null>(null);
   const [duracaoSeg, setDuracaoSeg] = useState(0);
-
-  // GPS tracking hook — active only while recording
-  const { points: gpsPoints, currentPosition: gpsPosition, error: gpsError } = useGeoTracking({
-    clinicId: gravando ? (sessao?.clinicaId ?? null) : null,
-    sessaoId: gravando ? (sessao?.sessaoId ?? null) : null,
-    enabled: gravando,
-  });
+  const [gpsPoints, setGpsPoints] = useState<{ lat: number; lng: number; ts: number }[]>([]);
+  const [gpsPosition, setGpsPosition] = useState<{ lat: number; lng: number; ts: number } | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessao) { setRotaDoDia(null); return; }
@@ -161,6 +156,40 @@ export default function Promotora() {
     if (!gravando) { setDuracaoSeg(0); return; }
     const t = setInterval(() => setDuracaoSeg((s) => s + 1), 1000);
     return () => clearInterval(t);
+  }, [gravando]);
+
+  // Local GPS tracking — only while recording, no Firestore writes
+  useEffect(() => {
+    if (!gravando) {
+      setGpsPoints([]);
+      setGpsPosition(null);
+      setGpsError(null);
+      return;
+    }
+    if (!navigator.geolocation) {
+      setGpsError("GPS não disponível neste dispositivo.");
+      return;
+    }
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() };
+        setGpsPosition(p);
+        setGpsError(null);
+        setGpsPoints((prev) => {
+          const last = prev[prev.length - 1];
+          if (last) {
+            const dLat = (p.lat - last.lat) * Math.PI / 180;
+            const dLng = (p.lng - last.lng) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(last.lat * Math.PI / 180) * Math.cos(p.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+            if (6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) < 10) return prev;
+          }
+          return [...prev, p];
+        });
+      },
+      () => setGpsError("Erro ao obter localização. Verifique se o GPS está ativo."),
+      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 30_000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [gravando]);
 
   const handleComeçar = async () => {
@@ -377,7 +406,8 @@ export default function Promotora() {
   };
 
   // GPS helpers
-  const haversineM = (a: GeoPoint, b: GeoPoint): number => {
+  type Pt = { lat: number; lng: number; ts: number };
+  const haversineM = (a: Pt, b: Pt): number => {
     const R = 6371000;
     const dLat = (b.lat - a.lat) * Math.PI / 180;
     const dLng = (b.lng - a.lng) * Math.PI / 180;
