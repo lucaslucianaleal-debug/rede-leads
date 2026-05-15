@@ -268,7 +268,7 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
   const filtered = useMemo(
     () => {
       const list = filterAbordadora ? rotas.filter((r) => r.abordadora === filterAbordadora) : rotas;
-      return [...list].sort((a, b) => a.criadoEm - b.criadoEm);
+      return [...list].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
     },
     [rotas, filterAbordadora]
   );
@@ -276,7 +276,7 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
   const filteredPercursos = useMemo(
     () => {
       const list = filterAbordadora ? percursos.filter((p) => p.abordadora === filterAbordadora) : percursos;
-      return [...list].sort((a, b) => a.criadoEm - b.criadoEm);
+      return [...list].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
     },
     [percursos, filterAbordadora]
   );
