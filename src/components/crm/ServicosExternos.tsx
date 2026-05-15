@@ -1247,19 +1247,62 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
           {/* Tab: Rota Planejada */}
           {rotaModalInnerTab === "rota" && (
             <>
-              <div className="px-4 pt-2 pb-2 flex items-center gap-2 flex-wrap">
-                {!rotaDrawMode ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
-                    onClick={() => setRotaDrawMode(true)}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    {draftWaypoints.length > 0 ? "Editar Rota" : "Definir Rota"}
-                  </Button>
-                ) : (
-                  <>
+              {/* MODO VISUALIZAÇÃO */}
+              {!rotaDrawMode && (
+                <div className="px-4 pt-3 pb-3 border-b bg-muted/20">
+                  {draftWaypoints.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 py-6 text-center">
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <Navigation className="h-6 w-6 text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Nenhuma rota planejada</p>
+                        <p className="text-xs text-muted-foreground mt-1">Desenhe um trajeto para {rotaModal?.abordadora}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="gap-1.5 bg-blue-600 hover:bg-blue-700 mt-2"
+                        onClick={() => setRotaDrawMode(true)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Desenhar Rota
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-blue-100 p-2 rounded-lg">
+                          <Navigation className="h-4 w-4 text-blue-700" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">Rota planejada</p>
+                          <p className="text-xs text-muted-foreground">{draftWaypoints.length} pontos</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
+                        onClick={() => setRotaDrawMode(true)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Editar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* MODO DESENHO */}
+              {rotaDrawMode && (
+                <div className="px-4 pt-3 pb-3 border-b bg-red-50/30">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex-1 flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                      <span className="text-xs font-semibold text-red-700">MODO DESENHO - Clique no mapa para adicionar pontos</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap mt-3">
                     <Button
                       size="sm"
                       variant="outline"
@@ -1282,7 +1325,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                     </Button>
                     <Button
                       size="sm"
-                      className="gap-1.5 bg-blue-600 hover:bg-blue-700"
+                      className="gap-1.5 bg-green-600 hover:bg-green-700"
                       onClick={handleSaveRota}
                       disabled={savingRota || draftWaypoints.length === 0}
                     >
@@ -1292,6 +1335,7 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="text-gray-600"
                       onClick={() => {
                         setRotaDrawMode(false);
                         if (rotaModal) {
@@ -1305,21 +1349,22 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                     >
                       Cancelar
                     </Button>
-                  </>
-                )}
-                {!rotaDrawMode && draftWaypoints.length > 0 && (
-                  <span className="text-xs text-gray-500 ml-auto">
-                    {draftWaypoints.length} pontos definidos
-                  </span>
-                )}
-              </div>
+                    {draftWaypoints.length > 0 && (
+                      <span className="text-xs text-red-700 font-semibold ml-auto">
+                        {draftWaypoints.length} {draftWaypoints.length === 1 ? "ponto" : "pontos"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div style={{ height: "60vh" }}>
                 {rotaModal && (
                   <MapaRota
                     clinicId={rotaModal.clinicId}
                     sessaoId={rotaModal.sessaoId}
                     abordadora={rotaModal.abordadora}
-                    plannedRoute={rotaDrawMode ? draftWaypoints : undefined}
+                    plannedRoute={rotaDrawMode ? draftWaypoints : (draftWaypoints.length > 0 ? draftWaypoints : undefined)}
                     onMapClick={rotaDrawMode ? (pt) => setDraftWaypoints((prev) => [...prev, pt]) : undefined}
                     height="100%"
                   />
