@@ -50,27 +50,23 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       // - Follow-ups realizados = dataFollowUp
       // - Agendamentos feitos = subset de follow-ups com dataAgendamento e agendamento >= follow-up
       const newLeads = leads.filter((l) => {
-        if ((l as any)._deleted) return false;
         const dc = l.dataContato || "";
         return dc.startsWith(dayStr);
       });
 
       const followUpsDone = leads.filter((l) => {
-        if ((l as any)._deleted) return false;
         const df = l.lastFollowUpDone || "";
         return df.startsWith(dayStr);
       });
 
       // Agendamentos: contar apenas agendamentos CRIADOS nesse dia (dataAgendamentoCriado)
       const appointmentsMade = leads.filter((l) => {
-        if ((l as any)._deleted) return false;
         const dac = l.dataAgendamentoCriado || "";
         return dac.startsWith(dayStr);
       });
 
       // Reagendamentos: contar alterações de agendamento feitas nesse dia
       const reschedulesMade = leads.filter((l) => {
-        if ((l as any)._deleted) return false;
         const daa = l.dataAgendamentoAlterado || "";
         return daa.startsWith(dayStr);
       });
@@ -109,10 +105,10 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
 
   // Métricas do dia de hoje para as barras de progresso
   const todayStr = format(new Date(), "dd/MM/yyyy");
-  const newLeadsToday = leads.filter((l) => !(l as any)._deleted && (l.dataContato || "").startsWith(todayStr));
-  const followUpsDoneToday = leads.filter((l) => !(l as any)._deleted && (l.lastFollowUpDone || "").startsWith(todayStr));
-  const appointmentsMadeToday = leads.filter((l) => !(l as any)._deleted && (l.dataAgendamentoCriado || "").startsWith(todayStr));
-  const reschedulesToday = leads.filter((l) => !(l as any)._deleted && (l.dataAgendamentoAlterado || "").startsWith(todayStr));
+  const newLeadsToday = leads.filter((l) => (l.dataContato || "").startsWith(todayStr));
+  const followUpsDoneToday = leads.filter((l) => (l.lastFollowUpDone || "").startsWith(todayStr));
+  const appointmentsMadeToday = leads.filter((l) => (l.dataAgendamentoCriado || "").startsWith(todayStr));
+  const reschedulesToday = leads.filter((l) => (l.dataAgendamentoAlterado || "").startsWith(todayStr));
   // IDs for debugging
   const newLeadsTodayIds = newLeadsToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
   const followUpsDoneTodayIds = followUpsDoneToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
@@ -192,13 +188,13 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </div>
 
         {/* Agendamentos do período + Barra Hoje + 🏆 */}
-        <div className="p-2 sm:p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-200/50">
-          <div className="mb-2 sm:mb-3">
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+        <div className="p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-200/50">
+          <div className="mb-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
               Agendamentos
             </p>
-            <p className="text-lg sm:text-2xl font-bold text-blue-600">{totalAgendamentos}</p>
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground">Meta {META_AGENDAMENTOS}/dia</p>
+            <p className="text-2xl font-bold text-blue-600">{totalAgendamentos}</p>
+            <p className="text-[10px] text-muted-foreground">Período: meta {META_AGENDAMENTOS}/dia</p>
           </div>
           <ProgressWithLabel
             label="Hoje"
@@ -210,13 +206,13 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </div>
 
         {/* Reagendamentos do período + Barra Hoje */}
-        <div className="p-2 sm:p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
-          <div className="mb-2 sm:mb-3">
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+        <div className="p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
+          <div className="mb-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
               Reagendamentos
             </p>
-            <p className="text-lg sm:text-2xl font-bold text-amber-600">{totalReagendamentos}</p>
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground">Reagendamentos no período</p>
+            <p className="text-2xl font-bold text-amber-600">{totalReagendamentos}</p>
+            <p className="text-[10px] text-muted-foreground">Período: reagendamentos registrados</p>
           </div>
           <ProgressWithLabel
             label="Hoje"
@@ -227,14 +223,14 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
         </div>
 
         {/* Taxa de conversão do dia */}
-        <div className="p-2 sm:p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
-          <p className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-1 flex items-center gap-1">
+        <div className="p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-1 flex items-center gap-1">
             <TrendingUp className="h-3 w-3" />
-            Conversão
+            Conversão Hoje
           </p>
-          <p className="text-lg sm:text-2xl font-bold text-amber-600">{taxaHoje}%</p>
-          <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-2">
-            {agendamentosHoje}/{atendimentosHoje}
+          <p className="text-2xl font-bold text-amber-600">{taxaHoje}%</p>
+          <p className="text-[10px] text-muted-foreground mt-3">
+            {agendamentosHoje} agendamentos de {atendimentosHoje} atendimentos
           </p>
         </div>
       </div>
@@ -242,7 +238,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       {/* Gráfico - Mostrar apenas se não for "Hoje" */}
       {period !== "today" && (
         <>
-          <ResponsiveContainer width="100%" height={180}>
+          <ResponsiveContainer width="100%" height={220}>
             <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
