@@ -266,12 +266,18 @@ export function MapaGeralRotas({ clinicId }: MapaGeralRotasProps) {
   );
 
   const filtered = useMemo(
-    () => (filterAbordadora ? rotas.filter((r) => r.abordadora === filterAbordadora) : rotas),
+    () => {
+      const list = filterAbordadora ? rotas.filter((r) => r.abordadora === filterAbordadora) : rotas;
+      return [...list].sort((a, b) => a.criadoEm - b.criadoEm);
+    },
     [rotas, filterAbordadora]
   );
 
   const filteredPercursos = useMemo(
-    () => (filterAbordadora ? percursos.filter((p) => p.abordadora === filterAbordadora) : percursos),
+    () => {
+      const list = filterAbordadora ? percursos.filter((p) => p.abordadora === filterAbordadora) : percursos;
+      return [...list].sort((a, b) => a.criadoEm - b.criadoEm);
+    },
     [percursos, filterAbordadora]
   );
 
