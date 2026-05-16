@@ -145,6 +145,8 @@ function getSourceBreakdownForMetric(
 }
 
 // ─── Helper: Status dos agendados (compareceu / aguardando / não veio) ─────
+// Filtra por dataAgendamento (data da consulta), igual ao card "Compareceu",
+// para garantir que os números sejam consistentes entre os dois lugares.
 function getAgendamentoStatusBreakdown(
   leads: Lead[],
   mmYYYY: string,
@@ -152,8 +154,10 @@ function getAgendamentoStatusBreakdown(
 ): { compareceu: number; nao_compareceu: number; aguardando: number; total: number } {
   const [mm, yyyy] = mmYYYY.split("/");
   const agendados = leads.filter((lead) => {
-    const dc = lead.dataAgendamentoCriado || "";
-    const parts = dc.split("/");
+    const dc = lead.dataAgendamento || "";
+    // dataAgendamento pode ter horário: "dd/MM/yyyy HH:mm" — pegar só a parte da data
+    const datePart = dc.split(" ")[0];
+    const parts = datePart.split("/");
     if (parts.length < 3) return false;
     const d = parseInt(parts[0], 10);
     const m = parts[1];
@@ -440,15 +444,15 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
   }, [funnelByFonte]);
 
   return (
-    <div className="bg-[#1C1C1E] rounded-xl border border-gray-800 p-2 sm:p-6 mt-6 overflow-hidden">
+    <div className="bg-[#1C1C1E] rounded-xl border border-gray-800 p-6 mt-6">
       {/* Cabeçalho */}
-      <div className="flex items-center gap-2 mb-3 sm:mb-5">
-        <TrendingUp className="w-4 sm:w-5 h-4 sm:h-5 text-indigo-400" />
-        <h3 className="text-white font-semibold text-sm sm:text-base">Comparação de Períodos</h3>
+      <div className="flex items-center gap-2 mb-5">
+        <TrendingUp className="w-5 h-5 text-indigo-400" />
+        <h3 className="text-white font-semibold text-base">Comparação de Períodos</h3>
       </div>
 
       {/* Controles */}
-      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:flex-wrap">
+      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:flex-wrap">
         <div>
           <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Métrica</p>
           <div className="flex gap-2 flex-wrap">
@@ -504,15 +508,15 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
       </div>
 
       {/* Gráfico */}
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={chartData} margin={{ top: 5, right: 10, left: -15, bottom: 5 }}>
+      <ResponsiveContainer width="100%" height={280}>
+        <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#2d2d30" />
           <XAxis
             dataKey="dia"
-            tick={{ fill: "#9ca3af", fontSize: 10 }}
+            tick={{ fill: "#9ca3af", fontSize: 11 }}
             tickLine={false}
             axisLine={{ stroke: "#374151" }}
-            interval="preserveStartEnd"
+            interval={1}
           />
           <YAxis
             tick={{ fill: "#9ca3af", fontSize: 11 }}
@@ -558,7 +562,7 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
       </ResponsiveContainer>
 
       {/* Cards de análise por mês */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 mt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
         {analytics.map((a, idx) => {
           const variation = variations[idx];
           const color = LINE_COLORS[idx % LINE_COLORS.length];
@@ -573,12 +577,11 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
             >
               {/* Cabeçalho: Mês + Realizado */}
               <div className="mb-2">
-                <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                  <span className="text-xs font-semibold text-white uppercase tracking-wide leading-tight">
-                    {getMonthLabel(a.month)}
-                    <span className="text-[10px] text-indigo-400 normal-case ml-1">(até dia {todayDay})</span>
+                <div className="flex items-baseline justify-between mb-1">
+                  <span className="text-xs font-semibold text-white uppercase tracking-wide">
+                    {getMonthLabel(a.month)} <span className="text-[10px] text-indigo-400 normal-case">(até dia {todayDay})</span>
                   </span>
-                  <span className="text-xl font-bold text-white shrink-0">{displayVal}</span>
+                  <span className="text-2xl font-bold text-white">{displayVal}</span>
                 </div>
               </div>
 
@@ -595,12 +598,11 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                     return (
                       <div>
                         {/* Linha: Realizado / Meta + Progresso % */}
-                        <div className="flex items-center justify-between gap-1 mb-2 flex-wrap">
+                        <div className="flex items-center justify-between mb-2">
                           <span className="text-xs text-gray-400">
-                            <strong className="text-white">{displayVal}</strong>/<strong>{projectedGoal}</strong>
-                            <span className="text-indigo-400 ml-1">(dia {todayDay})</span>
+                            Realizado: <strong className="text-white">{displayVal}</strong> / <strong>{projectedGoal}</strong> <span className="text-indigo-400">(até dia {todayDay})</span>
                           </span>
-                          <span className={`text-sm font-bold shrink-0 ${progress >= 100 ? "text-emerald-400" : isBelow ? "text-red-400" : "text-amber-400"}`}>
+                          <span className={`text-sm font-bold ${progress >= 100 ? "text-emerald-400" : isBelow ? "text-red-400" : "text-amber-400"}`}>
                             {Math.round(progress)}%
                           </span>
                         </div>

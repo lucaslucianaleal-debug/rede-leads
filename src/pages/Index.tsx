@@ -220,7 +220,7 @@ const CRMDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-[1400px] mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="bg-primary rounded-lg p-2 shrink-0">
               <FunnelIcon className="h-5 w-5 text-primary-foreground" />
@@ -356,7 +356,7 @@ const CRMDashboard = () => {
         </div>
       </header>
 
-      <main className="max-w-[1400px] mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         {loading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
             <div className="h-2 w-2 rounded-full bg-primary animate-bounce" />
@@ -389,8 +389,8 @@ const CRMDashboard = () => {
               </select>
             </div>
             <Tabs value={clientTab} onValueChange={setClientTab} className="w-full">
-              <div className="w-full overflow-x-auto pb-1">
-                <TabsList className="min-w-max justify-start gap-1">
+              <div className="w-full">
+                <TabsList className="w-full sm:max-w-xs justify-start gap-2">
                   <TabsTrigger value="agenda" className="flex items-center gap-1.5">
                     <CalendarCheck className="h-4 w-4 shrink-0" />
                     <span className="hidden sm:inline">Agenda do Dia</span>
@@ -430,8 +430,8 @@ const CRMDashboard = () => {
           </div>
         ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="w-full overflow-x-auto pb-1">
-            <TabsList className="min-w-max justify-start gap-1">
+          <div className="w-full">
+            <TabsList className="w-full sm:max-w-[1100px] justify-start gap-2">
             <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
               <LayoutDashboard className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Dashboard</span>
