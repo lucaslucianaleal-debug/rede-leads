@@ -173,6 +173,55 @@ function getAgendamentoStatusBreakdown(
   };
 }
 
+// ─── Helper: Fonte breakdown com taxa de qualidade ─────────────────────────
+// leads_novos  → qualityRate = % que gerou agendamento
+// agendamentos → qualityRate = % que compareceu
+function getSourceBreakdownWithQuality(
+  leads: Lead[],
+  metric: "leads_novos" | "agendamentos",
+  mmYYYY: string,
+  upToDay?: number
+): Array<{ fonte: string; count: number; qualityRate: number }> {
+  const [mm, yyyy] = mmYYYY.split("/");
+
+  const inMonth = (dateStr: string | undefined, maxDay?: number): boolean => {
+    if (!dateStr) return false;
+    const s = dateStr.split(" ")[0];
+    const parts = s.split("/");
+    if (parts.length < 3) return false;
+    const d = parseInt(parts[0], 10);
+    if (parts[1] !== mm || parts[2].slice(0, 4) !== yyyy) return false;
+    if (maxDay !== undefined && d > maxDay) return false;
+    return true;
+  };
+
+  const primaryField = metric === "leads_novos"
+    ? (l: Lead) => l.dataCriacao
+    : (l: Lead) => l.dataAgendamentoCriado;
+
+  const fonteMap = new Map<string, { count: number; qualified: number }>();
+  for (const lead of leads) {
+    if (!inMonth(primaryField(lead), upToDay)) continue;
+    const fonte = lead.fonteLead || "Outro";
+    if (!fonteMap.has(fonte)) fonteMap.set(fonte, { count: 0, qualified: 0 });
+    fonteMap.get(fonte)!.count++;
+    if (metric === "leads_novos" && !!lead.dataAgendamentoCriado) {
+      fonteMap.get(fonte)!.qualified++;
+    } else if (metric === "agendamentos" && lead.comparecimento === "COMPARECEU") {
+      fonteMap.get(fonte)!.qualified++;
+    }
+  }
+
+  return Array.from(fonteMap.entries())
+    .map(([fonte, v]) => ({
+      fonte,
+      count: v.count,
+      qualityRate: v.count > 0 ? Math.round((v.qualified / v.count) * 100) : 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 4);
+}
+
 // ─── Helper: Funil de conversão por fonte ─────────────────────────────────
 // Usa os mesmos campos de data que os cards para garantir consistência de números.
 // leads      → dataCriacao no período
@@ -432,10 +481,13 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
       if (totalLeads > 0) {
         const gConv = Math.round((totalAgend / totalLeads) * 100);
         const gShow = totalAgend > 0 ? Math.round((totalComp / totalAgend) * 100) : 0;
-        const statusText = gConv >= 40 && gShow >= 50 ? "excelente" : gConv >= 30 && gShow >= 35 ? "dentro do alvo" : "precisa melhorar";
+        const convMark = gConv >= 40 ? "✅" : "⚠️";
+        const showMark = gShow >= 50 ? "✅" : "⚠️";
+        const convNote = gConv >= 40 ? `` : ` (meta: 40%)`;
+        const showNote = gShow >= 50 ? `` : ` (meta: 50%)`;
         insights.push({
           type: gConv >= 40 && gShow >= 50 ? "good" : gConv < 25 || gShow < 30 ? "bad" : "tip",
-          text: `Funil geral ${statusText}: ${gConv}% leads→agendamento, ${gShow}% agendamento→compareceu`
+          text: `Funil geral — Conversão: ${convMark} ${gConv}%${convNote} leads→agend · Comparecimento: ${showMark} ${gShow}%${showNote} agend→vieram`
       });
     }
 
@@ -599,7 +651,10 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                         {/* Linha: Realizado / Meta + Progresso % */}
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs text-gray-400">
-                            Realizado: <strong className="text-white">{displayVal}</strong> / <strong>{projectedGoal}</strong> <span className="text-indigo-400">(até dia {todayDay})</span>
+                            Realizado: <strong className="text-white">{displayVal}</strong>
+                            <span className="mx-1.5 text-gray-700">·</span>
+                            Meta até dia {todayDay}: <strong className="text-indigo-300">{projectedGoal}</strong>
+                            <span className="text-gray-600 text-[10px] ml-1">(de {goal})</span>
                           </span>
                           <span className={`text-sm font-bold ${progress >= 100 ? "text-emerald-400" : isBelow ? "text-red-400" : "text-amber-400"}`}>
                             {Math.round(progress)}%
@@ -630,10 +685,34 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                 <div className="mt-3 pt-2.5 pb-2.5">
                   <p className="text-xs text-gray-400 mb-2 font-bold uppercase tracking-widest opacity-75">📊 Fonte:</p>
                   {(() => {
+                    if (metric === "leads_novos" || metric === "agendamentos") {
+                      const items = getSourceBreakdownWithQuality(leads, metric, a.month, todayDay);
+                      if (items.length === 0) return <p className="text-xs text-gray-600 px-1">Sem dados</p>;
+                      const qLabel = metric === "leads_novos" ? "→ agend" : "→ vieram";
+                      return (
+                        <div className="space-y-1.5">
+                          {items.map((item) => (
+                            <div key={item.fonte} className="flex items-center justify-between px-1 gap-2">
+                              <span className="text-xs text-gray-400 flex-1 truncate">{item.fonte}</span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-base font-bold text-teal-400">{item.count}</span>
+                                {item.count >= 2 && (
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                    item.qualityRate >= 60 ? "bg-emerald-900/70 text-emerald-300" :
+                                    item.qualityRate >= 35 ? "bg-amber-900/70 text-amber-300" :
+                                    "bg-red-900/70 text-red-300"
+                                  }`}>
+                                    {item.qualityRate}% {qLabel}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
                     const breakdown = getSourceBreakdownForMetric(leads, metric, a.month, todayDay);
-                    const sorted = Object.entries(breakdown)
-                      .sort((a, b) => b[1] - a[1])
-                      .slice(0, 4);
+                    const sorted = Object.entries(breakdown).sort((a, b) => b[1] - a[1]).slice(0, 4);
                     if (sorted.length === 0) return <p className="text-xs text-gray-600 px-1">Sem dados</p>;
                     return (
                       <div className="space-y-1.5">
@@ -671,6 +750,23 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                           <span className="text-amber-400">⏳ <strong>{st.aguardando}</strong> aguardando</span>
                           <span className="text-red-400">✘ <strong>{st.nao_compareceu}</strong> não veio</span>
                         </div>
+                        {/* Agendamentos futuros ainda no mês */}
+                        {a.isCurrentMonth && (() => {
+                          const [fmm, fyyyy] = a.month.split("/");
+                          const futureCount = leads.filter(l => {
+                            const s = (l.dataAgendamento || "").split(" ")[0];
+                            const p = s.split("/");
+                            if (p.length < 3) return false;
+                            const d = parseInt(p[0], 10);
+                            return p[1] === fmm && p[2].slice(0, 4) === fyyyy && d > todayDay;
+                          }).length;
+                          if (futureCount === 0) return null;
+                          return (
+                            <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-gray-800/60">
+                              <span className="text-[10px] text-sky-400">📅 <strong>{futureCount}</strong> agendamentos pendentes (dias {todayDay + 1}–{a.daysInMonth})</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })()}
@@ -812,7 +908,7 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
                   const gap = projectedGoal - displayVal;
 
                   if (gap > 0 && gap <= projectedGoal * 0.3) {
-                    const breakdown = getSourceBreakdown(leads, a.month, todayDay);
+                    const breakdown = getSourceBreakdownForMetric(leads, "leads_novos", a.month, todayDay);
                     const topSource = Object.entries(breakdown).sort((a, b) => b[1] - a[1])[1]?.[0];
 
                     return (
