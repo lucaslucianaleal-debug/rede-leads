@@ -48,6 +48,8 @@ export interface Lead {
   dataFollowUp: string;
   // Data em que o último follow-up foi efetuado (registro de execução)
   lastFollowUpDone?: string;
+  // Índice da variação usada no último follow-up (para FU 1-3 com múltiplas opções)
+  lastFollowUpVariation?: number;
   // Data em que o agendamento foi CRIADO/registrado no sistema (dd/MM/yyyy)
   dataAgendamentoCriado?: string;
   // Data em que o agendamento foi ALTERADO (reagendamento) pela última vez
@@ -61,6 +63,8 @@ export interface Lead {
   briefingRecepcao?: string;
   followUpCount: number;
   lembretes: ReminderStatus;
+  // Coordenadas do cliente para navegação e rastreamento
+  coordenadas?: { lat?: number; lng?: number };
   // Soft-delete fields
   _deleted?: boolean;
   deletedAt?: string;

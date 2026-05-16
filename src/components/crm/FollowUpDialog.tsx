@@ -20,8 +20,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Trash2, CalendarIcon, ChevronDown, ChevronUp } from "lucide-react";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { getFollowUpMessage, getFollowUpMessageForLead, formatFollowUpMessage } from "@/data/followUpMessages";
@@ -32,15 +37,22 @@ interface FollowUpDialogProps {
   onClose: () => void;
   onConfirm: (leadId: string, observacao: string, etapa?: LeadStage) => void;
   onDelete?: (leadId: string) => void;
+  /** Opcional: chamado quando usuária decide agendar direto do follow-up */
+  onSchedule?: (leadId: string, dataAgendamento: string) => void;
 }
 
-export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete }: FollowUpDialogProps) {
+export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete, onSchedule }: FollowUpDialogProps) {
   const [observacao, setObservacao] = useState("");
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  // useAutoStage: se true (padrão), usa a progressão automática; se false, o usuário escolheu manual
   const [useAutoStage, setUseAutoStage] = useState(true);
   const [manualStage, setManualStage] = useState<LeadStage>(lead?.etapaLead || "Novo");
+
+  // ─── Agendamento inline ───────────────────────────────────────────────────
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(new Date());
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleCalendarOpen, setScheduleCalendarOpen] = useState(false);
 
   // Calcular próxima etapa automática
   const getNextStageAuto = (): LeadStage => {
@@ -99,11 +111,26 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete }: Fol
 
   const handleConfirm = () => {
     const finalStage = useAutoStage ? nextAutoStage : manualStage;
-    onConfirm(lead.id, observacao, finalStage);
-    toast.success(`Follow-Up registrado: ${lead.nome} → ${finalStage}`);
+    // Se usuária ativou agendamento inline, salvar data antes de fechar
+    if (showSchedule && onSchedule) {
+      if (!scheduleDate) {
+        toast.error("Selecione uma data para o agendamento.");
+        return;
+      }
+      const dataAgendamento = `${format(scheduleDate, "dd/MM/yyyy")} ${scheduleTime}`;
+      onSchedule(lead.id, dataAgendamento);
+      onConfirm(lead.id, observacao, "Avaliação agendada");
+      toast.success(`Agendado: ${lead.nome} → ${dataAgendamento}`);
+    } else {
+      onConfirm(lead.id, observacao, finalStage);
+      toast.success(`Follow-Up registrado: ${lead.nome} → ${finalStage}`);
+    }
     setObservacao("");
     setUseAutoStage(true);
     setManualStage(lead?.etapaLead || "Novo");
+    setShowSchedule(false);
+    setScheduleDate(new Date());
+    setScheduleTime("09:00");
     onClose();
   };
 
@@ -182,6 +209,57 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete }: Fol
               rows={4}
             />
           </div>
+
+          {/* ── Agendamento inline ─────────────────────────────────────── */}
+          {onSchedule && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowSchedule(v => !v)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm font-medium hover:bg-green-100 transition"
+              >
+                <span>📅 Agendar avaliação agora</span>
+                {showSchedule ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+
+              {showSchedule && (
+                <div className="mt-2 p-3 rounded-lg border border-green-200 bg-green-50/50 space-y-3">
+                  <div>
+                    <Label className="text-xs">Data</Label>
+                    <Popover open={scheduleCalendarOpen} onOpenChange={setScheduleCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full mt-1 text-left font-normal h-9 text-sm">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {scheduleDate ? format(scheduleDate, "dd/MM/yyyy") : "Selecionar data"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={scheduleDate}
+                          onSelect={(d) => { setScheduleDate(d); setScheduleCalendarOpen(false); }}
+                          locale={ptBR}
+                          disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Horário</Label>
+                    <Input
+                      type="time"
+                      value={scheduleTime}
+                      onChange={(e) => setScheduleTime(e.target.value)}
+                      className="mt-1 h-9 text-sm"
+                    />
+                  </div>
+                  <p className="text-xs text-green-700">
+                    Confirmar vai salvar o agendamento e mudar etapa para "Avaliação agendada".
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">

@@ -1252,6 +1252,7 @@ export function FollowUpRuler({
         onClose={() => setSelectedLead(null)}
         onConfirm={handleConfirmFU}
         onDelete={onDeleteLead}
+        onSchedule={onUpdateLead ? (leadId, dataAgendamento) => onUpdateLead(leadId, { dataAgendamento, etapaLead: "Avaliação agendada" }) : undefined}
       />
 
       <CallLogDialog

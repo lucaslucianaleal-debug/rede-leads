@@ -29,6 +29,7 @@ interface FollowUpQueueProps {
   followUpGoal?: number;
   onOpenChat?: (phone: string, message?: string) => void;
   onCreateLead?: (lead: Omit<Lead, 'id'>) => void;
+  onUpdateLead?: (leadId: string, updates: Partial<Lead>) => void;
 }
 
 // Helper function to calculate days since last follow-up
@@ -79,7 +80,7 @@ const parseToDate = (v: any): Date | null => {
   return null;
 };
 
-export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall, onDeleteLead, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat, onCreateLead }: FollowUpQueueProps) {
+export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall, onDeleteLead, followUpsDoneToday = 0, followUpGoal = 20, onOpenChat, onCreateLead, onUpdateLead }: FollowUpQueueProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [callLead, setCallLead] = useState<Lead | null>(null);
   const [whatsLead, setWhatsLead] = useState<Lead | null>(null);
@@ -622,6 +623,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
         onClose={() => setSelectedLead(null)}
         onConfirm={handleConfirmFollowUp}
         onDelete={onDeleteLead}
+        onSchedule={onUpdateLead ? (leadId, dataAgendamento) => onUpdateLead(leadId, { dataAgendamento, etapaLead: "Avaliação agendada" }) : undefined}
       />
 
       <CallLogDialog

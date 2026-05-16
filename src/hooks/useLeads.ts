@@ -1286,6 +1286,30 @@ export function useLeads() {
     if ("dataAgendamento" in updates && updates.dataAgendamento && !("comparecimento" in updates)) {
       finalUpdates.comparecimento = "AGUARDANDO DATA";
     }
+
+    // GUARDRAIL: Se etapa muda para "Avaliação agendada" sem dataAgendamento,
+    // forçar etapa para "Em contato" e avisar. Nunca deixar estado incoerente.
+    const leadAtual = leads.find(l => l.id === leadId);
+    const novaEtapa = finalUpdates.etapaLead;
+    if (novaEtapa === "Avaliação agendada") {
+      const temData = finalUpdates.dataAgendamento || leadAtual?.dataAgendamento;
+      if (!temData) {
+        // Não tem data de agendamento — corrige para etapa anterior
+        const etapaSegura = leadAtual?.etapaLead || "Em contato";
+        finalUpdates.etapaLead = etapaSegura === "Avaliação agendada" ? "Em contato" : etapaSegura;
+        // Toast apenas se a mudança veio de fora (não de si mesma)
+        if (typeof window !== "undefined") {
+          import("sonner").then(({ toast }) => {
+            toast.warning("Agende uma data antes de marcar 'Avaliação agendada'", { duration: 4000 });
+          });
+        }
+      }
+    }
+
+    // GUARDRAIL: comparecimento "COMPARECEU" requer etapaLead = "Finalizado"
+    if (finalUpdates.comparecimento === "COMPARECEU" && !("etapaLead" in finalUpdates)) {
+      finalUpdates.etapaLead = "Finalizado";
+    }
     
     // Find the lead to get current data for sync
     const leadToUpdate = leads.find(l => l.id === leadId);
