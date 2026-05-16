@@ -435,64 +435,146 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
     return getConversionFunnelByFonte(leads, funnelPeriods);
   }, [leads, funnelPeriods]);
 
-// Insights automáticos de diagnóstico com ações concretas
-    const diagnosticoInsights = useMemo(() => {
-      const insights: { type: "good" | "bad" | "tip"; text: string }[] = [];
-      const significant = funnelByFonte.filter(f => f.leads >= 2);
-      if (significant.length === 0) return insights;
+  // Funil do mês ANTERIOR ao mais recente selecionado (para contexto histórico)
+  const prevMonthFunnel = useMemo(() => {
+    const latestMonth = selectedMonths[0];
+    const [mm, yyyy] = latestMonth.split("/");
+    const d = new Date(parseInt(yyyy), parseInt(mm) - 1, 1);
+    d.setMonth(d.getMonth() - 1);
+    const prevMonth = format(d, "MM/yyyy");
+    return getConversionFunnelByFonte(leads, [{ mmYYYY: prevMonth }]);
+  }, [leads, selectedMonths]);
 
-      // Melhor taxa de conversão L→A (melhor canal)
-      const bestConv = [...significant].sort((a, b) => b.convRate - a.convRate)[0];
-      if (bestConv.convRate >= 70) {
-        insights.push({ type: "good", text: `${bestConv.fonte}: ${bestConv.convRate}% conversão — aumentar investimento aqui` });
-      }
+  // Diagnóstico com histórico, prioridade, diagnóstico e impacto
+  const diagnosticoInsights = useMemo(() => {
+    type Priority = "critical" | "important" | "improve" | "good";
+    const insights: { priority: Priority; title: string; diagnosis: string; action: string; impact?: string }[] = [];
+    const significant = funnelByFonte.filter(f => f.leads >= 2);
+    if (significant.length === 0) return insights;
 
-      // Melhor taxa de comparecimento (qualidade de lead)
-      const withAppts = significant.filter(f => f.agendamentos >= 2);
-      if (withAppts.length > 0) {
-        const bestShow = [...withAppts].sort((a, b) => b.showRate - a.showRate)[0];
-        if (bestShow.showRate >= 60) {
-          insights.push({ type: "good", text: `${bestShow.fonte}: ${bestShow.showRate}% comparecimento — leads de alta qualidade` });
+    const prevMap = new Map(prevMonthFunnel.map(f => [f.fonte, f]));
+
+    for (const row of significant) {
+      const prev = prevMap.get(row.fonte);
+      const showTrend = prev && prev.agendamentos >= 2 ? row.showRate - prev.showRate : null;
+      const convTrend = prev && prev.leads >= 2 ? row.convRate - prev.convRate : null;
+
+      // ─── Comparecimento ───
+      if (row.agendamentos >= 2) {
+        const prevShowStr = prev
+          ? ` | mês ant: ${prev.showRate}%${showTrend !== null ? ` (${showTrend > 0 ? "+" : ""}${Math.round(showTrend)}pp)` : ""}`
+          : "";
+        const potentialExtra = Math.round(0.40 * row.agendamentos) - row.compareceu;
+
+        if (showTrend !== null && showTrend < -15) {
+          insights.push({
+            priority: "critical",
+            title: `${row.fonte}: Comparecimento ↓ ${Math.abs(Math.round(showTrend))}pp vs mês anterior`,
+            diagnosis: `${row.agendamentos} agend → ${row.compareceu} vieram (${row.showRate}%)${prevShowStr}`,
+            action: `URGENTE: investigar causa da queda. TESTE — WhatsApp confirmação 2h antes da consulta`,
+            impact: potentialExtra > 0 ? `Se voltar a ${prev?.showRate}%: +${potentialExtra} comparecimentos este mês` : undefined,
+          });
+        } else if (row.showRate < 35) {
+          insights.push({
+            priority: "important",
+            title: `${row.fonte}: Comparecimento abaixo do alvo (${row.showRate}% — meta: 50%)`,
+            diagnosis: `${row.agendamentos} agend → ${row.compareceu} vieram${prevShowStr}`,
+            action: `Reforçar confirmação 24h e 2h antes. Ligar para leads agendados 1 dia antes`,
+            impact: potentialExtra > 0 ? `Se 40% show-up: +${potentialExtra} comparecimentos` : undefined,
+          });
+        } else if (row.showRate < 50) {
+          insights.push({
+            priority: "improve",
+            title: `${row.fonte}: Comparecimento razoável (${row.showRate}% — meta: 50%)`,
+            diagnosis: `${row.agendamentos} agend → ${row.compareceu} vieram${prevShowStr}`,
+            action: `Enviar lembrete automático 24h antes. Verificar se data/hora está conveniente`,
+            impact: potentialExtra > 0 ? `Se 50%: +${potentialExtra} comparecimentos` : undefined,
+          });
+        } else {
+          insights.push({
+            priority: "good",
+            title: `${row.fonte}: Alta qualidade (${row.showRate}% comparecimento)`,
+            diagnosis: `${row.agendamentos} agend → ${row.compareceu} vieram${prevShowStr}`,
+            action: `Manter e priorizar. Leads desta fonte têm alto comprometimento`,
+          });
         }
-        const worstShow = [...withAppts].sort((a, b) => a.showRate - b.showRate)[0];
-        if (worstShow.showRate < 40) {
-          insights.push({ type: "bad", text: `${worstShow.fonte}: ${worstShow.showRate}% comparecimento — reforçar lembretes e confirmação` });
+      }
+
+      // ─── Conversão ───
+      if (row.leads >= 5) {
+        const prevConvStr = prev
+          ? ` | mês ant: ${prev.convRate}%${convTrend !== null ? ` (${convTrend > 0 ? "+" : ""}${Math.round(convTrend)}pp)` : ""}`
+          : "";
+        const gapAgend = Math.round(0.40 * row.leads) - row.agendamentos;
+
+        if (convTrend !== null && convTrend < -15) {
+          insights.push({
+            priority: "critical",
+            title: `${row.fonte}: Conversão caiu ↓ ${Math.abs(Math.round(convTrend))}pp vs mês anterior`,
+            diagnosis: `${row.leads} leads → ${row.agendamentos} agendados (${row.convRate}%)${prevConvStr}`,
+            action: `URGENTE: verificar se o fluxo de atendimento mudou. Revisar resposta ao primeiro contato`,
+            impact: gapAgend > 0 ? `Se 40% conv: +${gapAgend} agendamentos` : undefined,
+          });
+        } else if (row.convRate < 30 && !(row.agendamentos < 2)) {
+          insights.push({
+            priority: "important",
+            title: `${row.fonte}: Conversão baixa (${row.convRate}% — meta: 40%)`,
+            diagnosis: `${row.leads} leads → ${row.agendamentos} agendados${prevConvStr}`,
+            action: `TESTE A/B: abordagem direta ("Quer agendar agora?") vs pergunta aberta. Medir por 2 semanas`,
+            impact: gapAgend > 0 ? `Se 40% conv: +${gapAgend} agendamentos` : undefined,
+          });
+        } else if (row.convRate >= 80) {
+          insights.push({
+            priority: "good",
+            title: `${row.fonte}: Conversão excelente (${row.convRate}% → agendamento)`,
+            diagnosis: `${row.leads} leads → ${row.agendamentos} agendados${prevConvStr}`,
+            action: `Aumentar investimento nesta fonte. Maior ROI atual`,
+          });
         }
       }
 
-      // Alto volume mas baixa conversão (diagnóstico de funil)
-      const highVolLowConv = significant.filter(f => f.leads >= 5 && f.convRate < 40);
-      if (highVolLowConv.length > 0) {
-        const row = highVolLowConv[0];
-        const gap = Math.round((40 - row.convRate) * row.leads / 100);
-        insights.push({ type: "tip", text: `${row.fonte}: ${row.leads} leads mas só ${row.convRate}% agendamentos — revisar copy/timing (ganho: ~${gap} agend se 40%)` });
-      }
-
-      // Fontes sem agendamento (aviso)
-      const noAppts = funnelByFonte.filter(f => f.agendamentos === 0 && f.leads >= 1);
-      if (noAppts.length > 0) {
-        insights.push({ type: "bad", text: `${noAppts.map(f => f.fonte).join(", ")}: sem agendamentos — revisar redirecionamento ou valor da oferta` });
-      }
-
-      // Taxa geral do mês
-      const totalLeads = funnelByFonte.reduce((s, f) => s + f.leads, 0);
-      const totalAgend = funnelByFonte.reduce((s, f) => s + f.agendamentos, 0);
-      const totalComp = funnelByFonte.reduce((s, f) => s + f.compareceu, 0);
-      if (totalLeads > 0) {
-        const gConv = Math.round((totalAgend / totalLeads) * 100);
-        const gShow = totalAgend > 0 ? Math.round((totalComp / totalAgend) * 100) : 0;
-        const convMark = gConv >= 40 ? "✅" : "⚠️";
-        const showMark = gShow >= 50 ? "✅" : "⚠️";
-        const convNote = gConv >= 40 ? `` : ` (meta: 40%)`;
-        const showNote = gShow >= 50 ? `` : ` (meta: 50%)`;
+      // ─── Zero agendamentos ───
+      if (row.agendamentos === 0) {
+        const prevAgend = prev?.agendamentos ?? 0;
         insights.push({
-          type: gConv >= 40 && gShow >= 50 ? "good" : gConv < 25 || gShow < 30 ? "bad" : "tip",
-          text: `Funil geral — Conversão: ${convMark} ${gConv}%${convNote} leads→agend · Comparecimento: ${showMark} ${gShow}%${showNote} agend→vieram`
+          priority: row.leads >= 3 ? "critical" : "important",
+          title: `${row.fonte}: Zero agendamentos (${row.leads} lead${row.leads > 1 ? "s" : ""})`,
+          diagnosis: `${row.leads} leads criados → 0 agendados (0%)${prevAgend > 0 ? ` | mês ant: ${prevAgend} agend` : ""}`,
+          action: prevAgend > 0
+            ? `Fonte estava funcionando. Verificar se mudou algo no fluxo ou na oferta`
+            : `Avaliar ROI desta fonte. Se padrão há 2+ meses: considerar pausar ou redesenhar oferta`,
+        });
+      }
+    }
+
+    // ─── Funil geral ───
+    const tL = funnelByFonte.reduce((s, f) => s + f.leads, 0);
+    const tA = funnelByFonte.reduce((s, f) => s + f.agendamentos, 0);
+    const tC = funnelByFonte.reduce((s, f) => s + f.compareceu, 0);
+    if (tL > 0) {
+      const gConv = Math.round((tA / tL) * 100);
+      const gShow = tA > 0 ? Math.round((tC / tA) * 100) : 0;
+      const pL = prevMonthFunnel.reduce((s, f) => s + f.leads, 0);
+      const pA = prevMonthFunnel.reduce((s, f) => s + f.agendamentos, 0);
+      const pC = prevMonthFunnel.reduce((s, f) => s + f.compareceu, 0);
+      const pConv = pL > 0 ? Math.round((pA / pL) * 100) : null;
+      const pShow = pA > 0 ? Math.round((pC / pA) * 100) : null;
+      const prevNote = pConv !== null ? ` | mês ant: ${pConv}% conv, ${pShow}% comp` : "";
+      insights.push({
+        priority: gConv >= 40 && gShow >= 50 ? "good" : gConv < 25 || gShow < 30 ? "critical" : "important",
+        title: `Funil geral — Conv: ${gConv >= 40 ? "✅" : "⚠️"} ${gConv}% · Comp: ${gShow >= 50 ? "✅" : "⚠️"} ${gShow}%`,
+        diagnosis: `${tL} leads → ${tA} agend → ${tC} vieram${prevNote}`,
+        action: gConv >= 40 && gShow >= 50
+          ? `Funil saudável. Foco em volume — aumentar captação de leads`
+          : `Metas: 40% conv (atual ${gConv}%) e 50% comp (atual ${gShow}%). Priorize as fontes com maiores taxas`,
       });
     }
 
+    // Priorizar: crítico → importante → melhorar → bom
+    const order: Record<string, number> = { critical: 0, important: 1, improve: 2, good: 3 };
+    insights.sort((a, b) => (order[a.priority] ?? 4) - (order[b.priority] ?? 4));
     return insights;
-  }, [funnelByFonte]);
+  }, [funnelByFonte, prevMonthFunnel]);
 
   return (
     <div className="bg-[#1C1C1E] rounded-xl border border-gray-800 p-6 mt-6">
@@ -1094,18 +1176,50 @@ export function ComparisonChart({ leads }: ComparisonChartProps) {
             );
           })()}
 
-          {/* Insights automáticos com ações */}
+          {/* Recomendações estruturadas */}
           {diagnosticoInsights.length > 0 && (
-            <div className="px-4 py-3 space-y-2.5 border-t border-gray-800 bg-gray-950/30">
-              <p className="text-xs font-bold text-gray-400 uppercase">💡 Recomendações</p>
+            <div className="px-4 py-3 space-y-2 border-t border-gray-800 bg-gray-950/30">
+              <p className="text-xs font-bold text-gray-400 uppercase mb-3">💡 Recomendações</p>
               {diagnosticoInsights.map((insight, i) => (
-                <div key={i} className="flex items-start gap-2.5 text-xs">
-                  <span className="mt-0.5 shrink-0 text-sm leading-none">
-                    {insight.type === "good" ? "✅" : insight.type === "bad" ? "⚠️" : "💡"}
-                  </span>
-                  <span className={`leading-relaxed flex-1 ${insight.type === "good" ? "text-emerald-400" : insight.type === "bad" ? "text-red-400" : "text-amber-400"}`}>
-                    {insight.text}
-                  </span>
+                <div key={i} className={`rounded-lg border p-3 ${
+                  insight.priority === "critical" ? "bg-red-950/40 border-red-900/50" :
+                  insight.priority === "important" ? "bg-amber-950/40 border-amber-900/50" :
+                  insight.priority === "improve" ? "bg-blue-950/40 border-blue-900/50" :
+                  "bg-emerald-950/40 border-emerald-900/50"
+                }`}>
+                  {/* Prioridade + Título */}
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${
+                      insight.priority === "critical" ? "bg-red-800 text-red-100" :
+                      insight.priority === "important" ? "bg-amber-800 text-amber-100" :
+                      insight.priority === "improve" ? "bg-blue-800 text-blue-100" :
+                      "bg-emerald-800 text-emerald-100"
+                    }`}>
+                      {insight.priority === "critical" ? "🔴 CRÍTICO" :
+                       insight.priority === "important" ? "🟠 IMPORTANTE" :
+                       insight.priority === "improve" ? "🔵 MELHORAR" : "🟢 BOM"}
+                    </span>
+                    <span className={`text-xs font-semibold ${
+                      insight.priority === "critical" ? "text-red-300" :
+                      insight.priority === "important" ? "text-amber-300" :
+                      insight.priority === "improve" ? "text-blue-300" :
+                      "text-emerald-300"
+                    }`}>{insight.title}</span>
+                  </div>
+                  {/* Diagnóstico */}
+                  <div className="text-[10px] text-gray-500 mb-1.5 pl-2 border-l-2 border-gray-700 leading-relaxed">
+                    📊 {insight.diagnosis}
+                  </div>
+                  {/* Ação */}
+                  <div className="text-[10px] text-gray-300 leading-relaxed">
+                    ➜ {insight.action}
+                  </div>
+                  {/* Impacto */}
+                  {insight.impact && (
+                    <div className="text-[10px] text-sky-400 mt-1.5 font-medium">
+                      📈 Impacto estimado: {insight.impact}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
