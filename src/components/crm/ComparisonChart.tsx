@@ -145,8 +145,7 @@ function getSourceBreakdownForMetric(
 }
 
 // ─── Helper: Status dos agendados (compareceu / aguardando / não veio) ─────
-// - Compareceu/Não veio: conta apenas até upToDay (dias que já passaram)
-// - Aguardando: conta TODO o mês (porque podem acontecer nos próximos dias)
+// Conta APENAS agendamentos até hoje (upToDay).
 // Filtra por dataAgendamento (data da consulta), igual ao card "Compareceu".
 function getAgendamentoStatusBreakdown(
   leads: Lead[],
@@ -154,34 +153,23 @@ function getAgendamentoStatusBreakdown(
   upToDay?: number
 ): { compareceu: number; nao_compareceu: number; aguardando: number; total: number } {
   const [mm, yyyy] = mmYYYY.split("/");
-  
-  // Todos os agendamentos do mês (para "aguardando")
-  const allScheduled = leads.filter((lead) => {
+  const agendados = leads.filter((lead) => {
     const dc = lead.dataAgendamento || "";
     const datePart = dc.split(" ")[0];
     const parts = datePart.split("/");
     if (parts.length < 3) return false;
+    const d = parseInt(parts[0], 10);
     const m = parts[1];
     const y = parts[2].slice(0, 4);
     if (m !== mm || y !== yyyy) return false;
-    return true;
-  });
-  
-  // Agendamentos até hoje (para "compareceu" e "não veio")
-  const agendadosHoje = allScheduled.filter((lead) => {
-    const dc = lead.dataAgendamento || "";
-    const datePart = dc.split(" ")[0];
-    const parts = datePart.split("/");
-    const d = parseInt(parts[0], 10);
     if (upToDay !== undefined && d > upToDay) return false;
     return true;
   });
-  
   return {
-    compareceu: agendadosHoje.filter(l => l.comparecimento === "COMPARECEU").length,
-    nao_compareceu: agendadosHoje.filter(l => l.comparecimento === "NÃO COMPARECEU").length,
-    aguardando: allScheduled.filter(l => !l.comparecimento || l.comparecimento === "AGUARDANDO DATA").length,
-    total: agendadosHoje.length,
+    compareceu: agendados.filter(l => l.comparecimento === "COMPARECEU").length,
+    nao_compareceu: agendados.filter(l => l.comparecimento === "NÃO COMPARECEU").length,
+    aguardando: agendados.filter(l => !l.comparecimento || l.comparecimento === "AGUARDANDO DATA").length,
+    total: agendados.length,
   };
 }
 
