@@ -202,21 +202,34 @@ export function getVariationIndex(
 
 /**
  * Replace placeholders in follow-up message
- * [nome]    → lead name
- * [serviço] → service
- * [clínica] → clinic name (OdontoCompany)
- * [horário] → appointment time (e.g. "14:30")
+ * [nome]         → lead full name
+ * [primeiro_nome]→ lead first name
+ * [serviço]      → service
+ * [clínica]      → clinic name (OdontoCompany)
+ * [horário]      → appointment time (e.g. "14:30")
+ * [data_sugerida_1/2] → suggested date labels
+ * [hora_sugerida_1/2] → suggested hour labels
  */
 export function formatFollowUpMessage(
   template: string,
   leaderName: string,
   service: string = "nossos serviços",
   clinicName: string = "OdontoCompany",
-  horario: string = ""
+  horario: string = "",
+  data1: string = "",
+  data2: string = "",
+  hora1: string = "",
+  hora2: string = ""
 ): string {
+  const primeiroNome = leaderName.split(" ")[0] || "você";
   return template
     .replace(/\[nome\]/g, leaderName)
+    .replace(/\[primeiro_nome\]/g, primeiroNome)
     .replace(/\[serviço\]/g, service)
     .replace(/\[clínica\]/g, clinicName)
-    .replace(/\[horário\]/g, horario || "horário marcado");
+    .replace(/\[horário\]/g, horario || "horário marcado")
+    .replace(/\[data_sugerida_1\]/g, data1 || "em breve")
+    .replace(/\[data_sugerida_2\]/g, data2 || "em breve")
+    .replace(/\[hora_sugerida_1\]/g, hora1 || "a confirmar")
+    .replace(/\[hora_sugerida_2\]/g, hora2 || "a confirmar");
 }

@@ -264,6 +264,7 @@ export function FollowUpRuler({
   const [campaignOfferType, setCampaignOfferType] = useState<"clareamento" | "cupom">("clareamento");
   const [campaignVoucherPreviewUrl, setCampaignVoucherPreviewUrl] = useState<string | null>(null);
   const [campaignVoucherCopied, setCampaignVoucherCopied] = useState(false);
+  const [campaignPreviewSlot, setCampaignPreviewSlot] = useState<{ data1: string; hora1: string }>({ data1: "", hora1: "" });
 
   const { clinicMeta, currentClinic } = useAuth();
   const today = todayStr();
@@ -519,6 +520,19 @@ export function FollowUpRuler({
       setCampaignVoucherPreviewUrl(`/Voucher/Voucher cupom de ${cupomAmount}.jpeg`);
     }
     findCampaignVoucher();
+
+    // Also fetch available slots so the preview shows real dates
+    async function fetchCampaignSlot() {
+      if (!currentClinic) { setCampaignPreviewSlot({ data1: "", hora1: "" }); return; }
+      try {
+        const slots = await getAvailableSlots(currentClinic);
+        if (mounted && slots.length > 0) {
+          setCampaignPreviewSlot({ data1: slots[0].dayLabel, hora1: slots[0].hourLabel });
+        }
+      } catch { /* silent */ }
+    }
+    fetchCampaignSlot();
+
     return () => { mounted = false; };
   }, [currentCampaignLead, campaignOfferType, currentClinic]);
 
@@ -1408,8 +1422,8 @@ export function FollowUpRuler({
                     const previewMsg = msg
                       .replace("[primeiro_nome]", currentCampaignLead.nome.split(" ")[0] || "você")
                       .replace("[serviço]", currentCampaignLead.servicoProcurado || "seu procedimento")
-                      .replace("[data_sugerida_1]", "Quinta, 07/05")
-                      .replace("[hora_sugerida_1]", "8h30");
+                      .replace("[data_sugerida_1]", campaignPreviewSlot.data1 || "em breve")
+                      .replace("[hora_sugerida_1]", campaignPreviewSlot.hora1 || "a confirmar");
                     return previewMsg;
                   })()}
                 </div>
