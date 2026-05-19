@@ -1342,23 +1342,33 @@ export function useLeads() {
 
   // Função para registrar ligação — funciona igual a sendFollowUp + salva resultado
   const registerCall = (leadId: string, outcome: string, obs: string, returnDate?: string, nextStage?: LeadStage) => {
-    setLeads(prev => prev.map(l => {
-      if (l.id !== leadId) return l;
-      const timestamp = format(new Date(), "dd/MM/yyyy HH:mm");
-      const entry = `[${timestamp}] ${outcome}${obs ? ` — ${obs}` : ""}`;
-      const newObs = l.observacao ? `${l.observacao} | ${entry}` : entry;
-      const newCount = (l.followUpCount || 0) + 1;
-      const stageToUse = nextStage || getNextLeadStage(l.etapaLead);
-      return {
-        ...l,
-        observacao: newObs,
-        dataRetornoLigacao: returnDate || "",
-        lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
-        followUpCount: newCount,
-        dataFollowUp: calcNextFollowUpDate(newCount),
-        etapaLead: stageToUse,
-      };
-    }));
+    // Encontra o lead atual
+    const leadAtual = leads.find(l => l.id === leadId);
+    if (!leadAtual) return;
+
+    const timestamp = format(new Date(), "dd/MM/yyyy HH:mm");
+    const entry = `[${timestamp}] ${outcome}${obs ? ` — ${obs}` : ""}`;
+    const newObs = leadAtual.observacao ? `${leadAtual.observacao} | ${entry}` : entry;
+    const newCount = (leadAtual.followUpCount || 0) + 1;
+    const stageToUse = nextStage || getNextLeadStage(leadAtual.etapaLead);
+
+    const updates: Partial<Lead> = {
+      observacao: newObs,
+      dataRetornoLigacao: returnDate || "",
+      lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
+      followUpCount: newCount,
+      dataFollowUp: calcNextFollowUpDate(newCount),
+      etapaLead: stageToUse,
+    };
+
+    // Update local state immediately
+    setLeads(prev => prev.map(l =>
+      l.id === leadId ? { ...l, ...updates } : l
+    ));
+
+    // Sync to Firestore asynchronously
+    const syncData = { ...leadAtual, ...updates };
+    saveLeadWithSync(db, syncData, { previousPhone: leadAtual.telefone });
   };
 
   return {
