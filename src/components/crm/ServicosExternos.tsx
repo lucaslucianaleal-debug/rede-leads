@@ -941,6 +941,11 @@ export function ServicosExternos({ onRegisterCall }: ServicosExternosProps) {
                   </span>
                 )}
               </div>
+              {selected.dataAgendamento && (
+                <div className="text-xs bg-purple-50 border border-purple-200 text-purple-700 rounded-lg px-3 py-2 font-medium flex items-center gap-1">
+                  📅 Agendado: {selected.dataAgendamento}
+                </div>
+              )}
             </div>
 
             {/* Content — scrollável se precisar */}
