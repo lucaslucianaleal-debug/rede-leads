@@ -871,6 +871,9 @@ export function useLeads() {
     URL.revokeObjectURL(url);
   };
 
+  // Alias for exportRangeReport to match the expected prop name in AgendaDoDia
+  const exportFilteredAppointmentsXlsx = exportRangeReport;
+
   const exportCSV = (leadsParam?: Lead[]) => {
     const source = (leadsParam || leads).filter(l => l.etapaLead !== "Fora da região");
     const formatPhoneBR = (raw: string) => {
@@ -1388,6 +1391,7 @@ export function useLeads() {
     exportRangeReport,
     exportWeeklyAppointments,
     exportWeeklyAppointmentsXlsx,
+    exportFilteredAppointmentsXlsx,
     deleteLeads,
     deleteLead,
     clearAllLeads,
