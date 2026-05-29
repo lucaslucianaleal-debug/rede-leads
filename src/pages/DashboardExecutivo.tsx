@@ -15,6 +15,7 @@ import PredictiveScoreCard from "@/components/crm/executive/PredictiveScoreCard"
 import PerformanceBarCard from "@/components/crm/executive/PerformanceBarCard";
 import SourcePerformanceCard from "@/components/crm/executive/SourcePerformanceCard";
 import ActionCommandCard, { ActionCommand } from "@/components/crm/executive/ActionCommandCard";
+import HeroOperationalBlock from "@/components/crm/executive/HeroOperationalBlock";
 
 export default function DashboardExecutivo() {
   const { leads, lastSyncedAt, dataSource, ticketAverage } = useLeads();
@@ -165,6 +166,9 @@ export default function DashboardExecutivo() {
 
   return (
     <div className="space-y-6">
+      {/* Hero Operational Block - Situation summary and decision prompts */}
+      <HeroOperationalBlock leads={leads} ticketAverage={ticketAverage || 120} />
+
       {/* Action Command Cards - Top Priority */}
       {actionCommands.length > 0 && (
         <div className="mb-4">
