@@ -18,7 +18,7 @@ import ActionCommandCard, { ActionCommand } from "@/components/crm/executive/Act
 import HeroOperationalBlock from "@/components/crm/executive/HeroOperationalBlock";
 
 export default function DashboardExecutivo() {
-  const { leads, lastSyncedAt, dataSource, ticketAverage } = useLeads();
+  const { leads, lastSyncedAt, dataSource, ticketAverage, updateLead } = useLeads();
   const [periodPreset, setPeriodPreset] = React.useState<string>("last_7");
 
   // Helpers para métricas no período selecionado
@@ -98,6 +98,87 @@ export default function DashboardExecutivo() {
     }
   })();
 
+  // --- Prioritize modal state ---
+  const [showPrioritize, setShowPrioritize] = React.useState(false);
+  const [prioritized, setPrioritized] = React.useState<typeof leads>([] as typeof leads);
+
+  // Helper: days since creation
+  const daysSinceCreation = (d?: string) => {
+    if (!d) return 9999;
+    const parts = d.split('/');
+    if (parts.length < 3) return 9999;
+    const dt = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    const diff = Math.floor((Date.now() - dt.getTime()) / (1000 * 60 * 60 * 24));
+    return diff;
+  };
+
+  // Generate prioritized leads D1-D3: created within last 3 days and without agendamento OR follow-up pending
+  const computePrioritizedLeads = () => {
+    const list = (leads || []).filter(l => {
+      const d = daysSinceCreation(l.dataCriacao);
+      const isD1toD3 = d >= 0 && d <= 3;
+      const needsAction = (!l.dataAgendamento || l.dataAgendamento.trim() === "") || (l.comparecimento !== 'COMPARECEU' && l.dataFollowUp);
+      return isD1toD3 && needsAction;
+    }).slice(0, 100);
+    return list;
+  };
+
+  const openPrioritize = () => {
+    const list = computePrioritizedLeads();
+    setPrioritized(list);
+    setShowPrioritize(true);
+  };
+
+  // Auto-assign round-robin using a small captadores list derived from existing leads or fallback
+  const getCaptadoresPool = () => {
+    const pool = Array.from(new Set((leads || []).map(l => l.captador).filter(Boolean)));
+    if (pool.length === 0) return ['Operador A', 'Operador B', 'Operador C'];
+    return pool;
+  };
+
+  const autoAssignLeads = async (items: typeof leads) => {
+    const pool = getCaptadoresPool();
+    const idxKey = 'hero_assign_index_v1';
+    let idx = Number(localStorage.getItem(idxKey) || '0');
+    for (const l of items) {
+      const assignee = pool[idx % pool.length];
+      try {
+        await updateLead?.(l.id, { captador: assignee });
+      } catch (e) {}
+      idx++;
+    }
+    localStorage.setItem(idxKey, String(idx));
+    // refresh prioritized list
+    setPrioritized(items.map(i => ({ ...i, captador: pool[(idx - items.length) % pool.length] })));
+  };
+
+  // Count recent attempts by parsing observacao timestamps like [dd/MM/yyyy HH:mm]
+  const countRecentAttempts = (l: any, hours = 3) => {
+    if (!l.observacao) return 0;
+    const matches = Array.from(String(l.observacao).matchAll(/\[(\d{2}\/\d{2}\/\d{4} \d{2}:\d{2})\]/g));
+    let count = 0;
+    const now = Date.now();
+    matches.forEach(m => {
+      try {
+        const dt = m[1];
+        const parts = dt.split(' ');
+        const dateParts = parts[0].split('/');
+        const timeParts = parts[1].split(':');
+        const d = Number(dateParts[0]);
+        const mo = Number(dateParts[1]) - 1;
+        const y = Number(dateParts[2]);
+        const hh = Number(timeParts[0]);
+        const mm = Number(timeParts[1]);
+        const ts = new Date(y, mo, d, hh, mm).getTime();
+        if ((now - ts) <= hours * 60 * 60 * 1000) count++;
+      } catch (e) {}
+    });
+    // fallback: use followUpCount as proxy
+    if (count === 0) return l.followUpCount || 0;
+    return count;
+  };
+
+
   // --- Action-Command Engine (placed after parseDMY so parseDMY is available) ---
   const getWALink = (telefone: string) => {
     const num = telefone ? telefone.replace(/\D/g, "") : "";
@@ -134,6 +215,9 @@ export default function DashboardExecutivo() {
 
   const actionCommands: ActionCommand[] = [];
   urgenteLeads.slice(0, 2).forEach((l) => {
+    // triage: skip URGENTE if >=2 recent attempts in last 3h
+    const attempts = countRecentAttempts(l, 3);
+    if (attempts >= 2) return;
     actionCommands.push({
       acao: `Recuperar lead para evitar perda de agendamento!`,
       cliente: l.nome,
@@ -167,7 +251,49 @@ export default function DashboardExecutivo() {
   return (
     <div className="space-y-6">
       {/* Hero Operational Block - Situation summary and decision prompts */}
-      <HeroOperationalBlock leads={leads} ticketAverage={ticketAverage || 120} />
+      <HeroOperationalBlock leads={leads} ticketAverage={ticketAverage || 120} onPrioritize={openPrioritize} />
+
+      {/* Prioritize modal */}
+      {showPrioritize && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-3xl bg-card p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Lista Operacional — Priorizar D1–D3</h3>
+              <div className="flex gap-2">
+                <button onClick={() => { autoAssignLeads(prioritized); }} className="px-3 py-1 bg-emerald-600 text-white rounded">Auto-assign</button>
+                <button onClick={() => setShowPrioritize(false)} className="px-3 py-1 bg-muted rounded">Fechar</button>
+              </div>
+            </div>
+            <div className="mt-3 max-h-80 overflow-auto">
+              <table className="w-full text-sm table-auto">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th>Nome</th>
+                    <th>Telefone</th>
+                    <th>Dias</th>
+                    <th>Etapa</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prioritized.map((p) => (
+                    <tr key={p.id} className="border-b">
+                      <td className="py-2">{p.nome}</td>
+                      <td>{p.telefone}</td>
+                      <td>{daysSinceCreation(p.dataCriacao)}</td>
+                      <td>{p.etapaLead}</td>
+                      <td className="py-2">
+                        <button onClick={() => { const w = getWALink(p.telefone); if (w) window.open(w, '_blank'); }} className="mr-2 px-2 py-1 bg-primary text-white rounded">WhatsApp</button>
+                        <button onClick={async () => { await autoAssignLeads([p]); }} className="px-2 py-1 bg-amber-600 text-white rounded">Atribuir</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Action Command Cards - Top Priority */}
       {actionCommands.length > 0 && (

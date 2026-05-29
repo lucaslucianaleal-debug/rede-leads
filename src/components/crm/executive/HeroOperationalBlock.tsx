@@ -1,7 +1,7 @@
 import React from "react";
 import { Lead } from "@/types/crm";
 
-export default function HeroOperationalBlock({ leads, ticketAverage }: { leads: Lead[]; ticketAverage: number }) {
+export default function HeroOperationalBlock({ leads, ticketAverage, onPrioritize }: { leads: Lead[]; ticketAverage: number; onPrioritize?: () => void }) {
   // upcoming 7 days
   const now = new Date();
   const inNextDays = (d?: string, days = 7) => {
@@ -54,6 +54,13 @@ export default function HeroOperationalBlock({ leads, ticketAverage }: { leads: 
       ? 'Priorizar follow-ups D1–D3 nas próximas 2h (lista operacional).' 
       : 'Auto-atribuir leads sem responsável e distribuir por carga.';
 
+  // Confidence heuristic
+  const confidence = ((): 'Alta' | 'Média' | 'Baixa' => {
+    if (agendadosProx7.length >= 8 || followupsPendentes >= 10) return 'Alta';
+    if (agendadosProx7.length >= 4 || followupsPendentes >= 5) return 'Média';
+    return 'Baixa';
+  })();
+
   return (
     <div className="bg-card p-5 rounded-xl shadow-md">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -83,12 +90,15 @@ export default function HeroOperationalBlock({ leads, ticketAverage }: { leads: 
             </div>
           </div>
         </div>
-        <div className="w-full md:w-64 p-3 bg-gradient-to-br from-white/5 to-white/3 rounded-lg">
+          <div className="w-full md:w-64 p-3 bg-gradient-to-br from-white/5 to-white/3 rounded-lg">
           <div className="text-xs text-muted-foreground">Gargalo atual</div>
           <div className="text-xl font-bold mt-2">{bottleneck.key}</div>
           <div className="text-sm text-muted-foreground mt-1">Quantidade: {bottleneck.count}</div>
           <div className="mt-3">
-            <button className="px-3 py-2 bg-primary text-white rounded">Abrir ação operacional</button>
+            <div className="text-xs text-muted-foreground">Confiança: <span className="font-semibold">{confidence}</span></div>
+            <div className="mt-2">
+              <button onClick={() => onPrioritize && onPrioritize()} className="px-3 py-2 bg-primary text-white rounded">Priorizar agora</button>
+            </div>
           </div>
         </div>
       </div>
