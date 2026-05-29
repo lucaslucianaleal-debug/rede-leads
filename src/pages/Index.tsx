@@ -436,6 +436,10 @@ const CRMDashboard = () => {
               <LayoutDashboard className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
+            <TabsTrigger value="dashboard-executivo" className="flex items-center gap-1.5">
+              <LayoutDashboard className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Dashboard Executivo</span>
+            </TabsTrigger>
             <TabsTrigger value="agenda" className="flex items-center gap-1.5">
               <CalendarCheck className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Agenda do Dia</span>
@@ -510,6 +514,11 @@ const CRMDashboard = () => {
             {/* Gráfico de performance */}
             <PerformanceChart leads={allLeads} />
             <ComparisonChart leads={allLeads} />
+          </TabsContent>
+
+          <TabsContent value="dashboard-executivo" className="mt-6">
+            {/** Dashboard Executivo com cards inteligentes */}
+            {React.createElement(require("./DashboardExecutivo").default)}
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6">
