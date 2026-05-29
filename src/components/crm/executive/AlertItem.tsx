@@ -12,16 +12,23 @@ export type Alert = {
 };
 
 export const AlertItem: React.FC<{ alert: Alert; onResolve?: (id: string) => void; onAssign?: (id: string) => void }> = ({ alert, onResolve, onAssign }) => {
-  const color = alert.level === "high" ? "bg-rose-50 text-rose-700" : alert.level === "medium" ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700";
+  const severity = alert.level === "high" ? { dot: 'bg-rose-500', label: 'Alto' } : alert.level === 'medium' ? { dot: 'bg-amber-500', label: 'Médio' } : { dot: 'bg-emerald-500', label: 'Baixo' };
   return (
-    <div className={`p-3 rounded-lg border ${color} flex items-start justify-between`}>
+    <div className="p-3 rounded-lg bg-white/60 backdrop-blur-sm border border-slate-200 flex items-start justify-between shadow-sm hover:shadow-md transition-shadow duration-200">
       <div className="flex-1">
-        <div className="text-xs font-semibold">{alert.title}</div>
-        <div className="text-sm text-muted-foreground mt-1">{alert.reason}</div>
-        <div className="text-xs text-muted-foreground mt-2">Impacto estimado: <span className="font-medium">{alert.impact ?? '—'}</span></div>
+        <div className="flex items-center gap-3">
+          <span className={`w-3 h-3 rounded-full ${severity.dot} shadow-sm`} />
+          <div className="text-sm font-semibold text-foreground">{severity.label} • {alert.title}</div>
+        </div>
+        <div className="text-sm text-muted-foreground mt-2">{alert.reason}</div>
+        <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+          <div>Impacto estimado: <span className="font-medium text-foreground">{alert.impact ?? '—'}</span></div>
+          <div>Urgência: <span className="font-medium">{alert.timestamp ? 'Alta' : 'Média'}</span></div>
+        </div>
+        <div className="mt-2 text-xs text-muted-foreground">Recomendação: <span className="font-medium text-foreground">Entre em contato nas próximas 2h e confirme agendamento</span></div>
       </div>
       <div className="ml-4 flex flex-col gap-2">
-        <button onClick={() => onAssign && onAssign(alert.id)} className="px-3 py-1 text-sm rounded bg-primary text-white">Atribuir</button>
+        <button onClick={() => onAssign && onAssign(alert.id)} className="px-3 py-1 text-sm rounded bg-primary text-white shadow">Atribuir</button>
         <button onClick={() => onResolve && onResolve(alert.id)} className="px-3 py-1 text-sm rounded border">Resolver</button>
       </div>
     </div>

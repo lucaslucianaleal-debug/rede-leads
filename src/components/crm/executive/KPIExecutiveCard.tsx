@@ -32,25 +32,29 @@ function Sparkline({ data = [] }: { data?: number[] }) {
 }
 
 export const KPIExecutiveCard: React.FC<KPIExecutiveCardProps> = ({ title, value, delta, deltaDirection = "neutral", subtitle, sparkline }) => {
-  const deltaColor = deltaDirection === "up" ? "text-green-600" : deltaDirection === "down" ? "text-rose-600" : "text-muted-foreground";
+  const deltaColor = deltaDirection === "up" ? "text-emerald-600 bg-emerald-50" : deltaDirection === "down" ? "text-rose-600 bg-rose-50" : "text-muted-foreground bg-transparent";
   return (
-    <div className="bg-card p-4 rounded-lg shadow-sm flex flex-col justify-between" style={{ minHeight: 96 }}>
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-sm text-muted-foreground">{title}</div>
-          <div className="mt-1 text-2xl font-semibold text-foreground">{value}</div>
+    <div className="relative rounded-lg overflow-hidden" style={{ minHeight: 120 }}>
+      <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-black/2 pointer-events-none" />
+      <div className="bg-card p-5 rounded-lg shadow-[0_8px_30px_rgba(16,24,40,0.06)] hover:shadow-[0_12px_40px_rgba(16,24,40,0.09)] transition-shadow duration-300 ease-out h-full flex flex-col justify-between">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="text-xs text-muted-foreground tracking-wide">{title}</div>
+            <div className="mt-1 text-3xl sm:text-4xl lg:text-5xl font-extrabold text-foreground leading-tight">{value}</div>
+          </div>
+          <div className="text-right flex flex-col items-end gap-2">
+            {delta !== undefined && (
+              <div className={`px-2 py-1 rounded-full text-xs font-semibold ${deltaColor}`}>{delta}</div>
+            )}
+            <div className="text-xs text-muted-foreground">{subtitle}</div>
+          </div>
         </div>
-        <div className="text-right">
-          {delta !== undefined && (
-            <div className={`text-sm font-medium ${deltaColor}`}>{delta}</div>
-          )}
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex-1 max-w-[140px]">
+            <Sparkline data={sparkline || []} />
+          </div>
+          <div className="ml-4 text-xs text-muted-foreground">&nbsp;</div>
         </div>
-      </div>
-      <div className="mt-3 flex items-center justify-between">
-        <div className="shrink-0">
-          <Sparkline data={sparkline || []} />
-        </div>
-        <div className="text-xs text-muted-foreground ml-3">{subtitle}</div>
       </div>
     </div>
   );
