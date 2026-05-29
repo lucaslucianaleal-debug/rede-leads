@@ -98,6 +98,46 @@ export default function DashboardExecutivo() {
     }
   })();
 
+  // --- Period previous range helper + delta calc ---
+  const getPreviousRange = (start: Date, end: Date) => {
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const days = Math.round((end.getTime() - start.getTime()) / msPerDay) + 1;
+    const prevEnd = new Date(start.getTime() - 1);
+    const prevStart = new Date(prevEnd.getTime() - (days - 1) * msPerDay);
+    prevStart.setHours(0,0,0,0);
+    prevEnd.setHours(23,59,59,999);
+    return { start: prevStart, end: prevEnd };
+  };
+
+  const inRangePrev = (d?: string, prevRange?: { start: Date; end: Date }) => {
+    if (!d || !prevRange) return false;
+    const date = parseDMY(d);
+    if (!date) return false;
+    return date >= prevRange.start && date <= prevRange.end;
+  };
+
+  const computeDelta = (current: number, previous: number) => {
+    if (previous === 0 && current === 0) return { delta: '0%', dir: 'neutral' as const };
+    if (previous === 0) return { delta: '+∞', dir: 'up' as const };
+    const pct = Math.round(((current - previous) / previous) * 100);
+    const dir = pct > 0 ? 'up' : pct < 0 ? 'down' : 'neutral';
+    const sign = pct > 0 ? `+${pct}%` : `${pct}%`;
+    return { delta: sign, dir };
+  };
+
+  const prevRange = getPreviousRange(periodStart, periodEnd);
+  const totalLeadsPrev = leads.filter((l) => inRangePrev(l.dataCriacao, prevRange)).length;
+  const agendadosPrev = leads.filter((l) => inRangePrev(l.dataAgendamento, prevRange)).length;
+  const compareceramPrev = leads.filter((l) => inRangePrev(l.dataAgendamento, prevRange) && l.comparecimento === "COMPARECEU").length;
+  const followupsPendPrev = leads.filter((l) => inRangePrev(l.dataFollowUp, prevRange) && l.comparecimento !== "COMPARECEU").length;
+  const receitaPrevistaPrev = agendadosPrev * (ticketAverage || 0);
+
+  const deltaTotal = computeDelta(totalLeads, totalLeadsPrev);
+  const deltaAgend = computeDelta(agendados, agendadosPrev);
+  const deltaComp = computeDelta(compareceram, compareceramPrev);
+  const deltaFollow = computeDelta(followupsPend, followupsPendPrev);
+  const deltaReceita = computeDelta(receitaPrevista, receitaPrevistaPrev);
+
   // --- Prioritize modal state ---
   const [showPrioritize, setShowPrioritize] = React.useState(false);
   const [prioritized, setPrioritized] = React.useState<typeof leads>([] as typeof leads);
@@ -320,11 +360,11 @@ export default function DashboardExecutivo() {
         <div className="text-sm text-muted-foreground">Dados até: {lastSyncedAt ?? '—'} • Fonte: {dataSource ?? '—'}</div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-        <KPIExecutiveCard title="Total de Leads" value={totalLeads} subtitle="Últimos 7 dias" sparkline={sparkLast7} />
-        <KPIExecutiveCard title="Agendados" value={agendados} subtitle="Agendamentos" sparkline={sparkLast7} />
-        <KPIExecutiveCard title="Compareceram" value={compareceram} subtitle="Comparecimento" sparkline={sparkLast7} />
-        <KPIExecutiveCard title="Follow-ups Pend." value={followupsPend} subtitle="Ações pendentes" sparkline={sparkLast7} />
-        <KPIExecutiveCard title="Receita Prevista" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receitaPrevista)} subtitle={periodLabel} sparkline={sparkLast7} />
+        <KPIExecutiveCard title="Total de Leads" value={totalLeads} subtitle="Últimos 7 dias" sparkline={sparkLast7} delta={deltaTotal.delta} deltaDirection={deltaTotal.dir} />
+        <KPIExecutiveCard title="Agendados" value={agendados} subtitle="Agendamentos" sparkline={sparkLast7} delta={deltaAgend.delta} deltaDirection={deltaAgend.dir} />
+        <KPIExecutiveCard title="Compareceram" value={compareceram} subtitle="Comparecimento" sparkline={sparkLast7} delta={deltaComp.delta} deltaDirection={deltaComp.dir} />
+        <KPIExecutiveCard title="Follow-ups Pend." value={followupsPend} subtitle="Ações pendentes" sparkline={sparkLast7} delta={deltaFollow.delta} deltaDirection={deltaFollow.dir} />
+        <KPIExecutiveCard title="Receita Prevista" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receitaPrevista)} subtitle={periodLabel} sparkline={sparkLast7} delta={deltaReceita.delta} deltaDirection={deltaReceita.dir} />
         <KPIExecutiveCard title="CAC / ROI" value="—" subtitle="Dados de custo não informados" sparkline={sparkLast7} />
       </div>
 
