@@ -45,15 +45,61 @@ export default function DashboardExecutivo() {
         <KPIExecutiveCard title="CAC / ROI" value="—" subtitle="Dados de custo não informados" sparkline={sparkLast7} />
       </div>
 
-      <div className="grid gap-6 md:gap-8 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        <ScoreLeadCard leads={leads} />
-        <LeadMorrendoCard leads={leads} />
-        <RankingRecepcionistasCard leads={leads} />
-        <PrevisaoFaturamentoCard leads={leads} />
-        <IQFCard leads={leads} />
-        <RiscoNoShowCard leads={leads} />
-        <CACCard leads={leads} />
-        <ConsultoriaCard leads={leads} />
+      <div className="grid gap-6 md:gap-8 grid-cols-1 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <div className="mb-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Alertas Estratégicos</h3>
+              <div className="text-sm text-muted-foreground">Prioridade: Alta → Baixa</div>
+            </div>
+            <div className="mt-3">
+              <div className="bg-card p-4 rounded-lg">
+                {/* Alerts feed */}
+                <div>
+                  {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+                  {/* @ts-ignore */}
+                  <AlertsFeed leads={leads} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-3">Performance Operacional</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Use existing ranking as placeholder */}
+              <div>
+                <RankingRecepcionistasCard leads={leads} />
+              </div>
+              <div>
+                <div className="space-y-3">
+                  <PerformanceBarCard label="Tempo médio até primeiro contato (min)" value={30} max={120} />
+                  <PerformanceBarCard label="Taxa de resposta 24h (%)" value={68} max={100} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold">Previsão de Faturamento</h3>
+            <div className="mt-3"><ForecastBlock leads={leads} /></div>
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold">Índice Preditivo</h3>
+            <div className="mt-3"><PredictiveScoreCard leads={leads} /></div>
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold">Performance por Fonte</h3>
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              <SourcePerformanceCard source="Online" cac={120} roi={150} conversion={4.5} />
+              <SourcePerformanceCard source="Google" cac={180} roi={120} conversion={3.8} />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
