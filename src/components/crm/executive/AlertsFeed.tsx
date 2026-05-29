@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import AlertItem, { Alert } from "./AlertItem";
 import { useLeads } from "@/hooks/useLeads";
 
@@ -54,6 +54,27 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
   const { updateLead } = useLeads();
   const alerts = useMemo(() => generateAlertsFromLeads(leads), [leads]);
 
+  const [filterLevel, setFilterLevel] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+  const [showList, setShowList] = useState(false);
+
+  const applyFilter = (items: any[]) => {
+    if (filterLevel === 'all') return items;
+    return items.filter((i: any) => i.level === filterLevel);
+  };
+
+  const exportCSV = (items: any[]) => {
+    const headers = ['id','level','title','reason','impact','timestamp','leadId'];
+    const rows = items.map((r: any) => headers.map(h => `"${String(r[h] ?? '')}"`).join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `alerts_export_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const counts = alerts.reduce(
     (acc: any, a: any) => {
       acc.total++;
@@ -77,8 +98,8 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
           <div className="text-xs text-muted-foreground">{counts.total} alertas — Alto: {counts.high} • Médio: {counts.medium} • Baixo: {counts.low}</div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="px-3 py-1 text-xs rounded bg-amber-600 text-white">Filtrar: Alta</button>
-          <button className="px-3 py-1 text-xs rounded border">Exportar</button>
+          <button onClick={() => setFilterLevel(filterLevel === 'all' ? 'high' : filterLevel === 'high' ? 'medium' : filterLevel === 'medium' ? 'low' : 'all')} className="px-3 py-1 text-xs rounded bg-amber-600 text-white">Filtrar: {filterLevel === 'all' ? 'Tudo' : filterLevel === 'high' ? 'Alta' : filterLevel === 'medium' ? 'Média' : 'Baixa'}</button>
+          <button onClick={() => exportCSV(alerts.slice(0, max))} className="px-3 py-1 text-xs rounded border">Exportar</button>
         </div>
       </div>
 
@@ -91,7 +112,7 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
               <div className="text-sm text-muted-foreground">Impacto estimado: {typeof estimatedImpact === 'number' ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(estimatedImpact) : '—'}</div>
             </div>
             <div>
-              <button onClick={() => { /* open detailed view placeholder */ }} className="px-3 py-2 bg-rose-600 text-white rounded">Ver lista</button>
+              <button onClick={() => setShowList(true)} className="px-3 py-2 bg-rose-600 text-white rounded">Ver lista</button>
             </div>
           </div>
         </div>
@@ -116,10 +137,10 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
       </div>
 
       <div className="space-y-3">
-        {alerts.length === 0 ? (
+        {applyFilter(alerts).length === 0 ? (
           <div className="p-4 rounded-lg bg-card text-muted-foreground">Nenhum alerta estratégico encontrado.</div>
         ) : (
-          alerts.slice(0, max).map((a: any) => (
+          applyFilter(alerts).slice(0, max).map((a: any) => (
             <AlertItem
               key={a.id}
               alert={a}
@@ -169,6 +190,46 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
           ))
         )}
       </div>
+
+      {showList && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-4xl bg-card p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Leads em Risco — Lista completa</h3>
+              <div className="flex gap-2">
+                <button onClick={() => setShowList(false)} className="px-3 py-1 bg-muted rounded">Fechar</button>
+              </div>
+            </div>
+            <div className="mt-3 max-h-96 overflow-auto">
+              <table className="w-full text-sm table-auto">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th>Nome</th>
+                    <th>Telefone</th>
+                    <th>Agendamento</th>
+                    <th>Impacto</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leadsEmRisco.map((l: any) => (
+                    <tr key={l.id} className="border-b">
+                      <td className="py-2">{l.nome}</td>
+                      <td>{l.telefone}</td>
+                      <td>{l.dataAgendamento}</td>
+                      <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((useLeads().ticketAverage || 0))}</td>
+                      <td className="py-2">
+                        <button onClick={async () => { try { await updateLead?.(l.id, { alertAssigned: true, alertAssignedAt: new Date().toISOString() }); } catch(e){console.error(e)} }} className="mr-2 px-2 py-1 bg-amber-600 text-white rounded">Atribuir</button>
+                        <button onClick={async () => { try { await updateLead?.(l.id, { alertResolved: true, alertResolvedAt: new Date().toISOString() }); } catch(e){console.error(e)} }} className="px-2 py-1 border rounded">Resolver</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
