@@ -45,6 +45,7 @@ import { ptBR } from "date-fns/locale";
 import { useRef, useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import DashboardExecutivo from "./DashboardExecutivo";
 
 const CRMDashboard = () => {
   const { user, currentClinic, setSelectedClinic } = useAuth();
@@ -532,7 +533,7 @@ const CRMDashboard = () => {
 
           <TabsContent value="dashboard-executivo" className="mt-6">
             {/** Dashboard Executivo com cards inteligentes */}
-            {React.createElement(require("./DashboardExecutivo").default)}
+            <DashboardExecutivo />
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6">
