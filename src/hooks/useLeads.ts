@@ -114,6 +114,8 @@ export function useLeads() {
   const [canWrite, setCanWrite] = useState(false);
   // loading: true enquanto o primeiro getDoc ainda não resolveu
   const [loading, setLoading] = useState(true);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<string | null>(null);
 
   // Inicializa vazio — nunca arriscamos gravar dados mock no Firestore
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -165,6 +167,11 @@ export function useLeads() {
         if (!active) return;
         if (snap && snap.exists()) {
           let data = (snap.data() as any).leads as Lead[];
+          try {
+            const lu = (snap.data() as any).lastUpdated;
+            if (lu) setLastSyncedAt(typeof lu === 'string' ? lu : String(lu));
+            setDataSource(String((targetDoc as any)._path || targetDoc.path || "clinics/.../shared"));
+          } catch (e) {}
           if (data && Array.isArray(data)) {
             data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
             isFromFirebase.current = true;
@@ -224,8 +231,13 @@ export function useLeads() {
       try {
         unsub = onSnapshot(targetDoc, (snapshot) => {
           if (!active) return;
-          if (snapshot.exists()) {
+            if (snapshot.exists()) {
             let data = (snapshot.data() as any).leads as Lead[];
+              try {
+                const lu = (snapshot.data() as any).lastUpdated;
+                if (lu) setLastSyncedAt(typeof lu === 'string' ? lu : String(lu));
+                setDataSource(String((targetDoc as any)._path || targetDoc.path || "clinics/.../shared"));
+              } catch (e) {}
             if (data && Array.isArray(data)) {
               data = data.map((l: Lead) => ensureDateCriacao(normalizeLead(l)));
               isFromFirebase.current = true;
@@ -1378,6 +1390,8 @@ export function useLeads() {
     leads: filteredLeads,
     allLeads: leads,
     loading,
+    lastSyncedAt,
+    dataSource,
     filters,
     setFilters,
     stats,

@@ -16,7 +16,8 @@ import PerformanceBarCard from "@/components/crm/executive/PerformanceBarCard";
 import SourcePerformanceCard from "@/components/crm/executive/SourcePerformanceCard";
 
 export default function DashboardExecutivo() {
-  const { leads } = useLeads();
+  const { leads, lastSyncedAt, dataSource } = useLeads();
+  const [periodPreset, setPeriodPreset] = React.useState<string>("last_7");
 
   // Helpers para métricas básicas (fallbacks quando dados financeiros não disponíveis)
   const totalLeads = leads.length;
@@ -39,8 +40,31 @@ export default function DashboardExecutivo() {
     return arr;
   })();
 
+  const periodLabel = (() => {
+    switch (periodPreset) {
+      case 'last_7': return 'Últimos 7 dias';
+      case 'last_30': return 'Últimos 30 dias';
+      case 'month_current': return 'Mês atual';
+      case 'month_prev': return 'Mês anterior';
+      default: return 'Período selecionado';
+    }
+  })();
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <label className="text-sm text-muted-foreground">Período:</label>
+          <select value={periodPreset} onChange={(e) => setPeriodPreset(e.target.value)} className="rounded px-2 py-1 border">
+            <option value="last_7">Últimos 7 dias</option>
+            <option value="last_30">Últimos 30 dias</option>
+            <option value="month_current">Mês atual</option>
+            <option value="month_prev">Mês anterior</option>
+          </select>
+          <div className="text-sm text-muted-foreground">{periodLabel}</div>
+        </div>
+        <div className="text-sm text-muted-foreground">Dados até: {lastSyncedAt ?? '—'} • Fonte: {dataSource ?? '—'}</div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <KPIExecutiveCard title="Total de Leads" value={totalLeads} subtitle="Últimos 7 dias" sparkline={sparkLast7} />
         <KPIExecutiveCard title="Agendados" value={agendados} subtitle="Agendamentos" sparkline={sparkLast7} />

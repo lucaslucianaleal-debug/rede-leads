@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import AlertItem, { Alert } from "./AlertItem";
+import { useLeads } from "@/hooks/useLeads";
 
 type AlertsFeedProps = {
   leads: any[];
@@ -22,12 +23,13 @@ function generateAlertsFromLeads(leads: any[]): Alert[] {
       if (diffDays > 30 && (!l.lastFollowUpDone || l.lastFollowUpDone === "")) {
         alerts.push({
           id: `stale_${idx}`,
+          leadId: l.id,
           level: "medium",
           title: `Lead sem contato há ${diffDays} dias: ${l.nome}`,
           reason: `Criado em ${l.dataCriacao} — sem follow-up registrado.`,
           impact: "—",
           timestamp: l.dataCriacao,
-        });
+        } as any);
       }
     }
 
@@ -35,12 +37,13 @@ function generateAlertsFromLeads(leads: any[]): Alert[] {
     if (l.dataAgendamento && l.comparecimento !== "COMPARECEU") {
       alerts.push({
         id: `appt_${idx}`,
+        leadId: l.id,
         level: "low",
         title: `Agendamento sem confirmação: ${l.nome}`,
         reason: `Agendado em ${l.dataAgendamento} — status: ${l.comparecimento || 'Pendente'}`,
         impact: "—",
         timestamp: l.dataAgendamento,
-      });
+      } as any);
     }
   });
   // Sort high level first (we only have medium/low in heuristic)
@@ -48,6 +51,7 @@ function generateAlertsFromLeads(leads: any[]): Alert[] {
 }
 
 export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
+  const { updateLead } = useLeads();
   const alerts = useMemo(() => generateAlertsFromLeads(leads), [leads]);
 
   return (
@@ -55,8 +59,29 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
       {alerts.length === 0 ? (
         <div className="p-4 rounded-lg bg-card text-muted-foreground">Nenhum alerta estratégico encontrado.</div>
       ) : (
-        alerts.slice(0, max).map((a) => (
-          <AlertItem key={a.id} alert={a} onAssign={(id) => console.log('assign', id)} onResolve={(id) => console.log('resolve', id)} />
+        alerts.slice(0, max).map((a: any) => (
+          <AlertItem
+            key={a.id}
+            alert={a}
+            onAssign={async (id) => {
+              try {
+                if (a.leadId) {
+                  await updateLead(a.leadId, { alertAssigned: true, alertAssignedAt: new Date().toISOString() });
+                }
+              } catch (e) {
+                console.error('assign failed', e);
+              }
+            }}
+            onResolve={async (id) => {
+              try {
+                if (a.leadId) {
+                  await updateLead(a.leadId, { alertResolved: true, alertResolvedAt: new Date().toISOString() });
+                }
+              } catch (e) {
+                console.error('resolve failed', e);
+              }
+            }}
+          />
         ))
       )}
     </div>
