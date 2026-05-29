@@ -235,6 +235,13 @@ const CRMDashboard = () => {
           </div>
           <div className="flex gap-2 items-center">
             <AuthComponent />
+            <button
+              onClick={() => setActiveTab('dashboard-executivo')}
+              className="ml-2 inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all bg-secondary/10 text-foreground hover:bg-secondary/20"
+              aria-label="Abrir Dashboard Executivo"
+            >
+              Executivo
+            </button>
             {!isReceptionist && (
               <>
                 <input type="file" ref={fileRef} accept=".csv" onChange={handleImport} className="hidden" />
