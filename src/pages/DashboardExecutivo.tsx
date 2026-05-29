@@ -9,11 +9,9 @@ import { RiscoNoShowCard } from "@/components/crm/RiscoNoShowCard";
 import { CACCard } from "@/components/crm/CACCard";
 import { ConsultoriaCard } from "@/components/crm/ConsultoriaCard";
 
-// Blocos de exemplo (substitua por componentes reais depois)
-// O ScoreLeadCard real será usado abaixo
-
-
+export default function DashboardExecutivo() {
   const { leads } = useLeads();
+
   return (
     <div className="grid gap-6 md:gap-8 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       <ScoreLeadCard leads={leads} />
