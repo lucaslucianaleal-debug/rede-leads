@@ -123,20 +123,44 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
             <AlertItem
               key={a.id}
               alert={a}
-              onAssign={async (id) => {
+              onAssign={async (alertId) => {
                 try {
-                  if (a.leadId) {
-                    await updateLead(a.leadId, { alertAssigned: true, alertAssignedAt: new Date().toISOString() });
+                  const target = alerts.find((x: any) => x.id === alertId);
+                  if (!target) {
+                    console.warn('Alert not found for assign', alertId);
+                    return;
                   }
+                  if (!updateLead) {
+                    console.warn('updateLead not available');
+                    return;
+                  }
+                  if (!target.leadId) {
+                    console.warn('No leadId for alert', alertId);
+                    return;
+                  }
+                  await updateLead(target.leadId, { alertAssigned: true, alertAssignedAt: new Date().toISOString() });
+                  console.log('Alert assigned', alertId, target.leadId);
                 } catch (e) {
                   console.error('assign failed', e);
                 }
               }}
-              onResolve={async (id) => {
+              onResolve={async (alertId) => {
                 try {
-                  if (a.leadId) {
-                    await updateLead(a.leadId, { alertResolved: true, alertResolvedAt: new Date().toISOString() });
+                  const target = alerts.find((x: any) => x.id === alertId);
+                  if (!target) {
+                    console.warn('Alert not found for resolve', alertId);
+                    return;
                   }
+                  if (!updateLead) {
+                    console.warn('updateLead not available');
+                    return;
+                  }
+                  if (!target.leadId) {
+                    console.warn('No leadId for alert', alertId);
+                    return;
+                  }
+                  await updateLead(target.leadId, { alertResolved: true, alertResolvedAt: new Date().toISOString() });
+                  console.log('Alert resolved', alertId, target.leadId);
                 } catch (e) {
                   console.error('resolve failed', e);
                 }
