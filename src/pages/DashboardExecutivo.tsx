@@ -359,13 +359,25 @@ export default function DashboardExecutivo() {
         </div>
         <div className="text-sm text-muted-foreground">Dados até: {lastSyncedAt ?? '—'} • Fonte: {dataSource ?? '—'}</div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-        <KPIExecutiveCard title="Total de Leads" value={totalLeads} subtitle="Últimos 7 dias" sparkline={sparkLast7} delta={deltaTotal.delta} deltaDirection={deltaTotal.dir} />
-        <KPIExecutiveCard title="Agendados" value={agendados} subtitle="Agendamentos" sparkline={sparkLast7} delta={deltaAgend.delta} deltaDirection={deltaAgend.dir} />
-        <KPIExecutiveCard title="Compareceram" value={compareceram} subtitle="Comparecimento" sparkline={sparkLast7} delta={deltaComp.delta} deltaDirection={deltaComp.dir} />
-        <KPIExecutiveCard title="Follow-ups Pend." value={followupsPend} subtitle="Ações pendentes" sparkline={sparkLast7} delta={deltaFollow.delta} deltaDirection={deltaFollow.dir} />
-        <KPIExecutiveCard title="Receita Prevista" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receitaPrevista)} subtitle={periodLabel} sparkline={sparkLast7} delta={deltaReceita.delta} deltaDirection={deltaReceita.dir} />
-        <KPIExecutiveCard title="CAC / ROI" value="—" subtitle="Dados de custo não informados" sparkline={sparkLast7} />
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+          <KPIExecutiveCard title="Total de Leads" value={totalLeads} subtitle="Últimos 7 dias" sparkline={sparkLast7} delta={deltaTotal.delta} deltaDirection={deltaTotal.dir} />
+        </div>
+        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+          <KPIExecutiveCard title="Agendados" value={agendados} subtitle="Agendamentos" sparkline={sparkLast7} delta={deltaAgend.delta} deltaDirection={deltaAgend.dir} />
+        </div>
+        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+          <KPIExecutiveCard title="Compareceram" value={compareceram} subtitle="Comparecimento" sparkline={sparkLast7} delta={deltaComp.delta} deltaDirection={deltaComp.dir} />
+        </div>
+        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+          <KPIExecutiveCard title="Follow-ups Pend." value={followupsPend} subtitle="Ações pendentes" sparkline={sparkLast7} delta={deltaFollow.delta} deltaDirection={deltaFollow.dir} />
+        </div>
+        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+          <KPIExecutiveCard title="Receita Prevista" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receitaPrevista)} subtitle={periodLabel} sparkline={sparkLast7} delta={deltaReceita.delta} deltaDirection={deltaReceita.dir} />
+        </div>
+        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
+          <KPIExecutiveCard title="CAC / ROI" value="—" subtitle="Dados de custo não informados" sparkline={sparkLast7} />
+        </div>
       </div>
 
       <div className="grid gap-6 md:gap-8 grid-cols-1 lg:grid-cols-3">
