@@ -116,6 +116,8 @@ export function useLeads() {
   const [loading, setLoading] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<string | null>(null);
+  // Default ticket average (BRL) used for quick revenue estimates — configurable later
+  const ticketAverage = 120;
 
   // Inicializa vazio — nunca arriscamos gravar dados mock no Firestore
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -1392,6 +1394,7 @@ export function useLeads() {
     loading,
     lastSyncedAt,
     dataSource,
+    ticketAverage,
     filters,
     setFilters,
     stats,

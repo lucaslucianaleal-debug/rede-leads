@@ -18,12 +18,59 @@ import SourcePerformanceCard from "@/components/crm/executive/SourcePerformanceC
 export default function DashboardExecutivo() {
   const { leads, lastSyncedAt, dataSource } = useLeads();
   const [periodPreset, setPeriodPreset] = React.useState<string>("last_7");
+  const { ticketAverage } = useLeads();
 
-  // Helpers para métricas básicas (fallbacks quando dados financeiros não disponíveis)
-  const totalLeads = leads.length;
-  const agendados = leads.filter((l) => (l.dataAgendamento || "").trim() !== "").length;
-  const compareceram = leads.filter((l) => l.comparecimento === "COMPARECEU").length;
-  const followupsPend = leads.filter((l) => (l.etapaLead || "").toLowerCase().includes("follow-up") && l.comparecimento !== "COMPARECEU").length;
+  // Helpers para métricas no período selecionado
+  const parseDMY = (s?: string) => {
+    if (!s) return null;
+    const parts = s.split('/');
+    if (parts.length < 3) return null;
+    const d = Number(parts[0]);
+    const m = Number(parts[1]) - 1;
+    const y = Number(parts[2].split(' ')[0]);
+    return new Date(y, m, d);
+  };
+
+  const getPeriodRange = (preset: string) => {
+    const end = new Date();
+    let start = new Date();
+    switch (preset) {
+      case 'last_7':
+        start.setDate(end.getDate() - 6);
+        break;
+      case 'last_30':
+        start.setDate(end.getDate() - 29);
+        break;
+      case 'month_current':
+        start = new Date(end.getFullYear(), end.getMonth(), 1);
+        break;
+      case 'month_prev':
+        const prev = new Date(end.getFullYear(), end.getMonth() - 1, 1);
+        start = new Date(prev.getFullYear(), prev.getMonth(), 1);
+        end.setFullYear(prev.getFullYear(), prev.getMonth());
+        end.setDate(new Date(prev.getFullYear(), prev.getMonth() + 1, 0).getDate());
+        break;
+      default:
+        start.setDate(end.getDate() - 6);
+    }
+    start.setHours(0,0,0,0);
+    end.setHours(23,59,59,999);
+    return { start, end };
+  };
+
+  const { start: periodStart, end: periodEnd } = getPeriodRange(periodPreset);
+
+  const inRange = (d?: string) => {
+    const date = parseDMY(d);
+    if (!date) return false;
+    return date >= periodStart && date <= periodEnd;
+  };
+
+  const totalLeads = leads.filter((l) => inRange(l.dataCriacao)).length;
+  const agendados = leads.filter((l) => inRange(l.dataAgendamento)).length;
+  const compareceram = leads.filter((l) => inRange(l.dataAgendamento) && l.comparecimento === "COMPARECEU").length;
+  const followupsPend = leads.filter((l) => inRange(l.dataFollowUp) && l.comparecimento !== "COMPARECEU").length;
+  const receitaPrevista = agendados * (ticketAverage || 0);
 
   // Sparkline: leads criados últimos 7 dias
   const sparkLast7 = (() => {
@@ -70,7 +117,7 @@ export default function DashboardExecutivo() {
         <KPIExecutiveCard title="Agendados" value={agendados} subtitle="Agendamentos" sparkline={sparkLast7} />
         <KPIExecutiveCard title="Compareceram" value={compareceram} subtitle="Comparecimento" sparkline={sparkLast7} />
         <KPIExecutiveCard title="Follow-ups Pend." value={followupsPend} subtitle="Ações pendentes" sparkline={sparkLast7} />
-        <KPIExecutiveCard title="Receita Prevista" value="—" subtitle="Dados financeiros indisponíveis" sparkline={sparkLast7} />
+        <KPIExecutiveCard title="Receita Prevista" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receitaPrevista)} subtitle={periodLabel} sparkline={sparkLast7} />
         <KPIExecutiveCard title="CAC / ROI" value="—" subtitle="Dados de custo não informados" sparkline={sparkLast7} />
       </div>
 
