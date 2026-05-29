@@ -9,6 +9,11 @@ import { RiscoNoShowCard } from "@/components/crm/RiscoNoShowCard";
 import { CACCard } from "@/components/crm/CACCard";
 import { ConsultoriaCard } from "@/components/crm/ConsultoriaCard";
 import KPIExecutiveCard from "@/components/crm/executive/KPIExecutiveCard";
+import AlertsFeed from "@/components/crm/executive/AlertsFeed";
+import ForecastBlock from "@/components/crm/executive/ForecastBlock";
+import PredictiveScoreCard from "@/components/crm/executive/PredictiveScoreCard";
+import PerformanceBarCard from "@/components/crm/executive/PerformanceBarCard";
+import SourcePerformanceCard from "@/components/crm/executive/SourcePerformanceCard";
 
 export default function DashboardExecutivo() {
   const { leads } = useLeads();
