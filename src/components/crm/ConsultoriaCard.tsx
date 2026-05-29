@@ -1,3 +1,4 @@
+import React from "react";
 import React, { useMemo } from "react";
 import { Lead } from "@/types/crm";
 
