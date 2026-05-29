@@ -407,10 +407,6 @@ const CRMDashboard = () => {
                     <Database className="h-4 w-4 shrink-0" />
                     <span className="hidden sm:inline">Todos os Leads</span>
                   </TabsTrigger>
-                  <TabsTrigger value="dashboard-executivo" className="flex items-center gap-1.5">
-                    <LayoutDashboard className="h-4 w-4 shrink-0" />
-                    <span className="hidden sm:inline">Dashboard Executivo</span>
-                  </TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="agenda" className="mt-6">
@@ -438,9 +434,7 @@ const CRMDashboard = () => {
                   onOpenCall={handleOpenCall}
                 />
               </TabsContent>
-              <TabsContent value="dashboard-executivo" className="mt-6">
-                {React.createElement(require("./DashboardExecutivo").default)}
-              </TabsContent>
+              {/* Dashboard Executivo temporarily hidden */}
             </Tabs>
           </div>
         ) : (
@@ -451,10 +445,7 @@ const CRMDashboard = () => {
               <LayoutDashboard className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="dashboard-executivo" className="flex items-center gap-1.5">
-              <LayoutDashboard className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Dashboard Executivo</span>
-            </TabsTrigger>
+            {/* Dashboard Executivo temporarily hidden */}
             <TabsTrigger value="agenda" className="flex items-center gap-1.5">
               <CalendarCheck className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Agenda do Dia</span>
@@ -531,10 +522,7 @@ const CRMDashboard = () => {
             <ComparisonChart leads={allLeads} />
           </TabsContent>
 
-          <TabsContent value="dashboard-executivo" className="mt-6">
-            {/** Dashboard Executivo com cards inteligentes */}
-            <DashboardExecutivo />
-          </TabsContent>
+          {/* Dashboard Executivo temporarily hidden */}
 
           <TabsContent value="agenda" className="mt-6">
             <AgendaDoDia
