@@ -51,7 +51,7 @@ function generateAlertsFromLeads(leads: any[]): Alert[] {
 }
 
 export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
-  const { updateLead } = useLeads();
+  const { updateLead, ticketAverage } = useLeads();
   const alerts = useMemo(() => generateAlertsFromLeads(leads), [leads]);
 
   const [filterLevel, setFilterLevel] = useState<'all' | 'high' | 'medium' | 'low'>('all');
@@ -88,7 +88,7 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
 
   // Summary: leads em risco (heurística: agendados sem comparecimento)
   const leadsEmRisco = (leads || []).filter((l: any) => l.dataAgendamento && l.comparecimento !== 'COMPARECEU');
-  const estimatedImpact = (leadsEmRisco.length * (useLeads().ticketAverage || 0)) || '—';
+  const estimatedImpact = (leadsEmRisco.length * (ticketAverage || 0)) || '—';
 
   return (
     <div className="space-y-4">
@@ -217,7 +217,7 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({ leads, max = 6 }) => {
                       <td className="py-2">{l.nome}</td>
                       <td>{l.telefone}</td>
                       <td>{l.dataAgendamento}</td>
-                      <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((useLeads().ticketAverage || 0))}</td>
+                      <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((ticketAverage || 0))}</td>
                       <td className="py-2">
                         <button onClick={async () => { try { await updateLead?.(l.id, { alertAssigned: true, alertAssignedAt: new Date().toISOString() }); } catch(e){console.error(e)} }} className="mr-2 px-2 py-1 bg-amber-600 text-white rounded">Atribuir</button>
                         <button onClick={async () => { try { await updateLead?.(l.id, { alertResolved: true, alertResolvedAt: new Date().toISOString() }); } catch(e){console.error(e)} }} className="px-2 py-1 border rounded">Resolver</button>
