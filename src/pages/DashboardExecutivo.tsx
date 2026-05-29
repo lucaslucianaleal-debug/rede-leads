@@ -15,83 +15,10 @@ import PredictiveScoreCard from "@/components/crm/executive/PredictiveScoreCard"
 import PerformanceBarCard from "@/components/crm/executive/PerformanceBarCard";
 import SourcePerformanceCard from "@/components/crm/executive/SourcePerformanceCard";
 import ActionCommandCard, { ActionCommand } from "@/components/crm/executive/ActionCommandCard";
-  // --- Action-Command Engine ---
-  // Helper: WhatsApp link
-  const getWALink = (telefone: string) => {
-    const num = telefone.replace(/\D/g, "");
-    return num.length >= 10 ? `https://wa.me/${num}` : undefined;
-  };
-
-  // 1. URGENTE: Recuperação Imediata (agendamento hoje/amanhã, status frio/não respondeu)
-  const hoje = new Date();
-  const amanha = new Date();
-  amanha.setDate(hoje.getDate() + 1);
-  const isHojeOuAmanha = (d?: string) => {
-    const date = parseDMY(d);
-    if (!date) return false;
-    return (
-      date >= new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()) &&
-      date <= new Date(amanha.getFullYear(), amanha.getMonth(), amanha.getDate(), 23, 59, 59, 999)
-    );
-  };
-  const urgenteLeads = leads.filter(
-    (l) =>
-      isHojeOuAmanha(l.dataAgendamento) &&
-      ["FRIO", "NÃO RESPONDEU"].includes(l.status?.toUpperCase?.() || "") &&
-      l.comparecimento !== "COMPARECEU"
-  );
-
-  // 2. PRIORITÁRIO: Leads sem responsável/captador
-  const prioritarioLeads = leads.filter((l) => !l.captador || l.captador.trim() === "");
-
-  // 3. ROTINA: Leads com follow-up pendente
-  const rotinaLeads = leads.filter(
-    (l) =>
-      !l.dataAgendamento &&
-      l.etapaLead && l.etapaLead.toLowerCase().includes("follow-up") &&
-      l.comparecimento !== "COMPARECEU"
-  );
-
-  // Compose ActionCommand(s)
-  const actionCommands: ActionCommand[] = [];
-  // URGENTE: up to 2
-  urgenteLeads.slice(0, 2).forEach((l) => {
-    actionCommands.push({
-      acao: `Recuperar lead para evitar perda de agendamento!`,
-      cliente: l.nome,
-      clienteLink: getWALink(l.telefone),
-      motivo: `Lead agendado para hoje/amanhã com status ${l.status || "-"}.`,
-      tempo: "Imediato",
-      nivel: "URGENTE",
-    });
-  });
-  // PRIORITÁRIO: up to 2
-  prioritarioLeads.slice(0, 2).forEach((l) => {
-    actionCommands.push({
-      acao: `Atribuir responsável ao lead!`,
-      cliente: l.nome,
-      clienteLink: getWALink(l.telefone),
-      motivo: `Lead sem responsável/captador definido.`,
-      tempo: "Hoje",
-      nivel: "PRIORITÁRIO",
-    });
-  });
-  // ROTINA: up to 2
-  rotinaLeads.slice(0, 2).forEach((l) => {
-    actionCommands.push({
-      acao: `Realizar follow-up pendente`,
-      cliente: l.nome,
-      clienteLink: getWALink(l.telefone),
-      motivo: `Lead está em etapa de follow-up sem agendamento.`,
-      tempo: "Até o fim do dia",
-      nivel: "ROTINA",
-    });
-  });
 
 export default function DashboardExecutivo() {
-  const { leads, lastSyncedAt, dataSource } = useLeads();
+  const { leads, lastSyncedAt, dataSource, ticketAverage } = useLeads();
   const [periodPreset, setPeriodPreset] = React.useState<string>("last_7");
-  const { ticketAverage } = useLeads();
 
   // Helpers para métricas no período selecionado
   const parseDMY = (s?: string) => {
@@ -169,6 +96,72 @@ export default function DashboardExecutivo() {
       default: return 'Período selecionado';
     }
   })();
+
+  // --- Action-Command Engine (placed after parseDMY so parseDMY is available) ---
+  const getWALink = (telefone: string) => {
+    const num = telefone ? telefone.replace(/\D/g, "") : "";
+    return num.length >= 10 ? `https://wa.me/${num}` : undefined;
+  };
+
+  const hoje = new Date();
+  const amanha = new Date();
+  amanha.setDate(hoje.getDate() + 1);
+  const isHojeOuAmanha = (d?: string) => {
+    const date = parseDMY(d);
+    if (!date) return false;
+    return (
+      date >= new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()) &&
+      date <= new Date(amanha.getFullYear(), amanha.getMonth(), amanha.getDate(), 23, 59, 59, 999)
+    );
+  };
+
+  const urgenteLeads = (leads || []).filter(
+    (l) =>
+      isHojeOuAmanha(l.dataAgendamento) &&
+      ["FRIO", "NÃO RESPONDEU"].includes((l.status || "").toUpperCase()) &&
+      l.comparecimento !== "COMPARECEU"
+  );
+
+  const prioritarioLeads = (leads || []).filter((l) => !l.captador || l.captador.trim() === "");
+
+  const rotinaLeads = (leads || []).filter(
+    (l) =>
+      !l.dataAgendamento &&
+      l.etapaLead && l.etapaLead.toLowerCase().includes("follow-up") &&
+      l.comparecimento !== "COMPARECEU"
+  );
+
+  const actionCommands: ActionCommand[] = [];
+  urgenteLeads.slice(0, 2).forEach((l) => {
+    actionCommands.push({
+      acao: `Recuperar lead para evitar perda de agendamento!`,
+      cliente: l.nome,
+      clienteLink: getWALink(l.telefone),
+      motivo: `Lead agendado para hoje/amanhã com status ${l.status || "-"}.`,
+      tempo: "Imediato",
+      nivel: "URGENTE",
+    });
+  });
+  prioritarioLeads.slice(0, 2).forEach((l) => {
+    actionCommands.push({
+      acao: `Atribuir responsável ao lead!`,
+      cliente: l.nome,
+      clienteLink: getWALink(l.telefone),
+      motivo: `Lead sem responsável/captador definido.`,
+      tempo: "Hoje",
+      nivel: "PRIORITÁRIO",
+    });
+  });
+  rotinaLeads.slice(0, 2).forEach((l) => {
+    actionCommands.push({
+      acao: `Realizar follow-up pendente`,
+      cliente: l.nome,
+      clienteLink: getWALink(l.telefone),
+      motivo: `Lead está em etapa de follow-up sem agendamento.`,
+      tempo: "Até o fim do dia",
+      nivel: "ROTINA",
+    });
+  });
 
   return (
     <div className="space-y-6">
