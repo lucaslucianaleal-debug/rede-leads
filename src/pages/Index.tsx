@@ -399,6 +399,10 @@ const CRMDashboard = () => {
                     <Database className="h-4 w-4 shrink-0" />
                     <span className="hidden sm:inline">Todos os Leads</span>
                   </TabsTrigger>
+                  <TabsTrigger value="dashboard-executivo" className="flex items-center gap-1.5">
+                    <LayoutDashboard className="h-4 w-4 shrink-0" />
+                    <span className="hidden sm:inline">Dashboard Executivo</span>
+                  </TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="agenda" className="mt-6">
@@ -425,6 +429,9 @@ const CRMDashboard = () => {
                   onRegisterCall={handleRegisterCall}
                   onOpenCall={handleOpenCall}
                 />
+              </TabsContent>
+              <TabsContent value="dashboard-executivo" className="mt-6">
+                {React.createElement(require("./DashboardExecutivo").default)}
               </TabsContent>
             </Tabs>
           </div>
