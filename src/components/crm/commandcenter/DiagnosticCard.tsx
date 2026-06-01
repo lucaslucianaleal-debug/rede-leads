@@ -7,43 +7,104 @@ interface DiagnosticCardProps {
 }
 
 const typeConfig = {
-  crit: { border: "border-l-red-500", bg: "bg-red-500/5", badge: "bg-red-500/20 text-red-400", dot: "bg-red-500", label: "URGENTE" },
-  imp: { border: "border-l-amber-500", bg: "bg-amber-500/5", badge: "bg-amber-500/20 text-amber-400", dot: "bg-amber-500", label: "HOJE" },
-  ok: { border: "border-l-emerald-500", bg: "bg-emerald-500/5", badge: "bg-emerald-500/20 text-emerald-400", dot: "bg-emerald-500", label: "ROTINA" },
-  info: { border: "border-l-blue-500", bg: "bg-blue-500/5", badge: "bg-blue-500/20 text-blue-400", dot: "bg-blue-500", label: "INFO" },
+  crit: {
+    bg: "#FCEBEB",
+    border: "#F09595",
+    textMain: "#791F1F",
+    textMuted: "#8B4B4B",
+    leftBorder: "#E24B4A",
+    badge: "#791F1F",
+    badgeBg: "#FCEBEB",
+  },
+  imp: {
+    bg: "#FAEEDA",
+    border: "#E8C897",
+    textMain: "#633806",
+    textMuted: "#7A5A1D",
+    leftBorder: "#BA7517",
+    badge: "#633806",
+    badgeBg: "#FAEEDA",
+  },
+  ok: {
+    bg: "#EAF3DE",
+    border: "#C9E4A1",
+    textMain: "#27500A",
+    textMuted: "#4A6D24",
+    leftBorder: "#1D9E75",
+    badge: "#27500A",
+    badgeBg: "#EAF3DE",
+  },
+  info: {
+    bg: "#E6F1FB",
+    border: "#B3D9F2",
+    textMain: "#0C447C",
+    textMuted: "#2D5E99",
+    leftBorder: "#378ADD",
+    badge: "#0C447C",
+    badgeBg: "#E6F1FB",
+  },
+};
+
+const labels = {
+  crit: "URGENTE",
+  imp: "HOJE",
+  ok: "ROTINA",
+  info: "INFO",
 };
 
 export default function DiagnosticCard({ diagnostics, onAction }: DiagnosticCardProps) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {diagnostics.map((d, i) => {
         const cfg = typeConfig[d.type];
         return (
           <div
             key={i}
-            className={`flex items-start gap-3 p-3 rounded-xl border-l-4 border border-border/30 ${cfg.border} ${cfg.bg}`}
+            style={{
+              background: cfg.bg,
+              border: `0.5px solid ${cfg.border}`,
+              borderLeft: `3px solid ${cfg.leftBorder}`,
+            }}
+            className="p-4 rounded-lg"
           >
-            <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${cfg.badge}`}>
-                  {cfg.label}
-                </span>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="mb-1">
+                  <span
+                    style={{ color: cfg.badge, background: cfg.badgeBg }}
+                    className="text-[11px] font-semibold px-2 py-0.5 rounded inline-block"
+                  >
+                    {labels[d.type]}
+                  </span>
+                </div>
+                <p
+                  style={{ color: cfg.textMain }}
+                  className="text-sm font-semibold leading-snug mb-1"
+                >
+                  {d.title}
+                </p>
+                <p style={{ color: cfg.textMuted }} className="text-xs leading-snug">
+                  {d.description}
+                </p>
               </div>
-              <p className="text-sm font-semibold leading-snug text-foreground">{d.title}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{d.description}</p>
+
+              {d.action && d.actionId && (
+                <button
+                  onClick={() => onAction?.(d.actionId!)}
+                  style={{
+                    color: cfg.badge,
+                    borderColor: cfg.border,
+                  }}
+                  className="shrink-0 text-xs px-3 py-1.5 rounded border font-medium whitespace-nowrap transition-opacity hover:opacity-80"
+                >
+                  {d.action} ↗
+                </button>
+              )}
             </div>
-            {d.action && d.actionId && (
-              <button
-                onClick={() => onAction?.(d.actionId!)}
-                className="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-border/60 bg-background hover:bg-muted font-medium whitespace-nowrap transition-colors"
-              >
-                {d.action} ↗
-              </button>
-            )}
           </div>
         );
       })}
     </div>
   );
 }
+

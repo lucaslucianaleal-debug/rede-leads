@@ -14,8 +14,8 @@ interface HistoryChartProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg">
-      <p className="font-semibold mb-1">{label}</p>
+    <div style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="rounded-lg px-3 py-2 text-xs shadow-lg">
+      <p style={{ color: "#fff" }} className="font-semibold mb-1">{label}</p>
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color }}>
           {p.name}: <strong>{p.value}</strong>

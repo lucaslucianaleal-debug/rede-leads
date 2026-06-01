@@ -8,15 +8,15 @@ interface FunnelCardProps {
 export default function FunnelCard({ funnel }: FunnelCardProps) {
   const maxVal = funnel.leads || 1;
   const bars = [
-    { label: "leads", value: funnel.leads, color: "bg-blue-500" },
-    { label: "agendados", value: funnel.scheduled, color: "bg-violet-500" },
-    { label: "vieram", value: funnel.completed, color: "bg-emerald-500" },
+    { label: "leads", value: funnel.leads, color: "#378ADD" },
+    { label: "agendados", value: funnel.scheduled, color: "#534AB7" },
+    { label: "vieram", value: funnel.completed, color: "#1D9E75" },
   ];
 
   return (
-    <div className="rounded-xl border border-border/50 bg-card p-4">
+    <div style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
-        <h4 className="text-sm font-semibold">Funil acumulado jan–mai/26</h4>
+        <h4 style={{ color: "#fff", fontSize: "13px" }} className="font-semibold">Funil acumulado jan–mai/26</h4>
       </div>
 
       {/* Bars */}
@@ -25,35 +25,35 @@ export default function FunnelCard({ funnel }: FunnelCardProps) {
           const pct = Math.round((b.value / maxVal) * 100);
           return (
             <div key={b.label} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-sm font-bold">{b.value.toLocaleString("pt-BR")}</span>
+              <span style={{ color: "#fff", fontSize: "13px" }} className="font-semibold">{b.value.toLocaleString("pt-BR")}</span>
               <div className="w-full flex items-end" style={{ height: "56px" }}>
                 <div
-                  className={`w-full rounded-t-md ${b.color}`}
-                  style={{ height: `${Math.max(4, pct)}%` }}
+                  style={{ background: b.color, height: `${Math.max(4, pct)}%` }}
+                  className="w-full rounded-t-md"
                 />
               </div>
-              <span className="text-[10px] text-muted-foreground">{b.label}</span>
+              <span style={{ color: "#999", fontSize: "10px" }}>{b.label}</span>
             </div>
           );
         })}
 
         {/* Stats sidebar */}
-        <div className="flex flex-col gap-2 pl-4 border-l border-border/50 text-xs min-w-[120px]">
-          <div>
-            <span className="text-muted-foreground">Conv. leads → agend:</span>
-            <span className={`ml-1 font-bold ${parseFloat(funnel.conversionRate) >= 45 ? "text-emerald-400" : "text-amber-400"}`}>
+        <div className="flex flex-col gap-2 pl-4" style={{ borderLeft: "0.5px solid #3a3a3a" }}>
+          <div style={{ fontSize: "12px" }}>
+            <span style={{ color: "#999" }}>Conv. leads → agend:</span>
+            <span style={{ color: parseFloat(funnel.conversionRate) >= 45 ? "#10b981" : "#f59e0b", marginLeft: "4px" }} className="font-bold">
               {funnel.conversionRate} {parseFloat(funnel.conversionRate) >= 45 ? "✅" : "⚠️"}
             </span>
           </div>
-          <div>
-            <span className="text-muted-foreground">Agend → compareceu:</span>
-            <span className={`ml-1 font-bold ${parseFloat(funnel.showUpRate) >= 50 ? "text-emerald-400" : "text-amber-400"}`}>
+          <div style={{ fontSize: "12px" }}>
+            <span style={{ color: "#999" }}>Agend → compareceu:</span>
+            <span style={{ color: parseFloat(funnel.showUpRate) >= 50 ? "#10b981" : "#f59e0b", marginLeft: "4px" }} className="font-bold">
               {funnel.showUpRate} {parseFloat(funnel.showUpRate) >= 50 ? "✅" : "⚠️"} meta: 50%
             </span>
           </div>
-          <div>
-            <span className="text-muted-foreground">Gargalo real:</span>
-            <span className="ml-1 font-bold text-red-400">{funnel.bottleneck}, não conversão</span>
+          <div style={{ fontSize: "12px" }}>
+            <span style={{ color: "#999" }}>Gargalo real:</span>
+            <span style={{ color: "#ef4444", marginLeft: "4px" }} className="font-bold">{funnel.bottleneck}, não conversão</span>
           </div>
         </div>
       </div>
