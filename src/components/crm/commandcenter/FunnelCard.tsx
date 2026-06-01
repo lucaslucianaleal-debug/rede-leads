@@ -3,9 +3,11 @@ import type { FunnelData } from "@/types/commandCenter";
 
 interface FunnelCardProps {
   funnel: FunnelData;
+  period?: "hoje" | "semana" | "mes";
 }
 
-export default function FunnelCard({ funnel }: FunnelCardProps) {
+export default function FunnelCard({ funnel, period = "mes" }: FunnelCardProps) {
+  const periodLabel = period === "hoje" ? "do dia" : period === "semana" ? "da semana" : "do mês";
   const maxVal = funnel.leads || 1;
   const bars = [
     { label: "leads", value: funnel.leads, color: "#378ADD" },
@@ -16,7 +18,7 @@ export default function FunnelCard({ funnel }: FunnelCardProps) {
   return (
     <div style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
-        <h4 style={{ color: "#fff", fontSize: "13px" }} className="font-semibold">Funil acumulado jan–mai/26</h4>
+        <h4 style={{ color: "#fff", fontSize: "13px" }} className="font-semibold">Funil de conversão {periodLabel}</h4>
       </div>
 
       {/* Bars */}

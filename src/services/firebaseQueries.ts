@@ -267,47 +267,104 @@ export async function generateOperationalDiagnostics(clinicId: string): Promise<
 }
 
 /**
- * Calcula funil de conversão
+ * Calcula funil de conversão, filtrado pelo período selecionado
  */
-export async function calculateFunnelData(clinicId: string): Promise<FunnelData> {
+export async function calculateFunnelData(clinicId: string, period: "hoje" | "semana" | "mes" = "mes"): Promise<FunnelData> {
   try {
     const leads = await fetchLeadsFromClinic(clinicId);
 
-    const total = leads.length;
-    const scheduled = leads.filter(l => l.dataAgendamento && l.dataAgendamento.trim()).length;
-    const completed = leads.filter(l => l.comparecimento === "COMPARECEU").length;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const periodDays = period === "hoje" ? 1 : period === "semana" ? 7 : 30;
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - (periodDays - 1));
+
+    const inRange = (dateStr: string) => {
+      const d = parseDate(dateStr);
+      d.setHours(0, 0, 0, 0);
+      return d >= startDate && d <= today;
+    };
+
+    const periodLeads = leads.filter(l => inRange(l.dataCriacao));
+
+    const total = periodLeads.length;
+    const scheduled = periodLeads.filter(l => l.dataAgendamento?.trim()).length;
+    const completed = periodLeads.filter(l => l.comparecimento === "COMPARECEU").length;
 
     const conversionRate = total > 0 ? Math.round((scheduled / total) * 100) : 0;
     const showUpRate = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
 
-    // Gargalo: onde está perdendo mais?
     let bottleneck = "captação";
-    if (conversionRate < 40) {
-      bottleneck = "agendamento";
-    } else if (showUpRate < 50) {
-      bottleneck = "no-show";
-    }
+    if (conversionRate < 40) bottleneck = "agendamento";
+    else if (showUpRate < 50) bottleneck = "no-show";
 
-    console.log(`[calculateFunnelData] Total: ${total}, Scheduled: ${scheduled} (${conversionRate}%), Completed: ${completed} (${showUpRate}%), Bottleneck: ${bottleneck}`);
+    console.log(`[calculateFunnelData] ${period}: Total: ${total}, Scheduled: ${scheduled} (${conversionRate}%), Completed: ${completed} (${showUpRate}%)`);
 
-    return {
-      leads: total,
-      scheduled,
-      completed,
-      conversionRate: `${conversionRate}%`,
-      showUpRate: `${showUpRate}%`,
-      bottleneck,
-    };
+    return { leads: total, scheduled, completed, conversionRate: `${conversionRate}%`, showUpRate: `${showUpRate}%`, bottleneck };
   } catch (e) {
     console.error("Error calculating funnel:", e);
-    return {
-      leads: 0,
-      scheduled: 0,
-      completed: 0,
-      conversionRate: "0%",
-      showUpRate: "0%",
-      bottleneck: "desconhecido",
+    return { leads: 0, scheduled: 0, completed: 0, conversionRate: "0%", showUpRate: "0%", bottleneck: "desconhecido" };
+  }
+}
+
+export interface ConsultorStat {
+  name: string;
+  leads: number;
+  scheduled: number;
+  completed: number;
+  scheduledRate: number;  // % agendados / leads
+  showUpRate: number;     // % comparecidos / agendados
+}
+
+/**
+ * Ranking de consultores/captadores baseado no campo `captador` do lead
+ */
+export async function calculateConsultorRanking(clinicId: string, period: "hoje" | "semana" | "mes" = "mes"): Promise<ConsultorStat[]> {
+  try {
+    const leads = await fetchLeadsFromClinic(clinicId);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const periodDays = period === "hoje" ? 1 : period === "semana" ? 7 : 30;
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - (periodDays - 1));
+
+    const inRange = (dateStr: string) => {
+      const d = parseDate(dateStr);
+      d.setHours(0, 0, 0, 0);
+      return d >= startDate && d <= today;
     };
+
+    const periodLeads = leads.filter(l => inRange(l.dataCriacao));
+
+    const map = new Map<string, { leads: number; scheduled: number; completed: number }>();
+
+    periodLeads.forEach(l => {
+      const name = (l.captador || l.abordadora || "").trim() || "Sem captador";
+      if (!map.has(name)) map.set(name, { leads: 0, scheduled: 0, completed: 0 });
+      const s = map.get(name)!;
+      s.leads += 1;
+      if (l.dataAgendamento?.trim()) s.scheduled += 1;
+      if (l.comparecimento === "COMPARECEU") s.completed += 1;
+    });
+
+    const result: ConsultorStat[] = Array.from(map.entries())
+      .map(([name, s]) => ({
+        name,
+        leads: s.leads,
+        scheduled: s.scheduled,
+        completed: s.completed,
+        scheduledRate: s.leads > 0 ? Math.round((s.scheduled / s.leads) * 100) : 0,
+        showUpRate: s.scheduled > 0 ? Math.round((s.completed / s.scheduled) * 100) : 0,
+      }))
+      .filter(c => c.name !== "Sem captador" || c.leads > 0)
+      .sort((a, b) => b.scheduledRate - a.scheduledRate);
+
+    console.log(`[calculateConsultorRanking] ${period}:`, result);
+    return result;
+  } catch (e) {
+    console.error("Error calculating consultor ranking:", e);
+    return [];
   }
 }
 

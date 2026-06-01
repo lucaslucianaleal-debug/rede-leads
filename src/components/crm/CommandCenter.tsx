@@ -7,7 +7,6 @@ import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useActions } from "@/hooks/useActions";
 import { useExport } from "@/hooks/useExport";
 import { useLeads } from "@/hooks/useLeads";
-import { MOCK_FIELD_MEMBERS } from "@/data/commandCenterMock";
 import Topbar from "./commandcenter/Topbar";
 import KPIStrip from "./commandcenter/KPIStrip";
 import DiagnosticCard from "./commandcenter/DiagnosticCard";
@@ -19,7 +18,7 @@ import AutomationCard from "./commandcenter/AutomationCard";
 import UnitsRankingSection from "./commandcenter/UnitsRankingSection";
 import PerformanceByChannelCard from "./commandcenter/PerformanceByChannelCard";
 import RecentLeadsTable from "./commandcenter/RecentLeadsTable";
-import LiveFieldMap from "./commandcenter/LiveFieldMap";
+import ConsultorRanking from "./commandcenter/ConsultorRanking";
 
 export default function CommandCenter() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,7 +26,7 @@ export default function CommandCenter() {
   const [period, setPeriod] = useState<PeriodType>("mes");
   const [unit, setUnit] = useState("all");
 
-  const { kpis, diagnostics, funnel, history, recentLeads } = useDashboardData(period);
+  const { kpis, diagnostics, funnel, history, recentLeads, consultores } = useDashboardData(period);
   const { channels, ranking } = useOperationalMetrics();
   const { campaigns, kpis: metaKpis, diagnostics: metaDiagnostics } = useMetaAds(unit);
   const { messages, kpis: waKpis, diagnostics: waDiagnostics } = useWhatsApp(unit);
@@ -94,9 +93,9 @@ export default function CommandCenter() {
                   </section>
                 )}
 
-                {/* Campo ao Vivo */}
+                {/* Ranking de Captadores */}
                 <section>
-                  <LiveFieldMap members={MOCK_FIELD_MEMBERS} />
+                  <ConsultorRanking consultores={consultores} period={period} />
                 </section>
 
                 {/* Funil */}
@@ -105,7 +104,7 @@ export default function CommandCenter() {
                     <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
                       Funil de Conversão
                     </h3>
-                    <FunnelCard funnel={funnel} />
+                    <FunnelCard funnel={funnel} period={period} />
                     <div style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="mt-4 rounded-lg p-4">
                       <HistoryChart data={history} />
                     </div>

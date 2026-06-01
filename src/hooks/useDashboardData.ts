@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { KPI, Diagnostic, FunnelData, PeriodType } from "@/types/commandCenter";
-import { calculateOperationalKPIs, generateOperationalDiagnostics, calculateFunnelData, generateHistoryData, fetchRecentLeads } from "@/services/firebaseQueries";
+import { calculateOperationalKPIs, generateOperationalDiagnostics, calculateFunnelData, generateHistoryData, fetchRecentLeads, calculateConsultorRanking } from "@/services/firebaseQueries";
+import type { ConsultorStat } from "@/services/firebaseQueries";
 
 export function useDashboardData(period: PeriodType, clinicId = "odontocompany-olimpia") {
   const [kpis, setKpis] = useState<KPI[]>([]);
@@ -8,18 +9,20 @@ export function useDashboardData(period: PeriodType, clinicId = "odontocompany-o
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [recentLeads, setRecentLeads] = useState<any[]>([]);
+  const [consultores, setConsultores] = useState<ConsultorStat[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [kpisData, diagnosticsData, funnelData, historyData, recentLeadsData] = await Promise.all([
+        const [kpisData, diagnosticsData, funnelData, historyData, recentLeadsData, consultoresData] = await Promise.all([
           calculateOperationalKPIs(clinicId, period),
           generateOperationalDiagnostics(clinicId),
-          calculateFunnelData(clinicId),
+          calculateFunnelData(clinicId, period),
           generateHistoryData(clinicId, 7),
           fetchRecentLeads(clinicId, 8),
+          calculateConsultorRanking(clinicId, period),
         ]);
 
         setKpis(kpisData);
@@ -27,6 +30,7 @@ export function useDashboardData(period: PeriodType, clinicId = "odontocompany-o
         setFunnel(funnelData);
         setHistory(historyData);
         setRecentLeads(recentLeadsData);
+        setConsultores(consultoresData);
       } catch (e) {
         console.error("Error loading dashboard data:", e);
       } finally {
@@ -37,6 +41,6 @@ export function useDashboardData(period: PeriodType, clinicId = "odontocompany-o
     fetchData();
   }, [period, clinicId]);
 
-  return { kpis, diagnostics, funnel, history, recentLeads, loading };
+  return { kpis, diagnostics, funnel, history, recentLeads, consultores, loading };
 }
 
