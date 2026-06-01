@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import type { LayerType, PeriodType } from "@/types/commandCenter";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useOperationalMetrics } from "@/hooks/useOperationalMetrics";
@@ -32,9 +32,26 @@ export default function CommandCenter() {
   const [layer, setLayer] = useState<LayerType>("ops");
   const [period, setPeriod] = useState<PeriodType>("mes");
   const [unit, setUnit] = useState("all");
-  const [ticketMedio, setTicketMedio] = useState(1800);
+  const [ticketMedio, setTicketMedio] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ticketMedio");
+      return saved ? parseInt(saved, 10) : 1800;
+    } catch {
+      return 1800;
+    }
+  });
   const [editingTicket, setEditingTicket] = useState(false);
   const [ticketInput, setTicketInput] = useState("1800");
+
+  // Salvar ticket médio no localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("ticketMedio", ticketMedio.toString());
+      setTicketInput(ticketMedio.toString());
+    } catch {
+      // Ignorar erros de localStorage
+    }
+  }, [ticketMedio]);
 
   const clinicId = unitToClinicId[unit] || "odontocompany-olimpia";
   const { kpis, diagnostics, funnel, history, recentLeads, consultores } = useDashboardData(period, clinicId, ticketMedio);
