@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import type { KPI, Diagnostic, FunnelData, LayerType, PeriodType } from "@/types/commandCenter";
-import { MOCK_KPIS, MOCK_DIAGNOSTICS, MOCK_FUNNEL } from "@/data/commandCenterMock";
+import type { KPI, Diagnostic, FunnelData, PeriodType } from "@/types/commandCenter";
+import { KPI_BRIEFING, MOCK_DIAGNOSTICS, MOCK_FUNNEL } from "@/data/commandCenterMock";
 
-export function useDashboardData(layer: LayerType, period: PeriodType) {
+export function useDashboardData(period: PeriodType) {
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
@@ -12,13 +12,14 @@ export function useDashboardData(layer: LayerType, period: PeriodType) {
     setLoading(true);
     // Simula latência de API; trocar por chamada real quando disponível
     const timer = setTimeout(() => {
-      setKpis(MOCK_KPIS[layer]?.[period] ?? []);
-      setDiagnostics(MOCK_DIAGNOSTICS[layer] ?? []);
-      setFunnel(layer === "ops" ? MOCK_FUNNEL : null);
+      setKpis(KPI_BRIEFING);
+      setDiagnostics(MOCK_DIAGNOSTICS);
+      setFunnel(MOCK_FUNNEL);
       setLoading(false);
     }, 120);
     return () => clearTimeout(timer);
-  }, [layer, period]);
+  }, [period]);
 
   return { kpis, diagnostics, funnel, loading };
 }
+

@@ -1,186 +1,58 @@
 import type { KPI, Diagnostic, FunnelData, Campaign, WhatsAppMessage, Automation, WhatsAppMetrics } from "@/types/commandCenter";
 
-// ─── KPIs por layer × período ────────────────────────────────────────────────
+// ─── 4 KPIs fixos (briefing) ──────────────────────────────────────────────────
 
-export const MOCK_KPIS: Record<string, Record<string, KPI[]>> = {
-  ops: {
-    hoje: [
-      { label: "Leads hoje", value: "15", delta: "+3 vs ontem", status: "good" },
-      { label: "Agendados", value: "6", delta: "-1 vs ontem", status: "warn" },
-      { label: "Compareceram", value: "2", sub: "meta: 5", status: "bad" },
-      { label: "Follow-ups pend.", value: "86", sub: "D1–D3 hoje", status: "bad" },
-      { label: "Confirmações env.", value: "12", sub: "agendados amanhã", status: "info" },
-      { label: "Sem responsável", value: "851", sub: "precisa distribuir", status: "bad" },
-      { label: "Automáticas hoje", value: "18", sub: "42% do total", status: "good" },
-      { label: "Taxa de resposta", value: "68%", sub: "leads que respondem", status: "warn" },
-    ],
-    semana: [
-      { label: "Leads semana", value: "89", delta: "+12% vs ant.", status: "good" },
-      { label: "Agendados", value: "34", delta: "-8% vs ant.", status: "warn" },
-      { label: "Compareceram", value: "19", sub: "meta: 30", status: "bad" },
-      { label: "Follow-ups pend.", value: "86", sub: "acumulados", status: "bad" },
-      { label: "Confirmações env.", value: "67", sub: "automáticas", status: "good" },
-      { label: "Sem responsável", value: "851", sub: "crítico", status: "bad" },
-      { label: "Automáticas", value: "94", sub: "% auto: 58%", status: "good" },
-      { label: "Taxa de resposta", value: "71%", sub: "média semana", status: "warn" },
-    ],
-    mes: [
-      { label: "Leads mai/26", value: "428", delta: "-68% vs abr", status: "bad" },
-      { label: "Meta leads", value: "35%", sub: "meta: 200", status: "bad" },
-      { label: "Compareceram", value: "157", sub: "meta: 50%", status: "warn" },
-      { label: "Receita prevista", value: "R$ 51k", sub: "ticket R$ 120", status: "info" },
-      { label: "CAC médio", value: "—", sub: "integrar Meta", status: "neutral" },
-      { label: "Sem responsável", value: "851", sub: "R$ 56.808 parados", status: "bad" },
-      { label: "Conv. leads→agend", value: "45%", sub: "meta: 50%", status: "warn" },
-      { label: "Taxa comparecim.", value: "37%", sub: "meta: 50%", status: "bad" },
-    ],
-  },
-  meta: {
-    hoje: [
-      { label: "Leads Meta hoje", value: "8", delta: "+2 vs ontem", status: "good" },
-      { label: "Custo por lead", value: "R$ 12,40", sub: "meta: R$ 15", status: "good" },
-      { label: "CAC real", value: "R$ 45", sub: "por paciente sentado", status: "good" },
-      { label: "ROAS geral", value: "3.2x", sub: "meta: 2.5x", status: "good" },
-      { label: "Campanhas ativas", value: "4", sub: "de 6 totais", status: "info" },
-      { label: "Impressões hoje", value: "12.4k", sub: "CTR 2.1%", status: "info" },
-    ],
-    semana: [
-      { label: "Leads Meta", value: "43", delta: "+18% vs ant.", status: "good" },
-      { label: "Custo por lead", value: "R$ 13,80", sub: "meta: R$ 15", status: "good" },
-      { label: "CAC real", value: "R$ 52", sub: "por paciente sentado", status: "good" },
-      { label: "ROAS geral", value: "2.9x", sub: "meta: 2.5x", status: "good" },
-      { label: "Melhor campanha", value: "Promotora", sub: "ROAS 5.3x", status: "meta" },
-      { label: "Pior campanha", value: "Sorteio", sub: "ROAS 0.0x — pausar", status: "bad" },
-    ],
-    mes: [
-      { label: "Leads Meta mai", value: "187", delta: "-41% vs abr", status: "bad" },
-      { label: "Custo por lead", value: "R$ 14,20", sub: "acumulado", status: "good" },
-      { label: "CAC real", value: "R$ 61", sub: "por paciente sentado", status: "warn" },
-      { label: "ROAS geral", value: "2.4x", sub: "abaixo da meta", status: "warn" },
-      { label: "Verba gasta", value: "R$ 2.650", sub: "de R$ 5.000 budget", status: "info" },
-      { label: "Melhor canal", value: "Online", sub: "+28% eficiência", status: "meta" },
-    ],
-  },
-  wa: {
-    hoje: [
-      { label: "Msgs recebidas", value: "43", sub: "hoje", status: "info" },
-      { label: "Msgs enviadas", value: "61", sub: "humano + auto", status: "info" },
-      { label: "Tempo resp. médio", value: "4min", delta: "meta: 5min ✅", status: "good" },
-      { label: "Leads sem resposta", value: "8", sub: "+24h parados", status: "bad" },
-      { label: "Automáticas hoje", value: "18", sub: "42% do total", status: "good" },
-      { label: "Confirmações env.", value: "12", sub: "agendados amanhã", status: "good" },
-      { label: "Follow-ups auto", value: "6", sub: "D1–D3 hoje", status: "good" },
-      { label: "Taxa de resposta", value: "68%", sub: "leads que respondem", status: "warn" },
-    ],
-    semana: [
-      { label: "Msgs recebidas", value: "312", sub: "semana", status: "info" },
-      { label: "Msgs enviadas", value: "428", sub: "humano + auto", status: "info" },
-      { label: "Tempo resp. médio", value: "6min", delta: "meta: 5min ⚠️", status: "warn" },
-      { label: "Leads sem resposta", value: "8", sub: "acumulados", status: "bad" },
-      { label: "Automáticas", value: "94", sub: "% auto: 58%", status: "good" },
-      { label: "Follow-ups auto", value: "31", sub: "D1–D3", status: "good" },
-    ],
-    mes: [
-      { label: "Total msgs", value: "1.847", sub: "mai/26", status: "info" },
-      { label: "Tempo resp. médio", value: "7min", delta: "meta: 5min ⚠️", status: "warn" },
-      { label: "Taxa automação", value: "54%", sub: "meta: 60%", status: "warn" },
-      { label: "No-show evitados", value: "23", sub: "por confirmação auto", status: "good" },
-      { label: "Conversão WA→agend", value: "38%", sub: "meta: 45%", status: "bad" },
-      { label: "Leads reativados", value: "14", sub: "via follow-up D2", status: "good" },
-    ],
-  },
-};
+export const KPI_BRIEFING: KPI[] = [
+  { label: "Leads hoje", value: "15", delta: "+50% vs ontem", status: "good" },
+  { label: "Comparecidos", value: "1", sub: "meta: 5 hoje", status: "bad" },
+  { label: "Receita prevista", value: "R$ 2k", sub: "ticket R$ 120", status: "good" },
+  { label: "CAC real", value: "R$ 180", sub: "integrar Meta para exato", status: "warn" },
+];
 
-// ─── Diagnósticos por layer ───────────────────────────────────────────────────
+// ─── Diagnósticos unificados (ops + meta + wa) ────────────────────────────────
 
-export const MOCK_DIAGNOSTICS: Record<string, Diagnostic[]> = {
-  ops: [
-    {
-      type: "crit",
-      title: "851 leads sem responsável — R$ 56.808 parados",
-      description: "Distribuir agora por carga de equipe. Risco de perda aumenta a cada hora.",
-      action: "Distribuir",
-      actionId: "distribute_leads",
-    },
-    {
-      type: "imp",
-      title: "6 pacientes agendados sem confirmação de presença",
-      description: "Amanda, Vanessa, Damaris, Alisson, Paula, Milena — risco de no-show amanhã.",
-      action: "Confirmar",
-      actionId: "confirm_appointments",
-    },
-    {
-      type: "imp",
-      title: "86 follow-ups pendentes na fila D1–D3",
-      description: "Queda de 46% vs. semana anterior. Lucas e Julia precisam retomar cadência.",
-      action: "Ver fila",
-      actionId: "view_followup_queue",
-    },
-    {
-      type: "info",
-      title: "Promotora Sorteio Rádio com conversão 18% → abaixo da meta",
-      description: "Canal mais fraco esta semana. Avaliar substituição de abordagem.",
-      action: "Analisar",
-      actionId: "analyze_channel",
-    },
-  ],
-  meta: [
-    {
-      type: "crit",
-      title: "Campanha Sorteio com ROAS 0.0x — nenhuma conversão",
-      description: "R$ 320 gastos, 0 agendamentos. Pausar imediatamente.",
-      action: "Pausar campanha",
-      actionId: "pause_campaign_sorteio",
-    },
-    {
-      type: "imp",
-      title: "Google: comparecimento caiu 43pp esta semana",
-      description: "Causa provável: falta de confirmação 2h antes. Ativar automação.",
-      action: "Ativar confirmação",
-      actionId: "enable_confirmation_auto",
-    },
-    {
-      type: "ok",
-      title: "Promotora com ROAS 5.3x — melhor canal ativo",
-      description: "CAC R$ 45. Considerar aumentar verba em 20%.",
-      action: "Otimizar verba",
-      actionId: "optimize_budget_promotora",
-    },
-    {
-      type: "info",
-      title: "Leads Meta com tempo de resposta médio 18min",
-      description: "Meta recomenda <5min para máxima conversão. Ativar resposta automática.",
-    },
-  ],
-  wa: [
-    {
-      type: "crit",
-      title: "8 leads sem resposta há +24h — risco de perda",
-      description: "Ana Ferreira, João Lima e +6. Acionar agora via WA.",
-      action: "Responder todos",
-      actionId: "respond_pending",
-    },
-    {
-      type: "imp",
-      title: "Vanessa não confirmou presença amanhã 09:30",
-      description: "Enviar lembrete agora para evitar no-show.",
-      action: "Enviar lembrete",
-      actionId: "send_reminder_vanessa",
-    },
-    {
-      type: "ok",
-      title: "Tempo de resposta médio: 4min — dentro da meta",
-      description: "Meta estabelecida: 5min. Equipe performando bem hoje.",
-    },
-    {
-      type: "info",
-      title: "54% das mensagens são automáticas — meta 60%",
-      description: "Ativar follow-up D2 automático para aumentar automação.",
-      action: "Ativar follow-up D2",
-      actionId: "enable_followup_d2",
-    },
-  ],
-};
+export const MOCK_DIAGNOSTICS: Diagnostic[] = [
+  {
+    type: "crit",
+    title: "8 leads sem resposta +24h — risco de perda imediata",
+    description: "Ana Ferreira, João Lima e +6. Cada hora reduz chance de agendamento em ~12%.",
+    action: "Enviar WA agora",
+    actionId: "send_whatsapp_unresponded",
+  },
+  {
+    type: "crit",
+    title: "Campanha Sorteio com 0 conversões — R$ 320 queimados",
+    description: "ROAS 0.0x. 11 leads captados, 0 agendamentos. Pausar e redirecionar budget.",
+    action: "Pausar campanha",
+    actionId: "pause_campaign_sorteio",
+  },
+  {
+    type: "imp",
+    title: "Comparecimento em 37% — meta é 50%",
+    description: "Confirmação 2h antes reduz no-show em ~15pp. Automação está desligada.",
+    action: "Ativar confirmação",
+    actionId: "activate_automation_confirmation",
+  },
+  {
+    type: "ok",
+    title: "Tempo de resposta WA: 4min — dentro da meta",
+    description: "Meta: 5min. Equipe performando bem. Manter cadência.",
+    action: undefined,
+    actionId: undefined,
+  },
+];
+
+// ─── Histórico 7 dias ─────────────────────────────────────────────────────────
+
+export const MOCK_HISTORY = [
+  { date: "25/05", leads: 18, completed: 5 },
+  { date: "26/05", leads: 22, completed: 8 },
+  { date: "27/05", leads: 14, completed: 3 },
+  { date: "28/05", leads: 19, completed: 7 },
+  { date: "29/05", leads: 11, completed: 2 },
+  { date: "30/05", leads: 16, completed: 4 },
+  { date: "31/05", leads: 15, completed: 1 },
+];
 
 // ─── Funil ────────────────────────────────────────────────────────────────────
 
