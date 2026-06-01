@@ -6,7 +6,7 @@ import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useActions } from "@/hooks/useActions";
 import { useExport } from "@/hooks/useExport";
 import { useLeads } from "@/hooks/useLeads";
-import { MOCK_HISTORY, MOCK_UNITS_RANKING, MOCK_PERFORMANCE_CHANNELS, MOCK_RECENT_LEADS } from "@/data/commandCenterMock";
+import { MOCK_HISTORY, MOCK_UNITS_RANKING, MOCK_PERFORMANCE_CHANNELS, MOCK_RECENT_LEADS, MOCK_FIELD_MEMBERS } from "@/data/commandCenterMock";
 import Topbar from "./commandcenter/Topbar";
 import KPIStrip from "./commandcenter/KPIStrip";
 import DiagnosticCard from "./commandcenter/DiagnosticCard";
@@ -18,6 +18,7 @@ import AutomationCard from "./commandcenter/AutomationCard";
 import UnitsRankingSection from "./commandcenter/UnitsRankingSection";
 import PerformanceByChannelCard from "./commandcenter/PerformanceByChannelCard";
 import RecentLeadsTable from "./commandcenter/RecentLeadsTable";
+import LiveFieldMap from "./commandcenter/LiveFieldMap";
 
 export default function CommandCenter() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,6 +91,11 @@ export default function CommandCenter() {
                     <DiagnosticCard diagnostics={diagnostics} onAction={execute} />
                   </section>
                 )}
+
+                {/* Campo ao Vivo */}
+                <section>
+                  <LiveFieldMap members={MOCK_FIELD_MEMBERS} />
+                </section>
 
                 {/* Funil */}
                 {funnel && (

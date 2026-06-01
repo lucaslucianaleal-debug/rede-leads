@@ -96,3 +96,14 @@ export interface RecentLead {
   time: string;
   action?: string;
 }
+
+export interface FieldMember {
+  id: string;
+  name: string;
+  unit: string;
+  x: number; // 0-100 posição no mapa
+  y: number; // 0-100 posição no mapa
+  leads: number;
+  meta: number;
+  color: string;
+}

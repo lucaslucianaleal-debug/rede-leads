@@ -1,4 +1,4 @@
-import type { KPI, Diagnostic, FunnelData, Campaign, WhatsAppMessage, Automation, WhatsAppMetrics, UnitRanking, PerformanceChannel, RecentLead } from "@/types/commandCenter";
+import type { KPI, Diagnostic, FunnelData, Campaign, WhatsAppMessage, Automation, WhatsAppMetrics, UnitRanking, PerformanceChannel, RecentLead, FieldMember } from "@/types/commandCenter";
 
 // ─── 4 KPIs fixos (briefing) ──────────────────────────────────────────────────
 
@@ -148,4 +148,12 @@ export const MOCK_RECENT_LEADS: RecentLead[] = [
   { id: "6", name: "Fernanda Gomes", status: "agendado", date: "02/06", time: "15:30", action: "Confirmar" },
   { id: "7", name: "Gabriela Rocha", status: "confirmado", date: "31/05", time: "14:00", action: "Lembrar" },
   { id: "8", name: "Helena Pereira", status: "compareceu", date: "31/05", time: "13:00", action: "Seguir" },
+];
+
+// ─── Campo ao Vivo (Membros em Campo) ──────────────────────────────────────
+
+export const MOCK_FIELD_MEMBERS: FieldMember[] = [
+  { id: "1", name: "Lucas", unit: "Olímpia - GPS ao vivo", x: 60, y: 45, leads: 4, meta: 5, color: "#378ADD" },
+  { id: "2", name: "Julia", unit: "Rua David de Oliveira", x: 35, y: 65, leads: 0, meta: 5, color: "#ec4899" },
+  { id: "3", name: "Neto", unit: "Rua Benjamim Constant", x: 70, y: 50, leads: 2, meta: 5, color: "#1D9E75" },
 ];
