@@ -63,6 +63,7 @@ export interface Campaign {
 
   // Derivados:
   roas: number;          // (completed * ticketMedio) / totalSpend
+  predictability: number; // lead -> comparecimento (%), usado como previsibilidade
   cacLead: number;       // totalSpend / leads
   cacAgendamento: number; // totalSpend / scheduled
   cacComparecimento: number; // totalSpend / completed

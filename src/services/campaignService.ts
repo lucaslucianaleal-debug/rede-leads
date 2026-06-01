@@ -60,6 +60,7 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
       const completedCount = campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length;
 
       const roas = totals.totalSpend > 0 ? parseFloat(((completedCount * ticketMedio) / totals.totalSpend).toFixed(2)) : 0;
+      const predictability = leadsCount > 0 ? Math.round((completedCount / leadsCount) * 100) : 0;
       const cacLead = leadsCount > 0 ? parseFloat((totals.totalSpend / leadsCount).toFixed(2)) : 0;
       const cacAgendamento = scheduledCount > 0 ? parseFloat((totals.totalSpend / scheduledCount).toFixed(2)) : 0;
       const cacComparecimento = completedCount > 0 ? parseFloat((totals.totalSpend / completedCount).toFixed(2)) : 0;
@@ -83,6 +84,7 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         scheduled: scheduledCount,
         completed: completedCount,
         roas: (totals.totalSpend + (data.taxCost || 0)) > 0 ? parseFloat(((completedCount * ticketMedio) / (totals.totalSpend + (data.taxCost || 0))).toFixed(2)) : 0,
+        predictability,
         cacLead,
         cacAgendamento,
         cacComparecimento,

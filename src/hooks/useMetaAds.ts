@@ -26,13 +26,13 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
   const diagnostics: Diagnostic[] = [];
   const active = campaigns.filter(c => c.active);
   if (active.length > 0) {
-    const best = [...active].sort((a, b) => b.roas - a.roas)[0];
-    const worst = [...active].filter(c => c.totalSpend > 0).sort((a, b) => a.roas - b.roas)[0];
-    if (worst && worst.roas < 2 && worst.totalSpend > 0) {
-      diagnostics.push({ type: "crit", title: `${worst.name}: ROAS ${worst.roas.toFixed(1)}x — budget queimando`, description: `R$${worst.totalSpend.toLocaleString("pt-BR")} gastos, ${worst.completed} comparecimentos. Considere pausar ou revisar o criativo.`, action: "Pausar campanha", actionId: "pause_campaign" });
+    const best = [...active].sort((a, b) => b.predictability - a.predictability)[0];
+    const worst = [...active].filter(c => c.totalSpend > 0).sort((a, b) => a.predictability - b.predictability)[0];
+    if (worst && worst.predictability < 20 && worst.totalSpend > 0) {
+      diagnostics.push({ type: "crit", title: `${worst.name}: previsibilidade ${worst.predictability}% — funil fraco`, description: `R$${worst.totalSpend.toLocaleString("pt-BR")} gastos, ${worst.leads} leads e ${worst.completed} comparecimentos. Reveja segmentação, criativo e atendimento.`, action: "Pausar campanha", actionId: "pause_campaign" });
     }
-    if (best && best.roas >= 5) {
-      diagnostics.push({ type: "ok", title: `${best.name}: ROAS ${best.roas.toFixed(1)}x — excelente resultado`, description: `${best.leads} leads, ${best.completed} comparecimentos. Considere aumentar o budget desta campanha.` });
+    if (best && best.predictability >= 40) {
+      diagnostics.push({ type: "ok", title: `${best.name}: previsibilidade ${best.predictability}% — funil saudável`, description: `${best.leads} leads, ${best.scheduled} agendamentos e ${best.completed} comparecimentos. Campanha com leitura mais confiável.` });
     }
     const overBudget = active.find(c => c.budget > 0 && c.totalSpend / c.budget > 0.9);
     if (overBudget) {

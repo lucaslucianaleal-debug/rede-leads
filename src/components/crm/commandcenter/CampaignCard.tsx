@@ -111,10 +111,10 @@ function CampaignHealthChart({ metrics }: { metrics: CampaignDailyMetric[] }) {
   );
 }
 
-function RoasBadge({ roas }: { roas: number }) {
-  const color = roas >= 5 ? "#10b981" : roas >= 2 ? "#f59e0b" : roas > 0 ? "#ef4444" : "#666";
-  const label = roas === 0 ? "—" : `${roas.toFixed(1)}x`;
-  const verdict = roas >= 5 ? "✅ Vale a pena" : roas >= 2 ? "⚠️ Regular" : roas > 0 ? "🔴 Rever" : "Sem dados";
+function PredictabilityBadge({ predictability }: { predictability: number }) {
+  const color = predictability >= 40 ? "#10b981" : predictability >= 20 ? "#f59e0b" : predictability > 0 ? "#ef4444" : "#666";
+  const label = predictability === 0 ? "—" : `${predictability}%`;
+  const verdict = predictability >= 40 ? "✅ Previsível" : predictability >= 20 ? "⚠️ Atenção" : predictability > 0 ? "🔴 Baixa previsibilidade" : "Sem dados";
   return (
     <div className="text-right">
       <span style={{ color, fontSize: "18px" }} className="font-bold">{label}</span>
@@ -149,7 +149,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance }: {
               {c.dateStart && <p style={{ color: "#555", fontSize: "10px" }}>{c.dateStart}{c.dateEnd ? ` — ${c.dateEnd}` : ""}</p>}
             </div>
           </div>
-          <RoasBadge roas={c.roas} />
+          <PredictabilityBadge predictability={c.predictability} />
         </div>
 
         {/* KPIs de decisão */}
@@ -292,12 +292,10 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const active = campaigns.filter(c => c.active);
   const paused = campaigns.filter(c => !c.active);
   const totalSpend = campaigns.reduce((a, c) => a + c.totalSpend, 0);
-  const totalTaxCost = campaigns.reduce((a, c) => a + (c.taxCost || 0), 0);
   const totalLeads = campaigns.reduce((a, c) => a + c.leads, 0);
   const totalCompleted = campaigns.reduce((a, c) => a + c.completed, 0);
   const receita = totalCompleted * ticketMedio;
-  const custoRealTotal = totalSpend + totalTaxCost;
-  const roasGeral = custoRealTotal > 0 ? receita / custoRealTotal : 0;
+  const totalCompletedRate = totalLeads > 0 ? Math.round((totalCompleted / totalLeads) * 100) : 0;
 
   return (
     <>
@@ -314,8 +312,8 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
             {[
               { label: "Spend total", value: fmt(totalSpend), sub: `${active.length} ativa${active.length !== 1 ? "s" : ""}` },
               { label: "Leads captados", value: fmtN(totalLeads), sub: "todas campanhas" },
-              { label: "ROAS geral", value: roasGeral > 0 ? `${roasGeral.toFixed(1)}x` : "—", color: roasGeral >= 5 ? "#10b981" : roasGeral >= 2 ? "#f59e0b" : "#ef4444" },
-              { label: "Receita estimada", value: fmt(receita), color: "#10b981", sub: `${totalCompleted} comparecimentos` },
+              { label: "Previsibilidade geral", value: totalCompletedRate > 0 ? `${totalCompletedRate}%` : "—", color: totalCompletedRate >= 40 ? "#10b981" : totalCompletedRate >= 20 ? "#f59e0b" : "#ef4444", sub: "lead → comparecimento" },
+              { label: "Receita potencial", value: fmt(receita), color: "#10b981", sub: `${totalCompleted} comparecimentos` },
             ].map(k => (
               <div key={k.label}>
                 <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider mb-1">{k.label}</p>
