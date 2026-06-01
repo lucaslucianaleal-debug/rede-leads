@@ -19,6 +19,9 @@ import { db } from "@/lib/firebase";
 import { maskPhone, isValidPhone } from "@/lib/phone";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { useLeads } from "@/hooks/useLeads";
+import { useEffect, useRef } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { fetchActiveCampaignList } from "@/services/campaignService";
 
 interface EditLeadDialogProps {
   lead: Lead | null;
@@ -40,12 +43,22 @@ const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", 
 
 export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogProps) {
   const { allLeads } = useLeads();
+  const { currentClinic, selectedClinic } = useAuth();
+  const clinicId = currentClinic || selectedClinic || "";
   const [duplicateWarning, setDuplicateWarning] = useState<{ nome: string; etapa: string } | null>(null);
   const [form, setForm] = useState<Partial<Lead>>({});
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
   const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [previousPhone, setPreviousPhone] = useState<string | null>(null);
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
+  const fetchedClinic = useRef("");
+
+  useEffect(() => {
+    if (!clinicId || clinicId === fetchedClinic.current) return;
+    fetchedClinic.current = clinicId;
+    fetchActiveCampaignList(clinicId).then(setCampaigns);
+  }, [clinicId]);
 
   useEffect(() => {
     if (lead) {
@@ -243,6 +256,32 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
               </SelectContent>
             </Select>
           </div>
+
+          {/* Campanha Meta Ads */}
+          {campaigns.length > 0 && (
+            <div className="space-y-1">
+              <Label>Campanha Meta Ads</Label>
+              <Select
+                value={form.metaCampanhaId || "none"}
+                onValueChange={(v) => {
+                  if (v === "none") {
+                    set("metaCampanhaId", "");
+                    set("metaCampanhaNome", "");
+                  } else {
+                    const c = campaigns.find(c => c.id === v);
+                    set("metaCampanhaId", v);
+                    set("metaCampanhaNome", c?.name || "");
+                  }
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Nenhuma</SelectItem>
+                  {campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Etapa */}
           <div className="space-y-1">

@@ -65,6 +65,9 @@ export interface Lead {
   lembretes: ReminderStatus;
   // Coordenadas do cliente para navegação e rastreamento
   coordenadas?: { lat?: number; lng?: number };
+  // Campanha Meta Ads de origem
+  metaCampanhaId?: string;
+  metaCampanhaNome?: string;
   // Soft-delete fields
   _deleted?: boolean;
   deletedAt?: string;

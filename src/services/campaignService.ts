@@ -5,6 +5,22 @@ import { fetchLeadsFromClinic } from "./firebaseQueries";
 
 const CAMPAIGN_COLORS = ["#D4537E", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"];
 
+/**
+ * Retorna lista leve de campanhas ativas para seletores de formulário
+ */
+export async function fetchActiveCampaignList(clinicId: string): Promise<{ id: string; name: string }[]> {
+  if (!clinicId) return [];
+  try {
+    const colRef = collection(db, "clinics", clinicId, "campaigns");
+    const snapshot = await getDocs(colRef);
+    return snapshot.docs
+      .filter(d => d.data().active !== false)
+      .map(d => ({ id: d.id, name: d.data().name || "Campanha" }));
+  } catch {
+    return [];
+  }
+}
+
 function calcCampaignTotals(dailyMetrics: CampaignDailyMetric[]) {
   return dailyMetrics.reduce(
     (acc, d) => ({
