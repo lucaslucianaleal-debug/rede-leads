@@ -4,6 +4,7 @@ import type { Campaign, CampaignDailyMetric } from "@/types/commandCenter";
 interface Props {
   campaign: Campaign;
   onSave: (campaignId: string, metric: CampaignDailyMetric) => Promise<void>;
+  onDelete?: (campaignId: string, date: string) => Promise<void>;
   onClose: () => void;
   metric?: CampaignDailyMetric;
 }
@@ -13,7 +14,7 @@ function todayStr() {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
-export default function CampaignDailyModal({ campaign, onSave, onClose, metric }: Props) {
+export default function CampaignDailyModal({ campaign, onSave, onDelete, onClose, metric }: Props) {
   const [date, setDate] = useState(metric?.date || todayStr());
   const [spend, setSpend] = useState(metric?.spend.toString() || "");
   const [impressions, setImpressions] = useState(metric?.impressions.toString() || "");
@@ -69,6 +70,24 @@ export default function CampaignDailyModal({ campaign, onSave, onClose, metric }
     }
   };
 
+  const handleDelete = async () => {
+    if (!metric) return;
+    const confirmed = window.confirm(`Excluir a métrica do dia ${metric.date}?`);
+    if (!confirmed) return;
+    setSaving(true);
+    setError("");
+    try {
+      if (onDelete) {
+        await onDelete(campaign.id, metric.date);
+      }
+      onClose();
+    } catch (e) {
+      setError("Erro ao excluir. Tente novamente.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.7)" }}>
       <div style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a", width: "100%", maxWidth: "440px" }} className="rounded-xl p-6 mx-4">
@@ -119,7 +138,17 @@ export default function CampaignDailyModal({ campaign, onSave, onClose, metric }
 
         {error && <p style={{ color: "#ef4444", fontSize: "11px" }} className="mb-3">{error}</p>}
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
+          {metric && onDelete && (
+            <button
+              onClick={handleDelete}
+              disabled={saving}
+              style={{ border: "0.5px solid #7f1d1d", color: "#f87171", fontSize: "13px" }}
+              className="px-4 py-2 rounded font-medium hover:bg-[#3a1f1f] transition-colors disabled:opacity-60"
+            >
+              Excluir dia
+            </button>
+          )}
           <button
             onClick={onClose}
             style={{ border: "0.5px solid #3a3a3a", color: "#999", fontSize: "13px" }}

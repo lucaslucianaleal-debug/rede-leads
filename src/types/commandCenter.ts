@@ -46,6 +46,8 @@ export interface Campaign {
   dateStart: string; // DD/MM/YYYY
   dateEnd: string;   // DD/MM/YYYY
   budget: number;    // budget total planejado
+  fundsAdded: number; // créditos/fundos adicionados na conta de anúncios
+  taxCost: number;    // impostos/taxas cobrados pela plataforma
   dailyMetrics: CampaignDailyMetric[];
 
   // Calculados automaticamente (agregados de dailyMetrics):

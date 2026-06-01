@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { Campaign, CampaignDailyMetric } from "@/types/commandCenter";
 import CampaignDailyModal from "./CampaignDailyModal";
+import CampaignFinanceModal from "./CampaignFinanceModal";
 import CreateCampaignModal from "./CreateCampaignModal";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 
@@ -8,9 +9,11 @@ interface Props {
   campaigns: Campaign[];
   clinicId: string;
   ticketMedio: number;
-  onAddCampaign: (data: { name: string; dateStart: string; dateEnd: string; budget: number }) => Promise<void>;
+  onAddCampaign: (data: { name: string; dateStart: string; dateEnd: string; budget: number; fundsAdded?: number; taxCost?: number }) => Promise<void>;
   onSaveDailyMetric: (campaignId: string, metric: CampaignDailyMetric) => Promise<void>;
+  onDeleteDailyMetric: (campaignId: string, date: string) => Promise<void>;
   onToggleActive: (campaignId: string, active: boolean) => Promise<void>;
+  onSaveCampaignFinance: (campaignId: string, data: { fundsAdded: number; taxCost: number }) => Promise<void>;
   onReload: () => void;
 }
 
@@ -89,15 +92,17 @@ function RoasBadge({ roas }: { roas: number }) {
   );
 }
 
-function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle }: {
+function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance }: {
   c: Campaign;
   ticketMedio: number;
   onDailyMetric: (c: Campaign, metric?: CampaignDailyMetric) => void;
   onToggle: (c: Campaign) => void;
+  onFinance: (c: Campaign) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const receita = c.completed * ticketMedio;
-  const lucro = receita - c.totalSpend;
+  const custoReal = c.totalSpend + c.taxCost;
+  const margem = receita - custoReal;
 
   return (
     <div style={{ background: "#1e1e1e", border: `0.5px solid ${c.active ? "#3a3a3a" : "#2a2a2a"}` }} className="rounded-lg overflow-hidden">
@@ -159,6 +164,25 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle }: {
           </div>
         )}
 
+        <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3 mb-3 text-xs space-y-1">
+          <div className="flex items-center justify-between gap-3">
+            <span style={{ color: "#999" }}>Créditos/Fundos adicionados</span>
+            <strong style={{ color: "#fff" }}>{fmt(c.fundsAdded)}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span style={{ color: "#999" }}>Impostos / taxas</span>
+            <strong style={{ color: "#fff" }}>{fmt(c.taxCost)}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span style={{ color: "#999" }}>Custo real</span>
+            <strong style={{ color: "#fff" }}>{fmt(custoReal)}</strong>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span style={{ color: "#999" }}>Saldo estimado</span>
+            <strong style={{ color: margem >= 0 ? "#10b981" : "#ef4444" }}>{fmt(margem)}</strong>
+          </div>
+        </div>
+
         <div className="mb-3">
           {c.dailyMetrics.length > 0 ? (
             <CampaignHealthChart metrics={c.dailyMetrics} />
@@ -173,6 +197,9 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle }: {
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => onDailyMetric(c)} style={{ background: "#D4537E", color: "#fff", fontSize: "11px" }} className="px-3 py-1.5 rounded font-medium hover:opacity-90">
             + Métricas do dia
+          </button>
+          <button onClick={() => onFinance(c)} style={{ border: "0.5px solid #3a3a3a", color: "#999", fontSize: "11px" }} className="px-3 py-1.5 rounded hover:bg-[#323232]">
+            Financeiro
           </button>
           <button onClick={() => setExpanded(e => !e)} style={{ border: "0.5px solid #3a3a3a", color: "#999", fontSize: "11px" }} className="px-3 py-1.5 rounded hover:bg-[#323232]">
             {expanded ? "▲ Fechar" : "▼ Histórico"}
@@ -226,17 +253,20 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle }: {
   );
 }
 
-export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCampaign, onSaveDailyMetric, onToggleActive, onReload }: Props) {
+export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCampaign, onSaveDailyMetric, onDeleteDailyMetric, onToggleActive, onSaveCampaignFinance, onReload }: Props) {
   const [dailyModal, setDailyModal] = useState<{ campaign: Campaign; metric?: CampaignDailyMetric } | null>(null);
+  const [financeModal, setFinanceModal] = useState<Campaign | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   const active = campaigns.filter(c => c.active);
   const paused = campaigns.filter(c => !c.active);
   const totalSpend = campaigns.reduce((a, c) => a + c.totalSpend, 0);
+  const totalTaxCost = campaigns.reduce((a, c) => a + (c.taxCost || 0), 0);
   const totalLeads = campaigns.reduce((a, c) => a + c.leads, 0);
   const totalCompleted = campaigns.reduce((a, c) => a + c.completed, 0);
   const receita = totalCompleted * ticketMedio;
-  const roasGeral = totalSpend > 0 ? receita / totalSpend : 0;
+  const custoRealTotal = totalSpend + totalTaxCost;
+  const roasGeral = custoRealTotal > 0 ? receita / custoRealTotal : 0;
 
   return (
     <>
@@ -271,7 +301,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
       {active.length > 0 && (
         <div className="space-y-3 mb-3">
           {active.map(c => (
-            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })} onToggle={camp => onToggleActive(camp.id, !camp.active)} />
+            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })} onToggle={camp => onToggleActive(camp.id, !camp.active)} onFinance={camp => setFinanceModal(camp)} />
           ))}
         </div>
       )}
@@ -280,7 +310,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
         <div className="space-y-2">
           <p style={{ color: "#555", fontSize: "10px" }} className="uppercase tracking-wider mt-2">Pausadas</p>
           {paused.map(c => (
-            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })} onToggle={camp => onToggleActive(camp.id, !camp.active)} />
+            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })} onToggle={camp => onToggleActive(camp.id, !camp.active)} onFinance={camp => setFinanceModal(camp)} />
           ))}
         </div>
       )}
@@ -300,7 +330,15 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
           campaign={dailyModal.campaign}
           metric={dailyModal.metric}
           onSave={async (campaignId, metric) => { await onSaveDailyMetric(campaignId, metric); onReload(); }}
+          onDelete={async (campaignId, date) => { await onDeleteDailyMetric(campaignId, date); onReload(); }}
           onClose={() => setDailyModal(null)}
+        />
+      )}
+      {financeModal && (
+        <CampaignFinanceModal
+          campaign={financeModal}
+          onSave={async (campaignId, data) => { await onSaveCampaignFinance(campaignId, data); onReload(); }}
+          onClose={() => setFinanceModal(null)}
         />
       )}
       {showCreate && (

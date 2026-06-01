@@ -75,12 +75,14 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         dateStart: data.dateStart || "",
         dateEnd: data.dateEnd || "",
         budget: data.budget || 0,
+        fundsAdded: data.fundsAdded || 0,
+        taxCost: data.taxCost || 0,
         dailyMetrics,
         ...totals,
         leads: leadsCount,
         scheduled: scheduledCount,
         completed: completedCount,
-        roas,
+        roas: (totals.totalSpend + (data.taxCost || 0)) > 0 ? parseFloat(((completedCount * ticketMedio) / (totals.totalSpend + (data.taxCost || 0))).toFixed(2)) : 0,
         cacLead,
         cacAgendamento,
         cacComparecimento,
@@ -102,6 +104,8 @@ export async function createCampaign(clinicId: string, data: {
   dateStart: string;
   dateEnd: string;
   budget: number;
+  fundsAdded?: number;
+  taxCost?: number;
 }): Promise<string> {
   const colRef = collection(db, "clinics", clinicId, "campaigns");
   const newRef = doc(colRef);
@@ -111,6 +115,8 @@ export async function createCampaign(clinicId: string, data: {
     dateStart: data.dateStart,
     dateEnd: data.dateEnd,
     budget: data.budget,
+    fundsAdded: data.fundsAdded || 0,
+    taxCost: data.taxCost || 0,
     active: true,
     color,
     dailyMetrics: [],
@@ -150,12 +156,29 @@ export async function upsertDailyMetric(
 }
 
 /**
+ * Remove uma métrica de um dia específico.
+ */
+export async function deleteDailyMetric(
+  clinicId: string,
+  campaignId: string,
+  date: string
+): Promise<void> {
+  const docRef = doc(db, "clinics", clinicId, "campaigns", campaignId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) throw new Error("Campaign not found");
+
+  const current: CampaignDailyMetric[] = snap.data().dailyMetrics || [];
+  const updated = current.filter(m => m.date !== date);
+  await updateDoc(docRef, { dailyMetrics: updated });
+}
+
+/**
  * Atualiza status da campanha (ativa/pausada) ou budget/nome
  */
 export async function updateCampaign(
   clinicId: string,
   campaignId: string,
-  fields: Partial<{ name: string; active: boolean; budget: number; dateEnd: string }>
+  fields: Partial<{ name: string; active: boolean; budget: number; dateEnd: string; fundsAdded: number; taxCost: number }>
 ): Promise<void> {
   const docRef = doc(db, "clinics", clinicId, "campaigns", campaignId);
   await updateDoc(docRef, fields);

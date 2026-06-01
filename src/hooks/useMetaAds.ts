@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Campaign } from "@/types/commandCenter";
 import type { Diagnostic } from "@/types/commandCenter";
-import { fetchCampaigns, createCampaign, upsertDailyMetric, updateCampaign } from "@/services/campaignService";
+import { fetchCampaigns, createCampaign, upsertDailyMetric, updateCampaign, deleteDailyMetric } from "@/services/campaignService";
 import type { CampaignDailyMetric } from "@/types/commandCenter";
 
 export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' = 'mes') {
@@ -40,12 +40,23 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
     }
   }
 
-  const handleAddCampaign = async (data: { name: string; dateStart: string; dateEnd: string; budget: number }) => {
+  const handleAddCampaign = async (data: { name: string; dateStart: string; dateEnd: string; budget: number; fundsAdded?: number; taxCost?: number }) => {
     await createCampaign(clinicId, data);
+  };
+
+  const handleSaveCampaignFinance = async (campaignId: string, data: { fundsAdded: number; taxCost: number }) => {
+    await updateCampaign(clinicId, campaignId, data);
+    await load();
   };
 
   const handleSaveDailyMetric = async (campaignId: string, metric: CampaignDailyMetric) => {
     await upsertDailyMetric(clinicId, campaignId, metric);
+    await load();
+  };
+
+  const handleDeleteDailyMetric = async (campaignId: string, date: string) => {
+    await deleteDailyMetric(clinicId, campaignId, date);
+    await load();
   };
 
   const handleToggleActive = async (campaignId: string, active: boolean) => {
@@ -60,6 +71,8 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
     reload: load,
     handleAddCampaign,
     handleSaveDailyMetric,
+    handleDeleteDailyMetric,
+    handleSaveCampaignFinance,
     handleToggleActive,
   };
 }

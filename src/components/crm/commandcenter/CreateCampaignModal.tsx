@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 interface Props {
   clinicId: string;
-  onSave: (data: { name: string; dateStart: string; dateEnd: string; budget: number }) => Promise<void>;
+  onSave: (data: { name: string; dateStart: string; dateEnd: string; budget: number; fundsAdded?: number; taxCost?: number }) => Promise<void>;
   onClose: () => void;
 }
 
@@ -16,6 +16,8 @@ export default function CreateCampaignModal({ clinicId, onSave, onClose }: Props
   const [dateStart, setDateStart] = useState(todayStr());
   const [dateEnd, setDateEnd] = useState("");
   const [budget, setBudget] = useState("");
+  const [fundsAdded, setFundsAdded] = useState("");
+  const [taxCost, setTaxCost] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,7 +27,14 @@ export default function CreateCampaignModal({ clinicId, onSave, onClose }: Props
     setSaving(true);
     setError("");
     try {
-      await onSave({ name: name.trim(), dateStart, dateEnd, budget: parseFloat(budget) || 0 });
+      await onSave({
+        name: name.trim(),
+        dateStart,
+        dateEnd,
+        budget: parseFloat(budget) || 0,
+        fundsAdded: parseFloat(fundsAdded) || 0,
+        taxCost: parseFloat(taxCost) || 0,
+      });
       onClose();
     } catch (e) {
       setError("Erro ao criar campanha. Tente novamente.");
@@ -90,6 +99,31 @@ export default function CreateCampaignModal({ clinicId, onSave, onClose }: Props
               style={{ background: "#1a1a1a", border: "0.5px solid #3a3a3a", color: "#fff", fontSize: "13px" }}
               className="w-full px-3 py-2 rounded"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label style={{ color: "#999", fontSize: "11px" }} className="block mb-1.5 uppercase tracking-wider">Fundos iniciais (R$)</label>
+              <input
+                type="number"
+                placeholder="0"
+                value={fundsAdded}
+                onChange={e => setFundsAdded(e.target.value)}
+                style={{ background: "#1a1a1a", border: "0.5px solid #3a3a3a", color: "#fff", fontSize: "13px" }}
+                className="w-full px-3 py-2 rounded"
+              />
+            </div>
+            <div>
+              <label style={{ color: "#999", fontSize: "11px" }} className="block mb-1.5 uppercase tracking-wider">Impostos iniciais (R$)</label>
+              <input
+                type="number"
+                placeholder="0"
+                value={taxCost}
+                onChange={e => setTaxCost(e.target.value)}
+                style={{ background: "#1a1a1a", border: "0.5px solid #3a3a3a", color: "#fff", fontSize: "13px" }}
+                className="w-full px-3 py-2 rounded"
+              />
+            </div>
           </div>
         </div>
 
