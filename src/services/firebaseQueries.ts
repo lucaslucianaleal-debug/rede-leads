@@ -49,26 +49,40 @@ export async function fetchLeadsFromClinic(clinicId: string) {
 /**
  * Calcula KPIs operacionais a partir dos leads reais
  */
-export async function calculateOperationalKPIs(clinicId: string): Promise<KPI[]> {
+export async function calculateOperationalKPIs(clinicId: string, period: "hoje" | "semana" | "mes" = "mes"): Promise<KPI[]> {
   try {
     const leads = await fetchLeadsFromClinic(clinicId);
-    console.log(`[calculateOperationalKPIs] Processing ${leads.length} leads`);
+    console.log(`[calculateOperationalKPIs] Processing ${leads.length} leads for period: ${period}`);
     
-    // Leads de hoje
+    // Define range de datas baseado no período
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const leadsToday = leads.filter(l => {
+    
+    let startDate = new Date(today);
+    if (period === "hoje") {
+      // Apenas hoje
+      startDate = new Date(today);
+    } else if (period === "semana") {
+      // Últimos 7 dias
+      startDate.setDate(today.getDate() - 7);
+    } else if (period === "mes") {
+      // Últimos 30 dias
+      startDate.setDate(today.getDate() - 30);
+    }
+
+    // Leads no período
+    const leadsInPeriod = leads.filter(l => {
       const leadDate = parseDate(l.dataCriacao);
       leadDate.setHours(0, 0, 0, 0);
-      return leadDate.getTime() === today.getTime();
+      return leadDate >= startDate && leadDate <= today;
     }).length;
 
-    // Comparecidos hoje
-    const completedToday = leads.filter(l => {
+    // Comparecidos no período
+    const completedInPeriod = leads.filter(l => {
       if (l.comparecimento !== "COMPARECEU") return false;
       const visitDate = parseDate(l.dataAgendamento);
       visitDate.setHours(0, 0, 0, 0);
-      return visitDate.getTime() === today.getTime();
+      return visitDate >= startDate && visitDate <= today;
     }).length;
 
     // Total agendados (tendo dataAgendamento preenchida)
@@ -78,11 +92,11 @@ export async function calculateOperationalKPIs(clinicId: string): Promise<KPI[]>
     const comparecidos = leads.filter(l => l.comparecimento === "COMPARECEU").length;
     const showUpRate = scheduled > 0 ? Math.round((comparecidos / scheduled) * 100) : 0;
 
-    console.log(`[calculateOperationalKPIs] Today: ${leadsToday} leads, ${completedToday} completed, ${scheduled} scheduled, ${comparecidos} attended, ${showUpRate}%`);
+    console.log(`[calculateOperationalKPIs] ${period}: ${leadsInPeriod} leads, ${completedInPeriod} completed, ${scheduled} scheduled, ${comparecidos} attended, ${showUpRate}%`);
 
     return [
-      { label: "Leads hoje", value: leadsToday.toString(), status: leadsToday > 0 ? "good" : "warn" },
-      { label: "Comparecidos", value: completedToday.toString(), sub: "meta: 5 hoje", status: completedToday >= 5 ? "good" : "bad" },
+      { label: "Leads", value: leadsInPeriod.toString(), status: leadsInPeriod > 0 ? "good" : "warn" },
+      { label: "Comparecidos", value: completedInPeriod.toString(), sub: "meta: 5", status: completedInPeriod >= 5 ? "good" : "bad" },
       { label: "Taxa comparecimento", value: `${showUpRate}%`, sub: "meta: 50%", status: showUpRate >= 50 ? "good" : "warn" },
       { label: "Agendados", value: scheduled.toString(), status: scheduled > 0 ? "good" : "warn" },
     ];

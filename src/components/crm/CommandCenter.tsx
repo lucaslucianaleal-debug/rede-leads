@@ -23,7 +23,7 @@ import LiveFieldMap from "./commandcenter/LiveFieldMap";
 export default function CommandCenter() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [layer, setLayer] = useState<LayerType>("ops");
-  const [period, setPeriod] = useState<PeriodType>("hoje");
+  const [period, setPeriod] = useState<PeriodType>("mes");
   const [unit, setUnit] = useState("all");
 
   const { kpis, diagnostics, funnel } = useDashboardData(period);

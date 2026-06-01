@@ -13,7 +13,7 @@ export function useDashboardData(period: PeriodType, clinicId = "odontocompany-o
       setLoading(true);
       try {
         const [kpisData, diagnosticsData, funnelData] = await Promise.all([
-          calculateOperationalKPIs(clinicId),
+          calculateOperationalKPIs(clinicId, period),
           generateOperationalDiagnostics(clinicId),
           calculateFunnelData(clinicId),
         ]);
