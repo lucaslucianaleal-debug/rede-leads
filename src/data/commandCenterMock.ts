@@ -116,15 +116,11 @@ export const MOCK_UNITS = [
   { id: "olimpia", label: "Olímpia" },
   { id: "badybassit", label: "Bady Bassit" },
   { id: "novohorizonte", label: "Novo Horizonte" },
-  { id: "votuporanga", label: "Votuporanga" },
-  { id: "catanduva", label: "Catanduva" },
 ];
 
 export const MOCK_UNITS_RANKING: UnitRanking[] = [
   { id: "olimpia", name: "Olímpia", leadsPerDay: 18, showUpRate: 52, comparison: "+8% vs semana" },
   { id: "badybassit", name: "Bady Bassit", leadsPerDay: 16, showUpRate: 50, comparison: "+3% vs semana" },
-  { id: "catanduva", name: "Catanduva", leadsPerDay: 15, showUpRate: 48, comparison: "-3% vs semana" },
-  { id: "votuporanga", name: "Votuporanga", leadsPerDay: 12, showUpRate: 41, comparison: "+2% vs semana" },
   { id: "novohorizonte", name: "Novo Horizonte", leadsPerDay: 8, showUpRate: 35, comparison: "-5% vs semana" },
 ];
 

@@ -18,8 +18,6 @@ const unitToClinicId: Record<string, string> = {
   olimpia: "odontocompany-olimpia",
   badybassit: "odontocompany-badybassit",
   novohorizonte: "odontocompany-novohorizonte",
-  votuporanga: "odontocompany-votuporanga",
-  catanduva: "odontocompany-catanduva",
   all: "odontocompany-olimpia", // Default para "Toda a rede" — mostra Olimpia por enquanto
 };
 import ConversationCard from "./commandcenter/ConversationCard";
