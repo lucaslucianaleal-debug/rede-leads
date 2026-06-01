@@ -1,32 +1,65 @@
-import { useState, useEffect } from "react";
-import type { Campaign, MetaKPI } from "@/types/commandCenter";
-import { MOCK_CAMPAIGNS, META_ADS_KPIS, META_ADS_DIAGNOSTICS } from "@/data/commandCenterMock";
+import { useState, useEffect, useCallback } from "react";
+import type { Campaign } from "@/types/commandCenter";
 import type { Diagnostic } from "@/types/commandCenter";
+import { fetchCampaigns, createCampaign, upsertDailyMetric, updateCampaign } from "@/services/campaignService";
+import type { CampaignDailyMetric } from "@/types/commandCenter";
 
-export function useMetaAds(unitId?: string) {
+export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", ticketMedio = 1800) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [kpis, setKpis] = useState<MetaKPI[]>([]);
-  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     setLoading(true);
-    const timer = setTimeout(() => {
-      // TODO: Integrar com Firestore quando os dados de Meta Ads estiverem disponíveis
-      // Por enquanto usando mock data
-      setCampaigns(MOCK_CAMPAIGNS);
-      setKpis(META_ADS_KPIS);
-      setDiagnostics(META_ADS_DIAGNOSTICS);
+    try {
+      const data = await fetchCampaigns(clinicId, ticketMedio);
+      setCampaigns(data);
+    } catch (e) {
+      console.error("useMetaAds error:", e);
+    } finally {
       setLoading(false);
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [unitId]);
+    }
+  }, [clinicId, ticketMedio]);
 
-  const totalLeads = campaigns.reduce((a, c) => a + c.leads, 0);
-  const totalScheduled = campaigns.reduce((a, c) => a + c.scheduled, 0);
-  const avgRoas = campaigns.filter(c => c.roas > 0).reduce((a, c, _, arr) => a + c.roas / arr.length, 0);
-  const bestCampaign = [...campaigns].sort((a, b) => b.roas - a.roas)[0] ?? null;
-  const worstCampaign = [...campaigns].filter(c => c.active).sort((a, b) => a.roas - b.roas)[0] ?? null;
+  useEffect(() => { load(); }, [load]);
 
-  return { campaigns, kpis, diagnostics, loading, totalLeads, totalScheduled, avgRoas, bestCampaign, worstCampaign };
+  // Derived diagnostics from real data
+  const diagnostics: Diagnostic[] = [];
+  const active = campaigns.filter(c => c.active);
+  if (active.length > 0) {
+    const best = [...active].sort((a, b) => b.roas - a.roas)[0];
+    const worst = [...active].filter(c => c.totalSpend > 0).sort((a, b) => a.roas - b.roas)[0];
+    if (worst && worst.roas < 2 && worst.totalSpend > 0) {
+      diagnostics.push({ type: "crit", title: `${worst.name}: ROAS ${worst.roas.toFixed(1)}x — budget queimando`, description: `R$${worst.totalSpend.toLocaleString("pt-BR")} gastos, ${worst.completed} comparecimentos. Considere pausar ou revisar o criativo.`, action: "Pausar campanha", actionId: "pause_campaign" });
+    }
+    if (best && best.roas >= 5) {
+      diagnostics.push({ type: "ok", title: `${best.name}: ROAS ${best.roas.toFixed(1)}x — excelente resultado`, description: `${best.leads} leads, ${best.completed} comparecimentos. Considere aumentar o budget desta campanha.` });
+    }
+    const overBudget = active.find(c => c.budget > 0 && c.totalSpend / c.budget > 0.9);
+    if (overBudget) {
+      diagnostics.push({ type: "imp", title: `${overBudget.name}: ${Math.round((overBudget.totalSpend / overBudget.budget) * 100)}% do budget usado`, description: `Spend atual: R$${overBudget.totalSpend.toLocaleString("pt-BR")} de R$${overBudget.budget.toLocaleString("pt-BR")} planejado.` });
+    }
+  }
+
+  const handleAddCampaign = async (data: { name: string; dateStart: string; dateEnd: string; budget: number }) => {
+    await createCampaign(clinicId, data);
+  };
+
+  const handleSaveDailyMetric = async (campaignId: string, metric: CampaignDailyMetric) => {
+    await upsertDailyMetric(clinicId, campaignId, metric);
+  };
+
+  const handleToggleActive = async (campaignId: string, active: boolean) => {
+    await updateCampaign(clinicId, campaignId, { active });
+    await load();
+  };
+
+  return {
+    campaigns,
+    diagnostics,
+    loading,
+    reload: load,
+    handleAddCampaign,
+    handleSaveDailyMetric,
+    handleToggleActive,
+  };
 }

@@ -29,18 +29,43 @@ export interface FunnelData {
   leadsGoal?: number;
 }
 
+export interface CampaignDailyMetric {
+  date: string; // DD/MM/YYYY
+  spend: number;
+  impressions: number;
+  clicks: number;
+  reach: number;
+}
+
 export interface Campaign {
   id: string;
+  clinicId: string;
   name: string;
   active: boolean;
   color: string;
+  dateStart: string; // DD/MM/YYYY
+  dateEnd: string;   // DD/MM/YYYY
+  budget: number;    // budget total planejado
+  dailyMetrics: CampaignDailyMetric[];
+
+  // Calculados automaticamente (agregados de dailyMetrics):
+  totalSpend: number;
+  totalImpressions: number;
+  totalClicks: number;
+  totalReach: number;
+
+  // Calculados a partir dos leads no Firestore:
   leads: number;
   scheduled: number;
   completed: number;
-  cac: number | null;
-  roas: number;
-  responseTime: number; // minutos
-  budget: number;
+
+  // Derivados:
+  roas: number;          // (completed * ticketMedio) / totalSpend
+  cacLead: number;       // totalSpend / leads
+  cacAgendamento: number; // totalSpend / scheduled
+  cacComparecimento: number; // totalSpend / completed
+  conversionRate: number; // scheduled / leads * 100
+  showUpRate: number;     // completed / scheduled * 100
 }
 
 export interface WhatsAppMessage {

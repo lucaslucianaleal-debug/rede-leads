@@ -6,7 +6,6 @@ import { useMetaAds } from "@/hooks/useMetaAds";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useActions } from "@/hooks/useActions";
 import { useExport } from "@/hooks/useExport";
-import { useLeads } from "@/hooks/useLeads";
 import Topbar from "./commandcenter/Topbar";
 import KPIStrip from "./commandcenter/KPIStrip";
 import DiagnosticCard from "./commandcenter/DiagnosticCard";
@@ -39,12 +38,10 @@ export default function CommandCenter() {
 
   const clinicId = unitToClinicId[unit] || "odontocompany-olimpia";
   const { kpis, diagnostics, funnel, history, recentLeads, consultores } = useDashboardData(period, clinicId, ticketMedio);
-  const { channels, ranking } = useOperationalMetrics();
-  const { campaigns, kpis: metaKpis, diagnostics: metaDiagnostics } = useMetaAds(unit);
+  const { campaigns, diagnostics: metaDiagnostics, reload: reloadCampaigns, handleAddCampaign, handleSaveDailyMetric, handleToggleActive } = useMetaAds(unit, clinicId, ticketMedio);
   const { messages, kpis: waKpis, diagnostics: waDiagnostics } = useWhatsApp(unit);
   const { execute } = useActions(unit);
   const { exportPDF, exporting } = useExport();
-  const { leads } = useLeads();
 
   const today = new Date();
   const criticalCount = diagnostics.filter(d => d.type === "crit").length;
@@ -186,63 +183,37 @@ export default function CommandCenter() {
 
           {/* META ADS */}
           {layer === "meta" && (
-            <div className="grid grid-cols-3 gap-6">
-              {/* COLUNA ESQUERDA */}
-              <div className="col-span-2 space-y-6">
-                {/* KPI Strip */}
+            <div className="space-y-6 max-w-4xl">
+              {/* Diagnósticos Meta */}
+              {metaDiagnostics.length > 0 && (
                 <section>
-                  <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
-                    Métricas Meta Ads
-                  </h3>
-                  <KPIStrip kpis={metaKpis.length > 0 ? metaKpis.slice(0, 4) : []} />
-                </section>
-
-                {/* Diagnósticos Meta */}
-                {metaDiagnostics.length > 0 && (
-                  <section>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest">
-                        Diagnóstico Meta
-                      </h3>
-                      <span style={{ color: "#999" }} className="text-xs">
-                        {metaDiagnostics.filter(d => d.type === "crit").length} críticos
-                      </span>
-                    </div>
-                    <DiagnosticCard diagnostics={metaDiagnostics} onAction={execute} />
-                  </section>
-                )}
-
-                {/* Campanhas */}
-                <section>
-                  <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
-                    Campanhas ao vivo
-                  </h3>
-                  <CampaignCard campaigns={campaigns} />
-                </section>
-              </div>
-
-              {/* COLUNA DIREITA */}
-              <div className="col-span-1 space-y-6">
-                {/* Meta Ads KPIs details */}
-                <section style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4">
-                  <h4 style={{ color: "#fff", fontSize: "13px" }} className="font-semibold mb-4">KPIs Resumo</h4>
-                  <div className="space-y-3">
-                    {[
-                      { label: "Melhor campanha", value: "Clareamento", sub: "ROAS 5.3x" },
-                      { label: "Pior campanha", value: "Sorteio Rádio", sub: "ROAS 0.0x" },
-                      { label: "Budget total", value: "R$ 2.8k", sub: "mês" },
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between pb-3" style={{ borderBottom: idx < 2 ? "0.5px solid #3a3a3a" : "none" }}>
-                        <span style={{ color: "#999", fontSize: "11px" }}>{item.label}</span>
-                        <div className="text-right">
-                          <p style={{ color: "#fff", fontSize: "12px", fontWeight: "600" }}>{item.value}</p>
-                          <p style={{ color: "#666", fontSize: "9px" }}>{item.sub}</p>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest">
+                      Diagnósticos
+                    </h3>
+                    <span style={{ color: "#999" }} className="text-xs">
+                      {metaDiagnostics.filter(d => d.type === "crit").length} urgentes
+                    </span>
                   </div>
+                  <DiagnosticCard diagnostics={metaDiagnostics} onAction={execute} />
                 </section>
-              </div>
+              )}
+
+              {/* Campanhas */}
+              <section>
+                <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
+                  Campanhas
+                </h3>
+                <CampaignCard
+                  campaigns={campaigns}
+                  clinicId={clinicId}
+                  ticketMedio={ticketMedio}
+                  onAddCampaign={handleAddCampaign}
+                  onSaveDailyMetric={handleSaveDailyMetric}
+                  onToggleActive={handleToggleActive}
+                  onReload={reloadCampaigns}
+                />
+              </section>
             </div>
           )}
 
