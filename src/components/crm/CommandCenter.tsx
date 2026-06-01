@@ -39,7 +39,7 @@ export default function CommandCenter() {
   const clinicId = unitToClinicId[unit] || "odontocompany-olimpia";
   const { kpis, diagnostics, funnel, history, recentLeads, consultores } = useDashboardData(period, clinicId, ticketMedio);
   const { channels, ranking } = useOperationalMetrics();
-  const { campaigns, diagnostics: metaDiagnostics, reload: reloadCampaigns, handleAddCampaign, handleSaveDailyMetric, handleToggleActive } = useMetaAds(unit, clinicId, ticketMedio);
+  const { campaigns, diagnostics: metaDiagnostics, reload: reloadCampaigns, handleAddCampaign, handleSaveDailyMetric, handleToggleActive } = useMetaAds(unit, clinicId, ticketMedio, period);
   const { messages, kpis: waKpis, diagnostics: waDiagnostics } = useWhatsApp(unit);
   const { execute } = useActions(unit);
   const { exportPDF, exporting } = useExport();

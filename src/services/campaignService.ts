@@ -6,6 +6,53 @@ import { fetchLeadsFromClinic } from "./firebaseQueries";
 const CAMPAIGN_COLORS = ["#D4537E", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"];
 
 /**
+ * Converte período em range de datas (DD/MM/YYYY)
+ */
+function getPeriodDateRange(period: 'hoje' | 'semana' | 'mes'): { startDate: string; endDate: string } {
+  const today = new Date();
+  const parseDate = (d: Date) => {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  };
+
+  if (period === "hoje") {
+    const dateStr = parseDate(today);
+    return { startDate: dateStr, endDate: dateStr };
+  } else if (period === "semana") {
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay()); // Domingo
+    return { startDate: parseDate(start), endDate: parseDate(today) };
+  } else { // mes
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { startDate: parseDate(start), endDate: parseDate(today) };
+  }
+}
+
+/**
+ * Filtra métricas diárias por período
+ */
+function filterMetricsByPeriod(
+  metrics: CampaignDailyMetric[],
+  period: 'hoje' | 'semana' | 'mes'
+): CampaignDailyMetric[] {
+  const { startDate, endDate } = getPeriodDateRange(period);
+  const parseStr = (s: string) => {
+    const [d, m, y] = s.split("/").map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const start = parseStr(startDate);
+  const end = parseStr(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  return metrics.filter(m => {
+    const mDate = parseStr(m.date);
+    return mDate >= start && mDate <= end;
+  });
+}
+
+/**
  * Retorna lista leve de campanhas ativas para seletores de formulário
  */
 export async function fetchActiveCampaignList(clinicId: string): Promise<{ id: string; name: string }[]> {
@@ -36,7 +83,7 @@ function calcCampaignTotals(dailyMetrics: CampaignDailyMetric[]) {
 /**
  * Busca todas as campanhas de uma clínica e enriquece com dados reais de leads
  */
-export async function fetchCampaigns(clinicId: string, ticketMedio = 1800): Promise<Campaign[]> {
+export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' = 'mes'): Promise<Campaign[]> {
   try {
     const colRef = collection(db, "clinics", clinicId, "campaigns");
     const snapshot = await getDocs(colRef);
@@ -47,11 +94,28 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800): Prom
 
     return snapshot.docs.map((docSnap, idx) => {
       const data = docSnap.data();
-      const dailyMetrics: CampaignDailyMetric[] = data.dailyMetrics || [];
+      const allDailyMetrics: CampaignDailyMetric[] = data.dailyMetrics || [];
+      
+      // Filtrar métricas pelo período
+      const dailyMetrics = filterMetricsByPeriod(allDailyMetrics, period);
       const totals = calcCampaignTotals(dailyMetrics);
 
-      // Leads associados a esta campanha
-      const campaignLeads = leads.filter(l => l.metaCampanhaId === docSnap.id);
+      // Leads associados a esta campanha (filtrar por período se necessário)
+      const { startDate, endDate } = getPeriodDateRange(period);
+      const parseStr = (s: string) => {
+        const [d, m, y] = s.split("/").map(Number);
+        return new Date(y, m - 1, d);
+      };
+      const start = parseStr(startDate);
+      const end = parseStr(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      const campaignLeads = leads.filter(l => {
+        if (l.metaCampanhaId !== docSnap.id) return false;
+        const createdDate = parseStr(l.dataCriacao);
+        return createdDate >= start && createdDate <= end;
+      });
+      
       const leadsCount = campaignLeads.length;
       const scheduledCount = campaignLeads.filter(l => l.dataAgendamento?.trim()).length;
       const completedCount = campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length;

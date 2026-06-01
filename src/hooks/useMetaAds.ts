@@ -4,21 +4,21 @@ import type { Diagnostic } from "@/types/commandCenter";
 import { fetchCampaigns, createCampaign, upsertDailyMetric, updateCampaign } from "@/services/campaignService";
 import type { CampaignDailyMetric } from "@/types/commandCenter";
 
-export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", ticketMedio = 1800) {
+export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' = 'mes') {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchCampaigns(clinicId, ticketMedio);
+      const data = await fetchCampaigns(clinicId, ticketMedio, period);
       setCampaigns(data);
     } catch (e) {
       console.error("useMetaAds error:", e);
     } finally {
       setLoading(false);
     }
-  }, [clinicId, ticketMedio]);
+  }, [clinicId, ticketMedio, period]);
 
   useEffect(() => { load(); }, [load]);
 
