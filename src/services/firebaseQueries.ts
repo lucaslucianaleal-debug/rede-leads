@@ -220,45 +220,217 @@ export async function fetchConversationMessages(telefone: string, limit_count = 
 }
 
 /**
- * Gera diagnósticos baseado em leads reais
+ * Gera diagnósticos inteligentes com comparativos de período e ações diretas
  */
 export async function generateOperationalDiagnostics(clinicId: string): Promise<Diagnostic[]> {
   try {
     const leads = await fetchLeadsFromClinic(clinicId);
     const diagnostics: Diagnostic[] = [];
 
-    // Diagnóstico 1: Leads sem resposta (sem agendamento)
-    const noSchedule = leads.filter(l => !l.dataAgendamento || !l.dataAgendamento.trim());
-    if (noSchedule.length > 3) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const inRange = (dateStr: string, from: Date, to: Date) => {
+      const d = parseDate(dateStr);
+      d.setHours(0, 0, 0, 0);
+      return d >= from && d <= to;
+    };
+
+    // Semana atual (últimos 7 dias)
+    const weekStart = new Date(today); weekStart.setDate(today.getDate() - 6);
+    // Semana anterior
+    const prevWeekEnd = new Date(weekStart); prevWeekEnd.setDate(weekStart.getDate() - 1);
+    const prevWeekStart = new Date(prevWeekEnd); prevWeekStart.setDate(prevWeekEnd.getDate() - 6);
+
+    const weekLeads = leads.filter(l => inRange(l.dataCriacao, weekStart, today));
+    const prevWeekLeads = leads.filter(l => inRange(l.dataCriacao, prevWeekStart, prevWeekEnd));
+
+    // ── DIAGNÓSTICO 1: Leads sem agendamento (urgente se > 50) ──
+    const noSchedule = leads.filter(l => !l.dataAgendamento?.trim());
+    if (noSchedule.length > 50) {
       diagnostics.push({
         type: "crit",
         title: `${noSchedule.length} leads sem agendamento — risco de perda imediata`,
-        description: `Cada hora reduz chance de agendamento em ~12%.`,
+        description: `Cada hora sem contato reduz a chance de agendamento em ~12%. Prioridade máxima.`,
         action: "Enviar WA agora",
         actionId: "send_whatsapp_unresponded",
       });
-    }
-
-    // Diagnóstico 2: Taxa de comparecimento baixa
-    const scheduled = leads.filter(l => l.dataAgendamento && l.dataAgendamento.trim()).length;
-    const completed = leads.filter(l => l.comparecimento === "COMPARECEU").length;
-    const showUpRate = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 100;
-    if (showUpRate < 50 && scheduled > 5) {
+    } else if (noSchedule.length > 10) {
       diagnostics.push({
         type: "imp",
-        title: `Comparecimento em ${showUpRate}% — meta é 50%`,
-        description: `Confirmação 2h antes reduz no-show em ~15pp. Considerar automação.`,
+        title: `${noSchedule.length} leads aguardam agendamento`,
+        description: `Ainda recuperáveis com follow-up personalizado. Iniciar contato hoje.`,
+        action: "Ver leads",
+        actionId: "view_unscheduled_leads",
+      });
+    }
+
+    // ── DIAGNÓSTICO 2: Queda de leads na semana vs anterior ──
+    const weekCount = weekLeads.length;
+    const prevWeekCount = prevWeekLeads.length;
+    if (prevWeekCount > 0) {
+      const pct = Math.round(((weekCount - prevWeekCount) / prevWeekCount) * 100);
+      if (pct <= -20) {
+        diagnostics.push({
+          type: "crit",
+          title: `Volume de leads caiu ${Math.abs(pct)}% vs semana passada`,
+          description: `Esta semana: ${weekCount} leads | Semana anterior: ${prevWeekCount}. Verificar campanhas ativas.`,
+          action: "Ver campanhas",
+          actionId: "view_meta_campaigns",
+        });
+      } else if (pct <= -10) {
+        diagnostics.push({
+          type: "imp",
+          title: `Leads em queda: ${Math.abs(pct)}% abaixo da semana passada`,
+          description: `Esta semana: ${weekCount} leads | Semana anterior: ${prevWeekCount}. Avaliar investimento em mídia.`,
+          action: "Ver Meta Ads",
+          actionId: "view_meta_campaigns",
+        });
+      } else if (pct >= 15) {
+        diagnostics.push({
+          type: "ok",
+          title: `Volume de leads subiu ${pct}% vs semana passada`,
+          description: `Esta semana: ${weekCount} leads | Semana anterior: ${prevWeekCount}. Manter estratégia atual.`,
+        });
+      }
+    }
+
+    // ── DIAGNÓSTICO 3: Taxa de comparecimento global ──
+    const scheduled = leads.filter(l => l.dataAgendamento?.trim()).length;
+    const completed = leads.filter(l => l.comparecimento === "COMPARECEU").length;
+    const showUpRate = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
+    if (showUpRate < 35 && scheduled > 10) {
+      diagnostics.push({
+        type: "crit",
+        title: `Comparecimento crítico: ${showUpRate}% — meta é 50%`,
+        description: `${completed} de ${scheduled} agendados compareceram. Ativar confirmação automática D-1 pode recuperar 15pp.`,
         action: "Ativar confirmação",
         actionId: "activate_automation_confirmation",
       });
-    } else if (showUpRate >= 50) {
+    } else if (showUpRate < 50 && scheduled > 10) {
+      diagnostics.push({
+        type: "imp",
+        title: `Comparecimento em ${showUpRate}% — ${50 - showUpRate}pp abaixo da meta`,
+        description: `Confirmação 2h antes + lembrete no dia do agendamento reduz no-show significativamente.`,
+        action: "Ativar confirmação",
+        actionId: "activate_automation_confirmation",
+      });
+    } else if (showUpRate >= 50 && scheduled > 5) {
       diagnostics.push({
         type: "ok",
-        title: `Taxa de comparecimento ${showUpRate}% — acima da meta`,
-        description: `Equipe performando bem. Manter cadência.`,
+        title: `Comparecimento ${showUpRate}% — acima da meta de 50%`,
+        description: `${completed} pacientes atendidos de ${scheduled} agendados. Manter cadência de confirmação.`,
       });
     }
 
+    // ── DIAGNÓSTICO 4: Melhor canal de conversão ──
+    const channelMap = new Map<string, { total: number; scheduled: number }>();
+    leads.forEach(l => {
+      const ch = (l.fonteLead || "Desconhecido").trim();
+      if (!channelMap.has(ch)) channelMap.set(ch, { total: 0, scheduled: 0 });
+      const s = channelMap.get(ch)!;
+      s.total += 1;
+      if (l.dataAgendamento?.trim()) s.scheduled += 1;
+    });
+    const channels = Array.from(channelMap.entries())
+      .map(([name, s]) => ({ name, total: s.total, rate: s.total > 5 ? Math.round((s.scheduled / s.total) * 100) : 0 }))
+      .filter(c => c.total > 5)
+      .sort((a, b) => b.rate - a.rate);
+
+    if (channels.length >= 2) {
+      const best = channels[0];
+      const worst = channels[channels.length - 1];
+      if (best.rate > 0) {
+        diagnostics.push({
+          type: "info",
+          title: `Melhor canal: ${best.name} (${best.rate}% conversão) — ${best.total} leads`,
+          description: `Pior canal: ${worst.name} com ${worst.rate}% (${worst.total} leads). Revisar script ou redirecionar verba do ${worst.name}.`,
+          action: "Ver por canal",
+          actionId: "view_channel_performance",
+        });
+      }
+    }
+
+    // ── DIAGNÓSTICO 5: Melhor dia da semana ──
+    const dayCount: Record<number, { leads: number; scheduled: number }> = {};
+    leads.forEach(l => {
+      const d = parseDate(l.dataCriacao);
+      const dow = d.getDay(); // 0=dom...6=sab
+      if (!dayCount[dow]) dayCount[dow] = { leads: 0, scheduled: 0 };
+      dayCount[dow].leads += 1;
+      if (l.dataAgendamento?.trim()) dayCount[dow].scheduled += 1;
+    });
+    const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const bestDay = Object.entries(dayCount)
+      .map(([dow, s]) => ({ dow: parseInt(dow), rate: s.leads > 5 ? Math.round((s.scheduled / s.leads) * 100) : 0, leads: s.leads }))
+      .filter(d => d.leads > 5 && d.dow !== 0 && d.dow !== 6)
+      .sort((a, b) => b.rate - a.rate)[0];
+    if (bestDay && bestDay.rate > 0) {
+      diagnostics.push({
+        type: "info",
+        title: `Melhor dia para captar: ${dayNames[bestDay.dow]} (${bestDay.rate}% conversão)`,
+        description: `Concentrar ações de captação e follow-up às ${dayNames[bestDay.dow]}s aumenta ROI da equipe de campo.`,
+      });
+    }
+
+    // ── DIAGNÓSTICO 6: Consultores sem comparecimento ──
+    const captadorMap = new Map<string, { leads: number; completed: number }>();
+    weekLeads.forEach(l => {
+      const name = (l.captador || "").trim();
+      if (!name) return;
+      if (!captadorMap.has(name)) captadorMap.set(name, { leads: 0, completed: 0 });
+      const s = captadorMap.get(name)!;
+      s.leads += 1;
+      if (l.comparecimento === "COMPARECEU") s.completed += 1;
+    });
+    const zeroCaptadores = Array.from(captadorMap.entries())
+      .filter(([, s]) => s.leads >= 3 && s.completed === 0)
+      .map(([name]) => name);
+    if (zeroCaptadores.length > 0) {
+      diagnostics.push({
+        type: "imp",
+        title: `${zeroCaptadores.length} captador(es) sem comparecimento essa semana`,
+        description: `${zeroCaptadores.slice(0, 3).join(", ")} — leads captados mas nenhum compareceu. Revisar abordagem ou script de confirmação.`,
+        action: "Ver captadores",
+        actionId: "view_consultor_ranking",
+      });
+    }
+
+    // ── DIAGNÓSTICO 7: Receita estimada vs meta ──
+    const TICKET = 1800;
+    const META_MES = 80000;
+    const mesStart = new Date(today); mesStart.setDate(today.getDate() - 29);
+    const mesCompleted = leads.filter(l => l.comparecimento === "COMPARECEU" && inRange(l.dataCriacao, mesStart, today)).length;
+    const receitaEstimada = mesCompleted * TICKET;
+    const metaPct = Math.round((receitaEstimada / META_MES) * 100);
+    const diasRestantes = 30 - Math.round((today.getTime() - mesStart.getTime()) / 86400000);
+    if (metaPct < 30 && diasRestantes > 10) {
+      diagnostics.push({
+        type: "crit",
+        title: `Receita estimada R$${receitaEstimada.toLocaleString("pt-BR")} — apenas ${metaPct}% da meta`,
+        description: `Faltam ${diasRestantes} dias e R$${(META_MES - receitaEstimada).toLocaleString("pt-BR")} para bater R$${META_MES.toLocaleString("pt-BR")}. Intensificar confirmações.`,
+        action: "Planejar ação",
+        actionId: "view_revenue_plan",
+      });
+    } else if (metaPct < 60 && diasRestantes > 0) {
+      diagnostics.push({
+        type: "imp",
+        title: `Receita em ${metaPct}% da meta — R$${(META_MES - receitaEstimada).toLocaleString("pt-BR")} ainda a gerar`,
+        description: `${mesCompleted} comparecimentos × R$1.800 = R$${receitaEstimada.toLocaleString("pt-BR")}. Meta: R$${META_MES.toLocaleString("pt-BR")}/mês.`,
+      });
+    } else if (metaPct >= 100) {
+      diagnostics.push({
+        type: "ok",
+        title: `Meta de receita batida! ${metaPct}% — R$${receitaEstimada.toLocaleString("pt-BR")}`,
+        description: `${mesCompleted} atendimentos este mês. Excelente resultado — considerar meta mais agressiva.`,
+      });
+    }
+
+    // Ordenar: crit primeiro, depois imp, ok, info
+    const order = { crit: 0, imp: 1, ok: 2, info: 3 };
+    diagnostics.sort((a, b) => order[a.type] - order[b.type]);
+
+    console.log(`[generateOperationalDiagnostics] Generated ${diagnostics.length} diagnostics`);
     return diagnostics;
   } catch (e) {
     console.error("Error generating diagnostics:", e);
