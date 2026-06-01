@@ -53,57 +53,112 @@ export async function calculateOperationalKPIs(clinicId: string, period: "hoje" 
   try {
     const leads = await fetchLeadsFromClinic(clinicId);
     console.log(`[calculateOperationalKPIs] Processing ${leads.length} leads for period: ${period}`);
-    
-    // Define range de datas baseado no período
+
+    // Ticket médio estimado por paciente atendido
+    const TICKET_MEDIO = 1800;
+    // Meta mensal de receita (configurável)
+    const META_RECEITA_MES = 80000;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    let startDate = new Date(today);
-    if (period === "hoje") {
-      // Apenas hoje
-      startDate = new Date(today);
-    } else if (period === "semana") {
-      // Últimos 7 dias
-      startDate.setDate(today.getDate() - 7);
-    } else if (period === "mes") {
-      // Últimos 30 dias
-      startDate.setDate(today.getDate() - 30);
-    }
 
-    // Leads no período
-    const leadsInPeriod = leads.filter(l => {
-      const leadDate = parseDate(l.dataCriacao);
-      leadDate.setHours(0, 0, 0, 0);
-      return leadDate >= startDate && leadDate <= today;
-    }).length;
+    // Helpers para calcular tamanho do período em dias
+    const periodDays = period === "hoje" ? 1 : period === "semana" ? 7 : 30;
 
-    // Comparecidos no período (criados no período e que compareceram)
-    const completedInPeriod = leads.filter(l => {
-      if (l.comparecimento !== "COMPARECEU") return false;
-      const createdDate = parseDate(l.dataCriacao);
-      createdDate.setHours(0, 0, 0, 0);
-      return createdDate >= startDate && createdDate <= today;
-    }).length;
+    // Período atual
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - (periodDays - 1));
 
-    // Agendados no período: leads CRIADOS no período que têm dataAgendamento preenchida
-    // (dataAgendamento pode ser data futura - não filtrar por ela)
-    const scheduledInPeriod = leads.filter(l => {
-      if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
-      const createdDate = parseDate(l.dataCriacao);
-      createdDate.setHours(0, 0, 0, 0);
-      return createdDate >= startDate && createdDate <= today;
-    }).length;
+    // Período anterior (mesmo tamanho, imediatamente antes)
+    const prevEnd = new Date(startDate);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevEnd.getDate() - (periodDays - 1));
 
-    // Taxa de comparecimento: dos agendados no período, quantos compareceram
+    const inRange = (dateStr: string, from: Date, to: Date) => {
+      const d = parseDate(dateStr);
+      d.setHours(0, 0, 0, 0);
+      return d >= from && d <= to;
+    };
+
+    // --- PERÍODO ATUAL ---
+    const leadsInPeriod = leads.filter(l => inRange(l.dataCriacao, startDate, today)).length;
+
+    const completedInPeriod = leads.filter(l =>
+      l.comparecimento === "COMPARECEU" && inRange(l.dataCriacao, startDate, today)
+    ).length;
+
+    const scheduledInPeriod = leads.filter(l =>
+      l.dataAgendamento?.trim() && inRange(l.dataCriacao, startDate, today)
+    ).length;
+
     const showUpRate = scheduledInPeriod > 0 ? Math.round((completedInPeriod / scheduledInPeriod) * 100) : 0;
 
-    console.log(`[calculateOperationalKPIs] ${period}: ${leadsInPeriod} leads, ${completedInPeriod} completed, ${scheduledInPeriod} scheduled, ${showUpRate}%`);
+    // Receita estimada: comparecidos × ticket médio
+    const receitaEstimada = completedInPeriod * TICKET_MEDIO;
+
+    // --- PERÍODO ANTERIOR (para delta) ---
+    const leadsPrev = leads.filter(l => inRange(l.dataCriacao, prevStart, prevEnd)).length;
+    const completedPrev = leads.filter(l =>
+      l.comparecimento === "COMPARECEU" && inRange(l.dataCriacao, prevStart, prevEnd)
+    ).length;
+    const scheduledPrev = leads.filter(l =>
+      l.dataAgendamento?.trim() && inRange(l.dataCriacao, prevStart, prevEnd)
+    ).length;
+    const showUpPrev = scheduledPrev > 0 ? Math.round((completedPrev / scheduledPrev) * 100) : 0;
+    const receitaPrev = completedPrev * TICKET_MEDIO;
+
+    const delta = (curr: number, prev: number): string => {
+      if (prev === 0) return curr > 0 ? "▲ novo" : "—";
+      const pct = Math.round(((curr - prev) / prev) * 100);
+      return pct > 0 ? `▲ +${pct}% vs ant.` : pct < 0 ? `▼ ${pct}% vs ant.` : `= igual ao ant.`;
+    };
+
+    const deltaStatus = (curr: number, prev: number): KPI["status"] => {
+      if (prev === 0) return curr > 0 ? "good" : "neutral";
+      return curr >= prev ? "good" : "bad";
+    };
+
+    // Meta de receita pro rata (proporcional ao período)
+    const metaReceita = Math.round((META_RECEITA_MES / 30) * periodDays);
+    const metaPct = metaReceita > 0 ? Math.round((receitaEstimada / metaReceita) * 100) : 0;
+
+    console.log(`[calculateOperationalKPIs] ${period}: ${leadsInPeriod} leads (prev:${leadsPrev}), ${completedInPeriod} completed (prev:${completedPrev}), ${scheduledInPeriod} scheduled, ${showUpRate}% taxa, R$${receitaEstimada} receita`);
 
     return [
-      { label: "Leads", value: leadsInPeriod.toString(), status: leadsInPeriod > 0 ? "good" : "warn" },
-      { label: "Comparecidos", value: completedInPeriod.toString(), sub: "meta: 5", status: completedInPeriod >= 5 ? "good" : "bad" },
-      { label: "Taxa comparecimento", value: `${showUpRate}%`, sub: "meta: 50%", status: showUpRate >= 50 ? "good" : "warn" },
-      { label: "Agendados", value: scheduledInPeriod.toString(), status: scheduledInPeriod > 0 ? "good" : "warn" },
+      {
+        label: "Leads",
+        value: leadsInPeriod.toString(),
+        delta: delta(leadsInPeriod, leadsPrev),
+        status: leadsInPeriod > 0 ? deltaStatus(leadsInPeriod, leadsPrev) : "warn",
+      },
+      {
+        label: "Agendados",
+        value: scheduledInPeriod.toString(),
+        delta: delta(scheduledInPeriod, scheduledPrev),
+        status: scheduledInPeriod > 0 ? deltaStatus(scheduledInPeriod, scheduledPrev) : "warn",
+      },
+      {
+        label: "Comparecidos",
+        value: completedInPeriod.toString(),
+        delta: delta(completedInPeriod, completedPrev),
+        sub: "meta: 5/dia",
+        status: completedInPeriod >= 5 ? "good" : "bad",
+      },
+      {
+        label: "Taxa comparecimento",
+        value: `${showUpRate}%`,
+        delta: delta(showUpRate, showUpPrev),
+        sub: "meta: 50%",
+        status: showUpRate >= 50 ? "good" : showUpRate >= 35 ? "warn" : "bad",
+      },
+      {
+        label: "Receita estimada",
+        value: receitaEstimada.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }),
+        delta: delta(receitaEstimada, receitaPrev),
+        sub: `meta: ${metaReceita.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })} (${metaPct}%)`,
+        status: metaPct >= 100 ? "good" : metaPct >= 60 ? "warn" : "bad",
+      },
     ];
   } catch (e) {
     console.error("Error calculating KPIs:", e);
