@@ -247,30 +247,29 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
           </div>
 
           {/* Campanha Meta Ads */}
-          {campaigns.length > 0 && (
-            <div className="space-y-1">
-              <Label>Campanha Meta Ads</Label>
-              <Select
-                value={form.metaCampanhaId || "none"}
-                onValueChange={(v) => {
-                  if (v === "none") {
-                    set("metaCampanhaId", "");
-                    set("metaCampanhaNome", "");
-                  } else {
-                    const c = campaigns.find(c => c.id === v);
-                    set("metaCampanhaId", v);
-                    set("metaCampanhaNome", c?.name || "");
-                  }
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— Nenhuma</SelectItem>
-                  {campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* Campanha Meta Ads */}
+          <div className="space-y-1">
+            <Label>Campanha Meta Ads</Label>
+            <Select
+              value={form.metaCampanhaId || "none"}
+              onValueChange={(v) => {
+                if (v === "none") {
+                  set("metaCampanhaId", "");
+                  set("metaCampanhaNome", "");
+                } else {
+                  const c = campaigns.find(c => c.id === v);
+                  set("metaCampanhaId", v);
+                  set("metaCampanhaNome", c?.name || "");
+                }
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Nenhuma</SelectItem>
+                {campaigns.length > 0 ? campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>) : <SelectItem value="_disabled" disabled>Nenhuma campanha ativa</SelectItem>}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Etapa */}
           <div className="space-y-1">
