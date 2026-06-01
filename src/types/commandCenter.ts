@@ -70,3 +70,29 @@ export interface WhatsAppMetrics {
   totalToday: number;
   pendingNow: number;
 }
+
+export interface UnitRanking {
+  id: string;
+  name: string;
+  leadsPerDay: number;
+  showUpRate: number; // porcentagem 0-100
+  comparison: string; // "vs semana anterior"
+}
+
+export interface PerformanceChannel {
+  id: string;
+  name: string;
+  leads: number;
+  conversionRate: string; // "37%"
+  status: 'good' | 'warning' | 'critical';
+  icon: string;
+}
+
+export interface RecentLead {
+  id: string;
+  name: string;
+  status: 'agendado' | 'confirmado' | 'compareceu' | 'cancelado';
+  date: string;
+  time: string;
+  action?: string;
+}

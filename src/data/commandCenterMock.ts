@@ -1,4 +1,4 @@
-import type { KPI, Diagnostic, FunnelData, Campaign, WhatsAppMessage, Automation, WhatsAppMetrics } from "@/types/commandCenter";
+import type { KPI, Diagnostic, FunnelData, Campaign, WhatsAppMessage, Automation, WhatsAppMetrics, UnitRanking, PerformanceChannel, RecentLead } from "@/types/commandCenter";
 
 // ─── 4 KPIs fixos (briefing) ──────────────────────────────────────────────────
 
@@ -117,4 +117,35 @@ export const MOCK_UNITS = [
   { id: "novohorizonte", label: "Novo Horizonte" },
   { id: "votuporanga", label: "Votuporanga" },
   { id: "catanduva", label: "Catanduva" },
+];
+
+// ─── Ranking de Unidades ──────────────────────────────────────────────────────
+
+export const MOCK_UNITS_RANKING: UnitRanking[] = [
+  { id: "olimpia", name: "Olímpia", leadsPerDay: 18, showUpRate: 52, comparison: "+8% vs semana" },
+  { id: "catanduva", name: "Catanduva", leadsPerDay: 15, showUpRate: 48, comparison: "-3% vs semana" },
+  { id: "votuporanga", name: "Votuporanga", leadsPerDay: 12, showUpRate: 41, comparison: "+2% vs semana" },
+  { id: "novohorizonte", name: "Novo Horizonte", leadsPerDay: 8, showUpRate: 35, comparison: "-5% vs semana" },
+];
+
+// ─── Performance por Canal ─────────────────────────────────────────────────────
+
+export const MOCK_PERFORMANCE_CHANNELS: PerformanceChannel[] = [
+  { id: "online", name: "Online", leads: 89, conversionRate: "42%", status: "good", icon: "💻" },
+  { id: "presencial", name: "E-presencial", leads: 156, conversionRate: "38%", status: "good", icon: "🎥" },
+  { id: "google", name: "Google Ads", leads: 45, conversionRate: "29%", status: "warning", icon: "🔍" },
+  { id: "whatsapp", name: "WhatsApp", leads: 138, conversionRate: "34%", status: "good", icon: "💬" },
+];
+
+// ─── Leads Recentes ───────────────────────────────────────────────────────────
+
+export const MOCK_RECENT_LEADS: RecentLead[] = [
+  { id: "1", name: "Anne Caroline", status: "agendado", date: "31/05", time: "14:30", action: "Confirmar" },
+  { id: "2", name: "Bruna Silva", status: "confirmado", date: "31/05", time: "10:00", action: "Lembrar" },
+  { id: "3", name: "Carol Souza", status: "compareceu", date: "31/05", time: "09:30", action: "Seguir" },
+  { id: "4", name: "Diana Costa", status: "agendado", date: "01/06", time: "16:00", action: "Confirmar" },
+  { id: "5", name: "Eduarda Lima", status: "cancelado", date: "31/05", time: "11:00", action: "Reagendar" },
+  { id: "6", name: "Fernanda Gomes", status: "agendado", date: "02/06", time: "15:30", action: "Confirmar" },
+  { id: "7", name: "Gabriela Rocha", status: "confirmado", date: "31/05", time: "14:00", action: "Lembrar" },
+  { id: "8", name: "Helena Pereira", status: "compareceu", date: "31/05", time: "13:00", action: "Seguir" },
 ];
