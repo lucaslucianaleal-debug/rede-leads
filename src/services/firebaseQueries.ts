@@ -3,6 +3,27 @@ import { collection, query, where, getDocs, doc, getDoc, orderBy, limit, onSnaps
 import type { KPI, Diagnostic, FunnelData, Campaign, WhatsAppMessage, Automation } from "@/types/commandCenter";
 
 /**
+ * Converte data DD/MM/YYYY para Date
+ */
+function parseDate(dateStr: string | undefined): Date {
+  if (!dateStr) return new Date(0);
+  
+  // Se for uma string DD/MM/YYYY
+  if (typeof dateStr === 'string' && dateStr.includes('/')) {
+    const [day, month, year] = dateStr.split('/').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  
+  // Se for timestamp com propriedade seconds
+  if (typeof dateStr === 'object' && (dateStr as any)?.seconds) {
+    return new Date((dateStr as any).seconds * 1000);
+  }
+  
+  // Se for ISO string
+  return new Date(dateStr);
+}
+
+/**
  * Busca leads de uma clínica específica
  */
 export async function fetchLeadsFromClinic(clinicId: string) {
@@ -16,7 +37,9 @@ export async function fetchLeadsFromClinic(clinicId: string) {
     }
 
     const data = docSnap.data();
-    return (data?.leads || []) as any[];
+    const leads = (data?.leads || []) as any[];
+    console.log(`[firebaseQueries] Fetched ${leads.length} leads from ${clinicId}`);
+    return leads;
   } catch (e) {
     console.error("Error fetching clinic leads:", e);
     return [];
@@ -29,33 +52,36 @@ export async function fetchLeadsFromClinic(clinicId: string) {
 export async function calculateOperationalKPIs(clinicId: string): Promise<KPI[]> {
   try {
     const leads = await fetchLeadsFromClinic(clinicId);
+    console.log(`[calculateOperationalKPIs] Processing ${leads.length} leads`);
     
     // Leads de hoje
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const leadsToday = leads.filter(l => {
-      const leadDate = new Date(l.dataCriacao?.seconds * 1000 || 0);
+      const leadDate = parseDate(l.dataCriacao);
       leadDate.setHours(0, 0, 0, 0);
       return leadDate.getTime() === today.getTime();
     }).length;
 
     // Comparecidos hoje
     const completedToday = leads.filter(l => {
-      if (l.etapaLead !== "compareceu") return false;
-      const visitDate = new Date(l.dataAgendamento?.seconds * 1000 || 0);
+      if (l.comparecimento !== "COMPARECEU") return false;
+      const visitDate = parseDate(l.dataAgendamento);
       visitDate.setHours(0, 0, 0, 0);
       return visitDate.getTime() === today.getTime();
     }).length;
 
-    // Total agendados
-    const scheduled = leads.filter(l => l.etapaLead === "agendado" || l.etapaLead === "confirmado").length;
+    // Total agendados (tendo dataAgendamento preenchida)
+    const scheduled = leads.filter(l => l.dataAgendamento && l.dataAgendamento.trim()).length;
 
-    // Taxa de comparecimento
-    const comparecidos = leads.filter(l => l.etapaLead === "compareceu").length;
+    // Taxa de comparecimento (do total agendado, quantos compareceram)
+    const comparecidos = leads.filter(l => l.comparecimento === "COMPARECEU").length;
     const showUpRate = scheduled > 0 ? Math.round((comparecidos / scheduled) * 100) : 0;
 
+    console.log(`[calculateOperationalKPIs] Today: ${leadsToday} leads, ${completedToday} completed, ${scheduled} scheduled, ${comparecidos} attended, ${showUpRate}%`);
+
     return [
-      { label: "Leads hoje", value: leadsToday.toString(), status: "good" },
+      { label: "Leads hoje", value: leadsToday.toString(), status: leadsToday > 0 ? "good" : "warn" },
       { label: "Comparecidos", value: completedToday.toString(), sub: "meta: 5 hoje", status: completedToday >= 5 ? "good" : "bad" },
       { label: "Taxa comparecimento", value: `${showUpRate}%`, sub: "meta: 50%", status: showUpRate >= 50 ? "good" : "warn" },
       { label: "Agendados", value: scheduled.toString(), status: scheduled > 0 ? "good" : "warn" },
@@ -127,12 +153,12 @@ export async function generateOperationalDiagnostics(clinicId: string): Promise<
     const leads = await fetchLeadsFromClinic(clinicId);
     const diagnostics: Diagnostic[] = [];
 
-    // Diagnóstico 1: Leads sem resposta há +24h
-    const noResponse = leads.filter(l => l.etapaLead === "pendente");
-    if (noResponse.length > 3) {
+    // Diagnóstico 1: Leads sem resposta (sem agendamento)
+    const noSchedule = leads.filter(l => !l.dataAgendamento || !l.dataAgendamento.trim());
+    if (noSchedule.length > 3) {
       diagnostics.push({
         type: "crit",
-        title: `${noResponse.length} leads sem resposta +24h — risco de perda imediata`,
+        title: `${noSchedule.length} leads sem agendamento — risco de perda imediata`,
         description: `Cada hora reduz chance de agendamento em ~12%.`,
         action: "Enviar WA agora",
         actionId: "send_whatsapp_unresponded",
@@ -140,8 +166,8 @@ export async function generateOperationalDiagnostics(clinicId: string): Promise<
     }
 
     // Diagnóstico 2: Taxa de comparecimento baixa
-    const scheduled = leads.filter(l => l.etapaLead === "agendado" || l.etapaLead === "confirmado").length;
-    const completed = leads.filter(l => l.etapaLead === "compareceu").length;
+    const scheduled = leads.filter(l => l.dataAgendamento && l.dataAgendamento.trim()).length;
+    const completed = leads.filter(l => l.comparecimento === "COMPARECEU").length;
     const showUpRate = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 100;
     if (showUpRate < 50 && scheduled > 5) {
       diagnostics.push({
@@ -174,8 +200,8 @@ export async function calculateFunnelData(clinicId: string): Promise<FunnelData>
     const leads = await fetchLeadsFromClinic(clinicId);
 
     const total = leads.length;
-    const scheduled = leads.filter(l => l.etapaLead === "agendado" || l.etapaLead === "confirmado").length;
-    const completed = leads.filter(l => l.etapaLead === "compareceu").length;
+    const scheduled = leads.filter(l => l.dataAgendamento && l.dataAgendamento.trim()).length;
+    const completed = leads.filter(l => l.comparecimento === "COMPARECEU").length;
 
     const conversionRate = total > 0 ? Math.round((scheduled / total) * 100) : 0;
     const showUpRate = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
@@ -187,6 +213,8 @@ export async function calculateFunnelData(clinicId: string): Promise<FunnelData>
     } else if (showUpRate < 50) {
       bottleneck = "no-show";
     }
+
+    console.log(`[calculateFunnelData] Total: ${total}, Scheduled: ${scheduled} (${conversionRate}%), Completed: ${completed} (${showUpRate}%), Bottleneck: ${bottleneck}`);
 
     return {
       leads: total,
