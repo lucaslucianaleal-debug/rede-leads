@@ -25,8 +25,11 @@ export default function CommandCenter() {
   const [layer, setLayer] = useState<LayerType>("ops");
   const [period, setPeriod] = useState<PeriodType>("mes");
   const [unit, setUnit] = useState("all");
+  const [ticketMedio, setTicketMedio] = useState(1800);
+  const [editingTicket, setEditingTicket] = useState(false);
+  const [ticketInput, setTicketInput] = useState("1800");
 
-  const { kpis, diagnostics, funnel, history, recentLeads, consultores } = useDashboardData(period);
+  const { kpis, diagnostics, funnel, history, recentLeads, consultores } = useDashboardData(period, "odontocompany-olimpia", ticketMedio);
   const { channels, ranking } = useOperationalMetrics();
   const { campaigns, kpis: metaKpis, diagnostics: metaDiagnostics } = useMetaAds(unit);
   const { messages, kpis: waKpis, diagnostics: waDiagnostics } = useWhatsApp(unit);
@@ -70,9 +73,44 @@ export default function CommandCenter() {
               <div className="col-span-2 space-y-6">
                 {/* KPI Strip */}
                 <section>
-                  <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
-                    Pulso {period === "hoje" ? "do dia" : period === "semana" ? "da semana" : "do mês"}
-                  </h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest">
+                      Pulso {period === "hoje" ? "do dia" : period === "semana" ? "da semana" : "do mês"}
+                    </h3>
+                    {/* Ticket médio editável */}
+                    <div className="flex items-center gap-1.5">
+                      <span style={{ color: "#666", fontSize: "11px" }}>Ticket médio:</span>
+                      {editingTicket ? (
+                        <input
+                          type="number"
+                          value={ticketInput}
+                          onChange={e => setTicketInput(e.target.value)}
+                          onBlur={() => {
+                            const v = parseInt(ticketInput, 10);
+                            if (!isNaN(v) && v > 0) setTicketMedio(v);
+                            else setTicketInput(ticketMedio.toString());
+                            setEditingTicket(false);
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            if (e.key === "Escape") { setTicketInput(ticketMedio.toString()); setEditingTicket(false); }
+                          }}
+                          autoFocus
+                          style={{ background: "#2a2a2a", border: "1px solid #D4537E", color: "#fff", fontSize: "11px", width: "72px" }}
+                          className="px-2 py-0.5 rounded text-right"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => { setTicketInput(ticketMedio.toString()); setEditingTicket(true); }}
+                          style={{ color: "#D4537E", fontSize: "11px" }}
+                          className="font-medium hover:underline"
+                          title="Clique para editar o ticket médio"
+                        >
+                          R$ {ticketMedio.toLocaleString("pt-BR")}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <KPIStrip kpis={kpis} />
                 </section>
 

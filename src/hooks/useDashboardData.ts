@@ -3,7 +3,7 @@ import type { KPI, Diagnostic, FunnelData, PeriodType } from "@/types/commandCen
 import { calculateOperationalKPIs, generateOperationalDiagnostics, calculateFunnelData, generateHistoryData, fetchRecentLeads, calculateConsultorRanking } from "@/services/firebaseQueries";
 import type { ConsultorStat } from "@/services/firebaseQueries";
 
-export function useDashboardData(period: PeriodType, clinicId = "odontocompany-olimpia") {
+export function useDashboardData(period: PeriodType, clinicId = "odontocompany-olimpia", ticketMedio = 1800) {
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
@@ -17,8 +17,8 @@ export function useDashboardData(period: PeriodType, clinicId = "odontocompany-o
       setLoading(true);
       try {
         const [kpisData, diagnosticsData, funnelData, historyData, recentLeadsData, consultoresData] = await Promise.all([
-          calculateOperationalKPIs(clinicId, period),
-          generateOperationalDiagnostics(clinicId),
+          calculateOperationalKPIs(clinicId, period, ticketMedio),
+          generateOperationalDiagnostics(clinicId, ticketMedio),
           calculateFunnelData(clinicId, period),
           generateHistoryData(clinicId, 7),
           fetchRecentLeads(clinicId, 8),
@@ -39,7 +39,7 @@ export function useDashboardData(period: PeriodType, clinicId = "odontocompany-o
     };
 
     fetchData();
-  }, [period, clinicId]);
+  }, [period, clinicId, ticketMedio]);
 
   return { kpis, diagnostics, funnel, history, recentLeads, consultores, loading };
 }

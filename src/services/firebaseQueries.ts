@@ -49,13 +49,13 @@ export async function fetchLeadsFromClinic(clinicId: string) {
 /**
  * Calcula KPIs operacionais a partir dos leads reais
  */
-export async function calculateOperationalKPIs(clinicId: string, period: "hoje" | "semana" | "mes" = "mes"): Promise<KPI[]> {
+export async function calculateOperationalKPIs(clinicId: string, period: "hoje" | "semana" | "mes" = "mes", ticketMedio = 1800): Promise<KPI[]> {
   try {
     const leads = await fetchLeadsFromClinic(clinicId);
     console.log(`[calculateOperationalKPIs] Processing ${leads.length} leads for period: ${period}`);
 
     // Ticket médio estimado por paciente atendido
-    const TICKET_MEDIO = 1800;
+    const TICKET_MEDIO = ticketMedio;
     // Meta mensal de receita (configurável)
     const META_RECEITA_MES = 80000;
 
@@ -222,7 +222,7 @@ export async function fetchConversationMessages(telefone: string, limit_count = 
 /**
  * Gera diagnósticos inteligentes com comparativos de período e ações diretas
  */
-export async function generateOperationalDiagnostics(clinicId: string): Promise<Diagnostic[]> {
+export async function generateOperationalDiagnostics(clinicId: string, ticketMedio = 1800): Promise<Diagnostic[]> {
   try {
     const leads = await fetchLeadsFromClinic(clinicId);
     const diagnostics: Diagnostic[] = [];
@@ -397,7 +397,7 @@ export async function generateOperationalDiagnostics(clinicId: string): Promise<
     }
 
     // ── DIAGNÓSTICO 7: Receita estimada vs meta ──
-    const TICKET = 1800;
+    const TICKET = ticketMedio;
     const META_MES = 80000;
     const mesStart = new Date(today); mesStart.setDate(today.getDate() - 29);
     const mesCompleted = leads.filter(l => l.comparecimento === "COMPARECEU" && inRange(l.dataCriacao, mesStart, today)).length;
@@ -690,13 +690,24 @@ export async function calculateUnitRanking() {
       
       // Taxa de comparecimento
       const showUpRate = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
-      
+
       // Leads por dia (aproximado)
       const leadsPerDay = Math.round(totalLeads / 30);
 
-      // Tendência vs semana anterior (simplificado)
-      const trend = Math.floor(Math.random() * 20 - 10); // -10 a +10
-      const comparison = trend >= 0 ? `+${trend}% vs semana` : `${trend}% vs semana`;
+      // Tendência real: compara taxa de comparecimento semana atual vs semana anterior
+      const now = new Date(); now.setHours(0, 0, 0, 0);
+      const weekStart = new Date(now); weekStart.setDate(now.getDate() - 6);
+      const prevWeekEnd = new Date(weekStart); prevWeekEnd.setDate(weekStart.getDate() - 1);
+      const prevWeekStart = new Date(prevWeekEnd); prevWeekStart.setDate(prevWeekEnd.getDate() - 6);
+      const inW = (d: string, from: Date, to: Date) => { const p = parseDate(d); p.setHours(0,0,0,0); return p >= from && p <= to; };
+      const schCurr = leads.filter(l => l.dataAgendamento?.trim() && inW(l.dataCriacao, weekStart, now)).length;
+      const compCurr = leads.filter(l => l.comparecimento === "COMPARECEU" && inW(l.dataCriacao, weekStart, now)).length;
+      const schPrev = leads.filter(l => l.dataAgendamento?.trim() && inW(l.dataCriacao, prevWeekStart, prevWeekEnd)).length;
+      const compPrev = leads.filter(l => l.comparecimento === "COMPARECEU" && inW(l.dataCriacao, prevWeekStart, prevWeekEnd)).length;
+      const rateCurr = schCurr > 0 ? Math.round((compCurr / schCurr) * 100) : 0;
+      const ratePrev = schPrev > 0 ? Math.round((compPrev / schPrev) * 100) : 0;
+      const delta = rateCurr - ratePrev;
+      const comparison = delta > 0 ? `+${delta}pp vs semana` : delta < 0 ? `${delta}pp vs semana` : `= estável`;
 
       ranking.push({
         id: clinicId,
