@@ -6,7 +6,7 @@ import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useActions } from "@/hooks/useActions";
 import { useExport } from "@/hooks/useExport";
 import { useLeads } from "@/hooks/useLeads";
-import { MOCK_HISTORY, MOCK_UNITS_RANKING, MOCK_PERFORMANCE_CHANNELS, MOCK_RECENT_LEADS, MOCK_FIELD_MEMBERS, META_ADS_DIAGNOSTICS, WHATSAPP_DIAGNOSTICS } from "@/data/commandCenterMock";
+import { MOCK_HISTORY, MOCK_UNITS_RANKING, MOCK_PERFORMANCE_CHANNELS, MOCK_RECENT_LEADS, MOCK_FIELD_MEMBERS } from "@/data/commandCenterMock";
 import Topbar from "./commandcenter/Topbar";
 import KPIStrip from "./commandcenter/KPIStrip";
 import DiagnosticCard from "./commandcenter/DiagnosticCard";
@@ -27,8 +27,8 @@ export default function CommandCenter() {
   const [unit, setUnit] = useState("all");
 
   const { kpis, diagnostics, funnel } = useDashboardData(period);
-  const { campaigns } = useMetaAds(unit);
-  const { messages } = useWhatsApp(unit);
+  const { campaigns, kpis: metaKpis, diagnostics: metaDiagnostics } = useMetaAds(unit);
+  const { messages, kpis: waKpis, diagnostics: waDiagnostics } = useWhatsApp(unit);
   const { execute } = useActions(unit);
   const { exportPDF, exporting } = useExport();
   const { leads } = useLeads();
@@ -146,26 +146,21 @@ export default function CommandCenter() {
                   <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
                     Métricas Meta Ads
                   </h3>
-                  <KPIStrip kpis={MOCK_CAMPAIGNS.length > 0 ? [
-                    { label: "Leads gerados", value: campaigns.reduce((a, c) => a + c.leads, 0).toString(), status: "good" },
-                    { label: "Taxa de conversão", value: "37%", status: "good" },
-                    { label: "CAC médio", value: "R$ 62", status: "good" },
-                    { label: "ROAS médio", value: "3.8x", status: "good" },
-                  ] : []} />
+                  <KPIStrip kpis={metaKpis.length > 0 ? metaKpis.slice(0, 4) : []} />
                 </section>
 
                 {/* Diagnósticos Meta */}
-                {META_ADS_DIAGNOSTICS.length > 0 && (
+                {metaDiagnostics.length > 0 && (
                   <section>
                     <div className="flex items-center justify-between mb-3">
                       <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest">
                         Diagnóstico Meta
                       </h3>
                       <span style={{ color: "#999" }} className="text-xs">
-                        {META_ADS_DIAGNOSTICS.filter(d => d.type === "crit").length} críticos
+                        {metaDiagnostics.filter(d => d.type === "crit").length} críticos
                       </span>
                     </div>
-                    <DiagnosticCard diagnostics={META_ADS_DIAGNOSTICS} onAction={execute} />
+                    <DiagnosticCard diagnostics={metaDiagnostics} onAction={execute} />
                   </section>
                 )}
 
@@ -213,26 +208,21 @@ export default function CommandCenter() {
                   <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
                     Métricas WhatsApp
                   </h3>
-                  <KPIStrip kpis={[
-                    { label: "Msgs recebidas", value: "43", status: "neutral" },
-                    { label: "Msgs enviadas", value: "61", status: "good" },
-                    { label: "Tempo resp", value: "4min", status: "good" },
-                    { label: "Taxa automação", value: "42%", status: "good" },
-                  ]} />
+                  <KPIStrip kpis={waKpis.length > 0 ? waKpis.slice(0, 4) : []} />
                 </section>
 
                 {/* Diagnósticos WhatsApp */}
-                {WHATSAPP_DIAGNOSTICS.length > 0 && (
+                {waDiagnostics.length > 0 && (
                   <section>
                     <div className="flex items-center justify-between mb-3">
                       <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest">
                         Diagnóstico WhatsApp
                       </h3>
                       <span style={{ color: "#999" }} className="text-xs">
-                        {WHATSAPP_DIAGNOSTICS.filter(d => d.type === "crit").length} críticos
+                        {waDiagnostics.filter(d => d.type === "crit").length} críticos
                       </span>
                     </div>
-                    <DiagnosticCard diagnostics={WHATSAPP_DIAGNOSTICS} onAction={execute} />
+                    <DiagnosticCard diagnostics={waDiagnostics} onAction={execute} />
                   </section>
                 )}
 
