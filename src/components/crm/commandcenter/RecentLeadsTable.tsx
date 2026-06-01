@@ -17,7 +17,7 @@ export default function RecentLeadsTable({ leads }: RecentLeadsTableProps) {
     <div style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4">
       <div className="mb-4">
         <h4 style={{ color: "#fff", fontSize: "13px" }} className="font-semibold">Leads recentes</h4>
-        <p style={{ color: "#666", fontSize: "10px" }} className="mt-1">{leads.length} registros</p>
+        <p style={{ color: "#666", fontSize: "10px" }} className="mt-1">{leads?.length || 0} registros</p>
       </div>
 
       {/* Header */}
@@ -30,49 +30,53 @@ export default function RecentLeadsTable({ leads }: RecentLeadsTableProps) {
 
       {/* Rows */}
       <div className="space-y-1 max-h-96 overflow-y-auto">
-        {leads.map(lead => {
-          const cfg = statusConfig[lead.status];
-          return (
-            <div
-              key={lead.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#323232] transition-colors"
-            >
-              {/* Name */}
-              <div className="flex-1 min-w-0">
-                <p style={{ color: "#fff", fontSize: "12px" }} className="font-medium truncate">
-                  {lead.name}
-                </p>
-              </div>
+        {leads && leads.length > 0 ? (
+          leads.map(lead => {
+            const cfg = statusConfig[lead.status as keyof typeof statusConfig] || statusConfig.agendado;
+            return (
+              <div
+                key={lead.id}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#323232] transition-colors"
+              >
+                {/* Name */}
+                <div className="flex-1 min-w-0">
+                  <p style={{ color: "#fff", fontSize: "12px" }} className="font-medium truncate">
+                    {lead.name}
+                  </p>
+                </div>
 
-              {/* Date */}
-              <span style={{ color: "#666", fontSize: "10px" }} className="w-16 text-center">
-                {lead.date}
-              </span>
-
-              {/* Time */}
-              <span style={{ color: "#666", fontSize: "10px" }} className="w-16 text-center">
-                {lead.time}
-              </span>
-
-              {/* Status Badge */}
-              <div className="w-20">
-                <span
-                  style={{ color: cfg.text, background: cfg.bg, borderColor: cfg.border }}
-                  className="text-[9px] px-2 py-1 rounded border font-medium uppercase tracking-wide inline-block whitespace-nowrap"
-                >
-                  {cfg.label}
+                {/* Date */}
+                <span style={{ color: "#666", fontSize: "10px" }} className="w-16 text-center">
+                  {lead.date}
                 </span>
+
+                {/* Time */}
+                <span style={{ color: "#666", fontSize: "10px" }} className="w-16 text-center">
+                  {lead.time}
+                </span>
+
+                {/* Status Badge */}
+                <div className="w-20">
+                  <span
+                    style={{ color: cfg.text, background: cfg.bg, borderColor: cfg.border }}
+                    className="text-[9px] px-2 py-1 rounded border font-medium uppercase tracking-wide inline-block whitespace-nowrap"
+                  >
+                    {cfg.label}
+                  </span>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <p style={{ color: "#666", fontSize: "12px" }} className="text-center py-4">Carregando leads...</p>
+        )}
       </div>
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: "0.5px solid #3a3a3a" }}>
         <span style={{ color: "#999", fontSize: "10px" }}>Próx. 30 dias</span>
         <span style={{ color: "#378ADD", fontSize: "11px", fontWeight: "600" }}>
-          {leads.filter(l => l.status === "agendado").length} a agendar
+          {leads?.filter(l => l.status === "agendado").length || 0} a agendar
         </span>
       </div>
     </div>
