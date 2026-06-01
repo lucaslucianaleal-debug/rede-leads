@@ -1,4 +1,4 @@
-import type { KPI, Diagnostic, FunnelData, Campaign, WhatsAppMessage, Automation, WhatsAppMetrics, UnitRanking, PerformanceChannel, RecentLead, FieldMember } from "@/types/commandCenter";
+import type { KPI, Diagnostic, FunnelData, Campaign, WhatsAppMessage, Automation, WhatsAppMetrics, UnitRanking, PerformanceChannel, RecentLead, FieldMember, MetaKPI, WhatsAppKPI } from "@/types/commandCenter";
 
 // ─── 4 KPIs fixos (briefing) ──────────────────────────────────────────────────
 
@@ -156,4 +156,94 @@ export const MOCK_FIELD_MEMBERS: FieldMember[] = [
   { id: "1", name: "Lucas", unit: "Olímpia - GPS ao vivo", x: 60, y: 45, leads: 4, meta: 5, color: "#378ADD" },
   { id: "2", name: "Julia", unit: "Rua David de Oliveira", x: 35, y: 65, leads: 0, meta: 5, color: "#ec4899" },
   { id: "3", name: "Neto", unit: "Rua Benjamim Constant", x: 70, y: 50, leads: 2, meta: 5, color: "#1D9E75" },
+];
+
+// ─── Meta Ads KPIs ────────────────────────────────────────────────────────────
+
+export const META_ADS_KPIS: MetaKPI[] = [
+  { label: "Leads gerados", value: "89", delta: "+23% vs semana", status: "good" },
+  { label: "Taxa de resposta", value: "68%", delta: "meta: 50%", status: "good" },
+  { label: "Tempo resp médio", value: "4min", delta: "dentro da meta", status: "good" },
+  { label: "Leads sem resposta", value: "3", delta: "urgentes", status: "bad" },
+  { label: "CAC real por campanha", value: "R$ 62", delta: "meta: R$ 80", status: "good" },
+  { label: "Custo-saída", value: "R$ 15", delta: "abaixo de R$ 20", status: "good" },
+  { label: "ROAS médio", value: "4.2k", delta: "Profi.", status: "good" },
+];
+
+// ─── Meta Ads Diagnósticos ────────────────────────────────────────────────────
+
+export const META_ADS_DIAGNOSTICS: Diagnostic[] = [
+  {
+    type: "crit",
+    title: "Campanha 'Sorteio cupom' com 67% de conversão",
+    description: "Maior taxa de retorno ROI. Aumentar budget em 40% para aproveitar oportunidade.",
+    action: "Aumentar budget",
+    actionId: "increase_campaign_budget",
+  },
+  {
+    type: "imp",
+    title: "8 leads de Meta sem resposta em >24h",
+    description: "Cadência do time de follow-up precisa melhorar. Considerar automação WhatsApp.",
+    action: "Enviar WA agora",
+    actionId: "send_whatsapp_unresponded",
+  },
+  {
+    type: "ok",
+    title: "Clareamento ROAS 5.3x — melhor campanha da rede",
+    description: "Performance excepcional. Manter alocação de budget.",
+    action: undefined,
+    actionId: undefined,
+  },
+  {
+    type: "ok",
+    title: "Custo por lead R$ 16 — abaixo da meta de R$ 20",
+    description: "Eficiência de captação dentro do esperado. Qualidade dos leads confirmada.",
+    action: undefined,
+    actionId: undefined,
+  },
+];
+
+// ─── WhatsApp KPIs ────────────────────────────────────────────────────────────
+
+export const WHATSAPP_KPIS: WhatsAppKPI[] = [
+  { label: "Msgs recebidas", value: "43", delta: "hoje", status: "neutral" },
+  { label: "Msgs enviadas", value: "61", delta: "automáticas", status: "good" },
+  { label: "Tempo resp mediano", value: "4min", delta: "meta: 5min ✓", status: "good" },
+  { label: "Leads sem resposta", value: "3", delta: "críticos", status: "bad" },
+  { label: "Automações ativas", value: "6", delta: "de 6 total", status: "good" },
+  { label: "Confirmações enviadas", value: "18", delta: "hoje", status: "good" },
+  { label: "Follow-up ativo", value: "6", delta: "em andamento", status: "good" },
+];
+
+// ─── WhatsApp Diagnósticos ────────────────────────────────────────────────────
+
+export const WHATSAPP_DIAGNOSTICS: Diagnostic[] = [
+  {
+    type: "crit",
+    title: "Maria Eduarda esperando resposta há 2h24m",
+    description: "Crítico: sem trocas desde 14:36. Precedência de contato necessária.",
+    action: "Responder agora",
+    actionId: "respond_whatsapp_urgent",
+  },
+  {
+    type: "imp",
+    title: "Vanessa x Lory: indicadores que não vão comparecer",
+    description: "Padrão de falta de resposta. Considerar reativação 24h antes ou cancelamento.",
+    action: "Enviar follow-up",
+    actionId: "send_reactivation_followup",
+  },
+  {
+    type: "ok",
+    title: "Tempo de resposta ativar para 2min na segunda-feira",
+    description: "Configuração de prioridade recomendada para leads hot (confirmação).",
+    action: undefined,
+    actionId: undefined,
+  },
+  {
+    type: "ok",
+    title: "Taxa de automação: 42% das respostas automáticas",
+    description: "Bom equilíbrio entre automação e atendimento humano. Manter cadência.",
+    action: undefined,
+    actionId: undefined,
+  },
 ];

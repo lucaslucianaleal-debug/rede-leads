@@ -107,3 +107,17 @@ export interface FieldMember {
   meta: number;
   color: string;
 }
+
+export interface MetaKPI {
+  label: string;
+  value: string;
+  delta?: string;
+  status: 'good' | 'bad' | 'warn' | 'neutral';
+}
+
+export interface WhatsAppKPI {
+  label: string;
+  value: string;
+  delta?: string;
+  status: 'good' | 'bad' | 'warn' | 'neutral';
+}

@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import type { WhatsAppMessage, WhatsAppMetrics } from "@/types/commandCenter";
-import { MOCK_MESSAGES, MOCK_WA_METRICS } from "@/data/commandCenterMock";
+import type { WhatsAppMessage, WhatsAppMetrics, WhatsAppKPI, Diagnostic } from "@/types/commandCenter";
+import { MOCK_MESSAGES, MOCK_WA_METRICS, WHATSAPP_KPIS, WHATSAPP_DIAGNOSTICS } from "@/data/commandCenterMock";
 
 export function useWhatsApp(unitId?: string) {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [metrics, setMetrics] = useState<WhatsAppMetrics | null>(null);
+  const [kpis, setKpis] = useState<WhatsAppKPI[]>([]);
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -13,6 +15,8 @@ export function useWhatsApp(unitId?: string) {
       // Futuramente: chamada para /api/whatsapp/messages?unitId=...
       setMessages(MOCK_MESSAGES);
       setMetrics(MOCK_WA_METRICS);
+      setKpis(WHATSAPP_KPIS);
+      setDiagnostics(WHATSAPP_DIAGNOSTICS);
       setLoading(false);
     }, 120);
     return () => clearTimeout(timer);
@@ -22,5 +26,5 @@ export function useWhatsApp(unitId?: string) {
   const responded = messages.filter(m => m.status === "responded");
   const automated = messages.filter(m => m.status === "auto");
 
-  return { messages, metrics, loading, pending, responded, automated };
+  return { messages, metrics, kpis, diagnostics, loading, pending, responded, automated };
 }
