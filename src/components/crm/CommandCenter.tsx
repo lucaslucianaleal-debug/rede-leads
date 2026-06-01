@@ -12,6 +12,16 @@ import KPIStrip from "./commandcenter/KPIStrip";
 import DiagnosticCard from "./commandcenter/DiagnosticCard";
 import FunnelCard from "./commandcenter/FunnelCard";
 import CampaignCard from "./commandcenter/CampaignCard";
+
+// Mapear unit IDs para clinic IDs no Firestore
+const unitToClinicId: Record<string, string> = {
+  olimpia: "odontocompany-olimpia",
+  badybassit: "odontocompany-badybassit",
+  novohorizonte: "odontocompany-novohorizonte",
+  votuporanga: "odontocompany-votuporanga",
+  catanduva: "odontocompany-catanduva",
+  all: "odontocompany-olimpia", // Default para "Toda a rede" — mostra Olimpia por enquanto
+};
 import ConversationCard from "./commandcenter/ConversationCard";
 import HistoryChart from "./commandcenter/HistoryChart";
 import AutomationCard from "./commandcenter/AutomationCard";
@@ -29,7 +39,8 @@ export default function CommandCenter() {
   const [editingTicket, setEditingTicket] = useState(false);
   const [ticketInput, setTicketInput] = useState("1800");
 
-  const { kpis, diagnostics, funnel, history, recentLeads, consultores } = useDashboardData(period, "odontocompany-olimpia", ticketMedio);
+  const clinicId = unitToClinicId[unit] || "odontocompany-olimpia";
+  const { kpis, diagnostics, funnel, history, recentLeads, consultores } = useDashboardData(period, clinicId, ticketMedio);
   const { channels, ranking } = useOperationalMetrics();
   const { campaigns, kpis: metaKpis, diagnostics: metaDiagnostics } = useMetaAds(unit);
   const { messages, kpis: waKpis, diagnostics: waDiagnostics } = useWhatsApp(unit);
