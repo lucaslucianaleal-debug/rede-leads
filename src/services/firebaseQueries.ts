@@ -85,20 +85,24 @@ export async function calculateOperationalKPIs(clinicId: string, period: "hoje" 
       return visitDate >= startDate && visitDate <= today;
     }).length;
 
-    // Total agendados (tendo dataAgendamento preenchida)
-    const scheduled = leads.filter(l => l.dataAgendamento && l.dataAgendamento.trim()).length;
+    // Agendados no período (tendo dataAgendamento preenchida dentro do período)
+    const scheduledInPeriod = leads.filter(l => {
+      if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
+      const scheduledDate = parseDate(l.dataAgendamento);
+      scheduledDate.setHours(0, 0, 0, 0);
+      return scheduledDate >= startDate && scheduledDate <= today;
+    }).length;
 
-    // Taxa de comparecimento (do total agendado, quantos compareceram)
-    const comparecidos = leads.filter(l => l.comparecimento === "COMPARECEU").length;
-    const showUpRate = scheduled > 0 ? Math.round((comparecidos / scheduled) * 100) : 0;
+    // Taxa de comparecimento no período (do total agendado no período, quantos compareceram no período)
+    const showUpRate = scheduledInPeriod > 0 ? Math.round((completedInPeriod / scheduledInPeriod) * 100) : 0;
 
-    console.log(`[calculateOperationalKPIs] ${period}: ${leadsInPeriod} leads, ${completedInPeriod} completed, ${scheduled} scheduled, ${comparecidos} attended, ${showUpRate}%`);
+    console.log(`[calculateOperationalKPIs] ${period}: ${leadsInPeriod} leads, ${completedInPeriod} completed, ${scheduledInPeriod} scheduled, ${showUpRate}%`);
 
     return [
       { label: "Leads", value: leadsInPeriod.toString(), status: leadsInPeriod > 0 ? "good" : "warn" },
       { label: "Comparecidos", value: completedInPeriod.toString(), sub: "meta: 5", status: completedInPeriod >= 5 ? "good" : "bad" },
       { label: "Taxa comparecimento", value: `${showUpRate}%`, sub: "meta: 50%", status: showUpRate >= 50 ? "good" : "warn" },
-      { label: "Agendados", value: scheduled.toString(), status: scheduled > 0 ? "good" : "warn" },
+      { label: "Agendados", value: scheduledInPeriod.toString(), status: scheduledInPeriod > 0 ? "good" : "warn" },
     ];
   } catch (e) {
     console.error("Error calculating KPIs:", e);
