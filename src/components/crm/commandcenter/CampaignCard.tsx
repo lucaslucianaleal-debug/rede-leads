@@ -130,20 +130,13 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
             <LineChart data={chartData} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#3a3a3a" opacity={0.3} />
               <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
-              <YAxis yAxisId="left" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a", borderRadius: 8 }}
                 labelStyle={{ color: "#fff" }}
-                formatter={(value: any, name: any) => {
-                  if (name === "Spend") return [fmt(Number(value)), "Investimento"];
-                  if (name === "CPC") return [fmt(Number(value)), "Custo por clique"];
-                  return [value, name];
-                }}
+                formatter={(value: any) => [fmt(Number(value)), "CPC"]}
               />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px", paddingTop: "4px" }} />
-              <Line yAxisId="left" type="monotone" dataKey="spend" name="Spend" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-              <Line yAxisId="right" type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
