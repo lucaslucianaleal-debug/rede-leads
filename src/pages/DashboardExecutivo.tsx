@@ -1,24 +1,15 @@
 import React from "react";
-import { useLeads } from "@/hooks/useLeads";
-import { ScoreLeadCard } from "@/components/crm/ScoreLeadCard";
-import { LeadMorrendoCard } from "@/components/crm/LeadMorrendoCard";
-import { RankingRecepcionistasCard } from "@/components/crm/RankingRecepcionistasCard";
-import { PrevisaoFaturamentoCard } from "@/components/crm/PrevisaoFaturamentoCard";
-import { IQFCard } from "@/components/crm/IQFCard";
-import { RiscoNoShowCard } from "@/components/crm/RiscoNoShowCard";
-import { CACCard } from "@/components/crm/CACCard";
-import { ConsultoriaCard } from "@/components/crm/ConsultoriaCard";
-import KPIExecutiveCard from "@/components/crm/executive/KPIExecutiveCard";
-import AlertsFeed from "@/components/crm/executive/AlertsFeed";
-import ForecastBlock from "@/components/crm/executive/ForecastBlock";
-import PredictiveScoreCard from "@/components/crm/executive/PredictiveScoreCard";
-import PerformanceBarCard from "@/components/crm/executive/PerformanceBarCard";
-import SourcePerformanceCard from "@/components/crm/executive/SourcePerformanceCard";
-import ActionCommandCard, { ActionCommand } from "@/components/crm/executive/ActionCommandCard";
-import HeroOperationalBlock from "@/components/crm/executive/HeroOperationalBlock";
+import CommandCenter from "@/components/crm/CommandCenter";
 
 export default function DashboardExecutivo() {
-  const { leads, lastSyncedAt, dataSource, ticketAverage, updateLead } = useLeads();
+  return <CommandCenter />;
+}
+
+// ──────────────────────────────────────────────
+// LEGACY — preserved below for reference only
+// ──────────────────────────────────────────────
+function _LegacyDashboard() {
+  const { leads, lastSyncedAt, dataSource, ticketAverage, updateLead } = (null as any);
   const [periodPreset, setPeriodPreset] = React.useState<string>("last_7");
 
   // Helpers para métricas no período selecionado
@@ -359,25 +350,13 @@ export default function DashboardExecutivo() {
         </div>
         <div className="text-sm text-muted-foreground">Dados até: {lastSyncedAt ?? '—'} • Fonte: {dataSource ?? '—'}</div>
       </div>
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
-          <KPIExecutiveCard title="Total de Leads" value={totalLeads} subtitle="Últimos 7 dias" sparkline={sparkLast7} delta={deltaTotal.delta} deltaDirection={deltaTotal.dir} />
-        </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
-          <KPIExecutiveCard title="Agendados" value={agendados} subtitle="Agendamentos" sparkline={sparkLast7} delta={deltaAgend.delta} deltaDirection={deltaAgend.dir} />
-        </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
-          <KPIExecutiveCard title="Compareceram" value={compareceram} subtitle="Comparecimento" sparkline={sparkLast7} delta={deltaComp.delta} deltaDirection={deltaComp.dir} />
-        </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
-          <KPIExecutiveCard title="Follow-ups Pend." value={followupsPend} subtitle="Ações pendentes" sparkline={sparkLast7} delta={deltaFollow.delta} deltaDirection={deltaFollow.dir} />
-        </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
-          <KPIExecutiveCard title="Receita Prevista" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receitaPrevista)} subtitle={periodLabel} sparkline={sparkLast7} delta={deltaReceita.delta} deltaDirection={deltaReceita.dir} />
-        </div>
-        <div className="col-span-12 sm:col-span-6 lg:col-span-2">
-          <KPIExecutiveCard title="CAC / ROI" value="—" subtitle="Dados de custo não informados" sparkline={sparkLast7} />
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <KPIExecutiveCard title="Total de Leads" value={totalLeads} subtitle="Últimos 7 dias" sparkline={sparkLast7} delta={deltaTotal.delta} deltaDirection={deltaTotal.dir} />
+        <KPIExecutiveCard title="Agendados" value={agendados} subtitle="Agendamentos" sparkline={sparkLast7} delta={deltaAgend.delta} deltaDirection={deltaAgend.dir} />
+        <KPIExecutiveCard title="Compareceram" value={compareceram} subtitle="Comparecimento" sparkline={sparkLast7} delta={deltaComp.delta} deltaDirection={deltaComp.dir} />
+        <KPIExecutiveCard title="Follow-ups Pend." value={followupsPend} subtitle="Ações pendentes" sparkline={sparkLast7} delta={deltaFollow.delta} deltaDirection={deltaFollow.dir} />
+        <KPIExecutiveCard title="Receita Prevista" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(receitaPrevista)} subtitle={periodLabel} sparkline={sparkLast7} delta={deltaReceita.delta} deltaDirection={deltaReceita.dir} />
+        <KPIExecutiveCard title="CAC / ROI" value="—" subtitle="Dados de custo não informados" sparkline={sparkLast7} />
       </div>
 
       <div className="grid gap-6 md:gap-8 grid-cols-1 lg:grid-cols-3">
