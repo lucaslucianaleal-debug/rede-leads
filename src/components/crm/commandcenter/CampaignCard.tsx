@@ -3,6 +3,7 @@ import type { Campaign, CampaignDailyMetric } from "@/types/commandCenter";
 import CampaignDailyModal from "./CampaignDailyModal";
 import CampaignFinanceModal from "./CampaignFinanceModal";
 import CreateCampaignModal from "./CreateCampaignModal";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 
 interface Props {
   campaigns: Campaign[];
@@ -69,6 +70,18 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
     { label: "Conversão", value: campaign.showUpRate > 0 ? `${campaign.showUpRate}%` : "—", target: ">= 50%", ok: campaign.showUpRate >= 50 },
   ];
 
+  const chartData = [...campaign.dailyMetrics]
+    .sort((a, b) => {
+      const [da, ma, ya] = a.date.split("/").map(Number);
+      const [db, mb, yb] = b.date.split("/").map(Number);
+      return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+    })
+    .map((item) => ({
+      date: item.date,
+      spend: item.spend,
+      cpc: item.clicks > 0 ? Number((item.spend / item.clicks).toFixed(2)) : item.spend,
+    }));
+
   return (
     <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
       <div className="flex items-center justify-between mb-2 gap-2">
@@ -101,6 +114,38 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
         <div style={{ background: "#1f1f1f", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
           <p style={{ color: "#666" }} className="uppercase tracking-wider">Conversão para paciente</p>
           <p style={{ color: "#fff" }} className="font-semibold">{campaign.predictability > 0 ? `${campaign.predictability}%` : "—"}</p>
+        </div>
+      </div>
+
+      <div style={{ background: "#1f1f1f", border: "0.5px solid #3a3a3a" }} className="mt-3 rounded-lg p-2">
+        <div className="flex items-center justify-between mb-1.5 gap-2">
+          <div>
+            <p style={{ color: "#fff", fontSize: "10px" }} className="font-semibold uppercase tracking-wider">Tendência de custo</p>
+            <p style={{ color: "#666", fontSize: "9px" }}>Se o CPC sobe e o custo total não entrega mais funil, a campanha perde força.</p>
+          </div>
+          <span style={{ color: "#888", fontSize: "9px" }} className="uppercase">Últimos dias</span>
+        </div>
+        <div className="h-[130px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#3a3a3a" opacity={0.3} />
+              <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="left" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a", borderRadius: 8 }}
+                labelStyle={{ color: "#fff" }}
+                formatter={(value: any, name: any) => {
+                  if (name === "Spend") return [fmt(Number(value)), "Investimento"];
+                  if (name === "CPC") return [fmt(Number(value)), "Custo por clique"];
+                  return [value, name];
+                }}
+              />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px", paddingTop: "4px" }} />
+              <Line yAxisId="left" type="monotone" dataKey="spend" name="Spend" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+              <Line yAxisId="right" type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
