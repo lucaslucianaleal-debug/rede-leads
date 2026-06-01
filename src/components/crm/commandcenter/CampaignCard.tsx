@@ -36,7 +36,7 @@ function RoasBadge({ roas }: { roas: number }) {
 function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle }: {
   c: Campaign;
   ticketMedio: number;
-  onDailyMetric: (c: Campaign) => void;
+  onDailyMetric: (c: Campaign, metric?: CampaignDailyMetric) => void;
   onToggle: (c: Campaign) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -76,20 +76,12 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle }: {
         </div>
 
         {/* Funil rápido */}
-        <div className="flex items-center gap-1.5 mb-3 flex-wrap" style={{ fontSize: "11px", color: "#999" }}>
+        <div className="flex items-center gap-1.5 mb-3" style={{ fontSize: "11px", color: "#999" }}>
           <span>{c.leads} leads</span>
           <span style={{ color: "#444" }}>→</span>
           <span>{c.scheduled} agend.</span>
           <span style={{ color: "#444" }}>→</span>
           <span>{c.completed} compareceu</span>
-          {c.totalSpend > 0 && (
-            <>
-              <span style={{ color: "#444" }}>|</span>
-              <span style={{ color: lucro >= 0 ? "#10b981" : "#ef4444", fontWeight: 600 }}>
-                {lucro >= 0 ? "+" : ""}{fmt(lucro)} lucro
-              </span>
-            </>
-          )}
         </div>
 
         {/* Spend vs Budget */}
@@ -135,12 +127,19 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle }: {
                 ))}
               </div>
               {[...c.dailyMetrics].reverse().map((m, i) => (
-                <div key={i} className="grid grid-cols-5 gap-2">
+                <div key={i} className="grid grid-cols-5 gap-2 items-center">
                   <span style={{ color: "#999", fontSize: "11px" }}>{m.date}</span>
                   <span style={{ color: "#fff", fontSize: "11px" }}>{fmt(m.spend)}</span>
                   <span style={{ color: "#999", fontSize: "11px" }}>{fmtN(m.impressions)}</span>
                   <span style={{ color: "#999", fontSize: "11px" }}>{fmtN(m.clicks)}</span>
                   <span style={{ color: "#999", fontSize: "11px" }}>{fmtN(m.reach)}</span>
+                  <button
+                    onClick={() => onDailyMetric(c, m)}
+                    style={{ background: "#333", color: "#999", fontSize: "9px" }}
+                    className="px-2 py-0.5 rounded hover:bg-[#444] col-start-1 col-end-6"
+                  >
+                    Editar
+                  </button>
                 </div>
               ))}
               <div className="grid grid-cols-5 gap-2 pt-1" style={{ borderTop: "0.5px solid #2a2a2a" }}>
@@ -161,7 +160,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle }: {
 }
 
 export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCampaign, onSaveDailyMetric, onToggleActive, onReload }: Props) {
-  const [dailyModalCampaign, setDailyModalCampaign] = useState<Campaign | null>(null);
+  const [dailyModal, setDailyModal] = useState<{ campaign: Campaign; metric?: CampaignDailyMetric } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   const active = campaigns.filter(c => c.active);
@@ -205,7 +204,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
       {active.length > 0 && (
         <div className="space-y-3 mb-3">
           {active.map(c => (
-            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={setDailyModalCampaign} onToggle={camp => onToggleActive(camp.id, !camp.active)} />
+            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })} onToggle={camp => onToggleActive(camp.id, !camp.active)} />
           ))}
         </div>
       )}
@@ -214,7 +213,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
         <div className="space-y-2">
           <p style={{ color: "#555", fontSize: "10px" }} className="uppercase tracking-wider mt-2">Pausadas</p>
           {paused.map(c => (
-            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={setDailyModalCampaign} onToggle={camp => onToggleActive(camp.id, !camp.active)} />
+            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })} onToggle={camp => onToggleActive(camp.id, !camp.active)} />
           ))}
         </div>
       )}
@@ -229,11 +228,12 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
         </div>
       )}
 
-      {dailyModalCampaign && (
+      {dailyModal && (
         <CampaignDailyModal
-          campaign={dailyModalCampaign}
+          campaign={dailyModal.campaign}
+          metric={dailyModal.metric}
           onSave={async (campaignId, metric) => { await onSaveDailyMetric(campaignId, metric); onReload(); }}
-          onClose={() => setDailyModalCampaign(null)}
+          onClose={() => setDailyModal(null)}
         />
       )}
       {showCreate && (

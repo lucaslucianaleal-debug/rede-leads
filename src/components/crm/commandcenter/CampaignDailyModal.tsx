@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { Campaign, CampaignDailyMetric } from "@/types/commandCenter";
 
 interface Props {
   campaign: Campaign;
   onSave: (campaignId: string, metric: CampaignDailyMetric) => Promise<void>;
   onClose: () => void;
+  metric?: CampaignDailyMetric;
 }
 
 function todayStr() {
@@ -12,14 +13,24 @@ function todayStr() {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
-export default function CampaignDailyModal({ campaign, onSave, onClose }: Props) {
-  const [date, setDate] = useState(todayStr());
-  const [spend, setSpend] = useState("");
-  const [impressions, setImpressions] = useState("");
-  const [clicks, setClicks] = useState("");
-  const [reach, setReach] = useState("");
+export default function CampaignDailyModal({ campaign, onSave, onClose, metric }: Props) {
+  const [date, setDate] = useState(metric?.date || todayStr());
+  const [spend, setSpend] = useState(metric?.spend.toString() || "");
+  const [impressions, setImpressions] = useState(metric?.impressions.toString() || "");
+  const [clicks, setClicks] = useState(metric?.clicks.toString() || "");
+  const [reach, setReach] = useState(metric?.reach.toString() || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (metric) {
+      setDate(metric.date);
+      setSpend(metric.spend.toString());
+      setImpressions(metric.impressions.toString());
+      setClicks(metric.clicks.toString());
+      setReach(metric.reach.toString());
+    }
+  }, [metric]);
 
   // Pré-preenche se já existe dado para o dia
   const existing = campaign.dailyMetrics.find(m => m.date === date);
