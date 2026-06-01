@@ -38,26 +38,52 @@ function CampaignHealthChart({ metrics }: { metrics: CampaignDailyMetric[] }) {
       spend: item.spend,
       clicks: item.clicks,
       ctr: item.impressions > 0 ? Number(((item.clicks / item.impressions) * 100).toFixed(1)) : 0,
+      cpc: item.clicks > 0 ? Number((item.spend / item.clicks).toFixed(2)) : item.spend,
     }));
 
   const half = Math.max(1, Math.floor(chartData.length / 2));
   const firstSlice = chartData.slice(0, half);
   const lastSlice = chartData.slice(-half);
-  const firstEfficiency = firstSlice.reduce((acc, item) => acc + item.clicks, 0) / Math.max(firstSlice.reduce((acc, item) => acc + item.spend, 0), 1);
-  const lastEfficiency = lastSlice.reduce((acc, item) => acc + item.clicks, 0) / Math.max(lastSlice.reduce((acc, item) => acc + item.spend, 0), 1);
-  const variation = firstEfficiency > 0 ? ((lastEfficiency - firstEfficiency) / firstEfficiency) * 100 : 0;
-  const status = variation <= -15 ? { label: "Desacelerando", color: "#ef4444" } : variation >= 15 ? { label: "Acelerando", color: "#10b981" } : { label: "Estável", color: "#f59e0b" };
+  const firstCpc = firstSlice.reduce((acc, item) => acc + item.cpc, 0) / Math.max(firstSlice.length, 1);
+  const lastCpc = lastSlice.reduce((acc, item) => acc + item.cpc, 0) / Math.max(lastSlice.length, 1);
+  const clickTrend = firstSlice.reduce((acc, item) => acc + item.clicks, 0);
+  const clickTrendLast = lastSlice.reduce((acc, item) => acc + item.clicks, 0);
+  const cpcVariation = firstCpc > 0 ? ((lastCpc - firstCpc) / firstCpc) * 100 : 0;
+  const clickVariation = clickTrend > 0 ? ((clickTrendLast - clickTrend) / clickTrend) * 100 : 0;
+  const status = cpcVariation >= 15 && clickVariation <= -10
+    ? { label: "Desacelerando", color: "#ef4444" }
+    : cpcVariation <= -10 && clickVariation >= 10
+      ? { label: "Acelerando", color: "#10b981" }
+      : { label: "Estável", color: "#f59e0b" };
+
+  const current = chartData.at(-1);
+  const avgClicks = chartData.reduce((acc, item) => acc + item.clicks, 0) / Math.max(chartData.length, 1);
+  const avgCtr = chartData.reduce((acc, item) => acc + item.ctr, 0) / Math.max(chartData.length, 1);
 
   return (
     <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
       <div className="flex items-center justify-between mb-2 gap-2">
         <div>
           <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold uppercase tracking-wider">Saúde da campanha</p>
-          <p style={{ color: "#666", fontSize: "10px" }}>Gasto vs cliques para identificar desaceleração</p>
+          <p style={{ color: "#666", fontSize: "10px" }}>Leia assim: CPC subindo e cliques caindo = campanha perdendo força</p>
         </div>
         <span style={{ color: status.color, fontSize: "10px" }} className="font-semibold uppercase">
-          {status.label} {variation !== 0 ? `(${variation > 0 ? "+" : ""}${variation.toFixed(0)}%)` : ""}
+          {status.label} {cpcVariation !== 0 ? `(${cpcVariation > 0 ? "+" : ""}${cpcVariation.toFixed(0)}% CPC)` : ""}
         </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 mb-3 text-[10px]">
+        <div style={{ background: "#1f1f1f", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+          <p style={{ color: "#666" }} className="uppercase tracking-wider">CPC atual</p>
+          <p style={{ color: "#fff" }} className="font-semibold">{current ? fmt(current.cpc) : "—"}</p>
+        </div>
+        <div style={{ background: "#1f1f1f", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+          <p style={{ color: "#666" }} className="uppercase tracking-wider">Cliques médios</p>
+          <p style={{ color: "#fff" }} className="font-semibold">{avgClicks.toFixed(1)}</p>
+        </div>
+        <div style={{ background: "#1f1f1f", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+          <p style={{ color: "#666" }} className="uppercase tracking-wider">CTR médio</p>
+          <p style={{ color: "#fff" }} className="font-semibold">{avgCtr.toFixed(1)}%</p>
+        </div>
       </div>
       <div className="h-[140px]">
         <ResponsiveContainer width="100%" height="100%">
@@ -69,9 +95,14 @@ function CampaignHealthChart({ metrics }: { metrics: CampaignDailyMetric[] }) {
             <Tooltip
               contentStyle={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a", borderRadius: 8 }}
               labelStyle={{ color: "#fff" }}
+              formatter={(value: any, name: any) => {
+                if (name === "CPC") return [fmt(Number(value)), "Custo por clique"];
+                if (name === "Cliques") return [fmtN(Number(value)), "Cliques"];
+                return [value, name];
+              }}
             />
             <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px", paddingTop: "4px" }} />
-            <Line yAxisId="left" type="monotone" dataKey="spend" name="Spend" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+            <Line yAxisId="left" type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
             <Line yAxisId="right" type="monotone" dataKey="clicks" name="Cliques" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>
@@ -124,9 +155,9 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance }: {
         {/* KPIs de decisão */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           {[
-            { label: "Custo/Lead", value: c.cacLead > 0 ? fmt(c.cacLead) : "—", good: c.cacLead > 0 && c.cacLead <= 50, sub: "ideal: <R$50" },
-            { label: "Custo/Agendado", value: c.cacAgendamento > 0 ? fmt(c.cacAgendamento) : "—", good: c.cacAgendamento > 0 && c.cacAgendamento <= 100, sub: "ideal: <R$100" },
-            { label: "Custo/Compareceu", value: c.cacComparecimento > 0 ? fmt(c.cacComparecimento) : "—", good: c.cacComparecimento > 0 && c.cacComparecimento <= 200, sub: "ideal: <R$200" },
+            { label: "Custo/Lead", value: c.cacLead > 0 ? fmt(c.cacLead) : "—", good: c.cacLead > 0 && c.cacLead < 8, sub: "ideal: <R$8" },
+            { label: "Custo/Agendado", value: c.cacAgendamento > 0 ? fmt(c.cacAgendamento) : "—", good: c.cacAgendamento > 0 && c.cacAgendamento < 20, sub: "ideal: <R$20" },
+            { label: "Custo/Compareceu", value: c.cacComparecimento > 0 ? fmt(c.cacComparecimento) : "—", good: c.cacComparecimento > 0 && c.cacComparecimento < 80, sub: "ideal: <R$80" },
           ].map(k => (
             <div key={k.label} style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="rounded p-2 text-center">
               <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider mb-1">{k.label}</p>
