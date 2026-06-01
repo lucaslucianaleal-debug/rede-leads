@@ -11,14 +11,14 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchCampaigns(clinicId, ticketMedio, period);
+      const data = await fetchCampaigns(clinicId, ticketMedio);
       setCampaigns(data);
     } catch (e) {
       console.error("useMetaAds error:", e);
     } finally {
       setLoading(false);
     }
-  }, [clinicId, ticketMedio, period]);
+  }, [clinicId, ticketMedio]);
 
   useEffect(() => { load(); }, [load]);
 

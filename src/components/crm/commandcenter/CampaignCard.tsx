@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { Campaign, CampaignDailyMetric } from "@/types/commandCenter";
 import CampaignDailyModal from "./CampaignDailyModal";
 import CreateCampaignModal from "./CreateCampaignModal";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 
 interface Props {
   campaigns: Campaign[];
@@ -19,6 +20,61 @@ function fmt(n: number) {
 
 function fmtN(n: number) {
   return n.toLocaleString("pt-BR");
+}
+
+function CampaignHealthChart({ metrics }: { metrics: CampaignDailyMetric[] }) {
+  const chartData = [...metrics]
+    .slice()
+    .sort((a, b) => {
+      const [da, ma, ya] = a.date.split("/").map(Number);
+      const [db, mb, yb] = b.date.split("/").map(Number);
+      return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+    })
+    .map((item) => ({
+      date: item.date,
+      spend: item.spend,
+      clicks: item.clicks,
+      ctr: item.impressions > 0 ? Number(((item.clicks / item.impressions) * 100).toFixed(1)) : 0,
+    }));
+
+  const half = Math.max(1, Math.floor(chartData.length / 2));
+  const firstSlice = chartData.slice(0, half);
+  const lastSlice = chartData.slice(-half);
+  const firstEfficiency = firstSlice.reduce((acc, item) => acc + item.clicks, 0) / Math.max(firstSlice.reduce((acc, item) => acc + item.spend, 0), 1);
+  const lastEfficiency = lastSlice.reduce((acc, item) => acc + item.clicks, 0) / Math.max(lastSlice.reduce((acc, item) => acc + item.spend, 0), 1);
+  const variation = firstEfficiency > 0 ? ((lastEfficiency - firstEfficiency) / firstEfficiency) * 100 : 0;
+  const status = variation <= -15 ? { label: "Desacelerando", color: "#ef4444" } : variation >= 15 ? { label: "Acelerando", color: "#10b981" } : { label: "Estável", color: "#f59e0b" };
+
+  return (
+    <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div>
+          <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold uppercase tracking-wider">Saúde da campanha</p>
+          <p style={{ color: "#666", fontSize: "10px" }}>Gasto vs cliques para identificar desaceleração</p>
+        </div>
+        <span style={{ color: status.color, fontSize: "10px" }} className="font-semibold uppercase">
+          {status.label} {variation !== 0 ? `(${variation > 0 ? "+" : ""}${variation.toFixed(0)}%)` : ""}
+        </span>
+      </div>
+      <div className="h-[140px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#3a3a3a" opacity={0.35} />
+            <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#888" }} axisLine={false} tickLine={false} />
+            <YAxis yAxisId="left" tick={{ fontSize: 10, fill: "#888" }} axisLine={false} tickLine={false} />
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: "#888" }} axisLine={false} tickLine={false} />
+            <Tooltip
+              contentStyle={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a", borderRadius: 8 }}
+              labelStyle={{ color: "#fff" }}
+            />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px", paddingTop: "4px" }} />
+            <Line yAxisId="left" type="monotone" dataKey="spend" name="Spend" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+            <Line yAxisId="right" type="monotone" dataKey="clicks" name="Cliques" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 }
 
 function RoasBadge({ roas }: { roas: number }) {
@@ -102,6 +158,17 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle }: {
             </p>
           </div>
         )}
+
+        <div className="mb-3">
+          {c.dailyMetrics.length > 0 ? (
+            <CampaignHealthChart metrics={c.dailyMetrics} />
+          ) : (
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3 text-center">
+              <p style={{ color: "#999", fontSize: "11px" }} className="font-medium">Sem gráfico ainda</p>
+              <p style={{ color: "#666", fontSize: "10px" }} className="mt-1">Lance métricas diárias para enxergar a saúde da campanha.</p>
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => onDailyMetric(c)} style={{ background: "#D4537E", color: "#fff", fontSize: "11px" }} className="px-3 py-1.5 rounded font-medium hover:opacity-90">
