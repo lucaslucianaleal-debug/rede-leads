@@ -77,23 +77,24 @@ export async function calculateOperationalKPIs(clinicId: string, period: "hoje" 
       return leadDate >= startDate && leadDate <= today;
     }).length;
 
-    // Comparecidos no período
+    // Comparecidos no período (criados no período e que compareceram)
     const completedInPeriod = leads.filter(l => {
       if (l.comparecimento !== "COMPARECEU") return false;
-      const visitDate = parseDate(l.dataAgendamento);
-      visitDate.setHours(0, 0, 0, 0);
-      return visitDate >= startDate && visitDate <= today;
+      const createdDate = parseDate(l.dataCriacao);
+      createdDate.setHours(0, 0, 0, 0);
+      return createdDate >= startDate && createdDate <= today;
     }).length;
 
-    // Agendados no período (tendo dataAgendamento preenchida dentro do período)
+    // Agendados no período: leads CRIADOS no período que têm dataAgendamento preenchida
+    // (dataAgendamento pode ser data futura - não filtrar por ela)
     const scheduledInPeriod = leads.filter(l => {
       if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
-      const scheduledDate = parseDate(l.dataAgendamento);
-      scheduledDate.setHours(0, 0, 0, 0);
-      return scheduledDate >= startDate && scheduledDate <= today;
+      const createdDate = parseDate(l.dataCriacao);
+      createdDate.setHours(0, 0, 0, 0);
+      return createdDate >= startDate && createdDate <= today;
     }).length;
 
-    // Taxa de comparecimento no período (do total agendado no período, quantos compareceram no período)
+    // Taxa de comparecimento: dos agendados no período, quantos compareceram
     const showUpRate = scheduledInPeriod > 0 ? Math.round((completedInPeriod / scheduledInPeriod) * 100) : 0;
 
     console.log(`[calculateOperationalKPIs] ${period}: ${leadsInPeriod} leads, ${completedInPeriod} completed, ${scheduledInPeriod} scheduled, ${showUpRate}%`);
