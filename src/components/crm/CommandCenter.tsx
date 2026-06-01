@@ -1,12 +1,13 @@
 import React, { useRef, useState } from "react";
 import type { LayerType, PeriodType } from "@/types/commandCenter";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { useOperationalMetrics } from "@/hooks/useOperationalMetrics";
 import { useMetaAds } from "@/hooks/useMetaAds";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useActions } from "@/hooks/useActions";
 import { useExport } from "@/hooks/useExport";
 import { useLeads } from "@/hooks/useLeads";
-import { MOCK_HISTORY, MOCK_UNITS_RANKING, MOCK_PERFORMANCE_CHANNELS, MOCK_RECENT_LEADS, MOCK_FIELD_MEMBERS } from "@/data/commandCenterMock";
+import { MOCK_FIELD_MEMBERS } from "@/data/commandCenterMock";
 import Topbar from "./commandcenter/Topbar";
 import KPIStrip from "./commandcenter/KPIStrip";
 import DiagnosticCard from "./commandcenter/DiagnosticCard";
@@ -26,7 +27,8 @@ export default function CommandCenter() {
   const [period, setPeriod] = useState<PeriodType>("mes");
   const [unit, setUnit] = useState("all");
 
-  const { kpis, diagnostics, funnel } = useDashboardData(period);
+  const { kpis, diagnostics, funnel, history, recentLeads } = useDashboardData(period);
+  const { channels, ranking } = useOperationalMetrics();
   const { campaigns, kpis: metaKpis, diagnostics: metaDiagnostics } = useMetaAds(unit);
   const { messages, kpis: waKpis, diagnostics: waDiagnostics } = useWhatsApp(unit);
   const { execute } = useActions(unit);
@@ -105,19 +107,19 @@ export default function CommandCenter() {
                     </h3>
                     <FunnelCard funnel={funnel} />
                     <div style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="mt-4 rounded-lg p-4">
-                      <HistoryChart data={MOCK_HISTORY} />
+                      <HistoryChart data={history} />
                     </div>
                   </section>
                 )}
 
                 {/* Ranking de Unidades */}
                 <section>
-                  <UnitsRankingSection units={MOCK_UNITS_RANKING} />
+                  <UnitsRankingSection units={ranking} />
                 </section>
 
                 {/* Performance por Canal */}
                 <section>
-                  <PerformanceByChannelCard channels={MOCK_PERFORMANCE_CHANNELS} />
+                  <PerformanceByChannelCard channels={channels} />
                 </section>
               </div>
 
@@ -130,7 +132,7 @@ export default function CommandCenter() {
 
                 {/* Leads Recentes */}
                 <section>
-                  <RecentLeadsTable leads={MOCK_RECENT_LEADS} />
+                  <RecentLeadsTable leads={recentLeads} />
                 </section>
               </div>
             </div>
