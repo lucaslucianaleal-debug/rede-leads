@@ -572,6 +572,12 @@ export async function generateHistoryData(clinicId: string, days = 7) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Debug: mostra leads com comparecimento nos últimos 7 dias
+    const completedLeads = leads.filter(l => l.comparecimento === "COMPARECEU");
+    console.log(`[generateHistoryData] Total leads com COMPARECEU: ${completedLeads.length}`, 
+      completedLeads.slice(0, 3).map(l => ({ name: l.nome, dataAgendamento: l.dataAgendamento, comparecimento: l.comparecimento }))
+    );
+
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
@@ -586,15 +592,21 @@ export async function generateHistoryData(clinicId: string, days = 7) {
       }).length;
 
       // Comparecimentos neste dia = leads com dataAgendamento neste dia E status COMPARECEU
+      // dataAgendamento é a data da consulta (DD/MM/YYYY)
       const dailyCompleted = leads.filter(l => {
         if (l.comparecimento !== "COMPARECEU") return false;
-        // Se tem agendamento, usa o agendamento
-        if (l.dataAgendamento && l.dataAgendamento.trim()) {
-          const visitDate = parseDate(l.dataAgendamento);
-          visitDate.setHours(0, 0, 0, 0);
-          return visitDate.getTime() === date.getTime();
+        
+        // Validar que tem dataAgendamento preenchida
+        if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
+        
+        const visitDate = parseDate(l.dataAgendamento);
+        visitDate.setHours(0, 0, 0, 0);
+        
+        const match = visitDate.getTime() === date.getTime();
+        if (match) {
+          console.log(`[generateHistoryData] Match encontrado em ${dateStr}: ${l.nome} (agend: ${l.dataAgendamento})`);
         }
-        return false;
+        return match;
       }).length;
 
       historyData.push({
