@@ -584,19 +584,17 @@ export async function generateHistoryData(clinicId: string, days = 7) {
       
       const dateStr = `${date.getDate()}/${date.getMonth() + 1}`;
       
-      // Leads criados neste dia
-      const dailyLeads = leads.filter(l => {
-        const leadDate = parseDate(l.dataCriacao);
-        leadDate.setHours(0, 0, 0, 0);
-        return leadDate.getTime() === date.getTime();
+      // Leads AGENDADOS neste dia (dataAgendamento = data da consulta)
+      const dailyScheduled = leads.filter(l => {
+        if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
+        const visitDate = parseDate(l.dataAgendamento);
+        visitDate.setHours(0, 0, 0, 0);
+        return visitDate.getTime() === date.getTime();
       }).length;
 
-      // Comparecimentos neste dia = leads com dataAgendamento neste dia E status COMPARECEU
-      // dataAgendamento é a data da consulta (DD/MM/YYYY)
+      // Comparecimentos neste dia = agendados que compareceram
       const dailyCompleted = leads.filter(l => {
         if (l.comparecimento !== "COMPARECEU") return false;
-        
-        // Validar que tem dataAgendamento preenchida
         if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
         
         const visitDate = parseDate(l.dataAgendamento);
@@ -611,7 +609,7 @@ export async function generateHistoryData(clinicId: string, days = 7) {
 
       historyData.push({
         date: dateStr,
-        leads: dailyLeads,
+        leads: dailyScheduled,
         completed: dailyCompleted,
       });
     }
