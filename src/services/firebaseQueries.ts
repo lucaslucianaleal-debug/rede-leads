@@ -585,12 +585,16 @@ export async function generateHistoryData(clinicId: string, days = 7) {
         return leadDate.getTime() === date.getTime();
       }).length;
 
-      // Comparecimentos neste dia
+      // Comparecimentos neste dia = leads com dataAgendamento neste dia E status COMPARECEU
       const dailyCompleted = leads.filter(l => {
         if (l.comparecimento !== "COMPARECEU") return false;
-        const visitDate = parseDate(l.dataAgendamento);
-        visitDate.setHours(0, 0, 0, 0);
-        return visitDate.getTime() === date.getTime();
+        // Se tem agendamento, usa o agendamento
+        if (l.dataAgendamento && l.dataAgendamento.trim()) {
+          const visitDate = parseDate(l.dataAgendamento);
+          visitDate.setHours(0, 0, 0, 0);
+          return visitDate.getTime() === date.getTime();
+        }
+        return false;
       }).length;
 
       historyData.push({
@@ -610,6 +614,7 @@ export async function generateHistoryData(clinicId: string, days = 7) {
 
 /**
  * Calcula performance por canal (fonteLead)
+ * Filtra canais com volume insuficiente (< 10 leads) para evitar distorções estatísticas
  */
 export async function calculateChannelPerformance(clinicId: string) {
   try {
@@ -636,7 +641,7 @@ export async function calculateChannelPerformance(clinicId: string) {
       }
     });
 
-    // Converter para array e calcular taxa de conversão
+    // Converter para array e calcular métricas
     const iconMap: Record<string, string> = {
       "Online": "💻",
       "E-presencial": "🎥",
@@ -646,21 +651,35 @@ export async function calculateChannelPerformance(clinicId: string) {
       "Instagram": "📸",
     };
 
+    // FILTRO: apenas canais com >= 10 leads para ter confiabilidade estatística
+    const MIN_LEADS = 10;
+    
     const result = Array.from(channels.entries())
+      .filter(([_, stats]) => stats.total >= MIN_LEADS) // Apenas canais com volume
       .map(([name, stats], idx) => {
         const conversionRate = stats.total > 0 ? Math.round((stats.scheduled / stats.total) * 100) : 0;
+        const showUpRate = stats.scheduled > 0 ? Math.round((stats.completed / stats.scheduled) * 100) : 0;
+        
+        // Status baseado em comparecimentos reais, não conversão
+        let status = "bad";
+        if (showUpRate >= 50) status = "good";
+        else if (showUpRate >= 30) status = "warning";
+        
         return {
           id: `channel-${idx}`,
           name,
           leads: stats.total,
+          scheduled: stats.scheduled,
+          completed: stats.completed,
           conversionRate: `${conversionRate}%`,
-          status: conversionRate >= 40 ? "good" : conversionRate >= 20 ? "warning" : "bad",
+          showUpRate: `${showUpRate}%`,
+          status,
           icon: iconMap[name] || "📊",
         };
       })
-      .sort((a, b) => parseInt(b.conversionRate) - parseInt(a.conversionRate));
+      .sort((a, b) => parseInt(b.showUpRate) - parseInt(a.showUpRate)); // Ordena por comparecimento real
 
-    console.log(`[calculateChannelPerformance] Channels:`, result);
+    console.log(`[calculateChannelPerformance] Filtered channels (>=${MIN_LEADS} leads):`, result);
     return result;
   } catch (e) {
     console.error("Error calculating channel performance:", e);

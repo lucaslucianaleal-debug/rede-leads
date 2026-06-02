@@ -111,8 +111,11 @@ export interface PerformanceChannel {
   id: string;
   name: string;
   leads: number;
+  scheduled: number;
+  completed: number;
   conversionRate: string; // "37%"
-  status: 'good' | 'warning' | 'critical';
+  showUpRate: string; // "45%" - comparecimentos reais
+  status: 'good' | 'warning' | 'critical' | 'bad';
   icon: string;
 }
 
