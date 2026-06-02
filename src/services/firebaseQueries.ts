@@ -584,23 +584,23 @@ export async function generateHistoryData(clinicId: string, days = 7) {
       
       const dateStr = `${date.getDate()}/${date.getMonth() + 1}`;
       
-      // Leads AGENDADOS neste dia (dataAgendamento = data da consulta)
+      // Agendamentos no dia: usa a data real da consulta
       const dailyScheduled = leads.filter(l => {
         if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
-        const visitDate = parseDate(l.dataAgendamento);
-        visitDate.setHours(0, 0, 0, 0);
-        return visitDate.getTime() === date.getTime();
+        const appointmentDate = parseDate(l.dataAgendamento);
+        appointmentDate.setHours(0, 0, 0, 0);
+        return appointmentDate.getTime() === date.getTime();
       }).length;
 
-      // Comparecimentos neste dia = agendados que compareceram
+      // Comparecimentos no dia: agendamentos da mesma data com status COMPARECEU
       const dailyCompleted = leads.filter(l => {
         if (l.comparecimento !== "COMPARECEU") return false;
         if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
         
-        const visitDate = parseDate(l.dataAgendamento);
-        visitDate.setHours(0, 0, 0, 0);
+        const appointmentDate = parseDate(l.dataAgendamento);
+        appointmentDate.setHours(0, 0, 0, 0);
         
-        const match = visitDate.getTime() === date.getTime();
+        const match = appointmentDate.getTime() === date.getTime();
         if (match) {
           console.log(`[generateHistoryData] Match encontrado em ${dateStr}: ${l.nome} (agend: ${l.dataAgendamento})`);
         }
@@ -609,7 +609,7 @@ export async function generateHistoryData(clinicId: string, days = 7) {
 
       historyData.push({
         date: dateStr,
-        leads: dailyScheduled,
+        scheduled: dailyScheduled,
         completed: dailyCompleted,
       });
     }

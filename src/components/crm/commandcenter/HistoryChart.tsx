@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 interface HistoryPoint {
   date: string;
-  leads: number;
+  scheduled: number;
   completed: number;
 }
 
@@ -27,8 +27,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function HistoryChart({ data }: HistoryChartProps) {
   // compute trend vs first point
-  const first = data[0]?.leads ?? 1;
-  const last = data[data.length - 1]?.leads ?? 0;
+  const first = data[0]?.scheduled ?? 1;
+  const last = data[data.length - 1]?.scheduled ?? 0;
   const trendPct = Math.round(((last - first) / first) * 100);
   const trendLabel = trendPct > 0 ? `+${trendPct}%` : `${trendPct}%`;
   const trendColor = trendPct >= 0 ? "text-emerald-400" : "text-red-400";
@@ -38,7 +38,7 @@ export default function HistoryChart({ data }: HistoryChartProps) {
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-muted-foreground">Tendência 7 dias</span>
         <span className={`text-xs font-semibold ${trendColor}`}>
-          {trendLabel} leads vs semana anterior
+          {trendLabel} agendamentos vs semana anterior
         </span>
       </div>
       <ResponsiveContainer width="100%" height={120}>
@@ -63,8 +63,8 @@ export default function HistoryChart({ data }: HistoryChartProps) {
           />
           <Line
             type="monotone"
-            dataKey="leads"
-            name="Leads"
+            dataKey="scheduled"
+            name="Agendamentos"
             stroke="#3b82f6"
             strokeWidth={2}
             dot={{ r: 3, fill: "#3b82f6" }}
