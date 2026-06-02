@@ -27,18 +27,25 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function HistoryChart({ data }: HistoryChartProps) {
   // compute trend vs first point
-  const first = data[0]?.scheduled ?? 1;
+  const first = data[0]?.scheduled ?? 0;
   const last = data[data.length - 1]?.scheduled ?? 0;
-  const trendPct = Math.round(((last - first) / first) * 100);
-  const trendLabel = trendPct > 0 ? `+${trendPct}%` : `${trendPct}%`;
+  
+  const trendPct = first > 0 ? Math.round(((last - first) / first) * 100) : 0;
+  const trendLabel = trendPct > 0 ? `+${trendPct}%` : trendPct < 0 ? `${trendPct}%` : "0%";
   const trendColor = trendPct >= 0 ? "text-emerald-400" : "text-red-400";
+
+  // Soma totais da semana para debug
+  const totalScheduled = data.reduce((sum, d) => sum + (d.scheduled || 0), 0);
+  const totalCompleted = data.reduce((sum, d) => sum + (d.completed || 0), 0);
+  
+  console.log(`[HistoryChart] Data:`, { data, totalScheduled, totalCompleted, trendPct });
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-muted-foreground">Tendência 7 dias</span>
         <span className={`text-xs font-semibold ${trendColor}`}>
-          {trendLabel} agendamentos vs semana anterior
+          {trendLabel} agendamentos | {totalScheduled} total agendado, {totalCompleted} compareceu
         </span>
       </div>
       <ResponsiveContainer width="100%" height={120}>
