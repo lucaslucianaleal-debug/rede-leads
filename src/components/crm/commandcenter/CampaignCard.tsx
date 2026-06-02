@@ -78,8 +78,8 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
     })
     .map((item) => ({
       date: item.date,
-      spend: item.spend,
-      cpc: item.clicks > 0 ? Number((item.spend / item.clicks).toFixed(2)) : item.spend,
+      clicks: item.clicks || 0,
+      cpc: item.clicks > 0 ? Number((item.spend / item.clicks).toFixed(2)) : 0,
     }));
 
   return (
@@ -120,25 +120,46 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
       <div style={{ background: "#1f1f1f", border: "0.5px solid #3a3a3a" }} className="mt-3 rounded-lg p-2">
         <div className="flex items-center justify-between mb-1.5 gap-2">
           <div>
-            <p style={{ color: "#fff", fontSize: "10px" }} className="font-semibold uppercase tracking-wider">Tendência de custo</p>
-            <p style={{ color: "#666", fontSize: "9px" }}>Se o CPC sobe e o custo total não entrega mais funil, a campanha perde força.</p>
+            <p style={{ color: "#fff", fontSize: "10px" }} className="font-semibold uppercase tracking-wider">Eficiência da campanha</p>
+            <p style={{ color: "#666", fontSize: "9px" }}>Correlação: se cliques caem e CPC sobe, a campanha está perdendo eficiência</p>
           </div>
           <span style={{ color: "#888", fontSize: "9px" }} className="uppercase">Últimos dias</span>
         </div>
         <div className="h-[130px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
+            <LineChart data={chartData} margin={{ top: 5, right: 30, left: -18, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#3a3a3a" opacity={0.3} />
               <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="left" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} label={{ value: "Cliques", angle: -90, position: "insideLeft", style: { fontSize: 8, fill: "#888" } }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} label={{ value: "CPC (R$)", angle: 90, position: "insideRight", style: { fontSize: 8, fill: "#888" } }} />
               <Tooltip
-                contentStyle={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a", borderRadius: 8 }}
+                contentStyle={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a", borderRadius: 8, fontSize: "11px" }}
                 labelStyle={{ color: "#fff" }}
-                formatter={(value: any) => [fmt(Number(value)), "CPC"]}
+                formatter={(value: any, name: any) => {
+                  if (name === "Cliques") return [fmtN(Number(value)), "Cliques"];
+                  if (name === "CPC") return [fmt(Number(value)), "Custo/clique"];
+                  return [value, name];
+                }}
               />
-              <Line type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px", paddingTop: "4px" }} />
+              <Line yAxisId="left" type="monotone" dataKey="clicks" name="Cliques" stroke="#06b6d4" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+              <Line yAxisId="right" type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+        {/* Legenda de siglas */}
+        <div className="mt-2 pt-2 border-t border-[#3a3a3a] text-[9px]" style={{ color: "#666" }}>
+          <div className="grid grid-cols-2 gap-1.5">
+            <div>
+              <span style={{ color: "#06b6d4", fontWeight: "bold" }}>Cliques</span> = número de cliques no anúncio
+            </div>
+            <div>
+              <span style={{ color: "#f59e0b", fontWeight: "bold" }}>CPC</span> = Custo por Clique (gastos ÷ cliques)
+            </div>
+          </div>
+          <p className="mt-1" style={{ color: "#555" }}>
+            ℹ️ Padrão saudável: cliques estáveis e CPC baixo. Atenção: se cliques caem, CPC tende a subir.
+          </p>
         </div>
       </div>
     </div>
@@ -380,6 +401,40 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
           </button>
         </div>
       )}
+
+      {/* Legenda global de siglas */}
+      <div style={{ background: "#1f1f1f", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3 mb-4">
+        <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider font-semibold mb-2">📖 Guia de métricas & siglas</p>
+        <div className="grid grid-cols-2 gap-2 text-[9px]">
+          <div>
+            <span style={{ color: "#f59e0b", fontWeight: "bold" }}>CPC</span> — Custo por Clique (Total gasto ÷ Cliques)
+          </div>
+          <div>
+            <span style={{ color: "#06b6d4", fontWeight: "bold" }}>CPL</span> — Custo por Lead (Total gasto ÷ Leads captados)
+          </div>
+          <div>
+            <span style={{ color: "#10b981", fontWeight: "bold" }}>CAC Agendamento</span> — Custo para cada agendamento
+          </div>
+          <div>
+            <span style={{ color: "#ef4444", fontWeight: "bold" }}>CAC Comparecimento</span> — Custo até o paciente chegar
+          </div>
+          <div>
+            <span style={{ color: "#8b5cf6", fontWeight: "bold" }}>Conversão</span> — % de leads que agendaram
+          </div>
+          <div>
+            <span style={{ color: "#06b6d4", fontWeight: "bold" }}>Comparecimento</span> — % de agendados que apareceram
+          </div>
+          <div>
+            <span style={{ color: "#3b82f6", fontWeight: "bold" }}>Previsibilidade</span> — % de leads → pacientes (confiabilidade da campanha)
+          </div>
+          <div>
+            <span style={{ color: "#10b981", fontWeight: "bold" }}>Receita Potencial</span> — (Comparecimentos × Ticket médio)
+          </div>
+        </div>
+        <p style={{ color: "#555", fontSize: "8px" }} className="mt-2 pt-2 border-t border-[#3a3a3a]">
+          💡 <strong>Lógica do funil:</strong> Lead → Agendamento → Comparecimento → Paciente. Quanto menor o custo em cada etapa, melhor a rentabilidade.
+        </p>
+      </div>
 
       {dailyModal && (
         <CampaignDailyModal
