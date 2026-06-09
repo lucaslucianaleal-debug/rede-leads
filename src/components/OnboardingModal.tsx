@@ -27,6 +27,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
   const [newClinicName, setNewClinicName] = useState("");
   const [newClinicId, setNewClinicId] = useState("");
   const [newClinicAddress, setNewClinicAddress] = useState("");
+  const [newClinicPhone, setNewClinicPhone] = useState("");
   const [newClinicColor, setNewClinicColor] = useState("#E6FFFA");
 
   // User form
@@ -63,6 +64,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
         id: newClinicId,
         name: newClinicName,
         address: newClinicAddress,
+        phone: newClinicPhone,
         color: newClinicColor,
       });
 
@@ -120,6 +122,16 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
                 placeholder="Rua, número, bairro, cidade"
                 value={newClinicAddress}
                 onChange={(e) => setNewClinicAddress(e.target.value)}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="clinic-phone">Telefone</Label>
+              <Input
+                id="clinic-phone"
+                placeholder="(17) 99999-9999"
+                value={newClinicPhone}
+                onChange={(e) => setNewClinicPhone(e.target.value)}
                 className="bg-slate-700 border-slate-600 text-white"
               />
             </div>

@@ -79,7 +79,8 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
     .map((item) => ({
       date: item.date,
       clicks: item.clicks || 0,
-      cpc: item.clicks > 0 ? Number((item.spend / item.clicks).toFixed(2)) : 0,
+      // CPC = Spend/Cliques quando há cliques; senão mostra o gasto total (pois houve despesa sem retorno)
+      cpc: item.clicks > 0 ? Number((item.spend / item.clicks).toFixed(2)) : (item.spend || 0),
     }));
 
   return (
@@ -154,11 +155,11 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
               <span style={{ color: "#06b6d4", fontWeight: "bold" }}>Cliques</span> = número de cliques no anúncio
             </div>
             <div>
-              <span style={{ color: "#f59e0b", fontWeight: "bold" }}>CPC</span> = Custo por Clique (gastos ÷ cliques)
+              <span style={{ color: "#f59e0b", fontWeight: "bold" }}>CPC</span> = Custo/clique (ou gasto total se sem cliques)
             </div>
           </div>
           <p className="mt-1" style={{ color: "#555" }}>
-            ℹ️ Padrão saudável: cliques estáveis e CPC baixo. Atenção: se cliques caem, CPC tende a subir.
+            ℹ️ Padrão saudável: cliques estáveis e CPC baixo. ⚠️ Se CPC &gt; 0 e cliques = 0, houve gasto sem retorno nesse dia.
           </p>
         </div>
       </div>
@@ -407,7 +408,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
         <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider font-semibold mb-2">📖 Guia de métricas & siglas</p>
         <div className="grid grid-cols-2 gap-2 text-[9px]">
           <div>
-            <span style={{ color: "#f59e0b", fontWeight: "bold" }}>CPC</span> — Custo por Clique (Total gasto ÷ Cliques)
+            <span style={{ color: "#f59e0b", fontWeight: "bold" }}>CPC</span> — Custo por Clique (gasto ÷ cliques, ou gasto total se 0 cliques)
           </div>
           <div>
             <span style={{ color: "#06b6d4", fontWeight: "bold" }}>CPL</span> — Custo por Lead (Total gasto ÷ Leads captados)

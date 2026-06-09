@@ -7,6 +7,7 @@ export interface CreateClinicInput {
   id?: string;
   name: string;
   address?: string;
+  phone?: string;
   color?: string;
   logoUrl?: string;
 }
@@ -51,6 +52,7 @@ export function useClinics() {
         id: clinicId,
         name: input.name.trim(),
         address: input.address?.trim() || undefined,
+        phone: input.phone?.trim() || undefined,
         color: input.color?.trim() || undefined,
         logoUrl: input.logoUrl?.trim() || undefined,
         createdAt: new Date().toISOString(),

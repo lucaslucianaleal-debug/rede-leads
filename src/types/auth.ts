@@ -4,6 +4,7 @@ export interface ClinicRecord {
   id: string;
   name: string;
   address?: string;
+  phone?: string;
   logoUrl?: string;
   color?: string;
   createdAt?: string;
