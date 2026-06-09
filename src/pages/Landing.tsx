@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useClinics } from "@/hooks/useClinics";
+import { OnboardingModal } from "@/components/OnboardingModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +11,12 @@ import { toast } from "sonner";
 
 export default function Landing() {
   const { login, error, selectedClinic, setSelectedClinic } = useAuth();
-  const { clinics, loading: clinicsLoading } = useClinics();
+  const { clinics, loading: clinicsLoading, refetch: refetchClinics } = useClinics();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localClinic, setLocalClinic] = useState(selectedClinic || "");
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   useEffect(() => {
     if (selectedClinic) {
@@ -25,6 +27,12 @@ export default function Landing() {
       setLocalClinic(clinics[0].id);
     }
   }, [selectedClinic, clinics, localClinic]);
+
+  const handleOnboardingComplete = async (clinicId: string) => {
+    setLocalClinic(clinicId);
+    setSelectedClinic(clinicId);
+    await refetchClinics();
+  };
 
   const resolveEmail = (input: string): string => {
     const trimmed = input.trim().toLowerCase();
@@ -110,77 +118,113 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* Right: Login Form */}
+          {/* Right: Login or Onboarding */}
           <div>
-            <Card className="border-slate-700 bg-slate-800/80 backdrop-blur shadow-2xl">
-              <CardHeader className="text-center">
-                <div className="mx-auto bg-blue-500/20 rounded-full p-3 w-fit mb-2">
-                  <Lock className="h-6 w-6 text-blue-400" />
-                </div>
-                <CardTitle className="text-white text-2xl">Acesso Restrito</CardTitle>
-                <CardDescription className="text-slate-400">
-                  Entre com suas credenciais para acessar o CRM
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-slate-300">Clínica</Label>
-                    <select
-                      value={localClinic}
-                      onChange={(e) => setLocalClinic(e.target.value)}
-                      className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
-                      disabled={clinicsLoading || clinics.length === 0}
-                    >
-                      {clinics.length === 0 ? (
-                        <option value="">Nenhuma clínica cadastrada</option>
-                      ) : (
-                        clinics.map((clinic) => (
+            {clinicsLoading ? (
+              <Card className="border-slate-700 bg-slate-800/80 backdrop-blur shadow-2xl">
+                <CardContent className="pt-6 text-center">
+                  <p className="text-slate-400">Carregando...</p>
+                </CardContent>
+              </Card>
+            ) : clinics.length === 0 ? (
+              <Card className="border-slate-700 bg-slate-800/80 backdrop-blur shadow-2xl">
+                <CardHeader className="text-center">
+                  <div className="mx-auto bg-green-500/20 rounded-full p-3 w-fit mb-2">
+                    <Lock className="h-6 w-6 text-green-400" />
+                  </div>
+                  <CardTitle className="text-white text-2xl">Bem-vindo!</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Parece ser sua primeira vez por aqui
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-slate-300">
+                    Crie sua primeira clínica e conta de administrador para começar a usar o Rede Leads.
+                  </p>
+                  <Button
+                    onClick={() => setOnboardingOpen(true)}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2"
+                  >
+                    Cadastrar Clínica
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-slate-700 bg-slate-800/80 backdrop-blur shadow-2xl">
+                <CardHeader className="text-center">
+                  <div className="mx-auto bg-blue-500/20 rounded-full p-3 w-fit mb-2">
+                    <Lock className="h-6 w-6 text-blue-400" />
+                  </div>
+                  <CardTitle className="text-white text-2xl">Acesso Restrito</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Entre com suas credenciais para acessar o CRM
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Clínica</Label>
+                      <select
+                        value={localClinic}
+                        onChange={(e) => setLocalClinic(e.target.value)}
+                        className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
+                      >
+                        {clinics.map((clinic) => (
                           <option key={clinic.id} value={clinic.id}>
                             {clinic.name}
                           </option>
-                        ))
-                      )}
-                    </select>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-slate-300">Usuário ou E-mail</Label>
+                      <Input
+                        id="username"
+                        type="text"
+                        placeholder="usuario ou email@gmail.com"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-slate-300">Senha</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                    {error && <p className="text-sm text-red-400">{error}</p>}
+                    <Button
+                      type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2"
+                      disabled={loading}
+                    >
+                      {loading ? "Entrando..." : "Entrar"}
+                    </Button>
+                  </form>
+                  <div className="mt-4 pt-4 border-t border-slate-700">
+                    <p className="text-center text-xs text-slate-500 mb-2">
+                      Quer criar nova clínica?
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setOnboardingOpen(true)}
+                      className="w-full text-slate-300 border-slate-600 hover:bg-slate-700"
+                    >
+                      Criar Clínica
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username" className="text-slate-300">Usuário ou E-mail</Label>
-                    <Input
-                      id="username"
-                      type="text"
-                      placeholder="usuario ou email@gmail.com"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-slate-300">Senha</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                  {error && <p className="text-sm text-red-400">{error}</p>}
-                  <Button
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2"
-                    disabled={loading}
-                  >
-                    {loading ? "Entrando..." : "Entrar"}
-                  </Button>
-                </form>
-                <p className="mt-4 text-center text-xs text-slate-500">
-                  Não tem acesso? Solicite ao administrador do sistema.
-                </p>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </main>
@@ -191,6 +235,13 @@ export default function Landing() {
           © 2026 Rede Leads · Central de Conversão de Leads · WhatsApp: (17) 99115-4763
         </p>
       </footer>
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        open={onboardingOpen}
+        onClose={() => setOnboardingOpen(false)}
+        onComplete={handleOnboardingComplete}
+      />
     </div>
   );
 }
