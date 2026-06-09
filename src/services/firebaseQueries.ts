@@ -587,7 +587,8 @@ export async function generateHistoryData(clinicId: string, days = 7) {
       // Agendamentos no dia: usa a data real da consulta
       const dailyScheduled = leads.filter(l => {
         if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
-        const appointmentDate = parseDate(l.dataAgendamento);
+        const appointmentDateStr = l.dataAgendamento.trim().split(" ")[0];
+        const appointmentDate = parseDate(appointmentDateStr);
         appointmentDate.setHours(0, 0, 0, 0);
         return appointmentDate.getTime() === date.getTime();
       }).length;
@@ -597,7 +598,8 @@ export async function generateHistoryData(clinicId: string, days = 7) {
         if (l.comparecimento !== "COMPARECEU") return false;
         if (!l.dataAgendamento || !l.dataAgendamento.trim()) return false;
         
-        const appointmentDate = parseDate(l.dataAgendamento);
+        const appointmentDateStr = l.dataAgendamento.trim().split(" ")[0];
+        const appointmentDate = parseDate(appointmentDateStr);
         appointmentDate.setHours(0, 0, 0, 0);
         
         const match = appointmentDate.getTime() === date.getTime();
@@ -702,11 +704,17 @@ export async function calculateChannelPerformance(clinicId: string) {
  */
 export async function calculateUnitRanking() {
   try {
-    const clinics = ["odontocompany-olimpia", "odontocompany-badybassit", "odontocompany-novohorizonte"];
+    const clinicsSnapshot = await getDocs(collection(db, "clinics"));
+    const clinics = clinicsSnapshot.docs
+      .map((clinicDoc) => ({
+        id: clinicDoc.id,
+        name: (clinicDoc.data() as any)?.name || clinicDoc.id,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
     const ranking = [];
 
-    for (const clinicId of clinics) {
-      const leads = await fetchLeadsFromClinic(clinicId);
+    for (const clinic of clinics) {
+      const leads = await fetchLeadsFromClinic(clinic.id);
       
       // Total de leads
       const totalLeads = leads.length;
@@ -739,8 +747,8 @@ export async function calculateUnitRanking() {
       const comparison = delta > 0 ? `+${delta}pp vs semana` : delta < 0 ? `${delta}pp vs semana` : `= estável`;
 
       ranking.push({
-        id: clinicId,
-        name: clinicId === "odontocompany-olimpia" ? "Olimpia" : clinicId === "odontocompany-badybassit" ? "Bady Bassit" : "Novo Horizonte",
+        id: clinic.id,
+        name: clinic.name,
         leadsPerDay,
         showUpRate,
         comparison,

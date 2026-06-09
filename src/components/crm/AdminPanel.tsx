@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCRMUsers } from "@/hooks/useCRMUsers";
+import { useClinics } from "@/hooks/useClinics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,12 +44,51 @@ import { toast } from "sonner";
 export function AdminPanel() {
   const { users, createUser, updateUserRole, deleteUser, loading, error } =
     useCRMUsers();
+  const {
+    clinics,
+    createClinic,
+    loading: clinicsLoading,
+    error: clinicsError,
+  } = useClinics();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("viewer");
   const [open, setOpen] = useState(false);
-  const [clinicForUser, setClinicForUser] = useState<string | null>("odontocompany-olimpia");
+  const [clinicForUser, setClinicForUser] = useState<string | null>(null);
+  const [newClinicId, setNewClinicId] = useState("");
+  const [newClinicName, setNewClinicName] = useState("");
+  const [newClinicAddress, setNewClinicAddress] = useState("");
+  const [newClinicColor, setNewClinicColor] = useState("#E6FFFA");
+  const [newClinicLogoUrl, setNewClinicLogoUrl] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!clinicForUser && clinics.length > 0) {
+      setClinicForUser(clinics[0].id);
+    }
+  }, [clinicForUser, clinics]);
+
+  const handleCreateClinic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const clinic = await createClinic({
+        id: newClinicId,
+        name: newClinicName,
+        address: newClinicAddress,
+        color: newClinicColor,
+        logoUrl: newClinicLogoUrl,
+      });
+      toast.success(`Clínica "${clinic.name}" criada com sucesso!`);
+      setClinicForUser(clinic.id);
+      setNewClinicId("");
+      setNewClinicName("");
+      setNewClinicAddress("");
+      setNewClinicColor("#E6FFFA");
+      setNewClinicLogoUrl("");
+    } catch {
+      toast.error(clinicsError || "Erro ao criar clínica");
+    }
+  };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +98,7 @@ export function AdminPanel() {
       setUsername("");
       setPassword("");
       setRole("viewer");
-      setClinicForUser("odontocompany-olimpia");
+      setClinicForUser(clinics[0]?.id ?? null);
       setOpen(false);
     } catch {
       toast.error(error || "Erro ao criar usuário");
@@ -122,6 +162,66 @@ export function AdminPanel() {
           </DialogDescription>
         </DialogHeader>
 
+        {/* Create Clinic Form */}
+        <div className="space-y-4 border-b pb-4">
+          <h3 className="font-semibold">Criar Nova Clínica</h3>
+          <form onSubmit={handleCreateClinic} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="new-clinic-name">Nome da clínica</Label>
+                <Input
+                  id="new-clinic-name"
+                  placeholder="Odontocompany Ribeirão"
+                  value={newClinicName}
+                  onChange={(e) => setNewClinicName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-clinic-id">ID da clínica</Label>
+                <Input
+                  id="new-clinic-id"
+                  placeholder="odontocompany-ribeirao"
+                  value={newClinicId}
+                  onChange={(e) => setNewClinicId(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="new-clinic-address">Endereço</Label>
+                <Input
+                  id="new-clinic-address"
+                  placeholder="Rua, número, bairro, cidade"
+                  value={newClinicAddress}
+                  onChange={(e) => setNewClinicAddress(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-clinic-color">Cor</Label>
+                <Input
+                  id="new-clinic-color"
+                  type="color"
+                  value={newClinicColor}
+                  onChange={(e) => setNewClinicColor(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-clinic-logo">Logo URL</Label>
+              <Input
+                id="new-clinic-logo"
+                placeholder="https://..."
+                value={newClinicLogoUrl}
+                onChange={(e) => setNewClinicLogoUrl(e.target.value)}
+              />
+            </div>
+            <Button type="submit" disabled={clinicsLoading} className="w-full">
+              {clinicsLoading ? "Criando clínica..." : "Criar Clínica"}
+            </Button>
+          </form>
+        </div>
+
         {/* Create User Form */}
         <div className="space-y-4 border-b pb-4">
           <h3 className="font-semibold">Criar Novo Usuário</h3>
@@ -181,10 +281,17 @@ export function AdminPanel() {
                 value={clinicForUser || ''}
                 onChange={(e) => setClinicForUser(e.target.value || null)}
                 className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
+                disabled={clinicsLoading || clinics.length === 0}
               >
-                <option value="odontocompany-olimpia">Odontocompany Olimpia</option>
-                <option value="odontocompany-badybassit">Odontocompany Bady Bassit</option>
-                <option value="odontocompany-novohorizonte">Odontocompany Novo Horizonte</option>
+                {clinics.length === 0 ? (
+                  <option value="">Nenhuma clínica cadastrada</option>
+                ) : (
+                  clinics.map((clinic) => (
+                    <option key={clinic.id} value={clinic.id}>
+                      {clinic.name}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
             <Button type="submit" disabled={loading} className="w-full">
@@ -255,7 +362,9 @@ export function AdminPanel() {
           </div>
         </div>
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {(error || clinicsError) && (
+          <p className="text-sm text-red-500">{error || clinicsError}</p>
+        )}
       </DialogContent>
 
       {/* Delete Confirmation Dialog */}

@@ -1,5 +1,15 @@
 export type UserRole = "admin" | "editor" | "viewer" | "recepcao" | "cliente";
 
+export interface ClinicRecord {
+  id: string;
+  name: string;
+  address?: string;
+  logoUrl?: string;
+  color?: string;
+  createdAt?: string;
+  createdBy?: string;
+}
+
 export interface CRMUser {
   uid: string;
   username: string;

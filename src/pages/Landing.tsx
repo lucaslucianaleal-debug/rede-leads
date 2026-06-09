@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useClinics } from "@/hooks/useClinics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,17 +9,22 @@ import { Activity, Users, BarChart3, Bell, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Landing() {
-  const { login, error } = useAuth();
+  const { login, error, selectedClinic, setSelectedClinic } = useAuth();
+  const { clinics, loading: clinicsLoading } = useClinics();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { selectedClinic, setSelectedClinic } = useAuth();
-  const clinics = [
-    { id: "odontocompany-olimpia", label: "Odontocompany Olimpia" },
-    { id: "odontocompany-badybassit", label: "Odontocompany Bady Bassit" },
-    { id: "odontocompany-novohorizonte", label: "Odontocompany Novo Horizonte" },
-  ];
-  const [localClinic, setLocalClinic] = useState(selectedClinic || clinics[0].id);
+  const [localClinic, setLocalClinic] = useState(selectedClinic || "");
+
+  useEffect(() => {
+    if (selectedClinic) {
+      setLocalClinic(selectedClinic);
+      return;
+    }
+    if (!localClinic && clinics.length > 0) {
+      setLocalClinic(clinics[0].id);
+    }
+  }, [selectedClinic, clinics, localClinic]);
 
   const resolveEmail = (input: string): string => {
     const trimmed = input.trim().toLowerCase();
@@ -124,10 +130,17 @@ export default function Landing() {
                       value={localClinic}
                       onChange={(e) => setLocalClinic(e.target.value)}
                       className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
+                      disabled={clinicsLoading || clinics.length === 0}
                     >
-                      {clinics.map((c) => (
-                        <option key={c.id} value={c.id}>{c.label}</option>
-                      ))}
+                      {clinics.length === 0 ? (
+                        <option value="">Nenhuma clínica cadastrada</option>
+                      ) : (
+                        clinics.map((clinic) => (
+                          <option key={clinic.id} value={clinic.id}>
+                            {clinic.name}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                   <div className="space-y-2">
