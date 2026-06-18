@@ -171,6 +171,17 @@ const CRMDashboard = () => {
     return fonte.includes("indicacao") || fonte.includes("indicação");
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    return hour >= 12 && hour < 18 ? "Boa tarde" : "Bom dia";
+  };
+
+  const getIndicacaoWhatsAppMessage = (lead: Lead) => {
+    const primeiroNome = (lead.nome || "").trim().split(" ")[0] || "";
+    const indicante = lead.captador?.trim() || "a pessoa que indicou";
+    return `${getGreeting()} ${primeiroNome}! Como você está?\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia!\nA ${indicante} te indicou para estar ganhando 2 sessões de clareamento como benefício aqui da clínica! 🥳\n\nVocê conseguiria estar vindo na clínica por esses dias?`;
+  };
+
   const handleCreateLead = (lead: Omit<Lead, 'id'>) => {
     const created = createLead(lead);
     toast.success(`Lead "${lead.nome}" criado com sucesso!`);
@@ -185,6 +196,9 @@ const CRMDashboard = () => {
 
   const newLeadSuggestedMessage = newLeadWhatsApp
     ? (() => {
+        if (isIndicacaoLead(newLeadWhatsApp)) {
+          return getIndicacaoWhatsAppMessage(newLeadWhatsApp);
+        }
         const template = getFollowUpMessageForLead(newLeadWhatsApp.etapaLead, newLeadWhatsApp.followUpCount || 0, false, false);
         return template ? formatFollowUpMessage(template, newLeadWhatsApp.nome, newLeadWhatsApp.servicoProcurado, "OdontoCompany", "") : undefined;
       })()
