@@ -219,12 +219,14 @@ export function formatFollowUpMessage(
   data1: string = "",
   data2: string = "",
   hora1: string = "",
-  hora2: string = ""
+  hora2: string = "",
+  indicante: string = "a pessoa que indicou"
 ): string {
   const primeiroNome = leaderName.split(" ")[0] || "você";
   return template
     .replace(/\[nome\]/g, leaderName)
     .replace(/\[primeiro_nome\]/g, primeiroNome)
+    .replace(/\[indicante\]/g, indicante || "a pessoa que indicou")
     .replace(/\[serviço\]/g, service)
     .replace(/\[clínica\]/g, clinicName)
     .replace(/\[horário\]/g, horario || "horário marcado")

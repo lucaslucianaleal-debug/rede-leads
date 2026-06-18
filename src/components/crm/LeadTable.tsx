@@ -82,7 +82,7 @@ export function LeadTable({ leads, onMarkAttendance, selectedLeads = [], onSelec
 
   const handleWhatsAppClick = (lead: Lead) => {
     const template = getFollowUpMessage(lead.etapaLead);
-    const message = template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado) : undefined;
+    const message = template ? formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", "", "", "", "", lead.captador || "") : undefined;
     const digits = String(lead.telefone).replace(/[^0-9]/g, "");
     let url = `https://wa.me/${digits}`;
     if (message) url += `?text=${encodeURIComponent(message)}`;

@@ -349,7 +349,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
       const noShow = lead.comparecimento === "NÃO COMPARECEU";
       const horario = lead.dataAgendamento ? lead.dataAgendamento.split(" ")[1] || "" : "";
       const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppointment, noShow);
-      if (template) setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", horario));
+      if (template) setSuggestedMessage(formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, "", "", "", "", lead.captador || ""));
       else setSuggestedMessage("");
     }
     setShowWhatsAppDialog(true);
@@ -647,7 +647,7 @@ export function FollowUpQueue({ leads, allLeads, onSendFollowUp, onRegisterCall,
               const noShow = whatsLead?.comparecimento === "NÃO COMPARECEU";
               const horario = whatsLead?.dataAgendamento ? whatsLead.dataAgendamento.split(" ")[1] || "" : "";
               const template = getFollowUpMessageForLead(whatsLead.etapaLead, whatsLead.followUpCount || 0, hasAppointment, noShow);
-              if (template) return formatFollowUpMessage(template, whatsLead.nome, whatsLead.servicoProcurado, "OdontoCompany", horario);
+              if (template) return formatFollowUpMessage(template, whatsLead.nome, whatsLead.servicoProcurado, "OdontoCompany", horario, "", "", "", "", whatsLead.captador || "");
               return "";
             })()
           }

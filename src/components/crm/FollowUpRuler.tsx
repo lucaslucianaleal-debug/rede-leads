@@ -82,12 +82,12 @@ const PROMOTORA_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
 // ---------------------------------------------------------------------------
 const INDICACAO_SCRIPTS: Partial<Record<LeadStage, string[]>> = {
   "Novo": [
+    "Bom dia, [primeiro_nome]! Como você está?\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia!\nA [indicante] te indicou para estar ganhando 2 sessões de clareamento como benefício aqui da clínica! 🥳\n\nVocê conseguiria vir na clínica por esses dias?",
     "Bom dia, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?",
-    "Boa tarde, [primeiro_nome]! Tudo bem?\n\nPassei aqui vendo a campanha de indicação das 2 sessões de clareamento.\nAinda dá pra te incluir para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso confirmar?",
     "[primeiro_nome], como você está?\n\nAinda consigo colocar você na campanha das 2 sessões de clareamento como benefício sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar aí?",
   ],
   "Em contato": [
-    "Bom dia, [primeiro_nome]! Como você está?\n\nAinda consigo te colocar na campanha das 2 sessões de clareamento como benefício da clínica sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar para você?",
+    "Bom dia, [primeiro_nome]! Como você está?\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia!\nA [indicante] te indicou para estar ganhando 2 sessões de clareamento como benefício aqui da clínica! 🥳\n\nVocê conseguiria vir na clínica por esses dias?",
     "Boa tarde, [primeiro_nome]! Tudo bem?\n\nTô aqui vendo a campanha de indicação das 2 sessões de clareamento.\nAinda dá pra te incluir para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso confirmar?",
     "[primeiro_nome], como você está?\n\nAinda consigo colocar você na campanha das 2 sessões de clareamento como benefício sem custo para [data_sugerida_1] às [hora_sugerida_1].\n\nPosso agendar aí?",
   ],
@@ -223,7 +223,7 @@ const isPromotor  = (lead: Lead) =>
 
 const isIndicacao = (lead: Lead) => {
   const f = (lead.fonteLead || "").toLowerCase().trim();
-  return f === "indicação" || f === "indicacao";
+  return f.includes("indicacao") || f.includes("indicação");
 };
 
 // ---------------------------------------------------------------------------
@@ -386,20 +386,20 @@ export function FollowUpRuler({
     if (isIndicacao(lead)) {
       const scripts = INDICACAO_SCRIPTS[lead.etapaLead as LeadStage];
       const tpl = scripts?.[lead.followUpCount ? lead.followUpCount % scripts.length : 0] ?? scripts?.[0];
-      if (tpl) return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, data2, hora1, hora2);
+      if (tpl) return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, data2, hora1, hora2, lead.captador || "");
     }
     // Lead da promotora: usa script promotora se disponível
     if (isPromotor(lead)) {
       const scripts = PROMOTORA_SCRIPTS[lead.etapaLead as LeadStage];
       const tpl = scripts?.[lead.followUpCount ? lead.followUpCount % scripts.length : 0] ?? scripts?.[0];
-      if (tpl) return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, data2, hora1, hora2);
+      if (tpl) return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, data2, hora1, hora2, lead.captador || "");
     }
     // Lead orgânico: usa sistema existente
     const hasAppt = !!(lead.dataAgendamentoCriado || lead.dataAgendamentoAlterado);
     const noShow  = lead.comparecimento === "NÃO COMPARECEU";
     const tpl     = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppt, noShow);
     if (!tpl) return "";
-    return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, data2, hora1, hora2);
+    return formatFollowUpMessage(tpl, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, data1, data2, hora1, hora2, lead.captador || "");
   };
 
   // ── action handlers ───────────────────────────────────────────────────────
@@ -561,7 +561,7 @@ export function FollowUpRuler({
       msgTemplate = `Olá [primeiro_nome], tudo bem? 💚✨\n\nVocê ganhou um cupom de desconto de R$${cupomAmount} para seu tratamento de [serviço].\n\nPara garantir, responda EUQUERO até ${validade}.\n\nSó preciso do seu nome completo para confirmar.\n\nAproveite essa oportunidade! 💚💚`;
     }
     
-    return formatFollowUpMessage(msgTemplate, lead.nome, lead.servicoProcurado, "OdontoCompany", "", data1, "", hora1, "");
+    return formatFollowUpMessage(msgTemplate, lead.nome, lead.servicoProcurado, "OdontoCompany", "", data1, "", hora1, "", lead.captador || "");
   };
 
   const handleOpenCampaignModal = () => {

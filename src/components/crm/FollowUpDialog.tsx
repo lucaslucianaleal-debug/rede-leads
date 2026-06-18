@@ -323,7 +323,7 @@ export function FollowUpDialog({ lead, open, onClose, onConfirm, onDelete, onSch
               const horario = lead.dataAgendamento ? lead.dataAgendamento.split(" ")[1] || "" : "";
               const template = getFollowUpMessageForLead(lead.etapaLead, lead.followUpCount || 0, hasAppointment, noShow);
               if (template) {
-                return formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", horario);
+                return formatFollowUpMessage(template, lead.nome, lead.servicoProcurado, "OdontoCompany", horario, "", "", "", "", lead.captador || "");
               }
               return observacao || "";
             })()}

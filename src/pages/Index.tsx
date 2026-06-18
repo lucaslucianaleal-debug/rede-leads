@@ -18,10 +18,12 @@ import { ChatView } from "@/components/crm/ChatView";
 import { PerformanceChart } from "@/components/crm/PerformanceChart";
 import { ComparisonChart } from "@/components/crm/ComparisonChart";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
+import { getFollowUpMessageForLead, formatFollowUpMessage } from "@/data/followUpMessages";
 import { NewLeadsTab } from "@/components/crm/NewLeadsTab";
 import { ROIAnalysisView } from "@/components/crm/ROIAnalysisView";
 import { ServicosExternos } from "@/components/crm/ServicosExternos";
 import { FollowUpRuler } from "@/components/crm/FollowUpRuler";
+import { WhatsAppMessageDialog } from "@/components/crm/WhatsAppMessageDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -93,6 +95,7 @@ const CRMDashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [clientTab, setClientTab] = useState("agenda");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newLeadWhatsApp, setNewLeadWhatsApp] = useState<Lead | null>(null);
   const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [isClient, setIsClient] = useState(false);
   const [clientClinicIds, setClientClinicIds] = useState<string[]>([]);
@@ -163,11 +166,29 @@ const CRMDashboard = () => {
     registerCall(leadId, outcome, obs, returnDate, nextStage);
   };
 
+  const isIndicacaoLead = (lead: Omit<Lead, 'id'> | Lead) => {
+    const fonte = (lead.fonteLead || "").toLowerCase().trim();
+    return fonte.includes("indicacao") || fonte.includes("indicação");
+  };
+
   const handleCreateLead = (lead: Omit<Lead, 'id'>) => {
     const created = createLead(lead);
     toast.success(`Lead "${lead.nome}" criado com sucesso!`);
-    if (created) setCallLead(created);
+    if (created) {
+      if (isIndicacaoLead(lead)) {
+        setNewLeadWhatsApp(created);
+      } else {
+        setCallLead(created);
+      }
+    }
   };
+
+  const newLeadSuggestedMessage = newLeadWhatsApp
+    ? (() => {
+        const template = getFollowUpMessageForLead(newLeadWhatsApp.etapaLead, newLeadWhatsApp.followUpCount || 0, false, false);
+        return template ? formatFollowUpMessage(template, newLeadWhatsApp.nome, newLeadWhatsApp.servicoProcurado, "OdontoCompany", "") : undefined;
+      })()
+    : undefined;
 
   const handleOpenCall = (phone: string) => {
     const clean = (s: string) => s.replace(/\D/g, "");
@@ -663,7 +684,12 @@ const CRMDashboard = () => {
           handleCreateLead(lead);
           setShowCreateDialog(false);
         }}
-        onOpenCall={handleOpenCall}
+      />
+      <WhatsAppMessageDialog
+        lead={newLeadWhatsApp}
+        open={!!newLeadWhatsApp}
+        onClose={() => setNewLeadWhatsApp(null)}
+        suggestedMessage={newLeadSuggestedMessage}
       />
 
       {/* Delete Selected Dialog */}
