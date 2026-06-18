@@ -2,8 +2,110 @@ import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, arrayUnion } from "firebase/firestore";
 import type { Campaign, CampaignDailyMetric } from "@/types/commandCenter";
 import { fetchLeadsFromClinic } from "./firebaseQueries";
+import { parse, isValid } from "date-fns";
 
 const CAMPAIGN_COLORS = ["#D4537E", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"];
+const CAMPAIGN_BACKUP_FIELD = "metaAdsCampaigns";
+
+function parseCampaignDate(value?: string) {
+  if (!value) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const iso = new Date(value);
+    return isValid(iso) ? iso : null;
+  }
+
+  const parsed = parse(value.trim(), "dd/MM/yyyy", new Date());
+  return isValid(parsed) ? parsed : null;
+}
+
+function compareCampaignRecency(a: any, b: any) {
+  const aDate = parseCampaignDate(a.createdAt) || parseCampaignDate(a.dateStart) || parseCampaignDate(a.dateEnd) || new Date(0);
+  const bDate = parseCampaignDate(b.createdAt) || parseCampaignDate(b.dateStart) || parseCampaignDate(b.dateEnd) || new Date(0);
+  return bDate.getTime() - aDate.getTime();
+}
+
+function getSharedCampaignDoc(clinicId: string) {
+  return doc(db, "clinics", clinicId, "shared", "shared");
+}
+
+function toCampaignDataSnapshot(data: any, id: string, clinicId: string) {
+  return {
+    id,
+    clinicId,
+    name: data.name || "Campanha",
+    active: data.active ?? true,
+    color: data.color || CAMPAIGN_COLORS[0],
+    dateStart: data.dateStart || "",
+    dateEnd: data.dateEnd || "",
+    budget: data.budget || 0,
+    fundsAdded: data.fundsAdded || 0,
+    taxCost: data.taxCost || 0,
+    dailyMetrics: Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [],
+    createdAt: data.createdAt || new Date().toISOString(),
+  };
+}
+
+function buildCampaignFromSnapshot(
+  id: string,
+  clinicId: string,
+  data: any,
+  idx: number,
+  ticketMedio: number,
+  leadsCount: number,
+  scheduledCount: number,
+  completedCount: number,
+  totals: { totalSpend: number; totalImpressions: number; totalClicks: number; totalReach: number }
+): Campaign {
+  const color = data.color || CAMPAIGN_COLORS[idx % CAMPAIGN_COLORS.length];
+  const dailyMetrics: CampaignDailyMetric[] = Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [];
+  const roas = (totals.totalSpend + (data.taxCost || 0)) > 0
+    ? parseFloat(((completedCount * ticketMedio) / (totals.totalSpend + (data.taxCost || 0))).toFixed(2))
+    : 0;
+  const predictability = leadsCount > 0 ? Math.round((completedCount / leadsCount) * 100) : 0;
+  const cacLead = leadsCount > 0 ? parseFloat((totals.totalSpend / leadsCount).toFixed(2)) : 0;
+  const cacAgendamento = scheduledCount > 0 ? parseFloat((totals.totalSpend / scheduledCount).toFixed(2)) : 0;
+  const cacComparecimento = completedCount > 0 ? parseFloat((totals.totalSpend / completedCount).toFixed(2)) : 0;
+  const conversionRate = leadsCount > 0 ? Math.round((scheduledCount / leadsCount) * 100) : 0;
+  const showUpRate = scheduledCount > 0 ? Math.round((completedCount / scheduledCount) * 100) : 0;
+
+  return {
+    id,
+    clinicId,
+    name: data.name || "Campanha",
+    active: data.active ?? true,
+    color,
+    dateStart: data.dateStart || "",
+    dateEnd: data.dateEnd || "",
+    budget: data.budget || 0,
+    fundsAdded: data.fundsAdded || 0,
+    taxCost: data.taxCost || 0,
+    dailyMetrics,
+    ...totals,
+    leads: leadsCount,
+    scheduled: scheduledCount,
+    completed: completedCount,
+    roas,
+    predictability,
+    cacLead,
+    cacAgendamento,
+    cacComparecimento,
+    conversionRate,
+    showUpRate,
+  } as Campaign;
+}
+
+async function persistCampaignBackup(clinicId: string, campaigns: Array<{ id: string; [key: string]: any }>) {
+  if (!clinicId) return;
+  try {
+    await setDoc(getSharedCampaignDoc(clinicId), {
+      [CAMPAIGN_BACKUP_FIELD]: campaigns,
+      campaignsLastSyncAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (e) {
+    console.warn("[campaignService] Failed to persist Meta Ads backup:", e);
+  }
+}
 
 /**
  * Retorna lista leve de campanhas ativas para seletores de formulário
@@ -15,6 +117,7 @@ export async function fetchActiveCampaignList(clinicId: string): Promise<{ id: s
     const snapshot = await getDocs(colRef);
     return snapshot.docs
       .filter(d => d.data().active !== false)
+      .sort((a, b) => compareCampaignRecency(a.data(), b.data()))
       .map(d => ({ id: d.id, name: d.data().name || "Campanha" }));
   } catch {
     return [];
@@ -40,58 +143,68 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
   try {
     const colRef = collection(db, "clinics", clinicId, "campaigns");
     const snapshot = await getDocs(colRef);
+    const sharedSnap = await getDoc(getSharedCampaignDoc(clinicId));
+
+    if (snapshot.empty && sharedSnap.exists()) {
+      const backupCampaigns = Array.isArray(sharedSnap.data()?.[CAMPAIGN_BACKUP_FIELD])
+        ? sharedSnap.data()[CAMPAIGN_BACKUP_FIELD]
+        : [];
+
+      if (backupCampaigns.length > 0) {
+        await Promise.all(backupCampaigns.map(async (campaign: any) => {
+          if (!campaign?.id) return;
+          await setDoc(doc(db, "clinics", clinicId, "campaigns", campaign.id), {
+            ...campaign,
+            clinicId,
+          }, { merge: true });
+        }));
+
+        const leads = await fetchLeadsFromClinic(clinicId);
+        const restored = backupCampaigns.map((campaign: any, idx: number) => {
+          const data = toCampaignDataSnapshot(campaign, campaign.id, clinicId);
+          const campaignLeads = leads.filter(l => l.metaCampanhaId === campaign.id);
+          const leadsCount = campaignLeads.length;
+          const scheduledCount = campaignLeads.filter(l => l.dataAgendamento?.trim()).length;
+          const completedCount = campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length;
+          const totals = calcCampaignTotals(data.dailyMetrics || []);
+          return buildCampaignFromSnapshot(campaign.id, clinicId, data, idx, ticketMedio, leadsCount, scheduledCount, completedCount, totals);
+        });
+
+        await persistCampaignBackup(clinicId, backupCampaigns);
+        return restored;
+      }
+    }
 
     if (snapshot.empty) return [];
 
     const leads = await fetchLeadsFromClinic(clinicId);
 
-    return snapshot.docs.map((docSnap, idx) => {
-      const data = docSnap.data();
-      const allDailyMetrics: CampaignDailyMetric[] = data.dailyMetrics || [];
+    const campaigns = snapshot.docs
+      .sort((a, b) => compareCampaignRecency(a.data(), b.data()))
+      .map((docSnap, idx) => {
+        const data = docSnap.data();
+        const dailyMetrics: CampaignDailyMetric[] = Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [];
 
-      // Meta Ads precisa mostrar o desempenho completo da campanha, sem filtro de período.
-      const dailyMetrics = allDailyMetrics;
-      const totals = calcCampaignTotals(dailyMetrics);
+        // Meta Ads precisa mostrar o desempenho completo da campanha, sem filtro de período.
+        const totals = calcCampaignTotals(dailyMetrics);
+        const campaignLeads = leads.filter(l => l.metaCampanhaId === docSnap.id);
 
-      const campaignLeads = leads.filter(l => l.metaCampanhaId === docSnap.id);
-      
-      const leadsCount = campaignLeads.length;
-      const scheduledCount = campaignLeads.filter(l => l.dataAgendamento?.trim()).length;
-      const completedCount = campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length;
+        return buildCampaignFromSnapshot(
+          docSnap.id,
+          clinicId,
+          { ...data, dailyMetrics },
+          idx,
+          ticketMedio,
+          campaignLeads.length,
+          campaignLeads.filter(l => l.dataAgendamento?.trim()).length,
+          campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length,
+          totals
+        );
+      });
 
-      const roas = totals.totalSpend > 0 ? parseFloat(((completedCount * ticketMedio) / totals.totalSpend).toFixed(2)) : 0;
-      const predictability = leadsCount > 0 ? Math.round((completedCount / leadsCount) * 100) : 0;
-      const cacLead = leadsCount > 0 ? parseFloat((totals.totalSpend / leadsCount).toFixed(2)) : 0;
-      const cacAgendamento = scheduledCount > 0 ? parseFloat((totals.totalSpend / scheduledCount).toFixed(2)) : 0;
-      const cacComparecimento = completedCount > 0 ? parseFloat((totals.totalSpend / completedCount).toFixed(2)) : 0;
-      const conversionRate = leadsCount > 0 ? Math.round((scheduledCount / leadsCount) * 100) : 0;
-      const showUpRate = scheduledCount > 0 ? Math.round((completedCount / scheduledCount) * 100) : 0;
+    void persistCampaignBackup(clinicId, snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })));
 
-      return {
-        id: docSnap.id,
-        clinicId,
-        name: data.name || "Campanha",
-        active: data.active ?? true,
-        color: data.color || CAMPAIGN_COLORS[idx % CAMPAIGN_COLORS.length],
-        dateStart: data.dateStart || "",
-        dateEnd: data.dateEnd || "",
-        budget: data.budget || 0,
-        fundsAdded: data.fundsAdded || 0,
-        taxCost: data.taxCost || 0,
-        dailyMetrics,
-        ...totals,
-        leads: leadsCount,
-        scheduled: scheduledCount,
-        completed: completedCount,
-        roas: (totals.totalSpend + (data.taxCost || 0)) > 0 ? parseFloat(((completedCount * ticketMedio) / (totals.totalSpend + (data.taxCost || 0))).toFixed(2)) : 0,
-        predictability,
-        cacLead,
-        cacAgendamento,
-        cacComparecimento,
-        conversionRate,
-        showUpRate,
-      } as Campaign;
-    });
+    return campaigns;
   } catch (e) {
     console.error("Error fetching campaigns:", e);
     return [];
@@ -125,6 +238,20 @@ export async function createCampaign(clinicId: string, data: {
     clinicId,
     createdAt: new Date().toISOString(),
   });
+  await persistCampaignBackup(clinicId, [{
+    id: newRef.id,
+    name: data.name,
+    dateStart: data.dateStart,
+    dateEnd: data.dateEnd,
+    budget: data.budget,
+    fundsAdded: data.fundsAdded || 0,
+    taxCost: data.taxCost || 0,
+    active: true,
+    color,
+    dailyMetrics: [],
+    clinicId,
+    createdAt: new Date().toISOString(),
+  }]);
   return newRef.id;
 }
 
@@ -155,6 +282,10 @@ export async function upsertDailyMetric(
   }
 
   await updateDoc(docRef, { dailyMetrics: updated });
+  const snapAfter = await getDoc(docRef);
+  if (snapAfter.exists()) {
+    await persistCampaignBackup(clinicId, [{ id: campaignId, ...snapAfter.data() }]);
+  }
 }
 
 /**
@@ -172,6 +303,10 @@ export async function deleteDailyMetric(
   const current: CampaignDailyMetric[] = snap.data().dailyMetrics || [];
   const updated = current.filter(m => m.date !== date);
   await updateDoc(docRef, { dailyMetrics: updated });
+  const snapAfter = await getDoc(docRef);
+  if (snapAfter.exists()) {
+    await persistCampaignBackup(clinicId, [{ id: campaignId, ...snapAfter.data() }]);
+  }
 }
 
 /**
@@ -184,6 +319,10 @@ export async function updateCampaign(
 ): Promise<void> {
   const docRef = doc(db, "clinics", clinicId, "campaigns", campaignId);
   await updateDoc(docRef, fields);
+  const snapAfter = await getDoc(docRef);
+  if (snapAfter.exists()) {
+    await persistCampaignBackup(clinicId, [{ id: campaignId, ...snapAfter.data() }]);
+  }
 }
 
 /**
@@ -191,4 +330,18 @@ export async function updateCampaign(
  */
 export async function deleteCampaign(clinicId: string, campaignId: string): Promise<void> {
   await deleteDoc(doc(db, "clinics", clinicId, "campaigns", campaignId));
+  try {
+    const sharedRef = getSharedCampaignDoc(clinicId);
+    const sharedSnap = await getDoc(sharedRef);
+    if (sharedSnap.exists()) {
+      const current = Array.isArray(sharedSnap.data()?.[CAMPAIGN_BACKUP_FIELD]) ? sharedSnap.data()[CAMPAIGN_BACKUP_FIELD] : [];
+      const updated = current.filter((campaign: any) => campaign?.id !== campaignId);
+      await setDoc(sharedRef, {
+        [CAMPAIGN_BACKUP_FIELD]: updated,
+        campaignsLastSyncAt: new Date().toISOString(),
+      }, { merge: true });
+    }
+  } catch (e) {
+    console.warn("[campaignService] Failed to remove campaign from backup:", e);
+  }
 }

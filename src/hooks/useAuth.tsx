@@ -59,14 +59,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
           setUserProfile(profile);
           if (profile) {
             if (profile.role === "admin" || profile.role === "cliente") {
-              // Admin e Cliente podem mudar de clínica via selectedClinic
               const val = selectedClinic || profile.clinicId || null;
               setCurrentClinic(val);
               console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val, "selectedClinic:", selectedClinic);
             } else {
-              // Outros roles (editor, recepcao, viewer) ficam presos à clínica do perfil
-              const clinicFromProfile = profile.clinicId || (profile.clinics && profile.clinics[0]);
-              setCurrentClinic(clinicFromProfile || null);
+              const clinicFromProfile = profile.clinicId || (profile.clinicIds && profile.clinicIds[0]) || null;
+              setCurrentClinic(clinicFromProfile);
               console.log("[AuthProvider] user currentClinic ->", clinicFromProfile);
             }
           }
@@ -114,29 +112,26 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       const ud = await getDoc(doc(db, "users", uid));
       const profile = ud.exists() ? ud.data() : null;
       setUserProfile(profile);
-      // Se não houver selectedClinic, usa clinicId do perfil
-      if (!selectedClinic && profile && profile.clinicId) {
-        setSelectedClinic(profile.clinicId);
-      }
+      const profileClinics = profile && Array.isArray(profile.clinicIds)
+        ? profile.clinicIds.filter(Boolean)
+        : profile && Array.isArray(profile.clinics)
+          ? profile.clinics.filter(Boolean)
+          : [];
+      const singleClinic = profile ? (profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null)) : null;
       if (profile) {
         if (profile.role === "admin" || profile.role === "cliente") {
-          // Admin e Cliente podem selecionar qualquer clínica
           const val = clinic ?? selectedClinic ?? profile.clinicId ?? null;
           setCurrentClinic(val);
           console.log(`[AuthProvider][login] ${profile.role} set currentClinic ->`, val);
         } else {
           // Outros roles têm restrição à clínica atribuída
-          const effective = clinic ?? selectedClinic ?? profile.clinicId ?? null;
-          const allowed = profile.clinicId === effective || (Array.isArray(profile.clinics) && profile.clinics.includes(effective));
-          if (!allowed) {
-            await signOut(auth);
-            setError("Usuário não autorizado para a clínica selecionada");
-            setLoading(false);
-            return;
+          const effective = clinic ?? selectedClinic ?? singleClinic ?? null;
+          const allowed = profile.clinicId === effective || (Array.isArray(profile.clinicIds) && profile.clinicIds.includes(effective)) || (Array.isArray(profile.clinics) && profile.clinics.includes(effective));
+          if (effective && allowed) {
+            setSelectedClinic(effective);
           }
-          const val = effective ?? null;
-          setCurrentClinic(val);
-          console.log("[AuthProvider][login] user set currentClinic ->", val);
+          setCurrentClinic(effective);
+          console.log("[AuthProvider][login] user set currentClinic ->", effective, { allowed });
         }
       }
     } catch (err: any) {

@@ -10,23 +10,20 @@ import { Activity, Users, BarChart3, Bell, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Landing() {
-  const { login, error, selectedClinic, setSelectedClinic } = useAuth();
+  const { login, error, setSelectedClinic } = useAuth();
   const { clinics, loading: clinicsLoading, refetch: refetchClinics } = useClinics();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [localClinic, setLocalClinic] = useState(selectedClinic || "");
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [localClinic, setLocalClinic] = useState("");
 
   useEffect(() => {
-    if (selectedClinic) {
-      setLocalClinic(selectedClinic);
-      return;
-    }
     if (!localClinic && clinics.length > 0) {
       setLocalClinic(clinics[0].id);
+      setSelectedClinic(clinics[0].id);
     }
-  }, [selectedClinic, clinics, localClinic]);
+  }, [clinics, localClinic, setSelectedClinic]);
 
   const handleOnboardingComplete = async (clinicId: string) => {
     setLocalClinic(clinicId);
@@ -47,10 +44,10 @@ export default function Landing() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = resolveEmail(username);
+    const clinic = localClinic || null;
     setLoading(true);
-    setSelectedClinic(localClinic);
     try {
-      await (login as any)(email, password, localClinic);
+      await (login as any)(email, password, clinic);
       toast.success("Bem-vindo!");
     } catch {
       toast.error(error || "Usuário ou senha incorretos.");
@@ -73,8 +70,8 @@ export default function Landing() {
       </header>
 
       {/* Main */}
-      <main className="flex-1 flex items-center justify-center px-4">
-        <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+      <main className="flex-1 flex items-center justify-center px-4 py-6 md:py-10">
+        <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start lg:items-center">
           {/* Left: Info */}
           <div className="space-y-8">
             <div>
@@ -118,113 +115,91 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* Right: Login or Onboarding */}
-          <div>
-            {clinicsLoading ? (
-              <Card className="border-slate-700 bg-slate-800/80 backdrop-blur shadow-2xl">
-                <CardContent className="pt-6 text-center">
-                  <p className="text-slate-400">Carregando...</p>
-                </CardContent>
-              </Card>
-            ) : clinics.length === 0 ? (
-              <Card className="border-slate-700 bg-slate-800/80 backdrop-blur shadow-2xl">
-                <CardHeader className="text-center">
-                  <div className="mx-auto bg-green-500/20 rounded-full p-3 w-fit mb-2">
-                    <Lock className="h-6 w-6 text-green-400" />
+          {/* Right: Login */}
+          <div className="w-full max-w-lg lg:max-w-none mx-auto lg:mx-0">
+            <Card className="border-slate-700 bg-slate-800/80 backdrop-blur shadow-2xl">
+              <CardHeader className="text-center">
+                <div className="mx-auto bg-blue-500/20 rounded-full p-3 w-fit mb-2">
+                  <Lock className="h-6 w-6 text-blue-400" />
+                </div>
+                <CardTitle className="text-white text-2xl">Acesso Restrito</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Entre com suas credenciais para acessar o CRM
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-slate-300">Clínica</Label>
+                    <select
+                      value={localClinic}
+                      onChange={(e) => {
+                        setLocalClinic(e.target.value);
+                        setSelectedClinic(e.target.value || null);
+                      }}
+                      className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2"
+                      disabled={clinicsLoading}
+                    >
+                      {clinicsLoading
+                        ? <option value="">Carregando clínicas...</option>
+                        : clinics.length === 0
+                          ? <option value="">Nenhuma clínica cadastrada</option>
+                          : clinics.map((clinic) => (
+                              <option key={clinic.id} value={clinic.id}>
+                                {clinic.name}
+                              </option>
+                            ))
+                      }
+                    </select>
                   </div>
-                  <CardTitle className="text-white text-2xl">Bem-vindo!</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Parece ser sua primeira vez por aqui
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-slate-300">
-                    Crie sua primeira clínica e conta de administrador para começar a usar o Rede Leads.
+
+                  <div className="space-y-2">
+                    <Label htmlFor="username" className="text-slate-300">Usuário ou E-mail</Label>
+                    <Input
+                      id="username"
+                      type="text"
+                      placeholder="usuario ou email@gmail.com"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-slate-300">Senha</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  {error && <p className="text-sm text-red-400">{error}</p>}
+                  <Button
+                    type="submit"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2"
+                    disabled={loading || clinicsLoading || clinics.length === 0}
+                  >
+                    {loading ? "Entrando..." : "Entrar"}
+                  </Button>
+                </form>
+                <div className="mt-4 pt-4 border-t border-slate-700">
+                  <p className="text-center text-xs text-slate-500 mb-2">
+                    {clinics.length > 0 ? "Quer criar nova clínica?" : "Ainda não tem clínica cadastrada?"}
                   </p>
                   <Button
+                    type="button"
                     onClick={() => setOnboardingOpen(true)}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
                   >
-                    Cadastrar Clínica
+                    {clinics.length > 0 ? "Criar Clínica" : "Cadastrar Clínica"}
                   </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-slate-700 bg-slate-800/80 backdrop-blur shadow-2xl">
-                <CardHeader className="text-center">
-                  <div className="mx-auto bg-blue-500/20 rounded-full p-3 w-fit mb-2">
-                    <Lock className="h-6 w-6 text-blue-400" />
-                  </div>
-                  <CardTitle className="text-white text-2xl">Acesso Restrito</CardTitle>
-                  <CardDescription className="text-slate-400">
-                    Entre com suas credenciais para acessar o CRM
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-slate-300">Clínica</Label>
-                      <select
-                        value={localClinic}
-                        onChange={(e) => setLocalClinic(e.target.value)}
-                        className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
-                      >
-                        {clinics.map((clinic) => (
-                          <option key={clinic.id} value={clinic.id}>
-                            {clinic.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="username" className="text-slate-300">Usuário ou E-mail</Label>
-                      <Input
-                        id="username"
-                        type="text"
-                        placeholder="usuario ou email@gmail.com"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password" className="text-slate-300">Senha</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
-                    {error && <p className="text-sm text-red-400">{error}</p>}
-                    <Button
-                      type="submit"
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2"
-                      disabled={loading}
-                    >
-                      {loading ? "Entrando..." : "Entrar"}
-                    </Button>
-                  </form>
-                  <div className="mt-4 pt-4 border-t border-slate-700">
-                    <p className="text-center text-xs text-slate-500 mb-2">
-                      Quer criar nova clínica?
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setOnboardingOpen(true)}
-                      className="w-full text-slate-300 border-slate-600 hover:bg-slate-700"
-                    >
-                      Criar Clínica
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

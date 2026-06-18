@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, doc, getDocs, setDoc } from "firebase/firestore";
 import type { ClinicRecord } from "@/types/auth";
+import { CLINICAS } from "@/hooks/useCupons";
 
 export interface CreateClinicInput {
   id?: string;
@@ -21,18 +22,40 @@ const normalizeClinicId = (value: string) =>
 
 export function useClinics() {
   const [clinics, setClinics] = useState<ClinicRecord[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // true until first load completes
   const [error, setError] = useState<string | null>(null);
 
   const loadClinics = async () => {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, "clinics"));
-      const list = snapshot.docs
-        .map((clinicDoc) => ({ id: clinicDoc.id, ...(clinicDoc.data() as Omit<ClinicRecord, "id">) }))
-        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      const fromFirestore = snapshot.docs.map((clinicDoc) => ({
+        id: clinicDoc.id,
+        ...(clinicDoc.data() as Omit<ClinicRecord, "id">),
+      }));
+
+      // Garante que todas as clínicas conhecidas aparecem, mesmo sem doc no Firestore
+      const firestoreIds = new Set(fromFirestore.map((c) => c.id));
+      const fallback: ClinicRecord[] = CLINICAS.filter((c) => !firestoreIds.has(c.id)).map((c) => ({
+        id: c.id,
+        name: c.label,
+        createdAt: "",
+        createdBy: "system",
+      }));
+
+      const list = [...fromFirestore, ...fallback].sort((a, b) =>
+        a.name.localeCompare(b.name, "pt-BR")
+      );
       setClinics(list);
     } catch (err: any) {
+      // Se Firestore falhar, usa a lista hardcoded como fallback
+      const fallback: ClinicRecord[] = CLINICAS.map((c) => ({
+        id: c.id,
+        name: c.label,
+        createdAt: "",
+        createdBy: "system",
+      }));
+      setClinics(fallback);
       setError(err.message || "Erro ao carregar clínicas");
     } finally {
       setLoading(false);

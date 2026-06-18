@@ -70,10 +70,12 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
   });
 
   useEffect(() => {
-    if (!clinicId || clinicId === fetchedClinic.current) return;
-    fetchedClinic.current = clinicId;
+    if (!open || !clinicId) return;
+    if (clinicId !== fetchedClinic.current) {
+      fetchedClinic.current = clinicId;
+    }
     fetchActiveCampaignList(clinicId).then(setCampaigns);
-  }, [clinicId]);
+  }, [clinicId, open]);
 
   const selectValue = (val: any) => (val === "" || val === undefined ? "none" : String(val));
   const fromSelect = (val: string) => (val === "none" ? "" : val);

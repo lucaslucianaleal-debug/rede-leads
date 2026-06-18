@@ -36,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign, Ticket, BookOpen } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign, Ticket, BookOpen, Menu } from "lucide-react";
 import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
@@ -211,6 +211,17 @@ const CRMDashboard = () => {
     setShowDeleteDialog(false);
     toast.success(`${selectedLeads.length} leads excluídos!`);
   };
+
+  const tabsMenuItems = [
+    { value: "dashboard", label: "Dashboard" },
+    { value: "dashboard-executivo", label: "Command Center" },
+    { value: "agenda", label: "Agenda do Dia" },
+    { value: "all-leads", label: "Todos os Leads" },
+    { value: "novos-leads", label: "Novos Leads" },
+    { value: "regua-followup", label: "Rotina de Contatos" },
+    { value: "roi-custos", label: "ROI/Custos" },
+    { value: "externos", label: "Serviços Externos" },
+  ];
 
   const handleClearDuplicates = () => {
     const removedCount = clearDuplicates();
@@ -439,8 +450,42 @@ const CRMDashboard = () => {
           </div>
         ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="w-full">
-            <TabsList className="w-full sm:max-w-[1100px] justify-start gap-2">
+            <div className="w-full flex flex-col gap-3 lg:block">
+              <div className="flex items-center justify-between gap-3 lg:hidden">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <Menu className="h-4 w-4" />
+                      Navegação
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    {tabsMenuItems.map((item) => (
+                      <DropdownMenuItem key={item.value} onClick={() => setActiveTab(item.value)}>
+                        {item.label}
+                        {item.value === "novos-leads" && newLeadsCount > 0 && (
+                          <span className="ml-auto flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white leading-none">
+                            {newLeadsCount}
+                          </span>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {permissions?.canEdit && (
+                  <button
+                    onClick={() => setShowCreateDialog(true)}
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
+                    aria-label="Novo Lead"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Novo Lead</span>
+                  </button>
+                )}
+              </div>
+
+              <TabsList className="hidden lg:flex w-full sm:max-w-[1100px] justify-start gap-2 flex-wrap h-auto p-2">
             <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
               <LayoutDashboard className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -488,7 +533,7 @@ const CRMDashboard = () => {
                   <span className="hidden sm:inline">Novo Lead</span>
                 </button>
               )}
-            </TabsList>
+              </TabsList>
           </div>
 
           <TabsContent value="dashboard" className="space-y-6 mt-6">

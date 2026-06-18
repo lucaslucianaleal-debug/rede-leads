@@ -704,17 +704,11 @@ export async function calculateChannelPerformance(clinicId: string) {
  */
 export async function calculateUnitRanking() {
   try {
-    const clinicsSnapshot = await getDocs(collection(db, "clinics"));
-    const clinics = clinicsSnapshot.docs
-      .map((clinicDoc) => ({
-        id: clinicDoc.id,
-        name: (clinicDoc.data() as any)?.name || clinicDoc.id,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    const clinics = ["odontocompany-olimpia", "odontocompany-badybassit", "odontocompany-novohorizonte"];
     const ranking = [];
 
-    for (const clinic of clinics) {
-      const leads = await fetchLeadsFromClinic(clinic.id);
+    for (const clinicId of clinics) {
+      const leads = await fetchLeadsFromClinic(clinicId);
       
       // Total de leads
       const totalLeads = leads.length;
@@ -747,8 +741,8 @@ export async function calculateUnitRanking() {
       const comparison = delta > 0 ? `+${delta}pp vs semana` : delta < 0 ? `${delta}pp vs semana` : `= estável`;
 
       ranking.push({
-        id: clinic.id,
-        name: clinic.name,
+        id: clinicId,
+        name: clinicId === "odontocompany-olimpia" ? "Olimpia" : clinicId === "odontocompany-badybassit" ? "Bady Bassit" : "Novo Horizonte",
         leadsPerDay,
         showUpRate,
         comparison,

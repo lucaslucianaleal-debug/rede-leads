@@ -88,13 +88,13 @@ export default function CommandCenter() {
       />
 
       {/* Main content */}
-      <div className="px-6 py-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="px-3 sm:px-4 md:px-6 py-4 md:py-6">
+        <div className="w-full max-w-[1600px] mx-auto space-y-4 md:space-y-6">
           {/* OPERACIONAL - 2 Colunas */}
           {layer === "ops" && (
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
               {/* COLUNA ESQUERDA */}
-              <div className="col-span-2 space-y-6">
+              <div className="xl:col-span-2 space-y-4 md:space-y-6">
                 {/* KPI Strip */}
                 <section>
                   <div className="flex items-center justify-between mb-3">
@@ -185,7 +185,7 @@ export default function CommandCenter() {
               </div>
 
               {/* COLUNA DIREITA */}
-              <div className="col-span-1 space-y-6">
+              <div className="space-y-4 md:space-y-6">
                 {/* Automações */}
                 <section>
                   <AutomationCard />
@@ -239,9 +239,9 @@ export default function CommandCenter() {
 
           {/* WHATSAPP */}
           {layer === "wa" && (
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
               {/* COLUNA ESQUERDA */}
-              <div className="col-span-2 space-y-6">
+              <div className="xl:col-span-2 space-y-4 md:space-y-6">
                 {/* KPI Strip */}
                 <section>
                   <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
@@ -275,7 +275,7 @@ export default function CommandCenter() {
               </div>
 
               {/* COLUNA DIREITA */}
-              <div className="col-span-1 space-y-6">
+              <div className="space-y-4 md:space-y-6">
                 {/* WhatsApp Status */}
                 <section style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4">
                   <h4 style={{ color: "#fff", fontSize: "13px" }} className="font-semibold mb-4">Status Tempo Real</h4>

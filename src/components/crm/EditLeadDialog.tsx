@@ -55,10 +55,12 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const fetchedClinic = useRef("");
 
   useEffect(() => {
-    if (!clinicId || clinicId === fetchedClinic.current) return;
-    fetchedClinic.current = clinicId;
+    if (!open || !clinicId) return;
+    if (clinicId !== fetchedClinic.current) {
+      fetchedClinic.current = clinicId;
+    }
     fetchActiveCampaignList(clinicId).then(setCampaigns);
-  }, [clinicId]);
+  }, [clinicId, open]);
 
   useEffect(() => {
     if (lead) {
