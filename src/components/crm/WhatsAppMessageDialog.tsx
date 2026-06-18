@@ -27,7 +27,7 @@ const ETAPA_OPTIONS = [
   "Finalizado",
 ];
 
-import { Lead, LeadStage } from "@/types/crm";
+import { Lead, LeadStage, LeadStatus } from "@/types/crm";
 import {
   Dialog,
   DialogContent,
@@ -64,6 +64,7 @@ export function WhatsAppMessageDialog({
   serverConnected,
 }: WhatsAppMessageDialogProps) {
   const { updateLead } = useLeads();
+
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<string>(lead?.status || "MORNO");
   const [etapa, setEtapa] = useState<LeadStage>(lead?.etapaLead || "Novo");
@@ -89,9 +90,7 @@ export function WhatsAppMessageDialog({
     setVoucherCopied(false);
     setStatus(lead?.status || "MORNO");
     setEtapa(lead?.etapaLead || "Novo");
-  }, [suggestedMessage, open, lead?.status]);
-
-  if (!lead) return null;
+  }, [suggestedMessage, open, lead?.status, lead?.etapaLead]);
 
   const handleSend = async () => {
     // Atualiza etapa do lead se mudou (status já foi atualizado instantaneamente)
@@ -171,7 +170,13 @@ export function WhatsAppMessageDialog({
         if (!snap.empty) {
           const doc0 = snap.docs[0];
           setFoundVoucherId(doc0.id);
-          const data = doc0.data() as any;
+          type VoucherData = {
+            imageUrl?: string;
+            imageLocalPath?: string;
+            amount?: number;
+            expiresAt?: string;
+          };
+          const data = doc0.data() as VoucherData;
           // prefer a hosted image URL if present, else try to build relative path
           let img = data.imageUrl || data.imageLocalPath || '';
           let fileName = '';
@@ -214,9 +219,10 @@ export function WhatsAppMessageDialog({
         if (!mounted || !snap.exists()) return;
         const data = snap.data() || {};
         const leadsArr = Array.isArray(data.leads) ? data.leads : [];
-        const match = leadsArr.find((l: any) => {
+        const match = leadsArr.find((l: unknown) => {
           try {
-            const a = (l.telefone || '').replace(/\D/g, '');
+            const item = l as { telefone?: string; voucherPending?: boolean; voucherLastIssuedTier?: number };
+            const a = (item.telefone || '').replace(/\D/g, '');
             const b = (lead.telefone || '').replace(/\D/g, '');
             return a && b && (a === b || a.endsWith(b) || b.endsWith(a));
           } catch {
@@ -233,6 +239,8 @@ export function WhatsAppMessageDialog({
     checkSharedDoc();
     return () => { mounted = false; };
   }, [lead]);
+
+  if (!lead) return null;
 
   const handleDone = () => {
     onDone?.();
@@ -306,7 +314,7 @@ export function WhatsAppMessageDialog({
                   onClick={() => {
                     setStatus(s.value);
                     if (updateLead && lead && lead.status !== s.value) {
-                      updateLead(lead.id, { status: s.value as any });
+                      updateLead(lead.id, { status: s.value as LeadStatus });
                     }
                   }}
                   className={`px-2 py-2 rounded-lg text-xs font-medium border transition-colors text-center whitespace-normal break-words ${
@@ -331,7 +339,7 @@ export function WhatsAppMessageDialog({
                   setEtapa("Desistência");
                   setStatus("FRIO");
                   if (updateLead && lead) {
-                    updateLead(lead.id, { status: "FRIO" as any });
+                    updateLead(lead.id, { status: "FRIO" as LeadStatus });
                   }
                 }}
                 className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition font-medium"
