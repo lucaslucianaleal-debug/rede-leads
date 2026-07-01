@@ -27,10 +27,17 @@ function StatusBadge({ status, todayAttended, dailyTarget }: { status: DentistPe
     </span>
   );
   const pct = dailyTarget > 0 ? Math.round((todayAttended / dailyTarget) * 100) : 0;
+  if (todayAttended === 0 && dailyTarget > 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+        📌 Sem atendimento hoje (0%)
+      </span>
+    );
+  }
   const config = {
     ok:       { bg: "bg-emerald-50 border border-emerald-200", text: "text-emerald-700", label: `✅ Na meta (${pct}%)` },
-    warning:  { bg: "bg-amber-50 border border-amber-200",    text: "text-amber-700",   label: `⚠️ Abaixo (${pct}%)` },
-    critical: { bg: "bg-rose-50 border border-rose-200",      text: "text-rose-700",    label: `🔴 Crítico (${pct}%)` },
+    warning:  { bg: "bg-amber-50 border border-amber-200",    text: "text-amber-700",   label: `⚠️ Abaixo da meta (${pct}%)` },
+    critical: { bg: "bg-rose-50 border border-rose-200",      text: "text-rose-700",    label: `🔴 Muito abaixo da meta (${pct}%)` },
   };
   const c = config[status];
   return <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${c.bg} ${c.text}`}>{c.label}</span>;
@@ -134,8 +141,8 @@ export default function MPCDentistPerformance({ dentists }: Props) {
       {/* Legenda */}
       <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex gap-4 text-xs text-slate-500">
         <span>✅ Na meta = ≥100% da meta diária</span>
-        <span>⚠️ Abaixo = 60–99%</span>
-        <span>🔴 Crítico = &lt;60%</span>
+        <span>⚠️ Abaixo da meta = 60–99%</span>
+        <span>🔴 Muito abaixo = &lt;60%</span>
         <span>⏳ Sem dados = sem atendimentos registrados</span>
       </div>
     </div>

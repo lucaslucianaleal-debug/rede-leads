@@ -385,7 +385,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     showSuccess(`Vinculação automática concluída: ${linkedAppointments} atendimento(s) + ${linkedBudgets} orçamento(s)`);
   };
 
-  const updateUnlinkedAppointment = (id: string, patch: Partial<{ patientName: string; attendedAt: string }>) => {
+  const updateUnlinkedAppointment = (id: string, patch: Partial<{ patientName: string; patientPhone: string; attendedAt: string }>) => {
     setStore((prev) => ({
       ...prev,
       appointments: prev.appointments.map((a: any) => {
@@ -393,6 +393,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
         return {
           ...a,
           ...(patch.patientName !== undefined ? { patientName: patch.patientName } : {}),
+          ...(patch.patientPhone !== undefined ? { patientPhone: patch.patientPhone } : {}),
           ...(patch.attendedAt !== undefined ? { attendedAt: parseDateToISO(patch.attendedAt) || a.attendedAt } : {}),
           // Se editou nome, remove vínculo antigo para evitar relação incorreta
           ...(patch.patientName !== undefined ? { patientId: undefined } : {}),
@@ -401,7 +402,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     }));
   };
 
-  const updateUnlinkedBudget = (id: string, patch: Partial<{ patientName: string; budgetAt: string }>) => {
+  const updateUnlinkedBudget = (id: string, patch: Partial<{ patientName: string; patientPhone: string; budgetAt: string }>) => {
     setStore((prev) => ({
       ...prev,
       budgets: (prev.budgets || []).map((b: any) => {
@@ -409,6 +410,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
         return {
           ...b,
           ...(patch.patientName !== undefined ? { patientName: patch.patientName } : {}),
+          ...(patch.patientPhone !== undefined ? { patientPhone: patch.patientPhone } : {}),
           ...(patch.budgetAt !== undefined ? { budgetAt: parseDateToISO(patch.budgetAt) || b.budgetAt } : {}),
           ...(patch.patientName !== undefined ? { patientId: undefined } : {}),
         };
@@ -710,10 +712,16 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                             placeholder="Nome do paciente"
                           />
                           <input
+                            value={a.patientPhone || ""}
+                            onChange={(e) => updateUnlinkedAppointment(a.id, { patientPhone: e.target.value })}
+                            className="px-2 py-1.5 border border-slate-300 rounded text-sm"
+                            placeholder="Telefone (opcional)"
+                          />
+                          <input
                             type="date"
                             value={String(a.attendedAt || "").slice(0, 10)}
                             onChange={(e) => updateUnlinkedAppointment(a.id, { attendedAt: e.target.value })}
-                            className="px-2 py-1.5 border border-slate-300 rounded text-sm"
+                            className="px-2 py-1.5 border border-slate-300 rounded text-sm md:col-span-2"
                           />
                         </div>
                       ))}
@@ -732,10 +740,16 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                             placeholder="Nome do paciente"
                           />
                           <input
+                            value={b.patientPhone || ""}
+                            onChange={(e) => updateUnlinkedBudget(b.id, { patientPhone: e.target.value })}
+                            className="px-2 py-1.5 border border-slate-300 rounded text-sm"
+                            placeholder="Telefone (opcional)"
+                          />
+                          <input
                             type="date"
                             value={String(b.budgetAt || "").slice(0, 10)}
                             onChange={(e) => updateUnlinkedBudget(b.id, { budgetAt: e.target.value })}
-                            className="px-2 py-1.5 border border-slate-300 rounded text-sm"
+                            className="px-2 py-1.5 border border-slate-300 rounded text-sm md:col-span-2"
                           />
                         </div>
                       ))}

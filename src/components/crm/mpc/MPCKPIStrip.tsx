@@ -12,6 +12,7 @@ function KPICard({
   percentual,
   trend,
   unit,
+  format,
 }: {
   label: string;
   value: number;
@@ -19,6 +20,7 @@ function KPICard({
   percentual: number;
   trend: number;
   unit?: string;
+  format?: "number" | "currency";
 }) {
   const isOk = percentual >= 80;
   const isWarning = percentual >= 60 && percentual < 80;
@@ -28,16 +30,23 @@ function KPICard({
   const bgColor = isOk ? "bg-emerald-50" : isWarning ? "bg-amber-50" : "bg-rose-50";
   const borderColor = isOk ? "border-emerald-200" : isWarning ? "border-amber-200" : "border-rose-200";
 
+  const displayValue =
+    format === "currency"
+      ? `R$ ${Math.round(value).toLocaleString("pt-BR")}`
+      : `${Math.round(value)}${unit || ""}`;
+
+  const displayMeta =
+    format === "currency"
+      ? `R$ ${Math.round(meta).toLocaleString("pt-BR")}`
+      : `${Math.round(meta)}`;
+
   return (
     <div className={`${bgColor} border ${borderColor} rounded-lg p-5 flex flex-col justify-between h-full`}>
       <div>
         <div className="text-xs text-slate-600 font-semibold tracking-wide uppercase">{label}</div>
         <div className="mt-3 flex items-baseline gap-2">
-          <span className={`text-3xl font-bold ${statusColor}`}>
-            {Math.round(value)}
-            {unit}
-          </span>
-          <span className="text-xs text-slate-500">/ {Math.round(meta)}</span>
+          <span className={`text-2xl font-bold ${statusColor}`}>{displayValue}</span>
+          <span className="text-xs text-slate-500">/ {displayMeta}</span>
         </div>
       </div>
 
@@ -72,7 +81,8 @@ export default function MPCKPIStrip({ metrics }: MPCKPIStripProps) {
       meta: metrics.producao.meta,
       percentual: metrics.producao.percentualMeta,
       trend: metrics.producao.tendencia,
-      unit: "pac.",
+      unit: " pacientes",
+      format: "number" as const,
     },
     {
       label: "Conversão",
@@ -81,6 +91,7 @@ export default function MPCKPIStrip({ metrics }: MPCKPIStripProps) {
       percentual: metrics.conversao.percentualMeta,
       trend: metrics.conversao.tendencia,
       unit: "%",
+      format: "number" as const,
     },
     {
       label: "Comparecimento",
@@ -89,6 +100,7 @@ export default function MPCKPIStrip({ metrics }: MPCKPIStripProps) {
       percentual: metrics.comparecimento.percentualMeta,
       trend: metrics.comparecimento.tendencia,
       unit: "%",
+      format: "number" as const,
     },
     {
       label: "Satisfação",
@@ -97,6 +109,7 @@ export default function MPCKPIStrip({ metrics }: MPCKPIStripProps) {
       percentual: metrics.satisfacao.percentualMeta,
       trend: metrics.satisfacao.tendencia,
       unit: "/5",
+      format: "number" as const,
     },
     {
       label: "Receita",
@@ -104,7 +117,7 @@ export default function MPCKPIStrip({ metrics }: MPCKPIStripProps) {
       meta: metrics.receita.meta,
       percentual: metrics.receita.percentualMeta,
       trend: metrics.receita.tendencia,
-      unit: " R$",
+      format: "currency" as const,
     },
     {
       label: "Meta Geral",
@@ -113,6 +126,7 @@ export default function MPCKPIStrip({ metrics }: MPCKPIStripProps) {
       percentual: metrics.metaGeral,
       trend: 0,
       unit: "%",
+      format: "number" as const,
     },
   ];
 
