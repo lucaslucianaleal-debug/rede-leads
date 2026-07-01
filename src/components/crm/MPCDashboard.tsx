@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { MPCDashboardData } from "@/types/mpc";
-import { useMPCDataStore } from "@/hooks/useMPCDataStore";
 import MPCKPIStrip from "./mpc/MPCKPIStrip";
 import MPCAlertsFeed from "./mpc/MPCAlertsFeed";
 import MPCDentistPerformance from "./mpc/MPCDentistPerformance";
@@ -16,7 +15,6 @@ type MPCDashboardProps = {
 };
 
 export default function MPCDashboard({ data, isLoading = false, clinicId = null }: MPCDashboardProps) {
-  const { store } = useMPCDataStore(clinicId || "demo");
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">

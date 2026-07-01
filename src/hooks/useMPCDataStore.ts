@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import type { DentistPerformance } from "@/types/mpc";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 
@@ -47,6 +46,8 @@ export function useMPCDataStore(clinicId: string | null) {
   const [store, setStoreState] = useState<MPCStore>(defaultStore());
   const [loading, setLoading] = useState(true);
   const isDemo = !clinicId || clinicId === "demo";
+  // Guarda se o carregamento inicial já foi concluído — impede salvar estado vazio no Firebase
+  const hasLoaded = useRef(false);
 
   // Memoize docRef para evitar re-render infinito (doc() cria novo objeto a cada render)
   const docRef = useMemo(() => {
@@ -67,26 +68,27 @@ export function useMPCDataStore(clinicId: string | null) {
 
   // Sync with Firestore on mount and clinicId change
   useEffect(() => {
+    hasLoaded.current = false;
+
     if (isDemo) {
-      // Para demo, usa localStorage
-      const demoStore = getDemoStore();
-      setStoreState(demoStore);
+      setStoreState(getDemoStore());
       setLoading(false);
+      hasLoaded.current = true;
       return;
     }
 
     if (!docRef) {
       setStoreState(defaultStore());
       setLoading(false);
+      hasLoaded.current = true;
       return;
     }
 
     setLoading(true);
 
-    // First: load from Firestore
     const loadInitial = async () => {
       try {
-        const snap = await getDoc(docRef!);
+        const snap = await getDoc(docRef);
         if (snap.exists()) {
           setStoreState(snap.data() as MPCStore);
         } else {
@@ -97,34 +99,38 @@ export function useMPCDataStore(clinicId: string | null) {
         setStoreState(defaultStore());
       } finally {
         setLoading(false);
+        hasLoaded.current = true;
       }
     };
 
     loadInitial();
 
-    // Then: subscribe to real-time updates
+    // Assinar atualizações em tempo real (somente leitura — não dispara o save effect)
     const unsubscribe = onSnapshot(docRef, (snap) => {
       if (snap.exists()) {
         setStoreState(snap.data() as MPCStore);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      hasLoaded.current = false;
+    };
   }, [docRef, isDemo]);
 
-  // Save to Firestore whenever store changes
+  // Salva no Firestore — MAS SÓ depois do carregamento inicial, para não apagar dados existentes
   useEffect(() => {
-    if (!docRef || isDemo) return;
+    if (!docRef || isDemo || !hasLoaded.current) return;
 
     const saveToFirebase = async () => {
       try {
-        await setDoc(docRef, store, { merge: true });
+        await setDoc(docRef, store);
       } catch (e) {
         console.warn("[useMPCDataStore] Erro ao salvar no Firebase:", e);
       }
     };
 
-    const timer = setTimeout(saveToFirebase, 500); // Debounce
+    const timer = setTimeout(saveToFirebase, 800);
     return () => clearTimeout(timer);
   }, [store, docRef, isDemo]);
 
