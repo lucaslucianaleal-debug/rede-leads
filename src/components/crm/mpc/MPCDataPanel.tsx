@@ -347,6 +347,80 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     setBudgetBulkText("");
   };
 
+  const autoLinkUnmatchedByName = () => {
+    const leadByNormalizedName = new Map<string, string>();
+    allLeads.forEach((lead) => {
+      const key = normalizeName(lead.nome || "");
+      if (key && !leadByNormalizedName.has(key)) leadByNormalizedName.set(key, lead.id);
+    });
+
+    let linkedAppointments = 0;
+    let linkedBudgets = 0;
+
+    setStore((prev) => {
+      const appointments = prev.appointments.map((a: any) => {
+        if (a.patientId) return a;
+        const id = leadByNormalizedName.get(normalizeName(a.patientName || ""));
+        if (!id) return a;
+        linkedAppointments += 1;
+        return { ...a, patientId: id };
+      });
+
+      const budgets = (prev.budgets || []).map((b: any) => {
+        if (b.patientId) return b;
+        const id = leadByNormalizedName.get(normalizeName(b.patientName || ""));
+        if (!id) return b;
+        linkedBudgets += 1;
+        return { ...b, patientId: id };
+      });
+
+      return { ...prev, appointments, budgets };
+    });
+
+    showSuccess(`Vinculação automática concluída: ${linkedAppointments} atendimento(s) + ${linkedBudgets} orçamento(s)`);
+  };
+
+  const updateUnlinkedAppointment = (id: string, patch: Partial<{ patientName: string; attendedAt: string }>) => {
+    setStore((prev) => ({
+      ...prev,
+      appointments: prev.appointments.map((a: any) => {
+        if (a.id !== id) return a;
+        return {
+          ...a,
+          ...(patch.patientName !== undefined ? { patientName: patch.patientName } : {}),
+          ...(patch.attendedAt !== undefined ? { attendedAt: parseDateToISO(patch.attendedAt) || a.attendedAt } : {}),
+          // Se editou nome, remove vínculo antigo para evitar relação incorreta
+          ...(patch.patientName !== undefined ? { patientId: undefined } : {}),
+        };
+      }),
+    }));
+  };
+
+  const updateUnlinkedBudget = (id: string, patch: Partial<{ patientName: string; budgetAt: string }>) => {
+    setStore((prev) => ({
+      ...prev,
+      budgets: (prev.budgets || []).map((b: any) => {
+        if (b.id !== id) return b;
+        return {
+          ...b,
+          ...(patch.patientName !== undefined ? { patientName: patch.patientName } : {}),
+          ...(patch.budgetAt !== undefined ? { budgetAt: parseDateToISO(patch.budgetAt) || b.budgetAt } : {}),
+          ...(patch.patientName !== undefined ? { patientId: undefined } : {}),
+        };
+      }),
+    }));
+  };
+
+  const unlinkedAppointments = useMemo(
+    () => store.appointments.filter((a: any) => !a.patientId).slice(0, 30),
+    [store.appointments]
+  );
+
+  const unlinkedBudgets = useMemo(
+    () => (store.budgets || []).filter((b: any) => !b.patientId).slice(0, 30),
+    [store.budgets]
+  );
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Barra superior compacta */}
@@ -601,6 +675,66 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                     >
                       <Upload size={16} /> Importar Orçamentos
                     </button>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-semibold text-slate-900">Leads não vinculados (editar + vincular)</h4>
+                      <button
+                        onClick={autoLinkUnmatchedByName}
+                        className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-xs font-medium hover:bg-white"
+                      >
+                        Vincular por Nome
+                      </button>
+                    </div>
+
+                    <div className="text-xs text-slate-500">
+                      Mostrando até 30 de cada tipo. Você pode corrigir nome/data e clicar em "Vincular por Nome" novamente.
+                    </div>
+
+                    <div className="space-y-2">
+                      <h5 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Atendimentos sem vínculo ({unlinkedAppointments.length})</h5>
+                      {unlinkedAppointments.length === 0 ? (
+                        <p className="text-xs text-emerald-700">Nenhum atendimento pendente de vínculo.</p>
+                      ) : unlinkedAppointments.map((a: any) => (
+                        <div key={a.id} className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-white border border-slate-200 rounded-lg p-2">
+                          <input
+                            value={a.patientName || ""}
+                            onChange={(e) => updateUnlinkedAppointment(a.id, { patientName: e.target.value })}
+                            className="px-2 py-1.5 border border-slate-300 rounded text-sm"
+                            placeholder="Nome do paciente"
+                          />
+                          <input
+                            type="date"
+                            value={String(a.attendedAt || "").slice(0, 10)}
+                            onChange={(e) => updateUnlinkedAppointment(a.id, { attendedAt: e.target.value })}
+                            className="px-2 py-1.5 border border-slate-300 rounded text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="space-y-2">
+                      <h5 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Orçamentos sem vínculo ({unlinkedBudgets.length})</h5>
+                      {unlinkedBudgets.length === 0 ? (
+                        <p className="text-xs text-emerald-700">Nenhum orçamento pendente de vínculo.</p>
+                      ) : unlinkedBudgets.map((b: any) => (
+                        <div key={b.id} className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-white border border-slate-200 rounded-lg p-2">
+                          <input
+                            value={b.patientName || ""}
+                            onChange={(e) => updateUnlinkedBudget(b.id, { patientName: e.target.value })}
+                            className="px-2 py-1.5 border border-slate-300 rounded text-sm"
+                            placeholder="Nome do paciente"
+                          />
+                          <input
+                            type="date"
+                            value={String(b.budgetAt || "").slice(0, 10)}
+                            onChange={(e) => updateUnlinkedBudget(b.id, { budgetAt: e.target.value })}
+                            className="px-2 py-1.5 border border-slate-300 rounded text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}

@@ -150,7 +150,8 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
         canWrite.current = true;
       } catch (e) {
         console.warn("[MPC] Erro ao carregar:", e);
-        canWrite.current = false;
+        // Mesmo com falha no getDoc inicial, permite escrita para não perder dados digitados/importados.
+        canWrite.current = true;
       } finally {
         if (active) setLoading(false);
       }
@@ -201,14 +202,12 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
       return;
     }
 
-    if (!canWrite.current) return;
     if (isStoreEmpty(store)) return;
 
     const storeSnapshot = store;
     const docSnapshot = docRef;
 
     const timer = setTimeout(async () => {
-      if (!canWrite.current) return;
       try {
         const sanitized = sanitizeStore(storeSnapshot);
         await setDoc(docSnapshot, sanitized, { merge: true });
@@ -224,7 +223,7 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
         console.error("[MPC] ❌ Erro ao salvar:", e);
         toast.error("Erro ao salvar na nuvem", { description: String(e) });
       }
-    }, 1000);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [store, docRef, isDemo, readOnly, clinicId]);
