@@ -11,17 +11,7 @@ export type MPCStore = {
 };
 
 function defaultStore(): MPCStore {
-  return {
-    dentists: [],
-    appointments: [],
-    surveys: [],
-    averageTicket: 500,
-  };
-}
-
-function getMPCDocRef(clinicId: string | null) {
-  if (!clinicId || clinicId === "demo") return null;
-  return doc(db, "clinics", clinicId, "mpc", "store");
+  return { dentists: [], appointments: [], surveys: [], averageTicket: 500 };
 }
 
 const DEMO_STORAGE_KEY = "mpc_demo_store";
@@ -30,137 +20,163 @@ function getDemoStore(): MPCStore {
   try {
     const stored = localStorage.getItem(DEMO_STORAGE_KEY);
     return stored ? JSON.parse(stored) : defaultStore();
-  } catch {
-    return defaultStore();
-  }
+  } catch { return defaultStore(); }
 }
 
 function setDemoStore(store: MPCStore) {
-  try {
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store));
-  } catch (e) {
-    console.warn("[useMPCDataStore] Erro ao salvar no localStorage:", e);
-  }
+  try { localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store)); } catch {}
+}
+
+function isStoreEmpty(s: MPCStore) {
+  return s.dentists.length === 0 && s.appointments.length === 0 && s.surveys.length === 0;
 }
 
 export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: boolean }) {
   const readOnly = options?.readOnly ?? false;
+  const isDemo = !clinicId || clinicId === "demo";
+
   const [store, setStoreState] = useState<MPCStore>(defaultStore());
   const [loading, setLoading] = useState(true);
-  const isDemo = !clinicId || clinicId === "demo";
-  // Guarda se o carregamento inicial já foi concluído — impede salvar estado vazio no Firebase
-  const hasLoaded = useRef(false);
 
-  // Memoize docRef para evitar re-render infinito (doc() cria novo objeto a cada render)
+  // isFromFirebase: quando true, a mudança de store veio do Firebase (load ou snapshot)
+  // → o save effect NÃO deve salvar de volta (evita loop e sobrescrita com dado vazio)
+  const isFromFirebase = useRef(false);
+
+  // canWrite: só permite salvar depois do getDoc inicial confirmar o estado remoto
+  const canWrite = useRef(false);
+
   const docRef = useMemo(() => {
     if (isDemo) return null;
     return doc(db, "clinics", clinicId!, "mpc", "store");
   }, [clinicId, isDemo]);
 
-  // Wrapper para setStore que também salva em localStorage quando é demo
+  // setStore: chamado por AÇÕES DO USUÁRIO — isFromFirebase permanece false → save é permitido
   const setStore = useCallback((newStore: MPCStore | ((prev: MPCStore) => MPCStore)) => {
     setStoreState((prev) => {
       const updated = typeof newStore === "function" ? newStore(prev) : newStore;
-      if (isDemo) {
-        setDemoStore(updated);
-      }
+      if (isDemo) setDemoStore(updated);
       return updated;
     });
   }, [isDemo]);
 
-  // Sync with Firestore on mount and clinicId change
+  // Sync com Firestore
   useEffect(() => {
-    hasLoaded.current = false;
+    canWrite.current = false;
+    isFromFirebase.current = false;
 
     if (isDemo) {
       setStoreState(getDemoStore());
       setLoading(false);
-      hasLoaded.current = true;
+      canWrite.current = true;
       return;
     }
 
     if (!docRef) {
-      setStoreState(defaultStore());
       setLoading(false);
-      hasLoaded.current = true;
       return;
     }
 
     setLoading(true);
+    let active = true;
+    let unsub: () => void = () => {};
 
-    const loadInitial = async () => {
+    const init = async () => {
       try {
-        console.log(`[MPC] 🔄 Carregando do Firebase | path: clinics/${clinicId}/mpc/store`);
+        console.log(`[MPC] 🔄 Carregando | clinics/${clinicId}/mpc/store`);
         const snap = await getDoc(docRef);
+        if (!active) return;
+
         if (snap.exists()) {
           const data = snap.data() as MPCStore;
-          console.log(`[MPC] ✅ Dados carregados | dentistas: ${data.dentists?.length ?? 0} | atendimentos: ${data.appointments?.length ?? 0}`);
+          console.log(`[MPC] ✅ Carregado | dentistas: ${data.dentists?.length ?? 0} | atendimentos: ${data.appointments?.length ?? 0}`);
+          isFromFirebase.current = true;
           setStoreState(data);
         } else {
-          console.log(`[MPC] ℹ️ Documento ainda não existe no Firebase — iniciando vazio`);
+          console.log(`[MPC] ℹ️ Documento não existe ainda — pronto para receber dados`);
+          isFromFirebase.current = true;
           setStoreState(defaultStore());
         }
+
+        canWrite.current = true;
       } catch (e) {
-        console.warn("[useMPCDataStore] Erro ao carregar do Firebase:", e);
-        setStoreState(defaultStore());
+        console.warn("[MPC] Erro ao carregar:", e);
+        canWrite.current = false;
       } finally {
-        setLoading(false);
-        hasLoaded.current = true;
+        if (active) setLoading(false);
+      }
+
+      // Assinar atualizações em tempo real APÓS o getDoc inicial
+      try {
+        unsub = onSnapshot(docRef, (snap) => {
+          if (!active) return;
+          if (snap.metadata.hasPendingWrites) return;
+
+          if (snap.exists()) {
+            isFromFirebase.current = true;
+            setStoreState(prev => {
+              const incoming = snap.data() as MPCStore;
+              return JSON.stringify(prev) === JSON.stringify(incoming) ? prev : incoming;
+            });
+            canWrite.current = true;
+          }
+        }, (err) => {
+          console.warn("[MPC] onSnapshot error:", err);
+        });
+      } catch (e) {
+        console.warn("[MPC] Falha ao assinar onSnapshot:", e);
       }
     };
 
-    loadInitial();
-
-    // Assinar atualizações em tempo real
-    // Usa forma funcional do setState: se dados são iguais, retorna prev → React não re-renderiza → save effect não dispara → sem loop
-    const unsubscribe = onSnapshot(docRef, (snap) => {
-      if (snap.metadata.hasPendingWrites) return; // ignora eco do nosso próprio setDoc
-      if (snap.exists()) {
-        setStoreState(prev => {
-          const incoming = snap.data() as MPCStore;
-          // Só troca referência se dados realmente mudaram (evita loop)
-          return JSON.stringify(prev) === JSON.stringify(incoming) ? prev : incoming;
-        });
-      }
-    });
+    init();
 
     return () => {
-      unsubscribe();
-      hasLoaded.current = false;
+      active = false;
+      try { unsub(); } catch {}
+      canWrite.current = false;
     };
-  }, [docRef, isDemo]);
+  }, [docRef, isDemo, clinicId]);
 
-  // Salva no Firestore — hasLoaded é verificado DENTRO do timer (800ms depois), 
-  // garantindo que loadInitial() já terminou antes de salvar
+  // ─── Save Effect ────────────────────────────────────────────────────────────
+  // Só salva quando:
+  //   1. isFromFirebase.current = false  → mudança veio do USUÁRIO (não do Firebase)
+  //   2. canWrite.current = true          → getDoc inicial já foi concluído
+  //   3. store não está completamente vazio
   useEffect(() => {
     if (!docRef || isDemo || readOnly) return;
 
-    const savedStore = store; // captura snapshot do store atual para evitar closure stale
-    const savedDocRef = docRef;
+    // Mudança veio do Firebase → reseta flag e não salva de volta
+    if (isFromFirebase.current) {
+      isFromFirebase.current = false;
+      return;
+    }
+
+    if (!canWrite.current) return;
+    if (isStoreEmpty(store)) return;
+
+    const storeSnapshot = store;
+    const docSnapshot = docRef;
 
     const timer = setTimeout(async () => {
-      if (!hasLoaded.current) {
-        console.warn("[MPC] Save ignorado: dados ainda não carregados do Firebase");
-        return;
-      }
+      if (!canWrite.current) return;
       try {
-        await setDoc(savedDocRef, savedStore);
-        const clinicName = savedDocRef.parent.parent?.id ?? "?";
+        await setDoc(docSnapshot, storeSnapshot);
         console.log(
-          `[MPC] ✅ Salvo no Firebase | clinicId: ${clinicName} | dentistas: ${savedStore.dentists.length} | atendimentos: ${savedStore.appointments.length} | pesquisas: ${savedStore.surveys.length}`
+          `[MPC] ✅ SALVO | clinics/${clinicId}/mpc/store | dentistas: ${storeSnapshot.dentists.length} | atendimentos: ${storeSnapshot.appointments.length}`
         );
-        toast.success(`Dados salvos na nuvem`, {
-          description: `${savedStore.dentists.length} dentistas · ${savedStore.appointments.length} atendimentos`,
-          duration: 2500,
+        toast.success("Dados salvos na nuvem ☁️", {
+          description: `${storeSnapshot.dentists.length} dentista(s) · ${storeSnapshot.appointments.length} atendimento(s)`,
+          duration: 3000,
         });
       } catch (e) {
-        console.error("[MPC] ❌ Erro ao salvar no Firebase:", e);
+        console.error("[MPC] ❌ Erro ao salvar:", e);
+        toast.error("Erro ao salvar na nuvem", { description: String(e) });
       }
-    }, 800);
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [store, docRef, isDemo]);
+  }, [store, docRef, isDemo, readOnly, clinicId]);
 
+  // ─── Mutations ──────────────────────────────────────────────────────────────
   const addDentist = useCallback((d: { id?: string; name: string; specialty?: string; dailyTarget?: number; leadId?: string }) => {
     const id = d.id || `d_${Date.now()}`;
     setStore(s => ({ ...s, dentists: [...s.dentists, { id, name: d.name, specialty: d.specialty || "", dailyTarget: d.dailyTarget || 10, leadId: d.leadId }] }));
@@ -186,5 +202,6 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
     setStore(defaultStore());
   }, [setStore]);
 
-  return { store, setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, reset };
+  return { store, setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, reset, loading };
 }
+
