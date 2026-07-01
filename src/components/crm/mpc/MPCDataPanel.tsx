@@ -10,6 +10,7 @@ type Mutations = {
   removeDentist: (id: string) => void;
   recordAppointment: (a: any) => void;
   addSurvey: (s: any) => void;
+  saveNow: (nextStore?: MPCStore) => Promise<void>;
 };
 
 type MPCDataPanelProps = {
@@ -76,7 +77,7 @@ function parseDateTimeToISO(dateRaw: string, timeRaw?: string) {
 }
 
 export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
-  const { setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey } = mutations;
+  const { setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, saveNow } = mutations;
   const { allLeads } = useLeads();
 
   const [activeForm, setActiveForm] = useState<ActiveForm>(null);
@@ -242,7 +243,9 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
       return;
     }
 
-    setStore((prev) => ({ ...prev, appointments: [...prev.appointments, ...imported] }));
+    const nextStore = { ...store, appointments: [...store.appointments, ...imported] };
+    setStore(nextStore);
+    void saveNow(nextStore);
     showSuccess(
       `Importados ${imported.length} atendimentos em massa · ${linkedCount} vinculados ao CRM · ${noLeadCount} sem lead · ${invalidCount} inválidos`
     );
@@ -339,7 +342,9 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
       return;
     }
 
-    setStore((prev) => ({ ...prev, budgets: [...(prev.budgets || []), ...imported] }));
+    const nextStore = { ...store, budgets: [...(store.budgets || []), ...imported] };
+    setStore(nextStore);
+    void saveNow(nextStore);
     showSuccess(
       `Importados ${imported.length} orçamento(s) · ${linkedCount} vinculados ao CRM · ${noLeadCount} sem lead · ${invalidCount} inválidos`
     );

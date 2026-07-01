@@ -86,9 +86,9 @@ const CRMDashboard = () => {
 
   const { totalUnread, sendMessage, serverConnected } = useConversations();
 
-  const { store: mpcStore, setStore: mpcSetStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey } = useMPCDataStore(currentClinic);
+  const { store: mpcStore, setStore: mpcSetStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, saveNow: mpcSaveNow } = useMPCDataStore(currentClinic);
   const { data: mpcData, isLoading: mpcLoading } = useMPCDashboardData(mpcStore);
-  const mpcMutations = { setStore: mpcSetStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey };
+  const mpcMutations = { setStore: mpcSetStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, saveNow: mpcSaveNow };
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);

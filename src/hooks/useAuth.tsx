@@ -35,7 +35,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
+  const [selectedClinicState, setSelectedClinicState] = useState<string | null>(() => {
+    try { return localStorage.getItem('crm_selected_clinic') || null; } catch { return null; }
+  });
   const [currentClinic, setCurrentClinic] = useState<string | null>(() => {
     try { return localStorage.getItem('crm_current_clinic') || null; } catch { return null; }
   });
@@ -51,9 +53,17 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
     setCurrentClinic(val);
   };
 
+  const setSelectedClinic = (val: string | null) => {
+    try {
+      if (val) localStorage.setItem('crm_selected_clinic', val);
+      else localStorage.removeItem('crm_selected_clinic');
+    } catch {}
+    setSelectedClinicState(val);
+  };
+
   useEffect(() => {
-    try { console.log('[AuthProvider] selectedClinic ->', selectedClinic); } catch {}
-  }, [selectedClinic]);
+    try { console.log('[AuthProvider] selectedClinic ->', selectedClinicState); } catch {}
+  }, [selectedClinicState]);
 
   useEffect(() => {
     try { console.log('[AuthProvider] currentClinic ->', currentClinic); } catch {}
@@ -70,9 +80,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
           setUserProfile(profile);
           if (profile) {
             if (profile.role === "admin" || profile.role === "cliente") {
-              const val = selectedClinic || profile.clinicId || null;
+              const val = selectedClinicState || currentClinic || profile.clinicId || null;
               persistClinic(val);
-              console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val, "selectedClinic:", selectedClinic);
+              console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val, "selectedClinic:", selectedClinicState);
             } else {
               const clinicFromProfile = profile.clinicId || (profile.clinicIds && profile.clinicIds[0]) || null;
               persistClinic(clinicFromProfile);
@@ -89,7 +99,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       }
     });
     return unsubscribe;
-  }, [selectedClinic]);
+  }, [selectedClinicState, currentClinic]);
 
   // Load clinic metadata when currentClinic changes
   useEffect(() => {
@@ -131,12 +141,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       const singleClinic = profile ? (profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null)) : null;
       if (profile) {
         if (profile.role === "admin" || profile.role === "cliente") {
-          const val = clinic ?? selectedClinic ?? profile.clinicId ?? null;
+          const val = clinic ?? selectedClinicState ?? currentClinic ?? profile.clinicId ?? null;
           persistClinic(val);
           console.log(`[AuthProvider][login] ${profile.role} set currentClinic ->`, val);
         } else {
           // Outros roles têm restrição à clínica atribuída
-          const effective = clinic ?? selectedClinic ?? singleClinic ?? null;
+          const effective = clinic ?? selectedClinicState ?? currentClinic ?? singleClinic ?? null;
           const allowed = profile.clinicId === effective || (Array.isArray(profile.clinicIds) && profile.clinicIds.includes(effective)) || (Array.isArray(profile.clinics) && profile.clinics.includes(effective));
           if (effective && allowed) {
             setSelectedClinic(effective);
@@ -178,7 +188,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, error, login, register, logout, selectedClinic, setSelectedClinic, currentClinic, userProfile, clinicMeta }}
+      value={{ user, loading, error, login, register, logout, selectedClinic: selectedClinicState, setSelectedClinic, currentClinic, userProfile, clinicMeta }}
     >
       {children}
     </AuthContext.Provider>

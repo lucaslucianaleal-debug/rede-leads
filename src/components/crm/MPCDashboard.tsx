@@ -21,6 +21,7 @@ type MPCDashboardProps = {
     removeDentist: (id: string) => void;
     recordAppointment: (a: any) => void;
     addSurvey: (s: any) => void;
+    saveNow: (nextStore?: MPCStore) => Promise<void>;
   };
 };
 

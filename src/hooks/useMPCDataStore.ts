@@ -250,10 +250,21 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
     setStore(st => ({ ...st, surveys: [...st.surveys, s] }));
   }, [setStore]);
 
+  const saveNow = useCallback(async (nextStore?: MPCStore) => {
+    const targetStore = sanitizeStore(nextStore || store);
+    if (isDemo || !docRef) {
+      if (isDemo) setDemoStore(targetStore);
+      else setClinicCacheStore(clinicId, targetStore);
+      return;
+    }
+    await setDoc(docRef, targetStore, { merge: true });
+    setClinicCacheStore(clinicId, targetStore);
+  }, [store, isDemo, docRef, clinicId]);
+
   const reset = useCallback(() => {
     setStore(defaultStore());
   }, [setStore]);
 
-  return { store, setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, reset, loading };
+  return { store, setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, reset, saveNow, loading };
 }
 
