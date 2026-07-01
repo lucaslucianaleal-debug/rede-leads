@@ -51,6 +51,30 @@ function parseDateToISO(dateRaw: string) {
   return null;
 }
 
+function parseDateTimeToISO(dateRaw: string, timeRaw?: string) {
+  const datePart = dateRaw.trim();
+  const timePart = (timeRaw || "12:00").trim();
+  const timeMatch = timePart.match(/^(\d{1,2}):(\d{2})$/);
+  const hh = timeMatch ? String(Math.min(23, Number(timeMatch[1]))).padStart(2, "0") : "12";
+  const mm = timeMatch ? String(Math.min(59, Number(timeMatch[2]))).padStart(2, "0") : "00";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    const dt = new Date(`${datePart}T${hh}:${mm}:00`);
+    return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+
+  const br = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (br) {
+    const day = Number(br[1]);
+    const month = Number(br[2]) - 1;
+    const year = Number(br[3]);
+    const dt = new Date(year, month, day, Number(hh), Number(mm), 0);
+    return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+
+  return null;
+}
+
 export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
   const { setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey } = mutations;
   const { allLeads } = useLeads();
@@ -80,6 +104,8 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
   const [bulkDentistId, setBulkDentistId] = useState("");
   const [bulkStatus, setBulkStatus] = useState<"scheduled" | "confirmed" | "attended">("attended");
   const [bulkText, setBulkText] = useState("");
+  const [budgetBulkDentistId, setBudgetBulkDentistId] = useState("");
+  const [budgetBulkText, setBudgetBulkText] = useState("");
 
   const filteredApptLeads = useMemo(() => {
     if (!apptSearchQuery.trim()) return [];
@@ -224,6 +250,103 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     setBulkText("");
   };
 
+  const handleBulkImportBudgets = () => {
+    if (!budgetBulkDentistId || !budgetBulkText.trim()) return;
+
+    const leadByNormalizedName = new Map<string, string>();
+    allLeads.forEach((lead) => {
+      const key = normalizeName(lead.nome || "");
+      if (key && !leadByNormalizedName.has(key)) {
+        leadByNormalizedName.set(key, lead.id);
+      }
+    });
+
+    const lines = budgetBulkText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const imported: Array<{ id: string; dentistId: string; patientName: string; patientId?: string; budgetAt: string; procedure?: string; source?: string }> = [];
+    let linkedCount = 0;
+    let noLeadCount = 0;
+    let invalidCount = 0;
+
+    lines.forEach((line, idx) => {
+      // Formato markdown esperado:
+      // - **Nome**: 05/06/2026, 08:49, Dra Barbara
+      const md = line.match(/\*\*(.+?)\*\*\s*:\s*(\d{1,2}\/\d{1,2}\/\d{4})(?:\s*,\s*(\d{1,2}:\d{2}))?(?:\s*,\s*(.+))?/i);
+      if (md) {
+        const patientName = (md[1] || "").trim();
+        const date = (md[2] || "").trim();
+        const time = (md[3] || "12:00").trim();
+        const extra = (md[4] || "").trim();
+        const budgetAt = parseDateTimeToISO(date, time);
+        if (!patientName || !budgetAt) {
+          invalidCount += 1;
+          return;
+        }
+        const leadId = leadByNormalizedName.get(normalizeName(patientName));
+        if (leadId) linkedCount += 1;
+        else noLeadCount += 1;
+
+        imported.push({
+          id: `bud_bulk_${Date.now()}_${idx}`,
+          dentistId: budgetBulkDentistId,
+          patientName,
+          patientId: leadId,
+          budgetAt,
+          procedure: undefined,
+          source: extra || "import_markdown",
+        });
+        return;
+      }
+
+      // Alternativa por colunas: Nome;Data;Hora(opcional);Procedimento(opcional)
+      const cols = line.split(/[;,|\t]/).map((c) => c.trim()).filter(Boolean);
+      if (cols.length < 2) {
+        invalidCount += 1;
+        return;
+      }
+
+      const [nameCol, dateCol, thirdCol = "", fourthCol = ""] = cols;
+      if (idx === 0 && /nome/i.test(nameCol) && /data/i.test(dateCol)) return;
+
+      const timeLooksValid = /^\d{1,2}:\d{2}$/.test(thirdCol);
+      const budgetAt = parseDateTimeToISO(dateCol, timeLooksValid ? thirdCol : undefined);
+      if (!nameCol || !budgetAt) {
+        invalidCount += 1;
+        return;
+      }
+
+      const procedure = timeLooksValid ? fourthCol || undefined : thirdCol || undefined;
+      const leadId = leadByNormalizedName.get(normalizeName(nameCol));
+      if (leadId) linkedCount += 1;
+      else noLeadCount += 1;
+
+      imported.push({
+        id: `bud_bulk_${Date.now()}_${idx}`,
+        dentistId: budgetBulkDentistId,
+        patientName: nameCol,
+        patientId: leadId,
+        budgetAt,
+        procedure,
+        source: "import_table",
+      });
+    });
+
+    if (imported.length === 0) {
+      showSuccess(`Nenhuma linha válida para importar orçamento (${invalidCount} inválidas)`);
+      return;
+    }
+
+    setStore((prev) => ({ ...prev, budgets: [...(prev.budgets || []), ...imported] }));
+    showSuccess(
+      `Importados ${imported.length} orçamento(s) · ${linkedCount} vinculados ao CRM · ${noLeadCount} sem lead · ${invalidCount} inválidos`
+    );
+
+    setBudgetBulkText("");
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Barra superior compacta */}
@@ -235,6 +358,9 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
           </span>
           <span className="text-xs bg-white border border-slate-200 rounded-full px-2 py-0.5 text-slate-600">
             {store.appointments.length} atendimentos
+          </span>
+          <span className="text-xs bg-white border border-slate-200 rounded-full px-2 py-0.5 text-slate-600">
+            {(store.budgets || []).length} orçamentos
           </span>
           <span className="text-xs bg-white border border-slate-200 rounded-full px-2 py-0.5 text-slate-600">
             {store.surveys.length} pesquisas
@@ -442,6 +568,40 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                   >
                     <Upload size={16} /> Importar em Massa
                   </button>
+
+                  <div className="pt-4 border-t border-slate-200 space-y-3">
+                    <h4 className="text-sm font-semibold text-slate-900">Importar Orçamentos em Massa</h4>
+
+                    <div>
+                      <label className="text-xs text-slate-600 mb-1 block">Dentista *</label>
+                      <select value={budgetBulkDentistId} onChange={(e) => setBudgetBulkDentistId(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm">
+                        <option value="">Selecione um dentista</option>
+                        {store.dentists.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="text-xs text-slate-600 bg-white border border-slate-200 rounded-lg p-3">
+                      Formatos aceitos:<br />
+                      1) <strong>- **Nome**: 05/06/2026, 08:49, Dra Barbara</strong><br />
+                      2) <strong>Nome;Data;Hora;Procedimento(opcional)</strong>
+                    </div>
+
+                    <textarea
+                      value={budgetBulkText}
+                      onChange={(e) => setBudgetBulkText(e.target.value)}
+                      placeholder="Cole aqui sua lista de orçamentos"
+                      rows={8}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm resize-y"
+                    />
+
+                    <button
+                      onClick={handleBulkImportBudgets}
+                      disabled={!budgetBulkDentistId || !budgetBulkText.trim()}
+                      className="w-full px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-40 flex items-center justify-center gap-2"
+                    >
+                      <Upload size={16} /> Importar Orçamentos
+                    </button>
+                  </div>
                 </>
               )}
             </div>

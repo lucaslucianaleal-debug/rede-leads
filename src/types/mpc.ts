@@ -107,15 +107,23 @@ export interface MPCWeeklyDentistSummary {
   conversionDelta: number;
   satisfaction: number;
   surveyCount: number;
+  budgetCount?: number;
+  convertedCount?: number;
+  pendingBudgetCount?: number;
 }
 
 export interface MPCWeeklyReport {
   periodLabel: string;
   clinicAttended: number;
+  clinicBudgets?: number;
+  clinicConverted?: number;
+  clinicPendingBudgets?: number;
+  budgetConversionRate?: number;
   clinicCapacity: number;
   clinicUtilization: number;
   lowOccupancyDays: Array<{ date: string; attended: number; capacity: number }>;
   dentistSummaries: MPCWeeklyDentistSummary[];
+  pendingBudgetPatients?: string[];
   receptionAvg: number;
   receptionComplaints: string[];
   outliers: string[];

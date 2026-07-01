@@ -60,14 +60,34 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   prevStart.setHours(0, 0, 0, 0);
 
   const appointments = store.appointments || [];
+  const budgets = store.budgets || [];
   const surveys = store.surveys || [];
   const dentists = store.dentists || [];
 
   const inRange = (dt: Date, a: Date, b: Date) => dt >= a && dt <= b;
+  const normalize = (v: string) =>
+    (v || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const entityKey = (dentistId: string, patientId?: string, patientName?: string) => {
+    if (patientId) return `${dentistId}::id::${patientId}`;
+    return `${dentistId}::name::${normalize(patientName || "")}`;
+  };
+
+  const dayKey = (isoLike?: string) => String(isoLike || "").slice(0, 10);
 
   const attendedCurrent = appointments.filter((a: any) => {
     if (a.status !== "attended") return false;
     const dt = new Date(a.attendedAt || 0);
+    return inRange(dt, start, end);
+  });
+
+  const budgetsCurrent = budgets.filter((b: any) => {
+    const dt = new Date(b.budgetAt || 0);
     return inRange(dt, start, end);
   });
 
@@ -77,7 +97,23 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     return inRange(dt, prevStart, prevEnd);
   });
 
-  const clinicAttended = attendedCurrent.length;
+  const budgetsPrev = budgets.filter((b: any) => {
+    const dt = new Date(b.budgetAt || 0);
+    return inRange(dt, prevStart, prevEnd);
+  });
+
+  // Regra de negócio: orçamento também conta como atendimento.
+  // Para não duplicar, dedup por dentista + paciente + dia.
+  const clinicAttendanceSet = new Set<string>();
+  attendedCurrent.forEach((a: any) => {
+    clinicAttendanceSet.add(`${entityKey(a.dentistId, a.patientId, a.patientName)}::${dayKey(a.attendedAt)}`);
+  });
+  budgetsCurrent.forEach((b: any) => {
+    clinicAttendanceSet.add(`${entityKey(b.dentistId, b.patientId, b.patientName)}::${dayKey(b.budgetAt)}`);
+  });
+
+  const clinicAttended = clinicAttendanceSet.size;
+  const clinicBudgets = budgetsCurrent.length;
   const dailyCapacity = dentists.reduce((sum, d) => sum + (d.dailyTarget || 10), 0);
   const clinicCapacity = dailyCapacity * days;
   const clinicUtilization = clinicCapacity > 0 ? (clinicAttended / clinicCapacity) * 100 : 0;
@@ -86,7 +122,14 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const d = new Date(start);
     d.setDate(start.getDate() + idx);
     const dateStr = toIsoDate(d);
-    const attended = attendedCurrent.filter((a: any) => String(a.attendedAt || "").startsWith(dateStr)).length;
+    const daySet = new Set<string>();
+    attendedCurrent
+      .filter((a: any) => String(a.attendedAt || "").startsWith(dateStr))
+      .forEach((a: any) => daySet.add(entityKey(a.dentistId, a.patientId, a.patientName)));
+    budgetsCurrent
+      .filter((b: any) => String(b.budgetAt || "").startsWith(dateStr))
+      .forEach((b: any) => daySet.add(entityKey(b.dentistId, b.patientId, b.patientName)));
+    const attended = daySet.size;
     return { date: dateStr, attended, capacity: dailyCapacity };
   }).filter((day) => day.capacity > 0 && day.attended < Math.ceil(day.capacity * 0.6));
 
@@ -101,9 +144,33 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
       return a.dentistId === d.id && a.status === "attended" && inRange(dt, prevStart, prevEnd);
     }).length;
 
-    const attended = dentistCurrent.filter((a: any) => a.status === "attended").length;
+    const attendedOnly = dentistCurrent.filter((a: any) => a.status === "attended");
+    const dentistBudgetsCurrent = budgetsCurrent.filter((b: any) => b.dentistId === d.id);
+
+    const attendedSet = new Set<string>();
+    attendedOnly.forEach((a: any) => {
+      attendedSet.add(entityKey(d.id, a.patientId, a.patientName));
+    });
+    dentistBudgetsCurrent.forEach((b: any) => {
+      attendedSet.add(entityKey(d.id, b.patientId, b.patientName));
+    });
+
+    const attended = attendedSet.size;
     const scheduledOrConfirmed = dentistCurrent.filter((a: any) => a.status === "scheduled" || a.status === "confirmed").length;
-    const conversionRate = attended + scheduledOrConfirmed > 0 ? (attended / (attended + scheduledOrConfirmed)) * 100 : 0;
+    const budgetSet = new Set<string>();
+    dentistBudgetsCurrent.forEach((b: any) => {
+      budgetSet.add(entityKey(d.id, b.patientId, b.patientName));
+    });
+    const convertedSet = new Set<string>();
+    attendedOnly.forEach((a: any) => {
+      const k = entityKey(d.id, a.patientId, a.patientName);
+      if (budgetSet.has(k)) convertedSet.add(k);
+    });
+
+    const budgetCount = budgetSet.size;
+    const convertedCount = convertedSet.size;
+    const pendingBudgetCount = Math.max(0, budgetCount - convertedCount);
+    const conversionRate = budgetCount > 0 ? (convertedCount / budgetCount) * 100 : 0;
     const target = (d.dailyTarget || 10) * days;
 
     const trend: "up" | "down" | "stable" =
@@ -133,6 +200,9 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
       conversionDelta: Math.round((conversionRate - conversionTarget) * 10) / 10,
       satisfaction: Math.round(satisfaction * 10) / 10,
       surveyCount: dentistSurveys.length,
+      budgetCount,
+      convertedCount,
+      pendingBudgetCount,
     };
   });
 
@@ -163,10 +233,24 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   const conversionWinner = [...dentistSummaries].sort((a, b) => b.conversionRate - a.conversionRate)[0];
   const satisfactionWinner = [...dentistSummaries].filter((d) => d.surveyCount > 0).sort((a, b) => b.satisfaction - a.satisfaction)[0];
 
-  const convCurrentBase = appointments.filter((a: any) => inRange(new Date(a.attendedAt || 0), start, end));
-  const convPrevBase = appointments.filter((a: any) => inRange(new Date(a.attendedAt || 0), prevStart, prevEnd));
-  const convCurrent = convCurrentBase.length > 0 ? (convCurrentBase.filter((a: any) => a.status === "attended").length / convCurrentBase.length) * 100 : 0;
-  const convPrev = convPrevBase.length > 0 ? (convPrevBase.filter((a: any) => a.status === "attended").length / convPrevBase.length) * 100 : 0;
+  const convCurrent = dentistSummaries.length > 0
+    ? dentistSummaries.reduce((acc, d) => acc + d.conversionRate, 0) / dentistSummaries.length
+    : 0;
+  const convPrevByDentist = dentists.map((d: any) => {
+    const dbPrev = budgetsPrev.filter((b: any) => b.dentistId === d.id);
+    const daPrev = attendedPrev.filter((a: any) => a.dentistId === d.id);
+    const bSet = new Set<string>();
+    dbPrev.forEach((b: any) => bSet.add(entityKey(d.id, b.patientId, b.patientName)));
+    const cSet = new Set<string>();
+    daPrev.forEach((a: any) => {
+      const k = entityKey(d.id, a.patientId, a.patientName);
+      if (bSet.has(k)) cSet.add(k);
+    });
+    return bSet.size > 0 ? (cSet.size / bSet.size) * 100 : 0;
+  });
+  const convPrev = convPrevByDentist.length > 0
+    ? convPrevByDentist.reduce((acc, v) => acc + v, 0) / convPrevByDentist.length
+    : 0;
 
   const satCurrentBase = surveys.filter((s: any) => inRange(new Date(s.createdAt || 0), start, end));
   const satPrevBase = surveys.filter((s: any) => inRange(new Date(s.createdAt || 0), prevStart, prevEnd));
@@ -198,13 +282,34 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     managementActions.push(`Manter e replicar as práticas de ${satisfactionWinner.name}, destaque em satisfação.`);
   }
 
+  const allBudgetSet = new Set<string>();
+  budgetsCurrent.forEach((b: any) => allBudgetSet.add(entityKey(b.dentistId, b.patientId, b.patientName)));
+  const allConvertedSet = new Set<string>();
+  attendedCurrent.forEach((a: any) => {
+    const k = entityKey(a.dentistId, a.patientId, a.patientName);
+    if (allBudgetSet.has(k)) allConvertedSet.add(k);
+  });
+  const pendingBudgetPatients = budgetsCurrent
+    .filter((b: any) => !allConvertedSet.has(entityKey(b.dentistId, b.patientId, b.patientName)))
+    .map((b: any) => String(b.patientName || ""))
+    .filter(Boolean)
+    .slice(0, 20);
+  const clinicConverted = allConvertedSet.size;
+  const clinicPendingBudgets = Math.max(0, allBudgetSet.size - allConvertedSet.size);
+  const budgetConversionRate = allBudgetSet.size > 0 ? (allConvertedSet.size / allBudgetSet.size) * 100 : 0;
+
   return {
     periodLabel: `${fmtBR(start)} a ${fmtBR(end)}`,
     clinicAttended,
+    clinicBudgets,
+    clinicConverted,
+    clinicPendingBudgets,
+    budgetConversionRate: Math.round(budgetConversionRate * 10) / 10,
     clinicCapacity,
     clinicUtilization: Math.round(clinicUtilization * 10) / 10,
     lowOccupancyDays,
     dentistSummaries,
+    pendingBudgetPatients,
     receptionAvg: Math.round(receptionAvg * 10) / 10,
     receptionComplaints,
     outliers,
@@ -225,13 +330,16 @@ function downloadTextReport(report: MPCWeeklyReportType) {
   lines.push("");
   lines.push("1) Capacidade da clinica");
   lines.push(`- Atendidos: ${report.clinicAttended}`);
+  lines.push(`- Orcamentos: ${report.clinicBudgets ?? 0}`);
+  lines.push(`- Convertidos (orcamento -> atendimento): ${report.clinicConverted ?? 0}`);
+  lines.push(`- Conversao de orcamentos: ${Math.round(report.budgetConversionRate ?? 0)}%`);
   lines.push(`- Capacidade: ${report.clinicCapacity}`);
   lines.push(`- Utilizacao: ${Math.round(report.clinicUtilization)}%`);
   lines.push(`- Dias de baixa ocupacao: ${report.lowOccupancyDays.length}`);
   lines.push("");
   lines.push("2/3) Volume e conversao por dentista");
   report.dentistSummaries.forEach((d) => {
-    lines.push(`- ${d.name}: atendidos=${d.attended}, meta=${d.target}, mediaDia=${d.avgDaily.toFixed(1)}, conversao=${d.conversionRate}%`);
+    lines.push(`- ${d.name}: atendidos=${d.attended}, meta=${d.target}, orcamentos=${d.budgetCount ?? 0}, convertidos=${d.convertedCount ?? 0}, conversao=${d.conversionRate}%`);
   });
   lines.push("");
   lines.push("4/5) Satisfacao e recepcao");
@@ -252,6 +360,9 @@ function downloadTextReport(report: MPCWeeklyReportType) {
   lines.push("");
   lines.push("9) Acoes da gestao");
   (report.managementActions.length ? report.managementActions : ["Sem acao urgente no periodo"]).forEach((x) => lines.push(`- ${x}`));
+  lines.push("");
+  lines.push("Pendentes de conversao (amostra)");
+  (report.pendingBudgetPatients && report.pendingBudgetPatients.length > 0 ? report.pendingBudgetPatients : ["Sem pendencias relevantes"]).forEach((x) => lines.push(`- ${x}`));
 
   const content = lines.join("\n");
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -350,6 +461,9 @@ export default function MPCWeeklyReport({ report, store }: Props) {
           <h3 className="font-semibold text-slate-900 mb-2">1. A clínica operou dentro da capacidade esperada?</h3>
           <ul className="list-disc pl-5 space-y-1">
             <li>Pacientes atendidos no período: <strong>{filteredReport.clinicAttended}</strong></li>
+            <li>Orçamentos no período: <strong>{filteredReport.clinicBudgets ?? 0}</strong></li>
+            <li>Convertidos (orçamento → atendimento): <strong>{filteredReport.clinicConverted ?? 0}</strong></li>
+            <li>Taxa de conversão dos orçamentos: <strong>{Math.round(filteredReport.budgetConversionRate ?? 0)}%</strong></li>
             <li>Capacidade estimada no período: <strong>{filteredReport.clinicCapacity}</strong></li>
             <li>Utilização da capacidade: <strong>{Math.round(filteredReport.clinicUtilization)}%</strong></li>
             <li>Ociosidade: <strong>{filteredReport.clinicUtilization < 80 ? "Sim, há margem ociosa" : "Baixa ociosidade"}</strong></li>
@@ -368,6 +482,8 @@ export default function MPCWeeklyReport({ report, store }: Props) {
                   <th className="text-left px-3 py-2">Meta</th>
                   <th className="text-left px-3 py-2">Média diária</th>
                   <th className="text-left px-3 py-2">Tendência</th>
+                  <th className="text-left px-3 py-2">Orçamentos</th>
+                  <th className="text-left px-3 py-2">Convertidos</th>
                   <th className="text-left px-3 py-2">Conversão</th>
                   <th className="text-left px-3 py-2">Meta conv.</th>
                 </tr>
@@ -382,6 +498,8 @@ export default function MPCWeeklyReport({ report, store }: Props) {
                     <td className="px-3 py-2">
                       {d.trend === "up" ? "Crescimento" : d.trend === "down" ? "Queda" : "Estável"}
                     </td>
+                    <td className="px-3 py-2">{d.budgetCount ?? 0}</td>
+                    <td className="px-3 py-2">{d.convertedCount ?? 0}</td>
                     <td className="px-3 py-2">{d.conversionRate}%</td>
                     <td className="px-3 py-2">{d.conversionTarget}%</td>
                   </tr>
@@ -442,6 +560,19 @@ export default function MPCWeeklyReport({ report, store }: Props) {
                 <li key={`${idx}_${item.slice(0, 12)}`}>{item}</li>
               ))}
             </ul>
+          )}
+        </section>
+
+        <section>
+          <h3 className="font-semibold text-slate-900 mb-2">Orçamentos pendentes de conversão</h3>
+          {filteredReport.pendingBudgetPatients && filteredReport.pendingBudgetPatients.length > 0 ? (
+            <ul className="list-disc pl-5 space-y-1">
+              {filteredReport.pendingBudgetPatients.map((name, idx) => (
+                <li key={`${idx}_${name.slice(0, 12)}`}>{name}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-emerald-700">Sem pendências relevantes no período.</p>
           )}
         </section>
 

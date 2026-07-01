@@ -117,6 +117,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
       setStore({
         dentists: [],
         appointments: [],
+        budgets: [],
         surveys: [],
         averageTicket: 500,
       });

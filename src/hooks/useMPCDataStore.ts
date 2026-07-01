@@ -6,12 +6,23 @@ import { toast } from "sonner";
 export type MPCStore = {
   dentists: Array<{ id: string; name: string; specialty?: string; dailyTarget: number; leadId?: string }>;
   appointments: Array<{ id: string; dentistId: string; patientName: string; patientId?: string; status: "scheduled" | "confirmed" | "attended"; attendedAt: string }>;
+  budgets: Array<{ id: string; dentistId: string; patientName: string; patientId?: string; budgetAt: string; procedure?: string; source?: string }>;
   surveys: Array<{ id: string; leadId?: string; sector: "reception" | "clinic" | "ortho" | "sales"; score: number; comment?: string; createdAt: string }>;
   averageTicket: number;
 };
 
 function defaultStore(): MPCStore {
-  return { dentists: [], appointments: [], surveys: [], averageTicket: 500 };
+  return { dentists: [], appointments: [], budgets: [], surveys: [], averageTicket: 500 };
+}
+
+function normalizeStoreShape(store: any): MPCStore {
+  return {
+    dentists: Array.isArray(store?.dentists) ? store.dentists : [],
+    appointments: Array.isArray(store?.appointments) ? store.appointments : [],
+    budgets: Array.isArray(store?.budgets) ? store.budgets : [],
+    surveys: Array.isArray(store?.surveys) ? store.surveys : [],
+    averageTicket: Number(store?.averageTicket ?? 500),
+  };
 }
 
 const DEMO_STORAGE_KEY = "mpc_demo_store";
@@ -22,7 +33,7 @@ const getMPCStorageKey = (clinicId?: string | null) =>
 function getDemoStore(): MPCStore {
   try {
     const stored = localStorage.getItem(DEMO_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : defaultStore();
+    return stored ? normalizeStoreShape(JSON.parse(stored)) : defaultStore();
   } catch { return defaultStore(); }
 }
 
@@ -34,7 +45,7 @@ function getClinicCacheStore(clinicId: string | null): MPCStore | null {
   if (!clinicId) return null;
   try {
     const stored = localStorage.getItem(getMPCStorageKey(clinicId));
-    return stored ? (JSON.parse(stored) as MPCStore) : null;
+    return stored ? normalizeStoreShape(JSON.parse(stored)) : null;
   } catch {
     return null;
   }
@@ -48,11 +59,11 @@ function setClinicCacheStore(clinicId: string | null, store: MPCStore) {
 }
 
 function sanitizeStore(store: MPCStore): MPCStore {
-  return JSON.parse(JSON.stringify(store)) as MPCStore;
+  return normalizeStoreShape(JSON.parse(JSON.stringify(store)) as MPCStore);
 }
 
 function isStoreEmpty(s: MPCStore) {
-  return s.dentists.length === 0 && s.appointments.length === 0 && s.surveys.length === 0;
+  return s.dentists.length === 0 && s.appointments.length === 0 && s.budgets.length === 0 && s.surveys.length === 0;
 }
 
 export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: boolean }) {
@@ -112,7 +123,7 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
         if (!active) return;
 
         if (snap.exists()) {
-          const data = snap.data() as MPCStore;
+          const data = normalizeStoreShape(snap.data());
           console.log(`[MPC] ✅ Carregado | dentistas: ${data.dentists?.length ?? 0} | atendimentos: ${data.appointments?.length ?? 0}`);
           isFromFirebase.current = true;
           setStoreState(data);
@@ -153,7 +164,7 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
           if (snap.exists()) {
             isFromFirebase.current = true;
             setStoreState(prev => {
-              const incoming = snap.data() as MPCStore;
+              const incoming = normalizeStoreShape(snap.data());
               setClinicCacheStore(clinicId, incoming);
               return JSON.stringify(prev) === JSON.stringify(incoming) ? prev : incoming;
             });
@@ -206,7 +217,7 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
           `[MPC] ✅ SALVO | clinics/${clinicId}/mpc/store | dentistas: ${storeSnapshot.dentists.length} | atendimentos: ${storeSnapshot.appointments.length}`
         );
         toast.success("Dados salvos na nuvem ☁️", {
-          description: `${storeSnapshot.dentists.length} dentista(s) · ${storeSnapshot.appointments.length} atendimento(s)`,
+          description: `${storeSnapshot.dentists.length} dentista(s) · ${storeSnapshot.appointments.length} atendimento(s) · ${storeSnapshot.budgets.length} orçamento(s)`,
           duration: 3000,
         });
       } catch (e) {
