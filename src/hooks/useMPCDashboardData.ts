@@ -17,8 +17,8 @@ import {
 // ════════════════════════════════════════════════════════════════
 
 export function useMPCDashboardData(clinicId?: string) {
-  // 1. Buscar dados raw — usar store (localStorage) quando possível
-  const { store } = useMPCDataStore(clinicId || "demo");
+  // Leitura somente — readOnly: true impede gravações acidentais que sobrescrevem dados do MPCDataPanel
+  const { store } = useMPCDataStore(clinicId || "demo", { readOnly: true });
   
   // 2. Calcular métricas, alertas e recomendações sem React Query
   // para garantir recálculo imediato em mudanças do store

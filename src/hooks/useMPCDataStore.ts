@@ -42,7 +42,8 @@ function setDemoStore(store: MPCStore) {
   }
 }
 
-export function useMPCDataStore(clinicId: string | null) {
+export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: boolean }) {
+  const readOnly = options?.readOnly ?? false;
   const [store, setStoreState] = useState<MPCStore>(defaultStore());
   const [loading, setLoading] = useState(true);
   const isDemo = !clinicId || clinicId === "demo";
@@ -105,10 +106,16 @@ export function useMPCDataStore(clinicId: string | null) {
 
     loadInitial();
 
-    // Assinar atualizações em tempo real (somente leitura — não dispara o save effect)
+    // Assinar atualizações em tempo real
+    // Usa forma funcional do setState: se dados são iguais, retorna prev → React não re-renderiza → save effect não dispara → sem loop
     const unsubscribe = onSnapshot(docRef, (snap) => {
+      if (snap.metadata.hasPendingWrites) return; // ignora eco do nosso próprio setDoc
       if (snap.exists()) {
-        setStoreState(snap.data() as MPCStore);
+        setStoreState(prev => {
+          const incoming = snap.data() as MPCStore;
+          // Só troca referência se dados realmente mudaram (evita loop)
+          return JSON.stringify(prev) === JSON.stringify(incoming) ? prev : incoming;
+        });
       }
     });
 
@@ -118,13 +125,15 @@ export function useMPCDataStore(clinicId: string | null) {
     };
   }, [docRef, isDemo]);
 
-  // Salva no Firestore — MAS SÓ depois do carregamento inicial, para não apagar dados existentes
+  // Salva no Firestore — SÓ depois do carregamento inicial e SÓ quando o store muda por ação do usuário
+  // (onSnapshot com dados iguais não troca referência → este effect NÃO re-executa → sem loop)
   useEffect(() => {
-    if (!docRef || isDemo || !hasLoaded.current) return;
+    if (!docRef || isDemo || !hasLoaded.current || readOnly) return;
 
     const saveToFirebase = async () => {
       try {
         await setDoc(docRef, store);
+        console.log("[MPC] Salvo no Firebase:", store.dentists.length, "dentistas,", store.appointments.length, "atendimentos,", store.surveys.length, "pesquisas");
       } catch (e) {
         console.warn("[useMPCDataStore] Erro ao salvar no Firebase:", e);
       }
