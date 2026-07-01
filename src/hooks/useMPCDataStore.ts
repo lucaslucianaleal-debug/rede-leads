@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import type { DentistPerformance } from "@/types/mpc";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
@@ -46,8 +46,13 @@ function setDemoStore(store: MPCStore) {
 export function useMPCDataStore(clinicId: string | null) {
   const [store, setStoreState] = useState<MPCStore>(defaultStore());
   const [loading, setLoading] = useState(true);
-  const docRef = getMPCDocRef(clinicId);
   const isDemo = !clinicId || clinicId === "demo";
+
+  // Memoize docRef para evitar re-render infinito (doc() cria novo objeto a cada render)
+  const docRef = useMemo(() => {
+    if (isDemo) return null;
+    return doc(db, "clinics", clinicId!, "mpc", "store");
+  }, [clinicId, isDemo]);
 
   // Wrapper para setStore que também salva em localStorage quando é demo
   const setStore = useCallback((newStore: MPCStore | ((prev: MPCStore) => MPCStore)) => {
@@ -126,27 +131,27 @@ export function useMPCDataStore(clinicId: string | null) {
   const addDentist = useCallback((d: { id?: string; name: string; specialty?: string; dailyTarget?: number; leadId?: string }) => {
     const id = d.id || `d_${Date.now()}`;
     setStore(s => ({ ...s, dentists: [...s.dentists, { id, name: d.name, specialty: d.specialty || "", dailyTarget: d.dailyTarget || 10, leadId: d.leadId }] }));
-  }, []);
+  }, [setStore]);
 
   const updateDentist = useCallback((id: string, patch: Partial<{ name: string; specialty: string; dailyTarget: number }>) => {
     setStore(s => ({ ...s, dentists: s.dentists.map(d => d.id === id ? { ...d, ...patch } : d) }));
-  }, []);
+  }, [setStore]);
 
   const removeDentist = useCallback((id: string) => {
     setStore(s => ({ ...s, dentists: s.dentists.filter(d => d.id !== id) }));
-  }, []);
+  }, [setStore]);
 
   const recordAppointment = useCallback((a: any) => {
     setStore(s => ({ ...s, appointments: [...s.appointments, a] }));
-  }, []);
+  }, [setStore]);
 
   const addSurvey = useCallback((s: any) => {
     setStore(st => ({ ...st, surveys: [...st.surveys, s] }));
-  }, []);
+  }, [setStore]);
 
   const reset = useCallback(() => {
     setStore(defaultStore());
-  }, []);
+  }, [setStore]);
 
   return { store, setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, reset };
 }
