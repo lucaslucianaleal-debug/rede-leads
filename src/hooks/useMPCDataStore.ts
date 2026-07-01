@@ -16,6 +16,9 @@ function defaultStore(): MPCStore {
 
 const DEMO_STORAGE_KEY = "mpc_demo_store";
 
+const getMPCStorageKey = (clinicId?: string | null) =>
+  clinicId ? `mpc_store_${clinicId}` : DEMO_STORAGE_KEY;
+
 function getDemoStore(): MPCStore {
   try {
     const stored = localStorage.getItem(DEMO_STORAGE_KEY);
@@ -25,6 +28,27 @@ function getDemoStore(): MPCStore {
 
 function setDemoStore(store: MPCStore) {
   try { localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store)); } catch {}
+}
+
+function getClinicCacheStore(clinicId: string | null): MPCStore | null {
+  if (!clinicId) return null;
+  try {
+    const stored = localStorage.getItem(getMPCStorageKey(clinicId));
+    return stored ? (JSON.parse(stored) as MPCStore) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setClinicCacheStore(clinicId: string | null, store: MPCStore) {
+  if (!clinicId) return;
+  try {
+    localStorage.setItem(getMPCStorageKey(clinicId), JSON.stringify(store));
+  } catch {}
+}
+
+function sanitizeStore(store: MPCStore): MPCStore {
+  return JSON.parse(JSON.stringify(store)) as MPCStore;
 }
 
 function isStoreEmpty(s: MPCStore) {
@@ -55,9 +79,10 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
     setStoreState((prev) => {
       const updated = typeof newStore === "function" ? newStore(prev) : newStore;
       if (isDemo) setDemoStore(updated);
+      else setClinicCacheStore(clinicId, updated);
       return updated;
     });
-  }, [isDemo]);
+  }, [isDemo, clinicId]);
 
   // Sync com Firestore
   useEffect(() => {
@@ -91,10 +116,24 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
           console.log(`[MPC] ✅ Carregado | dentistas: ${data.dentists?.length ?? 0} | atendimentos: ${data.appointments?.length ?? 0}`);
           isFromFirebase.current = true;
           setStoreState(data);
+          setClinicCacheStore(clinicId, data);
         } else {
-          console.log(`[MPC] ℹ️ Documento não existe ainda — pronto para receber dados`);
-          isFromFirebase.current = true;
-          setStoreState(defaultStore());
+          // Mesmo comportamento de "leads": tenta bootstrap via cache local da clínica.
+          const cached = getClinicCacheStore(clinicId);
+          if (cached && !isStoreEmpty(cached)) {
+            console.log(`[MPC] ♻️ Bootstrap do cache local para Firebase | clinic=${clinicId}`);
+            isFromFirebase.current = true;
+            setStoreState(cached);
+            try {
+              await setDoc(docRef, sanitizeStore(cached), { merge: true });
+            } catch (writeErr) {
+              console.warn("[MPC] Falha no bootstrap para Firebase:", writeErr);
+            }
+          } else {
+            console.log(`[MPC] ℹ️ Documento não existe ainda — pronto para receber dados`);
+            isFromFirebase.current = true;
+            setStoreState(defaultStore());
+          }
         }
 
         canWrite.current = true;
@@ -115,6 +154,7 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
             isFromFirebase.current = true;
             setStoreState(prev => {
               const incoming = snap.data() as MPCStore;
+              setClinicCacheStore(clinicId, incoming);
               return JSON.stringify(prev) === JSON.stringify(incoming) ? prev : incoming;
             });
             canWrite.current = true;
@@ -159,7 +199,9 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
     const timer = setTimeout(async () => {
       if (!canWrite.current) return;
       try {
-        await setDoc(docSnapshot, storeSnapshot);
+        const sanitized = sanitizeStore(storeSnapshot);
+        await setDoc(docSnapshot, sanitized, { merge: true });
+        setClinicCacheStore(clinicId, sanitized);
         console.log(
           `[MPC] ✅ SALVO | clinics/${clinicId}/mpc/store | dentistas: ${storeSnapshot.dentists.length} | atendimentos: ${storeSnapshot.appointments.length}`
         );
