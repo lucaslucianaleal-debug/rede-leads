@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { toast } from "sonner";
 
 export type MPCStore = {
   dentists: Array<{ id: string; name: string; specialty?: string; dailyTarget: number; leadId?: string }>;
@@ -89,10 +90,14 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
 
     const loadInitial = async () => {
       try {
+        console.log(`[MPC] 🔄 Carregando do Firebase | path: clinics/${clinicId}/mpc/store`);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
-          setStoreState(snap.data() as MPCStore);
+          const data = snap.data() as MPCStore;
+          console.log(`[MPC] ✅ Dados carregados | dentistas: ${data.dentists?.length ?? 0} | atendimentos: ${data.appointments?.length ?? 0}`);
+          setStoreState(data);
         } else {
+          console.log(`[MPC] ℹ️ Documento ainda não existe no Firebase — iniciando vazio`);
           setStoreState(defaultStore());
         }
       } catch (e) {
@@ -125,21 +130,34 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
     };
   }, [docRef, isDemo]);
 
-  // Salva no Firestore — SÓ depois do carregamento inicial e SÓ quando o store muda por ação do usuário
-  // (onSnapshot com dados iguais não troca referência → este effect NÃO re-executa → sem loop)
+  // Salva no Firestore — hasLoaded é verificado DENTRO do timer (800ms depois), 
+  // garantindo que loadInitial() já terminou antes de salvar
   useEffect(() => {
-    if (!docRef || isDemo || !hasLoaded.current || readOnly) return;
+    if (!docRef || isDemo || readOnly) return;
 
-    const saveToFirebase = async () => {
-      try {
-        await setDoc(docRef, store);
-        console.log("[MPC] Salvo no Firebase:", store.dentists.length, "dentistas,", store.appointments.length, "atendimentos,", store.surveys.length, "pesquisas");
-      } catch (e) {
-        console.warn("[useMPCDataStore] Erro ao salvar no Firebase:", e);
+    const savedStore = store; // captura snapshot do store atual para evitar closure stale
+    const savedDocRef = docRef;
+
+    const timer = setTimeout(async () => {
+      if (!hasLoaded.current) {
+        console.warn("[MPC] Save ignorado: dados ainda não carregados do Firebase");
+        return;
       }
-    };
+      try {
+        await setDoc(savedDocRef, savedStore);
+        const clinicName = savedDocRef.parent.parent?.id ?? "?";
+        console.log(
+          `[MPC] ✅ Salvo no Firebase | clinicId: ${clinicName} | dentistas: ${savedStore.dentists.length} | atendimentos: ${savedStore.appointments.length} | pesquisas: ${savedStore.surveys.length}`
+        );
+        toast.success(`Dados salvos na nuvem`, {
+          description: `${savedStore.dentists.length} dentistas · ${savedStore.appointments.length} atendimentos`,
+          duration: 2500,
+        });
+      } catch (e) {
+        console.error("[MPC] ❌ Erro ao salvar no Firebase:", e);
+      }
+    }, 800);
 
-    const timer = setTimeout(saveToFirebase, 800);
     return () => clearTimeout(timer);
   }, [store, docRef, isDemo]);
 
