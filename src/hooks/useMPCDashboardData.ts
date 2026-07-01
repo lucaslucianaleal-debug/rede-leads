@@ -253,59 +253,77 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
   const appointments = rawData.appointments || [];
   const surveys = rawData.surveys || [];
 
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+  const monthAgo = new Date(now); monthAgo.setDate(monthAgo.getDate() - 30);
+
   return dentists.map((d: any) => {
-    // Contar atendimentos deste dentista
     const dentistAppts = appointments.filter((a: any) => a.dentistId === d.id);
-    const attended = dentistAppts.filter((a: any) => a.status === "attended").length;
-    const scheduled = dentistAppts.filter((a: any) => a.status === "scheduled").length;
-    
-    const conversionRate = scheduled > 0 ? (attended / scheduled) * 100 : 0;
-    
-    // Calcular satisfação média para este dentista (surveys vinculadas por leadId)
-    const dentistSurveys = surveys.filter((s: any) => {
-      // Se não temos link direto dentista-survey, pegamos surveys do período do dentista
-      // Ou apenas usamos surveys vinculadas à clínica
-      return s.score !== undefined;
-    });
-    
-    const satisfaction = dentistSurveys.length > 0
-      ? dentistSurveys.reduce((sum: number, s: any) => sum + s.score, 0) / dentistSurveys.length
+    const attendedAppts = dentistAppts.filter((a: any) => a.status === "attended");
+    const scheduledCount = dentistAppts.filter((a: any) => a.status === "scheduled").length;
+
+    // Contagens por período
+    const totalAttended = attendedAppts.length;
+
+    const todayAttended = attendedAppts.filter((a: any) => {
+      const d = a.attendedAt || a.createdAt || "";
+      return d.startsWith(todayStr);
+    }).length;
+
+    const weekAttended = attendedAppts.filter((a: any) => {
+      const d = new Date(a.attendedAt || a.createdAt || 0);
+      return d >= weekAgo;
+    }).length;
+
+    const monthAttended = attendedAppts.filter((a: any) => {
+      const d = new Date(a.attendedAt || a.createdAt || 0);
+      return d >= monthAgo;
+    }).length;
+
+    const conversionRate = scheduledCount > 0
+      ? (totalAttended / (scheduledCount + totalAttended)) * 100
+      : totalAttended > 0 ? 100 : 0;
+
+    // Satisfação média de toda a clínica (surveys não têm dentistId)
+    const avgSatisfaction = surveys.length > 0
+      ? Math.round((surveys.reduce((s: number, sv: any) => s + (sv.score || 0), 0) / surveys.length) * 10) / 10
       : 0;
 
-    // Calcular trend para os últimos 90 dias com dados reais
-    const today = new Date();
+    // Trend 90d — conta atendidos por dia
     const trend90d = Array.from({ length: 90 }, (_, i) => {
-      const targetDate = new Date(today);
-      targetDate.setDate(targetDate.getDate() - (89 - i));
-      const dateStr = targetDate.toISOString().split('T')[0];
-      
-      // Contar atendimentos deste dentista neste dia
-      const dayAppts = dentistAppts.filter((a: any) => {
-        const apptDate = new Date(a.attendedAt || a.createdAt || '').toISOString().split('T')[0];
-        return apptDate === dateStr && a.status === "attended";
-      }).length;
-      
-      return dayAppts;
+      const target = new Date(now);
+      target.setDate(target.getDate() - (89 - i));
+      const dateStr = target.toISOString().split("T")[0];
+      return attendedAppts.filter((a: any) =>
+        (a.attendedAt || a.createdAt || "").startsWith(dateStr)
+      ).length;
     });
 
-    // Status baseado na meta do dia
-    const todayAttendance = trend90d[trend90d.length - 1] || 0;
     const dailyTarget = d.dailyTarget || 10;
-    
+
+    // Status: "none" se nunca teve atendimento; caso contrário baseado em hoje vs meta
+    const status: "ok" | "warning" | "critical" | "none" =
+      totalAttended === 0
+        ? "none"
+        : todayAttended >= dailyTarget
+        ? "ok"
+        : todayAttended >= Math.ceil(dailyTarget * 0.6)
+        ? "warning"
+        : "critical";
+
     return {
       id: d.id,
       name: d.name,
       specialty: d.specialty || "",
       dailyTarget,
-      todayAttended: todayAttendance,
-      conversionRate,
-      satisfaction: Math.round(satisfaction * 10) / 10, // Arredondar para 1 casa decimal
-      status:
-        todayAttendance >= dailyTarget * 0.8
-          ? "ok"
-          : todayAttendance >= dailyTarget * 0.5
-            ? "warning"
-            : todayAttendance > 0 ? "warning" : "critical",
+      todayAttended,
+      weekAttended,
+      monthAttended,
+      totalAttended,
+      conversionRate: Math.round(conversionRate * 10) / 10,
+      satisfaction: avgSatisfaction,
+      status,
       trend90d,
       lastUpdated: new Date(),
     };

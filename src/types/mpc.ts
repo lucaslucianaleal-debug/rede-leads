@@ -57,9 +57,12 @@ export interface DentistPerformance {
   specialty: string;
   dailyTarget: number;
   todayAttended: number;
+  weekAttended: number;   // últimos 7 dias
+  monthAttended: number;  // últimos 30 dias
+  totalAttended: number;  // todos os atendimentos
   conversionRate: number; // %
   satisfaction: number; // 0-5
-  status: "ok" | "warning" | "critical";
+  status: "ok" | "warning" | "critical" | "none"; // none = sem dados ainda
   trend90d: number[]; // últimos 90 dias
   lastUpdated: Date;
 }

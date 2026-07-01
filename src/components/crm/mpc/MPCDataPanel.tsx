@@ -27,6 +27,7 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
   const [apptForm, setApptForm] = useState({
     dentistId: "", patientName: "", patientId: "",
     status: "attended" as "scheduled" | "confirmed" | "attended",
+    attendedAt: new Date().toISOString().split("T")[0], // data de hoje como padrão
   });
 
   // Formulario satisfacao
@@ -77,18 +78,20 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
   const handleAddAppointment = () => {
     if (!apptForm.dentistId || !apptForm.patientName.trim()) return;
     const dentist = store.dentists.find(d => d.id === apptForm.dentistId);
+    // Combina data selecionada + hora atual
+    const dateTime = new Date(`${apptForm.attendedAt}T${new Date().toTimeString().slice(0, 5)}`).toISOString();
     recordAppointment({
       id: `apt_${Date.now()}`,
       dentistId: apptForm.dentistId,
       patientName: apptForm.patientName,
       patientId: apptForm.patientId || undefined,
       status: apptForm.status,
-      attendedAt: new Date().toISOString(),
+      attendedAt: dateTime,
     });
     showSuccess(`Atendimento de "${apptForm.patientName}" registrado${dentist ? ` para ${dentist.name}` : ""}`);
-    setApptForm({ dentistId: "", patientName: "", patientId: "", status: "attended" });
+    setApptForm({ dentistId: "", patientName: "", patientId: "", status: "attended", attendedAt: new Date().toISOString().split("T")[0] });
     setApptSearchQuery("");
-  };
+  };;
 
   const handleAddSurvey = () => {
     if (!surveyForm.patientName.trim()) return;
@@ -284,13 +287,25 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
                     <input type="text" placeholder="Nome do paciente" value={apptForm.patientName} onChange={(e) => setApptForm({ ...apptForm, patientName: e.target.value, patientId: "" })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm" />
                     {apptForm.patientId && <p className="text-xs text-emerald-600 mt-0.5">✓ Paciente CRM vinculado</p>}
                   </div>
-                  <div>
-                    <label className="text-xs text-slate-600 mb-1 block">Status</label>
-                    <select value={apptForm.status} onChange={(e) => setApptForm({ ...apptForm, status: e.target.value as any })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm">
-                      <option value="attended">✅ Atendido</option>
-                      <option value="confirmed">📋 Confirmado</option>
-                      <option value="scheduled">📅 Agendado</option>
-                    </select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-600 mb-1 block">Status</label>
+                      <select value={apptForm.status} onChange={(e) => setApptForm({ ...apptForm, status: e.target.value as any })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm">
+                        <option value="attended">✅ Atendido</option>
+                        <option value="confirmed">📋 Confirmado</option>
+                        <option value="scheduled">📅 Agendado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-600 mb-1 block">Data do Atendimento *</label>
+                      <input
+                        type="date"
+                        value={apptForm.attendedAt}
+                        max={new Date().toISOString().split("T")[0]}
+                        onChange={(e) => setApptForm({ ...apptForm, attendedAt: e.target.value })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm"
+                      />
+                    </div>
                   </div>
                   <button onClick={handleAddAppointment} disabled={!apptForm.dentistId || !apptForm.patientName.trim()} className="w-full px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-40 flex items-center justify-center gap-2">
                     <Plus size={16} /> Registrar Atendimento
