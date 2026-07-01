@@ -108,7 +108,7 @@ export default function MPCDashboard({ data, isLoading = false, store, mutations
 
         {/* 7. Relatório Semanal (responde perguntas de gestão) */}
         <section className="mb-8">
-          <MPCWeeklyReport report={data.weeklyReport} />
+          <MPCWeeklyReport report={data.weeklyReport} store={store} />
         </section>
       </div>
     </div>
