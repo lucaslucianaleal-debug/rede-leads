@@ -1,0 +1,102 @@
+// ════════════════════════════════════════════════════════════════
+// MPC (Método de Performance e Clareza) — Executive Dashboard Types
+// ════════════════════════════════════════════════════════════════
+
+export type AlertLevel = "low" | "medium" | "critical";
+
+export interface MPCMetrics {
+  // Resumo Executivo (6 KPIs principais)
+  producao: {
+    total: number;
+    meta: number;
+    percentualMeta: number;
+    tendencia: number; // % de variação
+  };
+  conversao: {
+    total: number;
+    meta: number;
+    percentualMeta: number;
+    tendencia: number;
+  };
+  comparecimento: {
+    total: number;
+    meta: number;
+    percentualMeta: number;
+    tendencia: number;
+  };
+  satisfacao: {
+    total: number;
+    meta: number;
+    percentualMeta: number;
+    tendencia: number;
+  };
+  receita: {
+    total: number;
+    meta: number;
+    percentualMeta: number;
+    tendencia: number;
+  };
+  metaGeral: number; // % geral atingida
+}
+
+export interface MPCAlert {
+  id: string;
+  level: AlertLevel;
+  title: string;
+  probableCause: string;
+  impact: string;
+  suggestedAction: string;
+  affectedEntity: string; // ex: "Dra. Bárbara", "Recepção", "Implantes"
+  metrics?: Record<string, any>;
+  timestamp: Date;
+}
+
+export interface DentistPerformance {
+  id: string;
+  name: string;
+  specialty: string;
+  dailyTarget: number;
+  todayAttended: number;
+  conversionRate: number; // %
+  satisfaction: number; // 0-5
+  status: "ok" | "warning" | "critical";
+  trend90d: number[]; // últimos 90 dias
+  lastUpdated: Date;
+}
+
+export interface SectorHealth {
+  name: string; // Recepção, Dentistas, Comercial, Financeiro
+  score: number; // 0-5
+  status: "excellent" | "good" | "fair" | "poor";
+  topIssues: string[];
+  avgSatisfaction: number;
+  lastUpdated: Date;
+}
+
+export interface WeeklyFocus {
+  id: string;
+  priority: string;
+  rationale: string;
+  owner?: string;
+  targetMetric: string;
+}
+
+export interface RecommendedDecision {
+  id: string;
+  title: string;
+  description: string;
+  impact: "high" | "medium" | "low";
+  basedOnAlert?: string;
+  estimatedOutcome: string;
+  actionItems: string[];
+}
+
+export interface MPCDashboardData {
+  metrics: MPCMetrics;
+  alerts: MPCAlert[];
+  dentistPerformance: DentistPerformance[];
+  sectorHealth: SectorHealth[];
+  weeklyFocus: WeeklyFocus[];
+  recommendedDecisions: RecommendedDecision[];
+  generatedAt: Date;
+}

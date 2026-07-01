@@ -18,12 +18,10 @@ import { ChatView } from "@/components/crm/ChatView";
 import { PerformanceChart } from "@/components/crm/PerformanceChart";
 import { ComparisonChart } from "@/components/crm/ComparisonChart";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
-import { getFollowUpMessageForLead, formatFollowUpMessage } from "@/data/followUpMessages";
 import { NewLeadsTab } from "@/components/crm/NewLeadsTab";
 import { ROIAnalysisView } from "@/components/crm/ROIAnalysisView";
 import { ServicosExternos } from "@/components/crm/ServicosExternos";
 import { FollowUpRuler } from "@/components/crm/FollowUpRuler";
-import { WhatsAppMessageDialog } from "@/components/crm/WhatsAppMessageDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -38,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign, Ticket, BookOpen, Menu } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign, Ticket, BookOpen, Menu, TrendingUp } from "lucide-react";
 import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
@@ -48,6 +46,8 @@ import { useRef, useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import DashboardExecutivo from "./DashboardExecutivo";
+import MPCDashboard from "@/components/crm/MPCDashboard";
+import { useMPCDashboardData } from "@/hooks/useMPCDashboardData";
 
 const CRMDashboard = () => {
   const { user, currentClinic, setSelectedClinic } = useAuth();
@@ -85,6 +85,8 @@ const CRMDashboard = () => {
 
   const { totalUnread, sendMessage, serverConnected } = useConversations();
 
+  const { data: mpcData, isLoading: mpcLoading } = useMPCDashboardData(currentClinic);
+
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -95,7 +97,6 @@ const CRMDashboard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [clientTab, setClientTab] = useState("agenda");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newLeadWhatsApp, setNewLeadWhatsApp] = useState<Lead | null>(null);
   const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [isClient, setIsClient] = useState(false);
   const [clientClinicIds, setClientClinicIds] = useState<string[]>([]);
@@ -166,43 +167,11 @@ const CRMDashboard = () => {
     registerCall(leadId, outcome, obs, returnDate, nextStage);
   };
 
-  const isIndicacaoLead = (lead: Omit<Lead, 'id'> | Lead) => {
-    const fonte = (lead.fonteLead || "").toLowerCase().trim();
-    return fonte.includes("indicacao") || fonte.includes("indicação");
-  };
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    return hour >= 12 && hour < 18 ? "Boa tarde" : "Bom dia";
-  };
-
-  const getIndicacaoWhatsAppMessage = (lead: Lead) => {
-    const primeiroNome = (lead.nome || "").trim().split(" ")[0] || "";
-    const indicante = lead.captador?.trim() || "a pessoa que indicou";
-    return `${getGreeting()} ${primeiroNome}! Como você está?\n\nMeu nome é Lucas e sou da Odontocompany de Olímpia!\n\nA ${indicante} te indicou para estar ganhando 2 sessões de clareamento como benefício aqui da clínica! 🥳\n\nVocê conseguiria estar vindo na clínica por esses dias?`;
-  };
-
   const handleCreateLead = (lead: Omit<Lead, 'id'>) => {
     const created = createLead(lead);
     toast.success(`Lead "${lead.nome}" criado com sucesso!`);
-    if (created) {
-      if (isIndicacaoLead(lead)) {
-        setNewLeadWhatsApp(created);
-      } else {
-        setCallLead(created);
-      }
-    }
+    if (created) setCallLead(created);
   };
-
-  const newLeadSuggestedMessage = newLeadWhatsApp
-    ? (() => {
-        if (isIndicacaoLead(newLeadWhatsApp)) {
-          return getIndicacaoWhatsAppMessage(newLeadWhatsApp);
-        }
-        const template = getFollowUpMessageForLead(newLeadWhatsApp.etapaLead, newLeadWhatsApp.followUpCount || 0, false, false);
-        return template ? formatFollowUpMessage(template, newLeadWhatsApp.nome, newLeadWhatsApp.servicoProcurado, "OdontoCompany", "") : undefined;
-      })()
-    : undefined;
 
   const handleOpenCall = (phone: string) => {
     const clean = (s: string) => s.replace(/\D/g, "");
@@ -250,6 +219,7 @@ const CRMDashboard = () => {
   const tabsMenuItems = [
     { value: "dashboard", label: "Dashboard" },
     { value: "dashboard-executivo", label: "Command Center" },
+    { value: "mpc", label: "Painel MPC" },
     { value: "agenda", label: "Agenda do Dia" },
     { value: "all-leads", label: "Todos os Leads" },
     { value: "novos-leads", label: "Novos Leads" },
@@ -529,6 +499,10 @@ const CRMDashboard = () => {
               <LayoutDashboard className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Command Center</span>
             </TabsTrigger>
+            <TabsTrigger value="mpc" className="flex items-center gap-1.5">
+              <TrendingUp className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Painel MPC</span>
+            </TabsTrigger>
             <TabsTrigger value="agenda" className="flex items-center gap-1.5">
               <CalendarCheck className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Agenda do Dia</span>
@@ -607,6 +581,10 @@ const CRMDashboard = () => {
 
           <TabsContent value="dashboard-executivo" className="mt-6">
             <DashboardExecutivo />
+          </TabsContent>
+
+          <TabsContent value="mpc" className="mt-6">
+            <MPCDashboard data={mpcData} isLoading={mpcLoading} clinicId={currentClinic} />
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6">
@@ -698,12 +676,7 @@ const CRMDashboard = () => {
           handleCreateLead(lead);
           setShowCreateDialog(false);
         }}
-      />
-      <WhatsAppMessageDialog
-        lead={newLeadWhatsApp}
-        open={!!newLeadWhatsApp}
-        onClose={() => setNewLeadWhatsApp(null)}
-        suggestedMessage={newLeadSuggestedMessage}
+        onOpenCall={handleOpenCall}
       />
 
       {/* Delete Selected Dialog */}
