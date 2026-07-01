@@ -36,9 +36,20 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
-  const [currentClinic, setCurrentClinic] = useState<string | null>(null);
+  const [currentClinic, setCurrentClinic] = useState<string | null>(() => {
+    try { return localStorage.getItem('crm_current_clinic') || null; } catch { return null; }
+  });
   const [userProfile, setUserProfile] = useState<any | null>(null);
   const [clinicMeta, setClinicMeta] = useState<any | null>(null);
+
+  // Helper: set currentClinic e persiste no localStorage para evitar modo demo no reload
+  const persistClinic = (val: string | null) => {
+    try {
+      if (val) localStorage.setItem('crm_current_clinic', val);
+      else localStorage.removeItem('crm_current_clinic');
+    } catch {}
+    setCurrentClinic(val);
+  };
 
   useEffect(() => {
     try { console.log('[AuthProvider] selectedClinic ->', selectedClinic); } catch {}
@@ -60,11 +71,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
           if (profile) {
             if (profile.role === "admin" || profile.role === "cliente") {
               const val = selectedClinic || profile.clinicId || null;
-              setCurrentClinic(val);
+              persistClinic(val);
               console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val, "selectedClinic:", selectedClinic);
             } else {
               const clinicFromProfile = profile.clinicId || (profile.clinicIds && profile.clinicIds[0]) || null;
-              setCurrentClinic(clinicFromProfile);
+              persistClinic(clinicFromProfile);
               console.log("[AuthProvider] user currentClinic ->", clinicFromProfile);
             }
           }
@@ -73,7 +84,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         }
       } else {
         setUserProfile(null);
-        setCurrentClinic(null);
+        persistClinic(null);
         setClinicMeta(null);
       }
     });
@@ -121,7 +132,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       if (profile) {
         if (profile.role === "admin" || profile.role === "cliente") {
           const val = clinic ?? selectedClinic ?? profile.clinicId ?? null;
-          setCurrentClinic(val);
+          persistClinic(val);
           console.log(`[AuthProvider][login] ${profile.role} set currentClinic ->`, val);
         } else {
           // Outros roles têm restrição à clínica atribuída
@@ -130,7 +141,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
           if (effective && allowed) {
             setSelectedClinic(effective);
           }
-          setCurrentClinic(effective);
+          persistClinic(effective);
           console.log("[AuthProvider][login] user set currentClinic ->", effective, { allowed });
         }
       }
