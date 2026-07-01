@@ -8,6 +8,7 @@ import MPCSectorHealth from "./mpc/MPCSectorHealth";
 import MPCWeeklyFocus from "./mpc/MPCWeeklyFocus";
 import MPCRecommendedDecisions from "./mpc/MPCRecommendedDecisions";
 import MPCDataPanel from "./mpc/MPCDataPanel";
+import MPCWeeklyReport from "./mpc/MPCWeeklyReport";
 
 type MPCDashboardProps = {
   data: MPCDashboardData | null;
@@ -104,6 +105,11 @@ export default function MPCDashboard({ data, isLoading = false, store, mutations
             <MPCRecommendedDecisions decisions={data.recommendedDecisions} />
           </section>
         </div>
+
+        {/* 7. Relatório Semanal (responde perguntas de gestão) */}
+        <section className="mb-8">
+          <MPCWeeklyReport report={data.weeklyReport} />
+        </section>
       </div>
     </div>
   );

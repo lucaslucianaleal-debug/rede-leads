@@ -8,7 +8,7 @@ import {
   SectorHealth,
   WeeklyFocus,
   RecommendedDecision,
-  AlertLevel,
+  MPCWeeklyReport,
 } from "@/types/mpc";
 
 // ════════════════════════════════════════════════════════════════
@@ -24,6 +24,7 @@ export function useMPCDashboardData(store: MPCStore) {
     const sectorHealth = calculateSectorHealth(store);
     const weeklyFocus = generateWeeklyFocus(alerts, metrics);
     const recommendedDecisions = generateRecommendedDecisions(alerts, metrics);
+    const weeklyReport = generateWeeklyReport(store, dentistPerformance, sectorHealth);
 
     return {
       metrics,
@@ -32,6 +33,7 @@ export function useMPCDashboardData(store: MPCStore) {
       sectorHealth,
       weeklyFocus,
       recommendedDecisions,
+      weeklyReport,
       generatedAt: new Date(),
     } as MPCDashboardData;
   }, [store]);
@@ -478,5 +480,217 @@ function getMockMPCData() {
     surveys: [],
     dentists: [],
     averageTicket: 0,
+  };
+}
+
+function generateWeeklyReport(
+  rawData: any,
+  dentistPerformance: DentistPerformance[],
+  sectorHealth: SectorHealth[]
+): MPCWeeklyReport {
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - 6);
+  weekStart.setHours(0, 0, 0, 0);
+
+  const prevWeekStart = new Date(weekStart);
+  prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+  const prevWeekEnd = new Date(weekStart);
+
+  const appointments = rawData.appointments || [];
+  const surveys = rawData.surveys || [];
+  const dentists = rawData.dentists || [];
+
+  const attendedWeek = appointments.filter((a: any) => {
+    if (a.status !== "attended") return false;
+    const dt = new Date(a.attendedAt || a.createdAt || 0);
+    return dt >= weekStart && dt <= now;
+  });
+
+  const attendedPrevWeek = appointments.filter((a: any) => {
+    if (a.status !== "attended") return false;
+    const dt = new Date(a.attendedAt || a.createdAt || 0);
+    return dt >= prevWeekStart && dt < prevWeekEnd;
+  });
+
+  const clinicAttended = attendedWeek.length;
+  const dailyClinicCapacity = dentists.reduce((sum: number, d: any) => sum + (d.dailyTarget || 10), 0);
+  const clinicCapacity = dailyClinicCapacity * 7;
+  const clinicUtilization = clinicCapacity > 0 ? (clinicAttended / clinicCapacity) * 100 : 0;
+
+  const lowOccupancyDays = Array.from({ length: 7 }, (_, idx) => {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + idx);
+    const dateStr = d.toISOString().split("T")[0];
+    const attended = attendedWeek.filter((a: any) =>
+      String(a.attendedAt || a.createdAt || "").startsWith(dateStr)
+    ).length;
+    return {
+      date: dateStr,
+      attended,
+      capacity: dailyClinicCapacity,
+    };
+  }).filter((d) => d.capacity > 0 && d.attended < Math.ceil(d.capacity * 0.6));
+
+  const conversionTarget = 85;
+  const dentistSummaries = dentistPerformance.map((d) => {
+    const weekTarget = (d.dailyTarget || 10) * 7;
+
+    const dentistApptsWeek = appointments.filter((a: any) => {
+      const dt = new Date(a.attendedAt || a.createdAt || 0);
+      return a.dentistId === d.id && dt >= weekStart && dt <= now;
+    });
+    const dentistAttendedWeek = dentistApptsWeek.filter((a: any) => a.status === "attended").length;
+    const dentistPipelineWeek = dentistApptsWeek.filter((a: any) => a.status === "scheduled" || a.status === "confirmed").length;
+    const conversionRate =
+      dentistAttendedWeek + dentistPipelineWeek > 0
+        ? (dentistAttendedWeek / (dentistAttendedWeek + dentistPipelineWeek)) * 100
+        : 0;
+
+    const dentistApptsPrevWeek = appointments.filter((a: any) => {
+      const dt = new Date(a.attendedAt || a.createdAt || 0);
+      return a.dentistId === d.id && a.status === "attended" && dt >= prevWeekStart && dt < prevWeekEnd;
+    }).length;
+
+    const trend: "up" | "down" | "stable" =
+      dentistAttendedWeek > dentistApptsPrevWeek
+        ? "up"
+        : dentistAttendedWeek < dentistApptsPrevWeek
+        ? "down"
+        : "stable";
+
+    const dentistSurveys = surveys.filter((s: any) => {
+      if (!s.leadId) return false;
+      return attendedWeek.some((a: any) => a.dentistId === d.id && a.patientId === s.leadId);
+    });
+    const satisfaction = dentistSurveys.length > 0
+      ? dentistSurveys.reduce((acc: number, s: any) => acc + (s.score || 0), 0) / dentistSurveys.length
+      : 0;
+
+    return {
+      dentistId: d.id,
+      name: d.name,
+      attended: dentistAttendedWeek,
+      target: weekTarget,
+      deltaToTarget: dentistAttendedWeek - weekTarget,
+      avgDaily: dentistAttendedWeek / 7,
+      trend,
+      conversionRate: Math.round(conversionRate * 10) / 10,
+      conversionTarget,
+      conversionDelta: Math.round((conversionRate - conversionTarget) * 10) / 10,
+      satisfaction: Math.round(satisfaction * 10) / 10,
+      surveyCount: dentistSurveys.length,
+    };
+  });
+
+  const receptionSurveys = surveys.filter((s: any) => {
+    if (s.sector !== "reception") return false;
+    const dt = new Date(s.createdAt || 0);
+    return dt >= weekStart && dt <= now;
+  });
+
+  const receptionAvg = receptionSurveys.length > 0
+    ? receptionSurveys.reduce((acc: number, s: any) => acc + (s.score || 0), 0) / receptionSurveys.length
+    : 0;
+
+  const receptionComplaints = receptionSurveys
+    .filter((s: any) => (s.score || 0) <= 3 && s.comment)
+    .map((s: any) => String(s.comment))
+    .slice(0, 5);
+
+  const outliers: string[] = [];
+  dentistSummaries.forEach((d) => {
+    if (d.deltaToTarget < 0) outliers.push(`${d.name} abaixo da meta de atendimentos (${d.attended}/${d.target}).`);
+    if (d.conversionDelta < 0) outliers.push(`${d.name} com conversão abaixo da meta (${d.conversionRate}% vs ${d.conversionTarget}%).`);
+    if (d.surveyCount > 0 && d.satisfaction < 4) outliers.push(`${d.name} com satisfação baixa (${d.satisfaction}/5).`);
+  });
+
+  if (receptionSurveys.length > 0 && receptionAvg < 4) {
+    outliers.push(`Recepção abaixo do padrão de satisfação (${Math.round(receptionAvg * 10) / 10}/5).`);
+  }
+
+  const productivityWinner = [...dentistSummaries].sort((a, b) => b.attended - a.attended)[0];
+  const conversionWinner = [...dentistSummaries].sort((a, b) => b.conversionRate - a.conversionRate)[0];
+  const satisfactionWinner = [...dentistSummaries]
+    .filter((d) => d.surveyCount > 0)
+    .sort((a, b) => b.satisfaction - a.satisfaction)[0];
+
+  const currentWeekConvBase = appointments.filter((a: any) => {
+    const dt = new Date(a.attendedAt || a.createdAt || 0);
+    return dt >= weekStart && dt <= now;
+  });
+  const prevWeekConvBase = appointments.filter((a: any) => {
+    const dt = new Date(a.attendedAt || a.createdAt || 0);
+    return dt >= prevWeekStart && dt < prevWeekEnd;
+  });
+  const currentWeekConv = currentWeekConvBase.length > 0
+    ? (currentWeekConvBase.filter((a: any) => a.status === "attended").length / currentWeekConvBase.length) * 100
+    : 0;
+  const prevWeekConv = prevWeekConvBase.length > 0
+    ? (prevWeekConvBase.filter((a: any) => a.status === "attended").length / prevWeekConvBase.length) * 100
+    : 0;
+
+  const currentWeekSatSurveys = surveys.filter((s: any) => {
+    const dt = new Date(s.createdAt || 0);
+    return dt >= weekStart && dt <= now;
+  });
+  const prevWeekSatSurveys = surveys.filter((s: any) => {
+    const dt = new Date(s.createdAt || 0);
+    return dt >= prevWeekStart && dt < prevWeekEnd;
+  });
+  const currentWeekSat = currentWeekSatSurveys.length > 0
+    ? currentWeekSatSurveys.reduce((acc: number, s: any) => acc + (s.score || 0), 0) / currentWeekSatSurveys.length
+    : 0;
+  const prevWeekSat = prevWeekSatSurveys.length > 0
+    ? prevWeekSatSurveys.reduce((acc: number, s: any) => acc + (s.score || 0), 0) / prevWeekSatSurveys.length
+    : 0;
+
+  const concerningTrends: string[] = [];
+  if (attendedPrevWeek.length > 0 && clinicAttended < attendedPrevWeek.length) {
+    concerningTrends.push(`Produtividade semanal caiu de ${attendedPrevWeek.length} para ${clinicAttended} atendimentos.`);
+  }
+  if (prevWeekConv > 0 && currentWeekConv < prevWeekConv) {
+    concerningTrends.push(`Conversão semanal caiu de ${Math.round(prevWeekConv)}% para ${Math.round(currentWeekConv)}%.`);
+  }
+  if (prevWeekSat > 0 && currentWeekSat < prevWeekSat) {
+    concerningTrends.push(`Satisfação média caiu de ${prevWeekSat.toFixed(1)} para ${currentWeekSat.toFixed(1)}.`);
+  }
+
+  const managementActions: string[] = [];
+  dentistSummaries
+    .filter((d) => d.deltaToTarget < 0)
+    .slice(0, 2)
+    .forEach((d) => managementActions.push(`Reavaliar agenda de ${d.name} devido ao volume abaixo da meta.`));
+  dentistSummaries
+    .filter((d) => d.conversionDelta < 0)
+    .slice(0, 2)
+    .forEach((d) => managementActions.push(`Acompanhar conversão de ${d.name}, abaixo da meta semanal.`));
+  if (receptionAvg > 0 && receptionAvg < 4) {
+    managementActions.push("Revisar fluxo da recepção e reforçar protocolo de acolhimento.");
+  }
+  if (satisfactionWinner) {
+    managementActions.push(`Manter e replicar as práticas de ${satisfactionWinner.name}, destaque em satisfação.`);
+  }
+
+  const fmt = (d: Date) => d.toLocaleDateString("pt-BR");
+  const periodLabel = `${fmt(weekStart)} a ${fmt(now)}`;
+
+  return {
+    periodLabel,
+    clinicAttended,
+    clinicCapacity,
+    clinicUtilization: Math.round(clinicUtilization * 10) / 10,
+    lowOccupancyDays,
+    dentistSummaries,
+    receptionAvg: Math.round(receptionAvg * 10) / 10,
+    receptionComplaints,
+    outliers,
+    topPerformers: {
+      productivity: productivityWinner ? `${productivityWinner.name} (${productivityWinner.attended} atendimentos)` : undefined,
+      conversion: conversionWinner ? `${conversionWinner.name} (${conversionWinner.conversionRate}%)` : undefined,
+      satisfaction: satisfactionWinner ? `${satisfactionWinner.name} (${satisfactionWinner.satisfaction}/5)` : undefined,
+    },
+    concerningTrends,
+    managementActions,
   };
 }

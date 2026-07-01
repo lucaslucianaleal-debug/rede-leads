@@ -94,6 +94,40 @@ export interface RecommendedDecision {
   actionItems: string[];
 }
 
+export interface MPCWeeklyDentistSummary {
+  dentistId: string;
+  name: string;
+  attended: number;
+  target: number;
+  deltaToTarget: number;
+  avgDaily: number;
+  trend: "up" | "down" | "stable";
+  conversionRate: number;
+  conversionTarget: number;
+  conversionDelta: number;
+  satisfaction: number;
+  surveyCount: number;
+}
+
+export interface MPCWeeklyReport {
+  periodLabel: string;
+  clinicAttended: number;
+  clinicCapacity: number;
+  clinicUtilization: number;
+  lowOccupancyDays: Array<{ date: string; attended: number; capacity: number }>;
+  dentistSummaries: MPCWeeklyDentistSummary[];
+  receptionAvg: number;
+  receptionComplaints: string[];
+  outliers: string[];
+  topPerformers: {
+    productivity?: string;
+    conversion?: string;
+    satisfaction?: string;
+  };
+  concerningTrends: string[];
+  managementActions: string[];
+}
+
 export interface MPCDashboardData {
   metrics: MPCMetrics;
   alerts: MPCAlert[];
@@ -101,5 +135,6 @@ export interface MPCDashboardData {
   sectorHealth: SectorHealth[];
   weeklyFocus: WeeklyFocus[];
   recommendedDecisions: RecommendedDecision[];
+  weeklyReport: MPCWeeklyReport;
   generatedAt: Date;
 }
