@@ -48,6 +48,7 @@ import { toast } from "sonner";
 import DashboardExecutivo from "./DashboardExecutivo";
 import MPCDashboard from "@/components/crm/MPCDashboard";
 import { useMPCDashboardData } from "@/hooks/useMPCDashboardData";
+import { useMPCDataStore } from "@/hooks/useMPCDataStore";
 
 const CRMDashboard = () => {
   const { user, currentClinic, setSelectedClinic } = useAuth();
@@ -85,7 +86,9 @@ const CRMDashboard = () => {
 
   const { totalUnread, sendMessage, serverConnected } = useConversations();
 
-  const { data: mpcData, isLoading: mpcLoading } = useMPCDashboardData(currentClinic);
+  const { store: mpcStore, setStore: mpcSetStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey } = useMPCDataStore(currentClinic);
+  const { data: mpcData, isLoading: mpcLoading } = useMPCDashboardData(mpcStore);
+  const mpcMutations = { setStore: mpcSetStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey };
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -584,7 +587,7 @@ const CRMDashboard = () => {
           </TabsContent>
 
           <TabsContent value="mpc" className="mt-6">
-            <MPCDashboard data={mpcData} isLoading={mpcLoading} clinicId={currentClinic} />
+            <MPCDashboard data={mpcData} isLoading={mpcLoading} store={mpcStore} mutations={mpcMutations} />
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6">

@@ -1,36 +1,42 @@
 ﻿import React, { useState, useMemo } from "react";
 import { Plus, X, Search, UserPlus, CalendarPlus, Star, Settings } from "lucide-react";
-import { useMPCDataStore } from "@/hooks/useMPCDataStore";
+import { MPCStore } from "@/hooks/useMPCDataStore";
 import { useLeads } from "@/hooks/useLeads";
 
+type Mutations = {
+  setStore: (s: MPCStore | ((prev: MPCStore) => MPCStore)) => void;
+  addDentist: (d: { name: string; specialty?: string; dailyTarget?: number }) => void;
+  updateDentist: (id: string, patch: Partial<{ name: string; specialty: string; dailyTarget: number }>) => void;
+  removeDentist: (id: string) => void;
+  recordAppointment: (a: any) => void;
+  addSurvey: (s: any) => void;
+};
+
 type MPCDataPanelProps = {
-  clinicId: string | null;
+  store: MPCStore;
+  mutations: Mutations;
 };
 
 type ActiveForm = null | "dentista" | "atendimento" | "satisfacao" | "ticket";
 
-export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
-  const { store, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, setStore } =
-    useMPCDataStore(clinicId || "demo");
+export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
+  const { setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey } = mutations;
   const { allLeads } = useLeads();
 
   const [activeForm, setActiveForm] = useState<ActiveForm>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Formulario dentista
   const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10 });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Formulario atendimento
   const [apptSearchQuery, setApptSearchQuery] = useState("");
   const [showApptSearch, setShowApptSearch] = useState(false);
   const [apptForm, setApptForm] = useState({
     dentistId: "", patientName: "", patientId: "",
     status: "attended" as "scheduled" | "confirmed" | "attended",
-    attendedAt: new Date().toISOString().split("T")[0], // data de hoje como padrão
+    attendedAt: new Date().toISOString().split("T")[0],
   });
 
-  // Formulario satisfacao
   const [survSearchQuery, setSurvSearchQuery] = useState("");
   const [showSurvSearch, setShowSurvSearch] = useState(false);
   const [surveyForm, setSurveyForm] = useState({
@@ -78,7 +84,6 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
   const handleAddAppointment = () => {
     if (!apptForm.dentistId || !apptForm.patientName.trim()) return;
     const dentist = store.dentists.find(d => d.id === apptForm.dentistId);
-    // Combina data selecionada + hora atual
     const dateTime = new Date(`${apptForm.attendedAt}T${new Date().toTimeString().slice(0, 5)}`).toISOString();
     recordAppointment({
       id: `apt_${Date.now()}`,
@@ -91,7 +96,7 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
     showSuccess(`Atendimento de "${apptForm.patientName}" registrado${dentist ? ` para ${dentist.name}` : ""}`);
     setApptForm({ dentistId: "", patientName: "", patientId: "", status: "attended", attendedAt: new Date().toISOString().split("T")[0] });
     setApptSearchQuery("");
-  };;
+  };
 
   const handleAddSurvey = () => {
     if (!surveyForm.patientName.trim()) return;
@@ -125,74 +130,41 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
           </span>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => openForm("dentista")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              activeForm === "dentista" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
-            }`}
-          >
+          <button onClick={() => openForm("dentista")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeForm === "dentista" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"}`}>
             <UserPlus size={13} /> Dentista
           </button>
-          <button
-            onClick={() => openForm("atendimento")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              activeForm === "atendimento" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
-            }`}
-          >
+          <button onClick={() => openForm("atendimento")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeForm === "atendimento" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"}`}>
             <CalendarPlus size={13} /> Atendimento
           </button>
-          <button
-            onClick={() => openForm("satisfacao")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              activeForm === "satisfacao" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
-            }`}
-          >
+          <button onClick={() => openForm("satisfacao")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeForm === "satisfacao" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"}`}>
             <Star size={13} /> Satisfação
           </button>
-          <button
-            onClick={() => openForm("ticket")}
-            title={`Ticket Médio: R$ ${store.averageTicket}`}
-            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              activeForm === "ticket" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-100"
-            }`}
-          >
+          <button onClick={() => openForm("ticket")} title={`Ticket Médio: R$ ${store.averageTicket}`} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeForm === "ticket" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-100"}`}>
             <Settings size={13} />
           </button>
         </div>
       </div>
 
-      {/* Feedback sucesso */}
       {successMsg && (
         <div className="flex items-center gap-2 px-5 py-2.5 bg-emerald-50 border-b border-emerald-200 text-emerald-800 text-sm">
           ✅ {successMsg}
         </div>
       )}
 
-      {/* Formularios colapsaveis */}
       {activeForm && (
         <div className="p-5 border-b border-slate-100 bg-slate-50">
 
-          {/* TICKET */}
           {activeForm === "ticket" && (
             <div className="space-y-3 max-w-xs">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-900">Ticket Médio (R$)</span>
                 <button onClick={() => setActiveForm(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
               </div>
-              <input
-                type="number"
-                value={store.averageTicket}
-                onChange={(e) => setStore({ ...store, averageTicket: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white"
-                autoFocus
-              />
-              <button onClick={() => setActiveForm(null)} className="w-full px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800">
-                Salvar
-              </button>
+              <input type="number" value={store.averageTicket} onChange={(e) => setStore({ ...store, averageTicket: Number(e.target.value) })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white" autoFocus />
+              <button onClick={() => setActiveForm(null)} className="w-full px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800">Salvar</button>
             </div>
           )}
 
-          {/* DENTISTA */}
           {activeForm === "dentista" && (
             <div className="space-y-3 max-w-lg">
               <div className="flex items-center justify-between">
@@ -209,7 +181,7 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
                   <input type="text" placeholder="Ex: Implante, Ortho" value={dentistForm.specialty} onChange={(e) => setDentistForm({ ...dentistForm, specialty: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Meta Diária</label>
+                  <label className="text-xs text-slate-600 mb-1 block">Meta Diária (pacientes)</label>
                   <input type="number" min="1" value={dentistForm.dailyTarget} onChange={(e) => setDentistForm({ ...dentistForm, dailyTarget: Number(e.target.value) })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm" />
                 </div>
               </div>
@@ -218,9 +190,7 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
                   {editingId ? "Atualizar" : "Adicionar"}
                 </button>
                 {editingId && (
-                  <button onClick={() => { setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10 }); }} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-white">
-                    Cancelar
-                  </button>
+                  <button onClick={() => { setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10 }); }} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-white">Cancelar</button>
                 )}
               </div>
               {store.dentists.length > 0 && (
@@ -244,7 +214,6 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
             </div>
           )}
 
-          {/* ATENDIMENTO */}
           {activeForm === "atendimento" && (
             <div className="space-y-3 max-w-lg">
               <div className="flex items-center justify-between">
@@ -252,9 +221,7 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
                 <button onClick={() => setActiveForm(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
               </div>
               {store.dentists.length === 0 ? (
-                <p className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  ⚠️ Adicione um dentista primeiro
-                </p>
+                <p className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">⚠️ Adicione um dentista primeiro</p>
               ) : (
                 <>
                   <div>
@@ -297,14 +264,8 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs text-slate-600 mb-1 block">Data do Atendimento *</label>
-                      <input
-                        type="date"
-                        value={apptForm.attendedAt}
-                        max={new Date().toISOString().split("T")[0]}
-                        onChange={(e) => setApptForm({ ...apptForm, attendedAt: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm"
-                      />
+                      <label className="text-xs text-slate-600 mb-1 block">Data *</label>
+                      <input type="date" value={apptForm.attendedAt} max={new Date().toISOString().split("T")[0]} onChange={(e) => setApptForm({ ...apptForm, attendedAt: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm" />
                     </div>
                   </div>
                   <button onClick={handleAddAppointment} disabled={!apptForm.dentistId || !apptForm.patientName.trim()} className="w-full px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-40 flex items-center justify-center gap-2">
@@ -315,7 +276,6 @@ export default function MPCDataPanel({ clinicId }: MPCDataPanelProps) {
             </div>
           )}
 
-          {/* SATISFACAO */}
           {activeForm === "satisfacao" && (
             <div className="space-y-3 max-w-lg">
               <div className="flex items-center justify-between">

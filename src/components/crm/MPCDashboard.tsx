@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import { MPCDashboardData } from "@/types/mpc";
+import { MPCStore } from "@/hooks/useMPCDataStore";
 import MPCKPIStrip from "./mpc/MPCKPIStrip";
 import MPCAlertsFeed from "./mpc/MPCAlertsFeed";
 import MPCDentistPerformance from "./mpc/MPCDentistPerformance";
@@ -11,10 +12,18 @@ import MPCDataPanel from "./mpc/MPCDataPanel";
 type MPCDashboardProps = {
   data: MPCDashboardData | null;
   isLoading?: boolean;
-  clinicId?: string | null;
+  store: MPCStore;
+  mutations: {
+    setStore: (s: MPCStore | ((prev: MPCStore) => MPCStore)) => void;
+    addDentist: (d: any) => void;
+    updateDentist: (id: string, patch: any) => void;
+    removeDentist: (id: string) => void;
+    recordAppointment: (a: any) => void;
+    addSurvey: (s: any) => void;
+  };
 };
 
-export default function MPCDashboard({ data, isLoading = false, clinicId = null }: MPCDashboardProps) {
+export default function MPCDashboard({ data, isLoading = false, store, mutations }: MPCDashboardProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -63,7 +72,7 @@ export default function MPCDashboard({ data, isLoading = false, clinicId = null 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* 1. Data Input Panel */}
         <section className="mb-8">
-          <MPCDataPanel clinicId={clinicId} />
+          <MPCDataPanel store={store} mutations={mutations} />
         </section>
 
         {/* 2. KPI Strip (Resumo Executivo) */}

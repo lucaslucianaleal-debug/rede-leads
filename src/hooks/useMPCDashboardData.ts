@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useMPCDataStore } from "@/hooks/useMPCDataStore";
+import { MPCStore } from "@/hooks/useMPCDataStore";
 import {
   MPCDashboardData,
   MPCMetrics,
@@ -13,22 +13,15 @@ import {
 
 // ════════════════════════════════════════════════════════════════
 // Hook Principal: useMPCDashboardData
-// Orquestra cálculo de métricas, alertas e recomendações
+// Recebe o store diretamente — sem instância própria, sem problemas de sync
 // ════════════════════════════════════════════════════════════════
 
-export function useMPCDashboardData(clinicId?: string) {
-  // Leitura somente — readOnly: true impede gravações acidentais que sobrescrevem dados do MPCDataPanel
-  const { store } = useMPCDataStore(clinicId || "demo", { readOnly: true });
-  
-  // 2. Calcular métricas, alertas e recomendações sem React Query
-  // para garantir recálculo imediato em mudanças do store
+export function useMPCDashboardData(store: MPCStore) {
   const dashboardData = useMemo(() => {
-    const rawData = store || getMockMPCData();
-
-    const metrics = calculateMetrics(rawData);
-    const alerts = generateAlerts(rawData, metrics);
-    const dentistPerformance = calculateDentistPerformance(rawData);
-    const sectorHealth = calculateSectorHealth(rawData);
+    const metrics = calculateMetrics(store);
+    const alerts = generateAlerts(store, metrics);
+    const dentistPerformance = calculateDentistPerformance(store);
+    const sectorHealth = calculateSectorHealth(store);
     const weeklyFocus = generateWeeklyFocus(alerts, metrics);
     const recommendedDecisions = generateRecommendedDecisions(alerts, metrics);
 
