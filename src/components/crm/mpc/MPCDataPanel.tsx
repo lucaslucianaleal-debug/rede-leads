@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from "react";
-import { Plus, X, Search, UserPlus, CalendarPlus, Star, Settings } from "lucide-react";
+import { Plus, X, Search, UserPlus, CalendarPlus, Star, Settings, Upload } from "lucide-react";
 import { MPCStore } from "@/hooks/useMPCDataStore";
 import { useLeads } from "@/hooks/useLeads";
 
@@ -17,7 +17,39 @@ type MPCDataPanelProps = {
   mutations: Mutations;
 };
 
-type ActiveForm = null | "dentista" | "atendimento" | "satisfacao" | "ticket";
+type ActiveForm = null | "dentista" | "atendimento" | "satisfacao" | "ticket" | "importacao";
+
+function normalizeName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseDateToISO(dateRaw: string) {
+  const input = dateRaw.trim();
+  if (!input) return null;
+
+  // yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    const dt = new Date(`${input}T12:00:00`);
+    return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+
+  // dd/mm/yyyy
+  const br = input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (br) {
+    const day = Number(br[1]);
+    const month = Number(br[2]) - 1;
+    const year = Number(br[3]);
+    const dt = new Date(year, month, day, 12, 0, 0);
+    return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+
+  return null;
+}
 
 export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
   const { setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey } = mutations;
@@ -44,6 +76,10 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     sector: "clinic" as "reception" | "clinic" | "ortho" | "sales",
     score: 5, comment: "",
   });
+
+  const [bulkDentistId, setBulkDentistId] = useState("");
+  const [bulkStatus, setBulkStatus] = useState<"scheduled" | "confirmed" | "attended">("attended");
+  const [bulkText, setBulkText] = useState("");
 
   const filteredApptLeads = useMemo(() => {
     if (!apptSearchQuery.trim()) return [];
@@ -113,6 +149,81 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     setSurvSearchQuery("");
   };
 
+  const handleBulkImportAppointments = () => {
+    if (!bulkDentistId || !bulkText.trim()) return;
+
+    const leadByNormalizedName = new Map<string, string>();
+    allLeads.forEach((lead) => {
+      const key = normalizeName(lead.nome || "");
+      if (key && !leadByNormalizedName.has(key)) {
+        leadByNormalizedName.set(key, lead.id);
+      }
+    });
+
+    const lines = bulkText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const imported: any[] = [];
+    let linkedCount = 0;
+    let noLeadCount = 0;
+    let invalidCount = 0;
+
+    lines.forEach((line, idx) => {
+      const cols = line.split(/[;,|\t]/).map((c) => c.trim()).filter(Boolean);
+      if (cols.length < 2) {
+        invalidCount += 1;
+        return;
+      }
+
+      const [nameCol, dateCol, statusCol] = cols;
+      // Ignora provável cabeçalho
+      if (idx === 0 && /nome/i.test(nameCol) && /data/i.test(dateCol)) {
+        return;
+      }
+
+      const patientName = nameCol;
+      const attendedAtISO = parseDateToISO(dateCol);
+      if (!patientName || !attendedAtISO) {
+        invalidCount += 1;
+        return;
+      }
+
+      const parsedStatus = (statusCol || "").toLowerCase();
+      const status = parsedStatus === "scheduled" || parsedStatus === "agendado"
+        ? "scheduled"
+        : parsedStatus === "confirmed" || parsedStatus === "confirmado"
+        ? "confirmed"
+        : bulkStatus;
+
+      const leadId = leadByNormalizedName.get(normalizeName(patientName));
+      if (leadId) linkedCount += 1;
+      else noLeadCount += 1;
+
+      imported.push({
+        id: `apt_bulk_${Date.now()}_${idx}`,
+        dentistId: bulkDentistId,
+        patientName,
+        patientId: leadId,
+        status,
+        attendedAt: attendedAtISO,
+      });
+    });
+
+    if (imported.length === 0) {
+      showSuccess(`Nenhuma linha válida para importar (${invalidCount} inválidas)`);
+      return;
+    }
+
+    setStore((prev) => ({ ...prev, appointments: [...prev.appointments, ...imported] }));
+    showSuccess(
+      `Importados ${imported.length} atendimentos em massa · ${linkedCount} vinculados ao CRM · ${noLeadCount} sem lead · ${invalidCount} inválidos`
+    );
+
+    setBulkText("");
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Barra superior compacta */}
@@ -135,6 +246,9 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
           </button>
           <button onClick={() => openForm("atendimento")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeForm === "atendimento" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"}`}>
             <CalendarPlus size={13} /> Atendimento
+          </button>
+          <button onClick={() => openForm("importacao")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeForm === "importacao" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"}`}>
+            <Upload size={13} /> Em Massa
           </button>
           <button onClick={() => openForm("satisfacao")} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeForm === "satisfacao" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"}`}>
             <Star size={13} /> Satisfação
@@ -270,6 +384,63 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                   </div>
                   <button onClick={handleAddAppointment} disabled={!apptForm.dentistId || !apptForm.patientName.trim()} className="w-full px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-40 flex items-center justify-center gap-2">
                     <Plus size={16} /> Registrar Atendimento
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {activeForm === "importacao" && (
+            <div className="space-y-3 max-w-2xl">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-900">Importar Atendimentos em Massa</span>
+                <button onClick={() => setActiveForm(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+              </div>
+
+              {store.dentists.length === 0 ? (
+                <p className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">⚠️ Adicione um dentista primeiro</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-600 mb-1 block">Dentista *</label>
+                      <select value={bulkDentistId} onChange={(e) => setBulkDentistId(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm">
+                        <option value="">Selecione um dentista</option>
+                        {store.dentists.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-600 mb-1 block">Status padrão</label>
+                      <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value as any)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm">
+                        <option value="attended">Atendido</option>
+                        <option value="confirmed">Confirmado</option>
+                        <option value="scheduled">Agendado</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-slate-600 bg-white border border-slate-200 rounded-lg p-3">
+                    Formato por linha: <strong>Nome;Data;Status(opcional)</strong><br />
+                    Data aceita: <strong>dd/mm/aaaa</strong> ou <strong>aaaa-mm-dd</strong><br />
+                    Exemplo:<br />
+                    Maria da Silva;12/04/2026;attended<br />
+                    João Souza;2026-04-13;confirmed
+                  </div>
+
+                  <textarea
+                    value={bulkText}
+                    onChange={(e) => setBulkText(e.target.value)}
+                    placeholder="Cole aqui sua lista de atendimentos (uma linha por paciente)"
+                    rows={10}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm resize-y"
+                  />
+
+                  <button
+                    onClick={handleBulkImportAppointments}
+                    disabled={!bulkDentistId || !bulkText.trim()}
+                    className="w-full px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    <Upload size={16} /> Importar em Massa
                   </button>
                 </>
               )}
