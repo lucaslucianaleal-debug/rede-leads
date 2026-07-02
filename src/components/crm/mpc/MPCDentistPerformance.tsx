@@ -98,6 +98,21 @@ function statusLabel(status?: string) {
 
 export default function MPCDentistPerformance({ dentists }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [searchByDentist, setSearchByDentist] = useState<Record<string, { attended: string; budget: string }>>({});
+
+  const getSearch = (dentistId: string) =>
+    searchByDentist[dentistId] || { attended: "", budget: "" };
+
+  const updateSearch = (dentistId: string, field: "attended" | "budget", value: string) => {
+    setSearchByDentist((prev) => ({
+      ...prev,
+      [dentistId]: {
+        attended: prev[dentistId]?.attended || "",
+        budget: prev[dentistId]?.budget || "",
+        [field]: value,
+      },
+    }));
+  };
 
   if (dentists.length === 0) {
     return (
@@ -121,6 +136,26 @@ export default function MPCDentistPerformance({ dentists }: Props) {
         {dentists.map((d) => {
           const isExpanded = expandedId === d.id;
           const trend = getTrendSummary(d.trend90d);
+          const search = getSearch(d.id);
+
+          const attendedQuery = search.attended.trim().toLowerCase();
+          const budgetQuery = search.budget.trim().toLowerCase();
+
+          const sortedAttended = [...d.attendedLeads].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+          const sortedBudgets = [...d.budgetLeads].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+          const filteredAttended = attendedQuery
+            ? sortedAttended.filter((lead) =>
+                `${lead.name || ""} ${lead.date || ""} ${lead.phone || ""} ${statusLabel(lead.status)}`.toLowerCase().includes(attendedQuery)
+              )
+            : sortedAttended;
+
+          const filteredBudgets = budgetQuery
+            ? sortedBudgets.filter((lead) =>
+                `${lead.name || ""} ${lead.date || ""} ${lead.phone || ""}`.toLowerCase().includes(budgetQuery)
+              )
+            : sortedBudgets;
+
           return (
             <div key={d.id} className="px-6 py-4">
               <button
@@ -211,11 +246,19 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
                       Atendimentos Totais ({d.attendedLeads.length})
                     </p>
-                    {d.attendedLeads.length === 0 ? (
+                    <input
+                      type="text"
+                      value={search.attended}
+                      onChange={(e) => updateSearch(d.id, "attended", e.target.value)}
+                      placeholder="Pesquisar lead por nome, telefone ou data"
+                      className="w-full mb-2 px-2 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white"
+                    />
+                    <p className="text-[11px] text-slate-400 mb-2">Ordenado por data mais recente</p>
+                    {filteredAttended.length === 0 ? (
                       <p className="text-xs text-slate-500">Nenhum atendimento/agendamento registrado.</p>
                     ) : (
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
-                        {d.attendedLeads.map((lead, idx) => (
+                        {filteredAttended.map((lead, idx) => (
                           <div key={`${lead.name}_${lead.date}_${idx}`} className="text-xs text-slate-700 border-b border-slate-200 pb-1">
                             <p className="font-medium text-slate-900">{lead.name}</p>
                             <p>
@@ -232,11 +275,19 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
                       Orçamentos ({d.budgetLeads.length})
                     </p>
-                    {d.budgetLeads.length === 0 ? (
+                    <input
+                      type="text"
+                      value={search.budget}
+                      onChange={(e) => updateSearch(d.id, "budget", e.target.value)}
+                      placeholder="Pesquisar orçamento por nome, telefone ou data"
+                      className="w-full mb-2 px-2 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white"
+                    />
+                    <p className="text-[11px] text-slate-400 mb-2">Ordenado por data mais recente</p>
+                    {filteredBudgets.length === 0 ? (
                       <p className="text-xs text-slate-500">Nenhum orçamento registrado.</p>
                     ) : (
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
-                        {d.budgetLeads.map((lead, idx) => (
+                        {filteredBudgets.map((lead, idx) => (
                           <div key={`${lead.name}_${lead.date}_${idx}`} className="text-xs text-slate-700 border-b border-slate-200 pb-1">
                             <p className="font-medium text-slate-900">{lead.name}</p>
                             <p>{lead.date || "sem data"}{lead.phone ? ` · ${lead.phone}` : ""}</p>
