@@ -56,6 +56,9 @@ export interface DentistPerformance {
   name: string;
   specialty: string;
   dailyTarget: number;
+  configuredDailyTarget?: number;
+  isWorkingToday?: boolean;
+  workDays?: number[];
   todayAttended: number;
   weekAttended: number;   // últimos 7 dias
   monthAttended: number;  // últimos 30 dias

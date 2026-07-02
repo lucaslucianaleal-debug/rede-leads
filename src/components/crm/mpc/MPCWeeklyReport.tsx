@@ -82,6 +82,28 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   const isOperationalStatus = (status?: string) =>
     status === "attended" || status === "scheduled" || status === "confirmed";
 
+  const normalizeWorkDays = (days: any) => {
+    const arr = Array.isArray(days) ? days.map((d) => Number(d)).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [];
+    const unique = Array.from(new Set(arr)).sort((a, b) => a - b);
+    return unique.length > 0 ? unique : [1, 2, 3, 4, 5, 6];
+  };
+
+  const isWorkingOnDate = (dentist: any, date: Date) => normalizeWorkDays(dentist?.workDays).includes(date.getDay());
+
+  const countWorkingDays = (a: Date, b: Date, workDays: number[]) => {
+    const from = new Date(a);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(b);
+    to.setHours(23, 59, 59, 999);
+    let total = 0;
+    const c = new Date(from);
+    while (c <= to) {
+      if (workDays.includes(c.getDay())) total += 1;
+      c.setDate(c.getDate() + 1);
+    }
+    return total;
+  };
+
   const attendedCurrent = appointments.filter((a: any) => {
     if (!isOperationalStatus(a.status)) return false;
     const dt = new Date(a.attendedAt || a.createdAt || 0);
@@ -108,8 +130,14 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   // Atendimentos totais = volume operacional + avaliações com orçamento.
   const clinicAttended = attendedCurrent.length + budgetsCurrent.length;
   const clinicBudgets = budgetsCurrent.length;
-  const dailyCapacity = dentists.reduce((sum, d) => sum + (d.dailyTarget || 10), 0);
-  const clinicCapacity = dailyCapacity * days;
+  const getCapacityForDate = (date: Date) =>
+    dentists.reduce((sum, d: any) => (isWorkingOnDate(d, date) ? sum + (d.dailyTarget || 10) : sum), 0);
+
+  const clinicCapacity = Array.from({ length: days }, (_, idx) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + idx);
+    return getCapacityForDate(d);
+  }).reduce((a, b) => a + b, 0);
   const clinicUtilization = clinicCapacity > 0 ? (clinicAttended / clinicCapacity) * 100 : 0;
 
   const lowOccupancyDays = Array.from({ length: days }, (_, idx) => {
@@ -119,7 +147,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const attended =
       attendedCurrent.filter((a: any) => String(a.attendedAt || a.createdAt || "").startsWith(dateStr)).length +
       budgetsCurrent.filter((b: any) => String(b.budgetAt || b.createdAt || "").startsWith(dateStr)).length;
-    return { date: dateStr, attended, capacity: dailyCapacity };
+    return { date: dateStr, attended, capacity: getCapacityForDate(d) };
   }).filter((day) => day.capacity > 0 && day.attended < Math.ceil(day.capacity * 0.6));
 
   const conversionTarget = 85;
@@ -154,7 +182,9 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const convertedCount = convertedSet.size;
     const pendingBudgetCount = Math.max(0, budgetCount - convertedCount);
     const conversionRate = budgetCount > 0 ? (convertedCount / budgetCount) * 100 : 0;
-    const target = (d.dailyTarget || 10) * days;
+    const workDays = normalizeWorkDays(d.workDays);
+    const workingDaysCount = countWorkingDays(start, end, workDays);
+    const target = (d.dailyTarget || 10) * workingDaysCount;
 
     const prevTotalAttendance = dentistPrevAttended + dentistBudgetsPrev;
     const trend: "up" | "down" | "stable" =
@@ -181,7 +211,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
       attended,
       target,
       deltaToTarget: attended - target,
-      avgDaily: attended / days,
+      avgDaily: attended / Math.max(1, workingDaysCount),
       trend,
       conversionRate: Math.round(conversionRate * 10) / 10,
       conversionTarget,

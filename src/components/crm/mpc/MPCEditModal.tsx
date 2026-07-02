@@ -16,8 +16,32 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
   const { currentClinic } = useAuth();
   
   const [tab, setTab] = useState<"dentistas" | "atendimentos" | "satisfacao">("dentistas");
-  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10 });
+  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] as number[] });
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const weekdayOptions = [
+    { value: 1, label: "Seg" },
+    { value: 2, label: "Ter" },
+    { value: 3, label: "Qua" },
+    { value: 4, label: "Qui" },
+    { value: 5, label: "Sex" },
+    { value: 6, label: "Sáb" },
+    { value: 0, label: "Dom" },
+  ];
+
+  const normalizeWorkDays = (days: any) => {
+    const arr = Array.isArray(days) ? days.map((d) => Number(d)).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [];
+    const unique = Array.from(new Set(arr)).sort((a, b) => a - b);
+    return unique.length > 0 ? unique : [1, 2, 3, 4, 5, 6];
+  };
+
+  const toggleDentistWorkDay = (day: number) => {
+    setDentistForm((prev) => {
+      const exists = prev.workDays.includes(day);
+      const next = exists ? prev.workDays.filter((d) => d !== day) : [...prev.workDays, day];
+      return { ...prev, workDays: next.sort((a, b) => a - b) };
+    });
+  };
   
   // Busca para atendimentos
   const [appointmentSearchQuery, setAppointmentSearchQuery] = useState("");
@@ -49,11 +73,13 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
 
   const handleAddDentist = () => {
     if (!dentistForm.name.trim()) return;
+    if (dentistForm.workDays.length === 0) return;
     if (editingId) {
       updateDentist(editingId, {
         name: dentistForm.name,
         specialty: dentistForm.specialty,
         dailyTarget: dentistForm.dailyTarget,
+        workDays: dentistForm.workDays,
       });
       setEditingId(null);
     } else {
@@ -61,15 +87,21 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
         name: dentistForm.name,
         specialty: dentistForm.specialty,
         dailyTarget: dentistForm.dailyTarget,
+        workDays: dentistForm.workDays,
       });
     }
-    setDentistForm({ name: "", specialty: "", dailyTarget: 10 });
+    setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] });
   };
 
   const handleEditDentist = (id: string) => {
     const d = store.dentists.find(x => x.id === id);
     if (d) {
-      setDentistForm({ name: d.name, specialty: d.specialty || "", dailyTarget: d.dailyTarget });
+      setDentistForm({
+        name: d.name,
+        specialty: d.specialty || "",
+        dailyTarget: d.dailyTarget,
+        workDays: normalizeWorkDays((d as any).workDays),
+      });
       setEditingId(id);
     }
   };
@@ -207,9 +239,25 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
                   />
                 </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Dias de atendimento</label>
+                  <div className="grid grid-cols-7 gap-1">
+                    {weekdayOptions.map((day) => (
+                      <label key={day.value} className="flex items-center gap-1 text-[11px] bg-white border border-slate-200 rounded px-1.5 py-1">
+                        <input
+                          type="checkbox"
+                          checked={dentistForm.workDays.includes(day.value)}
+                          onChange={() => toggleDentistWorkDay(day.value)}
+                        />
+                        <span>{day.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleAddDentist}
+                    disabled={!dentistForm.name.trim() || dentistForm.workDays.length === 0}
                     className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800"
                   >
                     {editingId ? "Atualizar" : "Adicionar"}
@@ -218,7 +266,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
                     <button
                       onClick={() => {
                         setEditingId(null);
-                        setDentistForm({ name: "", specialty: "", dailyTarget: 10 });
+                        setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] });
                       }}
                       className="flex-1 px-4 py-2 border border-slate-300 text-slate-900 rounded-lg font-medium hover:bg-slate-50"
                     >
@@ -243,7 +291,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
                         <div>
                           <p className="font-medium text-slate-900">{d.name}</p>
                           <p className="text-xs text-slate-600">
-                            {d.specialty} • Meta: {d.dailyTarget} pac/dia
+                            {d.specialty} • Meta: {d.dailyTarget} pac/dia • Dias: {normalizeWorkDays((d as any).workDays).map((wd) => ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][wd]).join(", ")}
                           </p>
                         </div>
                         <div className="flex gap-2">

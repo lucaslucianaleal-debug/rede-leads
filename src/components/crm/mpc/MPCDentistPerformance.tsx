@@ -71,7 +71,12 @@ function getTrendSummary(data: number[]) {
   return { label: "estável", deltaPct, color: "text-amber-600", current: currentTotal, previous: previousTotal };
 }
 
-function StatusBadge({ status, todayAttended, dailyTarget }: { status: DentistPerformance["status"]; todayAttended: number; dailyTarget: number }) {
+function StatusBadge({ status, todayAttended, dailyTarget, isWorkingToday }: { status: DentistPerformance["status"]; todayAttended: number; dailyTarget: number; isWorkingToday?: boolean }) {
+  if (isWorkingToday === false) return (
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+      🗓️ Folga hoje
+    </span>
+  );
   if (status === "none") return (
     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
       ⏳ Sem dados
@@ -115,6 +120,12 @@ function statusLabel(status?: string) {
   return "Sem status";
 }
 
+function formatWorkDays(workDays?: number[]) {
+  const labels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const days = Array.isArray(workDays) && workDays.length > 0 ? workDays : [1, 2, 3, 4, 5, 6];
+  return days.map((d) => labels[d] || "?").join(", ");
+}
+
 export default function MPCDentistPerformance({ dentists, store, mutations }: Props) {
   const { allLeads } = useLeads();
   const crmById = useMemo(() => {
@@ -140,6 +151,24 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
     attendedBy?: string;
     crmQuery: string;
   }>(null);
+  const [scheduleEditingId, setScheduleEditingId] = useState<string | null>(null);
+  const [scheduleDraft, setScheduleDraft] = useState<number[]>([1, 2, 3, 4, 5, 6]);
+
+  const normalizeWorkDays = (days: any) => {
+    const arr = Array.isArray(days) ? days.map((d) => Number(d)).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [];
+    const unique = Array.from(new Set(arr)).sort((a, b) => a - b);
+    return unique.length > 0 ? unique : [1, 2, 3, 4, 5, 6];
+  };
+
+  const weekdayOptions = [
+    { value: 1, label: "Seg" },
+    { value: 2, label: "Ter" },
+    { value: 3, label: "Qua" },
+    { value: 4, label: "Qui" },
+    { value: 5, label: "Sex" },
+    { value: 6, label: "Sáb" },
+    { value: 0, label: "Dom" },
+  ];
 
   const crmMatches = useMemo(() => {
     if (!editingLead?.crmQuery.trim()) return [];
@@ -257,6 +286,31 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
     setEditingLead(null);
   };
 
+  const startEditSchedule = (dentistId: string, workDays?: number[]) => {
+    setScheduleEditingId(dentistId);
+    setScheduleDraft(normalizeWorkDays(workDays));
+  };
+
+  const toggleScheduleDay = (day: number) => {
+    setScheduleDraft((prev) => {
+      const exists = prev.includes(day);
+      const next = exists ? prev.filter((d) => d !== day) : [...prev, day];
+      return next.sort((a, b) => a - b);
+    });
+  };
+
+  const saveSchedule = async (dentistId: string) => {
+    const nextDays = normalizeWorkDays(scheduleDraft);
+    let nextStoreSnapshot: MPCStore | null = null;
+    mutations.setStore((prev) => {
+      const dentistsNext = (prev.dentists || []).map((d: any) => d.id === dentistId ? { ...d, workDays: nextDays } : d);
+      nextStoreSnapshot = { ...prev, dentists: dentistsNext };
+      return nextStoreSnapshot;
+    });
+    if (nextStoreSnapshot) await mutations.saveNow(nextStoreSnapshot);
+    setScheduleEditingId(null);
+  };
+
   if (dentists.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
@@ -342,7 +396,7 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                     <span className="font-semibold text-slate-900">{d.name}</span>
                     {d.specialty && <span className="text-xs text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">{d.specialty}</span>}
                   </div>
-                  <StatusBadge status={d.status} todayAttended={d.todayAttended} dailyTarget={d.dailyTarget} />
+                  <StatusBadge status={d.status} todayAttended={d.todayAttended} dailyTarget={d.dailyTarget} isWorkingToday={d.isWorkingToday} />
                   <p className="text-xs text-slate-500 mt-2">
                     Atend. Totais: <span className="font-semibold text-slate-700">{d.attendedLeads.length}</span>
                     {" · "}
@@ -350,6 +404,43 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                     {" · "}
                     Ret./Fech.: <span className="font-semibold text-emerald-700">{d.convertedLeads.length}</span>
                   </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Escala: <span className="font-medium text-slate-700">{formatWorkDays(d.workDays)}</span>
+                  </p>
+                  {scheduleEditingId === d.id && (
+                    <div className="mt-2 p-2 rounded-lg border border-slate-200 bg-slate-50">
+                      <p className="text-[11px] text-slate-600 mb-1">Editar dias de atendimento</p>
+                      <div className="grid grid-cols-7 gap-1 mb-2">
+                        {weekdayOptions.map((day) => (
+                          <label key={day.value} className="flex items-center gap-1 text-[11px] bg-white border border-slate-200 rounded px-1.5 py-1">
+                            <input
+                              type="checkbox"
+                              checked={scheduleDraft.includes(day.value)}
+                              onChange={() => toggleScheduleDay(day.value)}
+                            />
+                            <span>{day.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void saveSchedule(d.id)}
+                          disabled={scheduleDraft.length === 0}
+                          className="px-2 py-1 text-[11px] rounded bg-slate-900 text-white disabled:opacity-40"
+                        >
+                          Salvar escala
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setScheduleEditingId(null)}
+                          className="px-2 py-1 text-[11px] rounded border border-slate-300 text-slate-700"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Métricas */}
@@ -357,7 +448,19 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                   {/* Hoje */}
                   <div>
                     <div className="text-xs text-slate-400 mb-0.5">Hoje</div>
-                    <div className={`text-xl font-bold ${d.todayAttended >= d.dailyTarget ? "text-emerald-600" : "text-slate-900"}`}>
+                    <div className="mb-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditSchedule(d.id, d.workDays);
+                        }}
+                        className="text-[11px] text-blue-600 hover:text-blue-700 underline"
+                      >
+                        Editar escala
+                      </button>
+                    </div>
+                    <div className={`text-xl font-bold ${d.dailyTarget > 0 && d.todayAttended >= d.dailyTarget ? "text-emerald-600" : "text-slate-900"}`}>
                       {d.todayAttended}
                       <span className="text-sm text-slate-400 font-normal">/{d.dailyTarget}</span>
                     </div>

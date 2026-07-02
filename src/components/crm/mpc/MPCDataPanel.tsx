@@ -5,8 +5,8 @@ import { useLeads } from "@/hooks/useLeads";
 
 type Mutations = {
   setStore: (s: MPCStore | ((prev: MPCStore) => MPCStore)) => void;
-  addDentist: (d: { name: string; specialty?: string; dailyTarget?: number }) => void;
-  updateDentist: (id: string, patch: Partial<{ name: string; specialty: string; dailyTarget: number }>) => void;
+  addDentist: (d: { name: string; specialty?: string; dailyTarget?: number; workDays?: number[] }) => void;
+  updateDentist: (id: string, patch: Partial<{ name: string; specialty: string; dailyTarget: number; workDays: number[] }>) => void;
   removeDentist: (id: string) => void;
   recordAppointment: (a: any) => void;
   addSurvey: (s: any) => void;
@@ -95,8 +95,26 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
   const [activeForm, setActiveForm] = useState<ActiveForm>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10 });
+  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] as number[] });
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const weekdayOptions = [
+    { value: 1, label: "Seg" },
+    { value: 2, label: "Ter" },
+    { value: 3, label: "Qua" },
+    { value: 4, label: "Qui" },
+    { value: 5, label: "Sex" },
+    { value: 6, label: "Sáb" },
+    { value: 0, label: "Dom" },
+  ];
+
+  const toggleDentistWorkDay = (day: number) => {
+    setDentistForm((prev) => {
+      const exists = prev.workDays.includes(day);
+      const nextDays = exists ? prev.workDays.filter((d) => d !== day) : [...prev.workDays, day];
+      return { ...prev, workDays: nextDays.sort((a, b) => a - b) };
+    });
+  };
 
   const [apptSearchQuery, setApptSearchQuery] = useState("");
   const [showApptSearch, setShowApptSearch] = useState(false);
@@ -175,15 +193,16 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
 
   const handleAddDentist = () => {
     if (!dentistForm.name.trim()) return;
+    if (dentistForm.workDays.length === 0) return;
     if (editingId) {
-      updateDentist(editingId, { name: dentistForm.name, specialty: dentistForm.specialty, dailyTarget: dentistForm.dailyTarget });
+      updateDentist(editingId, { name: dentistForm.name, specialty: dentistForm.specialty, dailyTarget: dentistForm.dailyTarget, workDays: dentistForm.workDays });
       setEditingId(null);
       showSuccess(`Dentista "${dentistForm.name}" atualizado`);
     } else {
-      addDentist({ name: dentistForm.name, specialty: dentistForm.specialty, dailyTarget: dentistForm.dailyTarget });
+      addDentist({ name: dentistForm.name, specialty: dentistForm.specialty, dailyTarget: dentistForm.dailyTarget, workDays: dentistForm.workDays });
       showSuccess(`Dentista "${dentistForm.name}" adicionado com sucesso`);
     }
-    setDentistForm({ name: "", specialty: "", dailyTarget: 10 });
+    setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] });
   };
 
   const handleAddAppointment = () => {
@@ -738,7 +757,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
             <div className="space-y-3 max-w-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-900">{editingId ? "Editar Dentista" : "Adicionar Dentista"}</span>
-                <button onClick={() => { setActiveForm(null); setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10 }); }} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                <button onClick={() => { setActiveForm(null); setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] }); }} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
@@ -753,13 +772,28 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                   <label className="text-xs text-slate-600 mb-1 block">Meta Diária (pacientes)</label>
                   <input type="number" min="1" value={dentistForm.dailyTarget} onChange={(e) => setDentistForm({ ...dentistForm, dailyTarget: Number(e.target.value) })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm" />
                 </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-600 mb-1 block">Dias de atendimento</label>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {weekdayOptions.map((day) => (
+                      <label key={day.value} className="flex items-center gap-1 text-xs bg-white border border-slate-200 rounded px-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={dentistForm.workDays.includes(day.value)}
+                          onChange={() => toggleDentistWorkDay(day.value)}
+                        />
+                        <span>{day.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="flex gap-2">
-                <button onClick={handleAddDentist} disabled={!dentistForm.name.trim()} className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-40">
+                <button onClick={handleAddDentist} disabled={!dentistForm.name.trim() || dentistForm.workDays.length === 0} className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-40">
                   {editingId ? "Atualizar" : "Adicionar"}
                 </button>
                 {editingId && (
-                  <button onClick={() => { setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10 }); }} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-white">Cancelar</button>
+                  <button onClick={() => { setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] }); }} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-white">Cancelar</button>
                 )}
               </div>
               {store.dentists.length > 0 && (
@@ -771,9 +805,10 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                         <span className="font-medium text-slate-900">{d.name}</span>
                         {d.specialty && <span className="text-slate-500 ml-2 text-xs">{d.specialty}</span>}
                         <span className="text-slate-400 ml-2 text-xs">meta: {d.dailyTarget}/dia</span>
+                        <span className="text-slate-400 ml-2 text-xs">dias: {(Array.isArray((d as any).workDays) && (d as any).workDays.length > 0 ? (d as any).workDays : [1,2,3,4,5,6]).map((wd: number) => ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"][wd]).join(", ")}</span>
                       </div>
                       <div className="flex gap-1">
-                        <button onClick={() => { setEditingId(d.id); setDentistForm({ name: d.name, specialty: d.specialty || "", dailyTarget: d.dailyTarget }); }} className="p-1 hover:bg-blue-50 rounded text-blue-500 text-xs">✏️</button>
+                        <button onClick={() => { setEditingId(d.id); setDentistForm({ name: d.name, specialty: d.specialty || "", dailyTarget: d.dailyTarget, workDays: Array.isArray((d as any).workDays) && (d as any).workDays.length > 0 ? [...(d as any).workDays] : [1,2,3,4,5,6] }); }} className="p-1 hover:bg-blue-50 rounded text-blue-500 text-xs">✏️</button>
                         <button onClick={() => removeDentist(d.id)} className="p-1 hover:bg-red-50 rounded text-red-400 text-xs">🗑️</button>
                       </div>
                     </div>

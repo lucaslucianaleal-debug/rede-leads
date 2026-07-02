@@ -11,6 +11,35 @@ import {
   MPCWeeklyReport,
 } from "@/types/mpc";
 
+const DEFAULT_WORK_DAYS = [1, 2, 3, 4, 5, 6];
+
+function normalizeWorkDays(days: any): number[] {
+  const arr = Array.isArray(days)
+    ? days.map((d) => Number(d)).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+    : [];
+  const unique = Array.from(new Set(arr)).sort((a, b) => a - b);
+  return unique.length > 0 ? unique : DEFAULT_WORK_DAYS;
+}
+
+function isWorkingOnDate(dentist: any, date: Date): boolean {
+  return normalizeWorkDays(dentist?.workDays).includes(date.getDay());
+}
+
+function countWorkingDays(start: Date, end: Date, workDays: number[]): number {
+  const s = new Date(start);
+  s.setHours(0, 0, 0, 0);
+  const e = new Date(end);
+  e.setHours(23, 59, 59, 999);
+
+  let count = 0;
+  const cursor = new Date(s);
+  while (cursor <= e) {
+    if (workDays.includes(cursor.getDay())) count += 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
 // ════════════════════════════════════════════════════════════════
 // Hook Principal: useMPCDashboardData
 // Recebe o store diretamente — sem instância própria, sem problemas de sync
@@ -97,7 +126,10 @@ function calculateMetrics(rawData: any): MPCMetrics {
     return a.status === "attended" && att.getTime() === today.getTime();
   }).length;
   
-  const productionMeta = dentists.reduce((sum: number, d: any) => sum + (d.dailyTarget || 10), 0);
+  const productionMeta = dentists.reduce((sum: number, d: any) => {
+    if (!isWorkingOnDate(d, today)) return sum;
+    return sum + (d.dailyTarget || 10);
+  }, 0);
 
   // Conversão real: orçamento -> atendimento (deduplicado por dentista + paciente)
   const budgetSet = new Set<string>();
@@ -432,12 +464,17 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       return opCount + budgetCount;
     });
 
-    const dailyTarget = d.dailyTarget || 10;
+    const configuredDailyTarget = d.dailyTarget || 10;
+    const workDays = normalizeWorkDays(d.workDays);
+    const isWorkingToday = workDays.includes(now.getDay());
+    const dailyTarget = isWorkingToday ? configuredDailyTarget : 0;
 
     // Status: "none" se nunca teve atendimento; caso contrário baseado em hoje vs meta
     const status: "ok" | "warning" | "critical" | "none" =
       totalAttended === 0
         ? "none"
+        : !isWorkingToday
+        ? "ok"
         : todayAttended >= dailyTarget
         ? "ok"
         : todayAttended >= Math.ceil(dailyTarget * 0.6)
@@ -449,6 +486,9 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       name: d.name,
       specialty: d.specialty || "",
       dailyTarget,
+      configuredDailyTarget,
+      isWorkingToday,
+      workDays,
       todayAttended,
       weekAttended,
       monthAttended,
@@ -671,8 +711,17 @@ function generateWeeklyReport(
   });
 
   const clinicAttended = attendedWeek.length;
-  const dailyClinicCapacity = dentists.reduce((sum: number, d: any) => sum + (d.dailyTarget || 10), 0);
-  const clinicCapacity = dailyClinicCapacity * 7;
+  const getCapacityForDate = (date: Date) =>
+    dentists.reduce((sum: number, d: any) => {
+      if (!isWorkingOnDate(d, date)) return sum;
+      return sum + (d.dailyTarget || 10);
+    }, 0);
+
+  const clinicCapacity = Array.from({ length: 7 }, (_, idx) => {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + idx);
+    return getCapacityForDate(d);
+  }).reduce((a, b) => a + b, 0);
   const clinicUtilization = clinicCapacity > 0 ? (clinicAttended / clinicCapacity) * 100 : 0;
 
   const lowOccupancyDays = Array.from({ length: 7 }, (_, idx) => {
@@ -682,16 +731,18 @@ function generateWeeklyReport(
     const attended = attendedWeek.filter((a: any) =>
       String(a.attendedAt || a.createdAt || "").startsWith(dateStr)
     ).length;
+    const dayCapacity = getCapacityForDate(d);
     return {
       date: dateStr,
       attended,
-      capacity: dailyClinicCapacity,
+      capacity: dayCapacity,
     };
   }).filter((d) => d.capacity > 0 && d.attended < Math.ceil(d.capacity * 0.6));
 
   const conversionTarget = 85;
   const dentistSummaries = dentistPerformance.map((d) => {
-    const weekTarget = (d.dailyTarget || 10) * 7;
+    const workDays = normalizeWorkDays((dentists.find((x: any) => x.id === d.id) || d).workDays);
+    const weekTarget = (d.configuredDailyTarget || d.dailyTarget || 10) * countWorkingDays(weekStart, now, workDays);
 
     const dentistApptsWeek = appointments.filter((a: any) => {
       const dt = new Date(a.attendedAt || a.createdAt || 0);
@@ -751,7 +802,7 @@ function generateWeeklyReport(
       attended: dentistOperationalWeek,
       target: weekTarget,
       deltaToTarget: dentistOperationalWeek - weekTarget,
-      avgDaily: dentistOperationalWeek / 7,
+      avgDaily: weekTarget > 0 ? dentistOperationalWeek / Math.max(1, countWorkingDays(weekStart, now, workDays)) : 0,
       trend,
       conversionRate: Math.round(conversionRate * 10) / 10,
       conversionTarget,
