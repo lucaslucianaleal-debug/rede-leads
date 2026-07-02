@@ -98,17 +98,18 @@ function statusLabel(status?: string) {
 
 export default function MPCDentistPerformance({ dentists }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [searchByDentist, setSearchByDentist] = useState<Record<string, { attended: string; budget: string }>>({});
+  const [searchByDentist, setSearchByDentist] = useState<Record<string, { attended: string; budget: string; converted: string }>>({});
 
   const getSearch = (dentistId: string) =>
-    searchByDentist[dentistId] || { attended: "", budget: "" };
+    searchByDentist[dentistId] || { attended: "", budget: "", converted: "" };
 
-  const updateSearch = (dentistId: string, field: "attended" | "budget", value: string) => {
+  const updateSearch = (dentistId: string, field: "attended" | "budget" | "converted", value: string) => {
     setSearchByDentist((prev) => ({
       ...prev,
       [dentistId]: {
         attended: prev[dentistId]?.attended || "",
         budget: prev[dentistId]?.budget || "",
+        converted: prev[dentistId]?.converted || "",
         [field]: value,
       },
     }));
@@ -140,9 +141,15 @@ export default function MPCDentistPerformance({ dentists }: Props) {
 
           const attendedQuery = search.attended.trim().toLowerCase();
           const budgetQuery = search.budget.trim().toLowerCase();
+          const convertedQuery = search.converted.trim().toLowerCase();
 
           const sortedAttended = [...d.attendedLeads].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
           const sortedBudgets = [...d.budgetLeads].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+          const sortedConverted = [...d.convertedLeads].sort((a, b) => {
+            const da = a.attendedDate || a.budgetDate || "";
+            const db = b.attendedDate || b.budgetDate || "";
+            return db.localeCompare(da);
+          });
 
           const filteredAttended = attendedQuery
             ? sortedAttended.filter((lead) =>
@@ -155,6 +162,14 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                 `${lead.name || ""} ${lead.date || ""} ${lead.phone || ""}`.toLowerCase().includes(budgetQuery)
               )
             : sortedBudgets;
+
+          const filteredConverted = convertedQuery
+            ? sortedConverted.filter((lead) =>
+                `${lead.name || ""} ${lead.budgetDate || ""} ${lead.attendedDate || ""} ${lead.phone || ""}`
+                  .toLowerCase()
+                  .includes(convertedQuery)
+              )
+            : sortedConverted;
 
           return (
             <div key={d.id} className="px-6 py-4">
@@ -301,11 +316,19 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">
                       Retornos e Fechamentos ({d.convertedLeads.length})
                     </p>
-                    {d.convertedLeads.length === 0 ? (
+                    <input
+                      type="text"
+                      value={search.converted}
+                      onChange={(e) => updateSearch(d.id, "converted", e.target.value)}
+                      placeholder="Pesquisar fechamento por nome, telefone ou data"
+                      className="w-full mb-2 px-2 py-1.5 border border-emerald-300 rounded text-xs text-emerald-900 bg-white"
+                    />
+                    <p className="text-[11px] text-emerald-600 mb-2">Ordenado por data de atendimento mais recente</p>
+                    {filteredConverted.length === 0 ? (
                       <p className="text-xs text-emerald-700">Nenhum orçamento com retorno/fechamento ainda.</p>
                     ) : (
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
-                        {d.convertedLeads.map((lead, idx) => (
+                        {filteredConverted.map((lead, idx) => (
                           <div key={`${lead.name}_${lead.budgetDate}_${lead.attendedDate}_${idx}`} className="text-xs text-emerald-900 border-b border-emerald-200 pb-1">
                             <p className="font-medium">{lead.name}</p>
                             <p>Orçamento: {lead.budgetDate || "-"} · Atendimento: {lead.attendedDate || "-"}</p>
