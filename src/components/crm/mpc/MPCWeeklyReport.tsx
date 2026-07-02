@@ -152,6 +152,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
 
   const conversionTarget = 85;
   const dentistSummaries = dentists.map((d: any) => {
+    const isOrcamentista = d.isOrcamentista !== false;
     const dentistCurrent = appointments.filter((a: any) => {
       if (!isOperationalStatus(a.status)) return false;
       const dt = new Date(a.attendedAt || a.createdAt || 0);
@@ -181,7 +182,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const budgetCount = budgetSet.size;
     const convertedCount = convertedSet.size;
     const pendingBudgetCount = Math.max(0, budgetCount - convertedCount);
-    const conversionRate = budgetCount > 0 ? (convertedCount / budgetCount) * 100 : 0;
+    const conversionRate = isOrcamentista && budgetCount > 0 ? (convertedCount / budgetCount) * 100 : 0;
     const workDays = normalizeWorkDays(d.workDays);
     const workingDaysCount = countWorkingDays(start, end, workDays);
     const target = (d.dailyTarget || 10) * workingDaysCount;
@@ -208,14 +209,16 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     return {
       dentistId: d.id,
       name: d.name,
+      isOrcamentista,
       attended,
       target,
       deltaToTarget: attended - target,
       avgDaily: attended / Math.max(1, workingDaysCount),
+      attendanceRate: target > 0 ? Math.round(((attended / target) * 100) * 10) / 10 : 0,
       trend,
-      conversionRate: Math.round(conversionRate * 10) / 10,
-      conversionTarget,
-      conversionDelta: Math.round((conversionRate - conversionTarget) * 10) / 10,
+      conversionRate: isOrcamentista ? Math.round(conversionRate * 10) / 10 : null,
+      conversionTarget: isOrcamentista ? conversionTarget : null,
+      conversionDelta: isOrcamentista ? Math.round((conversionRate - conversionTarget) * 10) / 10 : null,
       satisfaction: Math.round(satisfaction * 10) / 10,
       surveyCount: dentistSurveys.length,
       budgetCount,
@@ -242,19 +245,20 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   const outliers: string[] = [];
   dentistSummaries.forEach((d) => {
     if (d.deltaToTarget < 0) outliers.push(`${d.name} abaixo da meta de atendimentos (${d.attended}/${d.target}).`);
-    if (d.conversionDelta < 0) outliers.push(`${d.name} com conversão abaixo da meta (${d.conversionRate}% vs ${d.conversionTarget}%).`);
+    if (d.isOrcamentista !== false && (d.conversionDelta ?? 0) < 0) outliers.push(`${d.name} com conversão abaixo da meta (${d.conversionRate}% vs ${d.conversionTarget}%).`);
     if (d.surveyCount > 0 && d.satisfaction < 4) outliers.push(`${d.name} com satisfação baixa (${d.satisfaction}/5).`);
   });
   if (receptionAvg > 0 && receptionAvg < 4) outliers.push(`Recepção abaixo do padrão (${Math.round(receptionAvg * 10) / 10}/5).`);
 
   const productivityWinner = [...dentistSummaries].sort((a, b) => b.attended - a.attended)[0];
-  const conversionWinner = [...dentistSummaries].sort((a, b) => b.conversionRate - a.conversionRate)[0];
+  const conversionWinner = [...dentistSummaries].filter((d) => d.isOrcamentista !== false).sort((a, b) => (b.conversionRate || 0) - (a.conversionRate || 0))[0];
   const satisfactionWinner = [...dentistSummaries].filter((d) => d.surveyCount > 0).sort((a, b) => b.satisfaction - a.satisfaction)[0];
 
-  const convCurrent = dentistSummaries.length > 0
-    ? dentistSummaries.reduce((acc, d) => acc + d.conversionRate, 0) / dentistSummaries.length
+  const dentistsForConversion = dentistSummaries.filter((d) => d.isOrcamentista !== false);
+  const convCurrent = dentistsForConversion.length > 0
+    ? dentistsForConversion.reduce((acc, d) => acc + (d.conversionRate || 0), 0) / dentistsForConversion.length
     : 0;
-  const convPrevByDentist = dentists.map((d: any) => {
+  const convPrevByDentist = dentists.filter((d: any) => d.isOrcamentista !== false).map((d: any) => {
     const dbPrev = budgetsPrev.filter((b: any) => b.dentistId === d.id);
     const daPrev = attendedPrev.filter((a: any) => a.dentistId === d.id && a.status === "attended");
     const bSet = new Set<string>();
@@ -290,7 +294,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   dentistSummaries.filter((d) => d.deltaToTarget < 0).slice(0, 2).forEach((d) => {
     managementActions.push(`Reavaliar agenda de ${d.name}, abaixo da meta de atendimentos.`);
   });
-  dentistSummaries.filter((d) => d.conversionDelta < 0).slice(0, 2).forEach((d) => {
+  dentistSummaries.filter((d) => d.isOrcamentista !== false && (d.conversionDelta ?? 0) < 0).slice(0, 2).forEach((d) => {
     managementActions.push(`Acompanhar conversão de ${d.name}, abaixo da meta no período.`);
   });
   if (receptionAvg > 0 && receptionAvg < 4) {
@@ -355,9 +359,13 @@ function downloadTextReport(report: MPCWeeklyReportType) {
   lines.push(`- Utilizacao: ${Math.round(report.clinicUtilization)}%`);
   lines.push(`- Dias de baixa ocupacao: ${report.lowOccupancyDays.length}`);
   lines.push("");
-  lines.push("2/3) Volume e conversao por dentista");
+  lines.push("2/3) Volume e conversao/taxa por dentista");
   report.dentistSummaries.forEach((d) => {
-    lines.push(`- ${d.name}: atendimentos_totais=${d.attended}, meta=${d.target}, orcamentos=${d.budgetCount ?? 0}, convertidos=${d.convertedCount ?? 0}, conversao=${d.conversionRate}%`);
+    if (d.isOrcamentista === false) {
+      lines.push(`- ${d.name}: atendimentos_totais=${d.attended}, meta=${d.target}, taxa_atendimento=${Math.round(d.attendanceRate ?? 0)}% (somente execucao)`);
+      return;
+    }
+    lines.push(`- ${d.name}: atendimentos_totais=${d.attended}, meta=${d.target}, orcamentos=${d.budgetCount ?? 0}, convertidos=${d.convertedCount ?? 0}, conversao=${Math.round(d.conversionRate ?? 0)}%`);
   });
   lines.push("");
   lines.push("4/5) Satisfacao e recepcao");
@@ -490,8 +498,9 @@ export default function MPCWeeklyReport({ report, store }: Props) {
         </section>
 
         <section>
-          <h3 className="font-semibold text-slate-900 mb-2">2 e 3. Volume e conversão por dentista</h3>
+          <h3 className="font-semibold text-slate-900 mb-2">2 e 3. Volume e conversão/taxa por dentista</h3>
           <p className="text-xs text-slate-500 mb-2">Atendimentos totais = atendidos/agendados/confirmados + avaliações com orçamento.</p>
+          <p className="text-xs text-slate-500 mb-2">Para dentista sem perfil orçamentista, o indicador exibido é taxa de atendimento versus meta, sem cobrança de conversão.</p>
           <p className="text-xs text-slate-500 mb-2">Tendência = comparação do período selecionado com o período imediatamente anterior (mesma duração).</p>
           <div className="overflow-x-auto">
             <table className="min-w-full border border-slate-200 rounded-lg text-xs md:text-sm">
@@ -504,8 +513,8 @@ export default function MPCWeeklyReport({ report, store }: Props) {
                   <th className="text-left px-3 py-2">Tendência</th>
                   <th className="text-left px-3 py-2">Orçamentos</th>
                   <th className="text-left px-3 py-2">Convertidos</th>
-                  <th className="text-left px-3 py-2">Conversão</th>
-                  <th className="text-left px-3 py-2">Meta conv.</th>
+                  <th className="text-left px-3 py-2">Conversão / Atend.</th>
+                  <th className="text-left px-3 py-2">Meta conv./atend.</th>
                 </tr>
               </thead>
               <tbody>
@@ -518,10 +527,10 @@ export default function MPCWeeklyReport({ report, store }: Props) {
                     <td className="px-3 py-2">
                       {d.trend === "up" ? "Crescimento" : d.trend === "down" ? "Queda" : "Estável"}
                     </td>
-                    <td className="px-3 py-2">{d.budgetCount ?? 0}</td>
-                    <td className="px-3 py-2">{d.convertedCount ?? 0}</td>
-                    <td className="px-3 py-2">{d.conversionRate}%</td>
-                    <td className="px-3 py-2">{d.conversionTarget}%</td>
+                    <td className="px-3 py-2">{d.isOrcamentista === false ? "N/A" : (d.budgetCount ?? 0)}</td>
+                    <td className="px-3 py-2">{d.isOrcamentista === false ? "N/A" : (d.convertedCount ?? 0)}</td>
+                    <td className="px-3 py-2">{d.isOrcamentista === false ? `Atend. ${Math.round(d.attendanceRate ?? 0)}%` : `${d.conversionRate}%`}</td>
+                    <td className="px-3 py-2">{d.isOrcamentista === false ? "Meta atend." : `${d.conversionTarget}%`}</td>
                   </tr>
                 ))}
               </tbody>

@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
 
 export type MPCStore = {
-  dentists: Array<{ id: string; name: string; specialty?: string; dailyTarget: number; workDays?: number[]; leadId?: string }>;
+  dentists: Array<{ id: string; name: string; specialty?: string; dailyTarget: number; workDays?: number[]; isOrcamentista?: boolean; leadId?: string }>;
   appointments: Array<{ id: string; dentistId: string; patientName: string; patientId?: string; patientPhone?: string; status: "scheduled" | "confirmed" | "attended"; attendedAt: string; attendedBy?: string; saleValue?: number; saleProcedure?: string }>;
   budgets: Array<{ id: string; dentistId: string; patientName: string; patientId?: string; patientPhone?: string; budgetAt: string; procedure?: string; source?: string; saleValue?: number; saleProcedure?: string }>;
   surveys: Array<{ id: string; leadId?: string; sector: "reception" | "clinic" | "ortho" | "sales" | "dentist"; dentistId?: string; score: number; comment?: string; createdAt: string }>;
@@ -24,7 +24,7 @@ function normalizeStoreShape(store: any): MPCStore {
 
   return {
     dentists: Array.isArray(store?.dentists)
-      ? store.dentists.map((d: any) => ({ ...d, workDays: normalizeWorkDays(d?.workDays) }))
+      ? store.dentists.map((d: any) => ({ ...d, workDays: normalizeWorkDays(d?.workDays), isOrcamentista: d?.isOrcamentista !== false }))
       : [],
     appointments: Array.isArray(store?.appointments) ? store.appointments : [],
     budgets: Array.isArray(store?.budgets) ? store.budgets : [],
@@ -243,19 +243,20 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
     return unique.length > 0 ? unique : [1, 2, 3, 4, 5, 6];
   };
 
-  const addDentist = useCallback((d: { id?: string; name: string; specialty?: string; dailyTarget?: number; workDays?: number[]; leadId?: string }) => {
+  const addDentist = useCallback((d: { id?: string; name: string; specialty?: string; dailyTarget?: number; workDays?: number[]; isOrcamentista?: boolean; leadId?: string }) => {
     const id = d.id || `d_${Date.now()}`;
     const workDays = normalizeWorkDays(d.workDays);
-    setStore(s => ({ ...s, dentists: [...s.dentists, { id, name: d.name, specialty: d.specialty || "", dailyTarget: d.dailyTarget || 10, workDays, leadId: d.leadId }] }));
+    setStore(s => ({ ...s, dentists: [...s.dentists, { id, name: d.name, specialty: d.specialty || "", dailyTarget: d.dailyTarget || 10, workDays, isOrcamentista: d.isOrcamentista !== false, leadId: d.leadId }] }));
   }, [setStore]);
 
-  const updateDentist = useCallback((id: string, patch: Partial<{ name: string; specialty: string; dailyTarget: number; workDays: number[] }>) => {
+  const updateDentist = useCallback((id: string, patch: Partial<{ name: string; specialty: string; dailyTarget: number; workDays: number[]; isOrcamentista: boolean }>) => {
     setStore(s => ({
       ...s,
       dentists: s.dentists.map(d => {
         if (d.id !== id) return d;
         const next = { ...d, ...patch } as any;
         if (patch.workDays !== undefined) next.workDays = normalizeWorkDays(patch.workDays);
+        if (patch.isOrcamentista !== undefined) next.isOrcamentista = patch.isOrcamentista;
         return next;
       })
     }));

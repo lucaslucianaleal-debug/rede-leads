@@ -16,7 +16,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
   const { currentClinic } = useAuth();
   
   const [tab, setTab] = useState<"dentistas" | "atendimentos" | "satisfacao">("dentistas");
-  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] as number[] });
+  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] as number[], isOrcamentista: true });
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const weekdayOptions = [
@@ -80,6 +80,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
         specialty: dentistForm.specialty,
         dailyTarget: dentistForm.dailyTarget,
         workDays: dentistForm.workDays,
+        isOrcamentista: dentistForm.isOrcamentista,
       });
       setEditingId(null);
     } else {
@@ -88,9 +89,10 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
         specialty: dentistForm.specialty,
         dailyTarget: dentistForm.dailyTarget,
         workDays: dentistForm.workDays,
+        isOrcamentista: dentistForm.isOrcamentista,
       });
     }
-    setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] });
+    setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true });
   };
 
   const handleEditDentist = (id: string) => {
@@ -101,6 +103,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
         specialty: d.specialty || "",
         dailyTarget: d.dailyTarget,
         workDays: normalizeWorkDays((d as any).workDays),
+        isOrcamentista: (d as any).isOrcamentista !== false,
       });
       setEditingId(id);
     }
@@ -254,6 +257,17 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
                     ))}
                   </div>
                 </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Perfil de orçamento</label>
+                  <label className="inline-flex items-center gap-2 text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-1.5">
+                    <input
+                      type="checkbox"
+                      checked={dentistForm.isOrcamentista}
+                      onChange={(e) => setDentistForm({ ...dentistForm, isOrcamentista: e.target.checked })}
+                    />
+                    Dentista orçamentista
+                  </label>
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleAddDentist}
@@ -266,7 +280,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
                     <button
                       onClick={() => {
                         setEditingId(null);
-                        setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] });
+                        setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true });
                       }}
                       className="flex-1 px-4 py-2 border border-slate-300 text-slate-900 rounded-lg font-medium hover:bg-slate-50"
                     >
@@ -291,7 +305,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
                         <div>
                           <p className="font-medium text-slate-900">{d.name}</p>
                           <p className="text-xs text-slate-600">
-                            {d.specialty} • Meta: {d.dailyTarget} pac/dia • Dias: {normalizeWorkDays((d as any).workDays).map((wd) => ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][wd]).join(", ")}
+                            {d.specialty} • Meta: {d.dailyTarget} pac/dia • Dias: {normalizeWorkDays((d as any).workDays).map((wd) => ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][wd]).join(", ")} • Perfil: {(d as any).isOrcamentista === false ? "somente execução" : "orçamentista"}
                           </p>
                         </div>
                         <div className="flex gap-2">

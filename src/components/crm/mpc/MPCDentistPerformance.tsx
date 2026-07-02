@@ -402,10 +402,17 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                     {" · "}
                     Orçamentos: <span className="font-semibold text-slate-700">{d.budgetLeads.length}</span>
                     {" · "}
-                    Ret./Fech.: <span className="font-semibold text-emerald-700">{d.convertedLeads.length}</span>
+                    {d.hasConversionGoal !== false ? (
+                      <>Ret./Fech.: <span className="font-semibold text-emerald-700">{d.convertedLeads.length}</span></>
+                    ) : (
+                      <>Taxa de atendimento: <span className="font-semibold text-emerald-700">{Math.round(d.attendanceRate || 0)}%</span></>
+                    )}
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
                     Escala: <span className="font-medium text-slate-700">{formatWorkDays(d.workDays)}</span>
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Perfil: <span className="font-medium text-slate-700">{d.isOrcamentista === false ? "Somente execução" : "Orçamentista"}</span>
                   </p>
                   {scheduleEditingId === d.id && (
                     <div className="mt-2 p-2 rounded-lg border border-slate-200 bg-slate-50">
@@ -478,11 +485,15 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                     <div className="text-lg font-semibold text-slate-700">{d.monthAttended}</div>
                     <div className="text-xs text-slate-400">atend. totais</div>
                   </div>
-                  {/* Conversão */}
+                  {/* Conversão / Taxa de atendimento */}
                   <div>
-                    <div className="text-xs text-slate-400 mb-0.5">Conversão</div>
-                    <div className="text-lg font-semibold text-slate-700">{d.conversionRate}%</div>
-                    <div className="text-xs text-slate-400">ret./fech. {d.convertedLeads.length}/{d.budgetLeads.length}</div>
+                    <div className="text-xs text-slate-400 mb-0.5">{d.hasConversionGoal !== false ? "Conversão" : "Taxa Atend."}</div>
+                    <div className="text-lg font-semibold text-slate-700">{Math.round(d.hasConversionGoal !== false ? d.conversionRate : (d.attendanceRate || 0))}%</div>
+                    <div className="text-xs text-slate-400">
+                      {d.hasConversionGoal !== false
+                        ? `ret./fech. ${d.convertedLeads.length}/${d.budgetLeads.length}`
+                        : `meta sem. ${d.weekAttended}/${d.weekTarget || 0}`}
+                    </div>
                   </div>
                   {/* Satisfação */}
                   <div>
@@ -622,43 +633,56 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                     )}
                   </div>
 
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">
-                      Retornos e Fechamentos ({d.convertedLeads.length})
-                    </p>
-                    <input
-                      type="text"
-                      value={search.converted}
-                      onChange={(e) => updateSearch(d.id, "converted", e.target.value)}
-                      placeholder="Pesquisar fechamento por nome, telefone ou data"
-                      className="w-full mb-2 px-2 py-1.5 border border-emerald-300 rounded text-xs text-emerald-900 bg-white"
-                    />
-                    <p className="text-[11px] text-emerald-600 mb-2">Ordenado por data de atendimento mais recente</p>
-                    {filteredConverted.length === 0 ? (
-                      <p className="text-xs text-emerald-700">Nenhum orçamento com retorno/fechamento ainda.</p>
-                    ) : (
-                      <div className="max-h-56 overflow-y-auto space-y-1.5">
-                        {filteredConverted.map((lead, idx) => (
-                          (() => {
-                            const identity = getSyncedIdentity(lead.patientId, lead.name, lead.phone);
-                            return (
-                          <div key={`${lead.name}_${lead.budgetDate}_${lead.attendedDate}_${idx}`} className="text-xs text-emerald-900 border-b border-emerald-200 pb-1">
-                            <div className="flex items-center gap-1.5">
-                              <p className="font-medium">{identity.name}</p>
-                              {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">SYNC</span>}
+                  {d.hasConversionGoal !== false ? (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">
+                        Retornos e Fechamentos ({d.convertedLeads.length})
+                      </p>
+                      <input
+                        type="text"
+                        value={search.converted}
+                        onChange={(e) => updateSearch(d.id, "converted", e.target.value)}
+                        placeholder="Pesquisar fechamento por nome, telefone ou data"
+                        className="w-full mb-2 px-2 py-1.5 border border-emerald-300 rounded text-xs text-emerald-900 bg-white"
+                      />
+                      <p className="text-[11px] text-emerald-600 mb-2">Ordenado por data de atendimento mais recente</p>
+                      {filteredConverted.length === 0 ? (
+                        <p className="text-xs text-emerald-700">Nenhum orçamento com retorno/fechamento ainda.</p>
+                      ) : (
+                        <div className="max-h-56 overflow-y-auto space-y-1.5">
+                          {filteredConverted.map((lead, idx) => (
+                            (() => {
+                              const identity = getSyncedIdentity(lead.patientId, lead.name, lead.phone);
+                              return (
+                            <div key={`${lead.name}_${lead.budgetDate}_${lead.attendedDate}_${idx}`} className="text-xs text-emerald-900 border-b border-emerald-200 pb-1">
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium">{identity.name}</p>
+                                {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">SYNC</span>}
+                              </div>
+                              <p>Orçamento: {lead.budgetDate || "-"} · Atendimento: {lead.attendedDate || "-"}</p>
+                              {identity.phone && <p>{identity.phone}</p>}
+                              {identity.synced && identity.crmName && identity.crmName !== identity.name && (
+                                <p className="text-[11px] text-emerald-700">CRM: {identity.crmName}</p>
+                              )}
                             </div>
-                            <p>Orçamento: {lead.budgetDate || "-"} · Atendimento: {lead.attendedDate || "-"}</p>
-                            {identity.phone && <p>{identity.phone}</p>}
-                            {identity.synced && identity.crmName && identity.crmName !== identity.name && (
-                              <p className="text-[11px] text-emerald-700">CRM: {identity.crmName}</p>
-                            )}
-                          </div>
-                            );
-                          })()
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                              );
+                            })()
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 mb-2">Meta de Atendimento</p>
+                      <p className="text-sm text-blue-900">
+                        Taxa de atendimento no período: <span className="font-semibold">{Math.round(d.attendanceRate || 0)}%</span>
+                      </p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Meta semanal: {d.weekAttended}/{d.weekTarget || 0}
+                      </p>
+                      <p className="text-[11px] text-blue-700 mt-2">Conversão não é cobrada para este perfil (somente execução).</p>
+                    </div>
+                  )}
                 </div>
 
                 {editingLead && editingLead.dentistId === d.id && (

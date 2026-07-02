@@ -59,6 +59,10 @@ export interface DentistPerformance {
   configuredDailyTarget?: number;
   isWorkingToday?: boolean;
   workDays?: number[];
+  isOrcamentista?: boolean;
+  hasConversionGoal?: boolean;
+  attendanceRate?: number;
+  weekTarget?: number;
   todayAttended: number;
   weekAttended: number;   // últimos 7 dias
   monthAttended: number;  // últimos 30 dias
@@ -103,14 +107,16 @@ export interface RecommendedDecision {
 export interface MPCWeeklyDentistSummary {
   dentistId: string;
   name: string;
+  isOrcamentista?: boolean;
   attended: number;
   target: number;
   deltaToTarget: number;
   avgDaily: number;
+  attendanceRate?: number;
   trend: "up" | "down" | "stable";
-  conversionRate: number;
-  conversionTarget: number;
-  conversionDelta: number;
+  conversionRate?: number | null;
+  conversionTarget?: number | null;
+  conversionDelta?: number | null;
   satisfaction: number;
   surveyCount: number;
   budgetCount?: number;

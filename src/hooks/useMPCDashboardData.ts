@@ -465,9 +465,12 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     });
 
     const configuredDailyTarget = d.dailyTarget || 10;
+    const isOrcamentista = d.isOrcamentista !== false;
     const workDays = normalizeWorkDays(d.workDays);
     const isWorkingToday = workDays.includes(now.getDay());
     const dailyTarget = isWorkingToday ? configuredDailyTarget : 0;
+    const weekTarget = configuredDailyTarget * countWorkingDays(weekStart, now, workDays);
+    const attendanceRate = weekTarget > 0 ? (weekAttended / weekTarget) * 100 : 0;
 
     // Status: "none" se nunca teve atendimento; caso contrário baseado em hoje vs meta
     const status: "ok" | "warning" | "critical" | "none" =
@@ -489,11 +492,15 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       configuredDailyTarget,
       isWorkingToday,
       workDays,
+      isOrcamentista,
+      hasConversionGoal: isOrcamentista,
+      attendanceRate: Math.round(attendanceRate * 10) / 10,
+      weekTarget,
       todayAttended,
       weekAttended,
       monthAttended,
       totalAttended,
-      conversionRate: Math.round(conversionRate * 10) / 10,
+      conversionRate: isOrcamentista ? Math.round(conversionRate * 10) / 10 : 0,
       satisfaction: avgSatisfaction,
       status,
       trend90d,
@@ -741,6 +748,7 @@ function generateWeeklyReport(
 
   const conversionTarget = 85;
   const dentistSummaries = dentistPerformance.map((d) => {
+    const isOrcamentista = (dentists.find((x: any) => x.id === d.id) || d).isOrcamentista !== false;
     const workDays = normalizeWorkDays((dentists.find((x: any) => x.id === d.id) || d).workDays);
     const weekTarget = (d.configuredDailyTarget || d.dailyTarget || 10) * countWorkingDays(weekStart, now, workDays);
 
@@ -768,7 +776,7 @@ function generateWeeklyReport(
         if (dentistBudgetSet.has(key)) dentistConvertedSet.add(key);
       });
 
-    const conversionRate = dentistBudgetSet.size > 0
+    const conversionRate = isOrcamentista && dentistBudgetSet.size > 0
       ? (dentistConvertedSet.size / dentistBudgetSet.size) * 100
       : 0;
 
@@ -799,14 +807,16 @@ function generateWeeklyReport(
     return {
       dentistId: d.id,
       name: d.name,
+      isOrcamentista,
       attended: dentistOperationalWeek,
       target: weekTarget,
       deltaToTarget: dentistOperationalWeek - weekTarget,
       avgDaily: weekTarget > 0 ? dentistOperationalWeek / Math.max(1, countWorkingDays(weekStart, now, workDays)) : 0,
+      attendanceRate: weekTarget > 0 ? Math.round(((dentistOperationalWeek / weekTarget) * 100) * 10) / 10 : 0,
       trend,
-      conversionRate: Math.round(conversionRate * 10) / 10,
-      conversionTarget,
-      conversionDelta: Math.round((conversionRate - conversionTarget) * 10) / 10,
+      conversionRate: isOrcamentista ? Math.round(conversionRate * 10) / 10 : null,
+      conversionTarget: isOrcamentista ? conversionTarget : null,
+      conversionDelta: isOrcamentista ? Math.round((conversionRate - conversionTarget) * 10) / 10 : null,
       satisfaction: Math.round(satisfaction * 10) / 10,
       surveyCount: dentistSurveys.length,
       budgetCount: dentistBudgetSet.size,
@@ -833,7 +843,7 @@ function generateWeeklyReport(
   const outliers: string[] = [];
   dentistSummaries.forEach((d) => {
     if (d.deltaToTarget < 0) outliers.push(`${d.name} abaixo da meta de atendimentos (${d.attended}/${d.target}).`);
-    if (d.conversionDelta < 0) outliers.push(`${d.name} com conversão abaixo da meta (${d.conversionRate}% vs ${d.conversionTarget}%).`);
+    if (d.isOrcamentista !== false && (d.conversionDelta ?? 0) < 0) outliers.push(`${d.name} com conversão abaixo da meta (${d.conversionRate}% vs ${d.conversionTarget}%).`);
     if (d.surveyCount > 0 && d.satisfaction < 4) outliers.push(`${d.name} com satisfação baixa (${d.satisfaction}/5).`);
   });
 
@@ -842,7 +852,7 @@ function generateWeeklyReport(
   }
 
   const productivityWinner = [...dentistSummaries].sort((a, b) => b.attended - a.attended)[0];
-  const conversionWinner = [...dentistSummaries].sort((a, b) => b.conversionRate - a.conversionRate)[0];
+  const conversionWinner = [...dentistSummaries].filter((d) => d.isOrcamentista !== false).sort((a, b) => (b.conversionRate || 0) - (a.conversionRate || 0))[0];
   const satisfactionWinner = [...dentistSummaries]
     .filter((d) => d.surveyCount > 0)
     .sort((a, b) => b.satisfaction - a.satisfaction)[0];
@@ -913,7 +923,7 @@ function generateWeeklyReport(
     .slice(0, 2)
     .forEach((d) => managementActions.push(`Reavaliar agenda de ${d.name} devido ao volume abaixo da meta.`));
   dentistSummaries
-    .filter((d) => d.conversionDelta < 0)
+    .filter((d) => d.isOrcamentista !== false && (d.conversionDelta ?? 0) < 0)
     .slice(0, 2)
     .forEach((d) => managementActions.push(`Acompanhar conversão de ${d.name}, abaixo da meta semanal.`));
   if (receptionAvg > 0 && receptionAvg < 4) {
