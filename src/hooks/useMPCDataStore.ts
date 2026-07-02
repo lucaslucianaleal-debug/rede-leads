@@ -30,12 +30,17 @@ function normalizeStoreShape(store: any): MPCStore {
 
   return {
     dentists: Array.isArray(store?.dentists)
-      ? store.dentists.map((d: any) => ({
-          ...d,
-          workDays: normalizeWorkDays(d?.workDays),
-          isOrcamentista: d?.isOrcamentista !== false,
-          startDate: normalizeStartDate(d?.startDate),
-        }))
+      ? store.dentists.map((d: any) => {
+          const normalizedStartDate = normalizeStartDate(d?.startDate);
+          const normalized: any = {
+            ...d,
+            workDays: normalizeWorkDays(d?.workDays),
+            isOrcamentista: d?.isOrcamentista !== false,
+          };
+          if (normalizedStartDate) normalized.startDate = normalizedStartDate;
+          else delete normalized.startDate;
+          return normalized;
+        })
       : [],
     appointments: Array.isArray(store?.appointments) ? store.appointments : [],
     budgets: Array.isArray(store?.budgets) ? store.budgets : [],
@@ -78,7 +83,20 @@ function setClinicCacheStore(clinicId: string | null, store: MPCStore) {
 }
 
 function sanitizeStore(store: MPCStore): MPCStore {
-  return normalizeStoreShape(JSON.parse(JSON.stringify(store)) as MPCStore);
+  const removeUndefinedDeep = (value: any): any => {
+    if (Array.isArray(value)) return value.map(removeUndefinedDeep);
+    if (value && typeof value === "object") {
+      const out: any = {};
+      Object.entries(value).forEach(([k, v]) => {
+        if (v === undefined) return;
+        out[k] = removeUndefinedDeep(v);
+      });
+      return out;
+    }
+    return value;
+  };
+
+  return normalizeStoreShape(removeUndefinedDeep(store) as MPCStore);
 }
 
 function isStoreEmpty(s: MPCStore) {
@@ -269,7 +287,10 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
         const next = { ...d, ...patch } as any;
         if (patch.workDays !== undefined) next.workDays = normalizeWorkDays(patch.workDays);
         if (patch.isOrcamentista !== undefined) next.isOrcamentista = patch.isOrcamentista;
-        if (patch.startDate !== undefined) next.startDate = /^\d{4}-\d{2}-\d{2}$/.test(String(patch.startDate || "")) ? patch.startDate : undefined;
+        if (patch.startDate !== undefined) {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(String(patch.startDate || ""))) next.startDate = patch.startDate;
+          else delete next.startDate;
+        }
         return next;
       })
     }));
