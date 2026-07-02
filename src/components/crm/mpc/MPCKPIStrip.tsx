@@ -76,7 +76,7 @@ function KPICard({
 export default function MPCKPIStrip({ metrics }: MPCKPIStripProps) {
   const kpis = [
     {
-      label: "Produção",
+      label: "Atend. Totais",
       value: metrics.producao.total,
       meta: metrics.producao.meta,
       percentual: metrics.producao.percentualMeta,

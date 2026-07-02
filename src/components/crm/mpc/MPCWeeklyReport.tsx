@@ -79,12 +79,15 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   };
 
   const dayKey = (isoLike?: string) => String(isoLike || "").slice(0, 10);
+  const isOperationalStatus = (status?: string) =>
+    status === "attended" || status === "scheduled" || status === "confirmed";
 
   const attendedCurrent = appointments.filter((a: any) => {
-    if (a.status !== "attended") return false;
-    const dt = new Date(a.attendedAt || 0);
+    if (!isOperationalStatus(a.status)) return false;
+    const dt = new Date(a.attendedAt || a.createdAt || 0);
     return inRange(dt, start, end);
   });
+  const completedCurrent = attendedCurrent.filter((a: any) => a.status === "attended");
 
   const budgetsCurrent = budgets.filter((b: any) => {
     const dt = new Date(b.budgetAt || 0);
@@ -92,8 +95,8 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   });
 
   const attendedPrev = appointments.filter((a: any) => {
-    if (a.status !== "attended") return false;
-    const dt = new Date(a.attendedAt || 0);
+    if (!isOperationalStatus(a.status)) return false;
+    const dt = new Date(a.attendedAt || a.createdAt || 0);
     return inRange(dt, prevStart, prevEnd);
   });
 
@@ -102,14 +105,10 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     return inRange(dt, prevStart, prevEnd);
   });
 
-  // Regra de negócio: orçamento também conta como atendimento.
-  // Para não duplicar, dedup por dentista + paciente + dia.
+  // Atendimentos totais = atendidos + agendados/confirmados (sem misturar orçamento).
   const clinicAttendanceSet = new Set<string>();
   attendedCurrent.forEach((a: any) => {
-    clinicAttendanceSet.add(`${entityKey(a.dentistId, a.patientId, a.patientName)}::${dayKey(a.attendedAt)}`);
-  });
-  budgetsCurrent.forEach((b: any) => {
-    clinicAttendanceSet.add(`${entityKey(b.dentistId, b.patientId, b.patientName)}::${dayKey(b.budgetAt)}`);
+    clinicAttendanceSet.add(`${entityKey(a.dentistId, a.patientId, a.patientName)}::${dayKey(a.attendedAt || a.createdAt)}`);
   });
 
   const clinicAttended = clinicAttendanceSet.size;
@@ -124,11 +123,8 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const dateStr = toIsoDate(d);
     const daySet = new Set<string>();
     attendedCurrent
-      .filter((a: any) => String(a.attendedAt || "").startsWith(dateStr))
+      .filter((a: any) => String(a.attendedAt || a.createdAt || "").startsWith(dateStr))
       .forEach((a: any) => daySet.add(entityKey(a.dentistId, a.patientId, a.patientName)));
-    budgetsCurrent
-      .filter((b: any) => String(b.budgetAt || "").startsWith(dateStr))
-      .forEach((b: any) => daySet.add(entityKey(b.dentistId, b.patientId, b.patientName)));
     const attended = daySet.size;
     return { date: dateStr, attended, capacity: dailyCapacity };
   }).filter((day) => day.capacity > 0 && day.attended < Math.ceil(day.capacity * 0.6));
@@ -136,27 +132,25 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   const conversionTarget = 85;
   const dentistSummaries = dentists.map((d: any) => {
     const dentistCurrent = appointments.filter((a: any) => {
-      const dt = new Date(a.attendedAt || 0);
+      if (!isOperationalStatus(a.status)) return false;
+      const dt = new Date(a.attendedAt || a.createdAt || 0);
       return a.dentistId === d.id && inRange(dt, start, end);
     });
     const dentistPrevAttended = appointments.filter((a: any) => {
-      const dt = new Date(a.attendedAt || 0);
-      return a.dentistId === d.id && a.status === "attended" && inRange(dt, prevStart, prevEnd);
+      if (!isOperationalStatus(a.status)) return false;
+      const dt = new Date(a.attendedAt || a.createdAt || 0);
+      return a.dentistId === d.id && inRange(dt, prevStart, prevEnd);
     }).length;
 
     const attendedOnly = dentistCurrent.filter((a: any) => a.status === "attended");
     const dentistBudgetsCurrent = budgetsCurrent.filter((b: any) => b.dentistId === d.id);
 
     const attendedSet = new Set<string>();
-    attendedOnly.forEach((a: any) => {
-      attendedSet.add(entityKey(d.id, a.patientId, a.patientName));
-    });
-    dentistBudgetsCurrent.forEach((b: any) => {
-      attendedSet.add(entityKey(d.id, b.patientId, b.patientName));
+    dentistCurrent.forEach((a: any) => {
+      attendedSet.add(`${entityKey(d.id, a.patientId, a.patientName)}::${dayKey(a.attendedAt || a.createdAt)}`);
     });
 
     const attended = attendedSet.size;
-    const scheduledOrConfirmed = dentistCurrent.filter((a: any) => a.status === "scheduled" || a.status === "confirmed").length;
     const budgetSet = new Set<string>();
     dentistBudgetsCurrent.forEach((b: any) => {
       budgetSet.add(entityKey(d.id, b.patientId, b.patientName));
@@ -238,7 +232,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     : 0;
   const convPrevByDentist = dentists.map((d: any) => {
     const dbPrev = budgetsPrev.filter((b: any) => b.dentistId === d.id);
-    const daPrev = attendedPrev.filter((a: any) => a.dentistId === d.id);
+    const daPrev = attendedPrev.filter((a: any) => a.dentistId === d.id && a.status === "attended");
     const bSet = new Set<string>();
     dbPrev.forEach((b: any) => bSet.add(entityKey(d.id, b.patientId, b.patientName)));
     const cSet = new Set<string>();
@@ -285,7 +279,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   const allBudgetSet = new Set<string>();
   budgetsCurrent.forEach((b: any) => allBudgetSet.add(entityKey(b.dentistId, b.patientId, b.patientName)));
   const allConvertedSet = new Set<string>();
-  attendedCurrent.forEach((a: any) => {
+  completedCurrent.forEach((a: any) => {
     const k = entityKey(a.dentistId, a.patientId, a.patientName);
     if (allBudgetSet.has(k)) allConvertedSet.add(k);
   });
@@ -329,7 +323,7 @@ function downloadTextReport(report: MPCWeeklyReportType) {
   lines.push(`Periodo: ${report.periodLabel}`);
   lines.push("");
   lines.push("1) Capacidade da clinica");
-  lines.push(`- Atendidos: ${report.clinicAttended}`);
+  lines.push(`- Atendimentos totais: ${report.clinicAttended}`);
   lines.push(`- Orcamentos: ${report.clinicBudgets ?? 0}`);
   lines.push(`- Convertidos (orcamento -> atendimento): ${report.clinicConverted ?? 0}`);
   lines.push(`- Conversao de orcamentos: ${Math.round(report.budgetConversionRate ?? 0)}%`);
@@ -339,7 +333,7 @@ function downloadTextReport(report: MPCWeeklyReportType) {
   lines.push("");
   lines.push("2/3) Volume e conversao por dentista");
   report.dentistSummaries.forEach((d) => {
-    lines.push(`- ${d.name}: atendidos=${d.attended}, meta=${d.target}, orcamentos=${d.budgetCount ?? 0}, convertidos=${d.convertedCount ?? 0}, conversao=${d.conversionRate}%`);
+    lines.push(`- ${d.name}: atendimentos_totais=${d.attended}, meta=${d.target}, orcamentos=${d.budgetCount ?? 0}, convertidos=${d.convertedCount ?? 0}, conversao=${d.conversionRate}%`);
   });
   lines.push("");
   lines.push("4/5) Satisfacao e recepcao");
@@ -460,7 +454,7 @@ export default function MPCWeeklyReport({ report, store }: Props) {
         <section>
           <h3 className="font-semibold text-slate-900 mb-2">1. A clínica operou dentro da capacidade esperada?</h3>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Pacientes atendidos no período: <strong>{filteredReport.clinicAttended}</strong></li>
+            <li>Atendimentos totais no período: <strong>{filteredReport.clinicAttended}</strong></li>
             <li>Orçamentos no período: <strong>{filteredReport.clinicBudgets ?? 0}</strong></li>
             <li>Convertidos (orçamento → atendimento): <strong>{filteredReport.clinicConverted ?? 0}</strong></li>
             <li>Taxa de conversão dos orçamentos: <strong>{Math.round(filteredReport.budgetConversionRate ?? 0)}%</strong></li>
@@ -478,7 +472,7 @@ export default function MPCWeeklyReport({ report, store }: Props) {
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
                   <th className="text-left px-3 py-2">Dentista</th>
-                  <th className="text-left px-3 py-2">Atendidos</th>
+                  <th className="text-left px-3 py-2">Atend. Totais</th>
                   <th className="text-left px-3 py-2">Meta</th>
                   <th className="text-left px-3 py-2">Média diária</th>
                   <th className="text-left px-3 py-2">Tendência</th>

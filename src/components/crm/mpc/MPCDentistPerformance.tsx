@@ -84,6 +84,13 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
   );
 }
 
+function statusLabel(status?: string) {
+  if (status === "attended") return "Atendido";
+  if (status === "scheduled") return "Agendado";
+  if (status === "confirmed") return "Confirmado";
+  return "Sem status";
+}
+
 export default function MPCDentistPerformance({ dentists }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -127,7 +134,7 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                   <p className="text-xs text-slate-500 mt-2">
                     Orçamentos: <span className="font-semibold text-slate-700">{d.budgetLeads.length}</span>
                     {" · "}
-                    Atendimentos: <span className="font-semibold text-slate-700">{d.attendedLeads.length}</span>
+                    Atend. Totais: <span className="font-semibold text-slate-700">{d.attendedLeads.length}</span>
                     {" · "}
                     Convertidos: <span className="font-semibold text-emerald-700">{d.convertedLeads.length}</span>
                   </p>
@@ -148,13 +155,13 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                   <div>
                     <div className="text-xs text-slate-400 mb-0.5">7 dias</div>
                     <div className="text-lg font-semibold text-slate-700">{d.weekAttended}</div>
-                    <div className="text-xs text-slate-400">atendidos</div>
+                    <div className="text-xs text-slate-400">atend. totais</div>
                   </div>
                   {/* Mês */}
                   <div>
                     <div className="text-xs text-slate-400 mb-0.5">30 dias</div>
                     <div className="text-lg font-semibold text-slate-700">{d.monthAttended}</div>
-                    <div className="text-xs text-slate-400">atendidos</div>
+                    <div className="text-xs text-slate-400">atend. totais</div>
                   </div>
                   {/* Conversão */}
                   <div>
@@ -191,16 +198,19 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                 <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                      Atendimentos ({d.attendedLeads.length})
+                      Atendimentos Totais ({d.attendedLeads.length})
                     </p>
                     {d.attendedLeads.length === 0 ? (
-                      <p className="text-xs text-slate-500">Nenhum atendimento registrado.</p>
+                      <p className="text-xs text-slate-500">Nenhum atendimento/agendamento registrado.</p>
                     ) : (
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
                         {d.attendedLeads.map((lead, idx) => (
                           <div key={`${lead.name}_${lead.date}_${idx}`} className="text-xs text-slate-700 border-b border-slate-200 pb-1">
                             <p className="font-medium text-slate-900">{lead.name}</p>
-                            <p>{lead.date || "sem data"}{lead.phone ? ` · ${lead.phone}` : ""}</p>
+                            <p>
+                              {lead.date || "sem data"} · {statusLabel(lead.status)}
+                              {lead.phone ? ` · ${lead.phone}` : ""}
+                            </p>
                           </div>
                         ))}
                       </div>

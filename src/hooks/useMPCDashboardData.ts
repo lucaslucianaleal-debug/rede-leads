@@ -70,7 +70,18 @@ function calculateMetrics(rawData: any): MPCMetrics {
     return `${dentistId}::name::${normalize(patientName || "")}`;
   };
 
-  // Produção: pacientes atendidos hoje vs meta diária
+  const isOperationalStatus = (status?: string) =>
+    status === "attended" || status === "scheduled" || status === "confirmed";
+
+  // Produção: volume operacional (atendidos + agendados/confirmados) hoje vs meta diária
+  const operationalToday = appointments.filter((a: any) => {
+    if (!a.attendedAt && !a.createdAt) return false;
+    const att = new Date(a.attendedAt || a.createdAt || new Date());
+    att.setHours(0, 0, 0, 0);
+    return isOperationalStatus(a.status) && att.getTime() === today.getTime();
+  }).length;
+
+  // Receita segue baseada em atendimentos concluídos
   const attendedToday = appointments.filter((a: any) => {
     if (!a.attendedAt && !a.createdAt) return false;
     const att = new Date(a.attendedAt || a.createdAt || new Date());
@@ -116,7 +127,7 @@ function calculateMetrics(rawData: any): MPCMetrics {
   // Meta Geral: combinação ponderada
   const metaGeralPct = productionMeta > 0
     ? Math.min(100, (
-        ((attendedToday / productionMeta) * 100) * 0.35 +
+        ((operationalToday / productionMeta) * 100) * 0.35 +
         (conversionRate || 0) * 0.35 +
         (avgSatisfaction > 0 ? (avgSatisfaction / 5) * 100 : 100) * 0.30
       ))
@@ -124,9 +135,9 @@ function calculateMetrics(rawData: any): MPCMetrics {
 
   return {
     producao: {
-      total: attendedToday,
+      total: operationalToday,
       meta: productionMeta || 1,
-      percentualMeta: productionMeta > 0 ? (attendedToday / productionMeta) * 100 : 0,
+      percentualMeta: productionMeta > 0 ? (operationalToday / productionMeta) * 100 : 0,
       tendencia: 0,
     },
     conversao: {
@@ -203,8 +214,8 @@ function generateAlerts(rawData: any, metrics: MPCMetrics): MPCAlert[] {
       level: "medium",
       title: "Taxa de conversão fora do padrão",
       probableCause: "Possível aumento em desistências ou agendamentos com muito antecedência",
-      impact: `${Math.round(100 - metrics.conversao.total)}% dos agendados não comparecendo`,
-      suggestedAction: "Aumentar frequência de lembretes e confirmar agendamentos",
+      impact: `${Math.round(100 - metrics.conversao.total)}% dos orçamentos ainda não converteram em atendimento`,
+      suggestedAction: "Reforçar follow-up comercial dos orçamentos pendentes",
       affectedEntity: "Comercial",
       timestamp: new Date(),
     });
@@ -244,7 +255,7 @@ function generateAlerts(rawData: any, metrics: MPCMetrics): MPCAlert[] {
       id: "alert_receita_baixa",
       level: "critical",
       title: "Receita do dia abaixo da meta",
-      probableCause: "Combinação de baixa produção, conversão e comparecimento",
+      probableCause: "Combinação de baixo volume operacional, conversão e satisfação",
       impact: `Deficit de R$ ${Math.round(metrics.receita.meta - metrics.receita.total)}`,
       suggestedAction: "Revisar performance diária e executar ações corretivas",
       affectedEntity: "Financeiro",
@@ -281,6 +292,9 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     return `${dentistId}::name::${normalize(patientName || "")}`;
   };
 
+  const isOperationalStatus = (status?: string) =>
+    status === "attended" || status === "scheduled" || status === "confirmed";
+
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
   const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
@@ -289,22 +303,23 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
   return dentists.map((d: any) => {
     const dentistAppts = appointments.filter((a: any) => a.dentistId === d.id);
     const dentistBudgets = budgets.filter((b: any) => b.dentistId === d.id);
+    const productionAppts = dentistAppts.filter((a: any) => isOperationalStatus(a.status));
     const attendedAppts = dentistAppts.filter((a: any) => a.status === "attended");
 
     // Contagens por período
-    const totalAttended = attendedAppts.length;
+    const totalAttended = productionAppts.length;
 
-    const todayAttended = attendedAppts.filter((a: any) => {
+    const todayAttended = productionAppts.filter((a: any) => {
       const d = a.attendedAt || a.createdAt || "";
       return d.startsWith(todayStr);
     }).length;
 
-    const weekAttended = attendedAppts.filter((a: any) => {
+    const weekAttended = productionAppts.filter((a: any) => {
       const d = new Date(a.attendedAt || a.createdAt || 0);
       return d >= weekAgo;
     }).length;
 
-    const monthAttended = attendedAppts.filter((a: any) => {
+    const monthAttended = productionAppts.filter((a: any) => {
       const d = new Date(a.attendedAt || a.createdAt || 0);
       return d >= monthAgo;
     }).length;
@@ -337,11 +352,12 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       ? (convertedLeads.length / budgetMap.size) * 100
       : 0;
 
-    const attendedLeads = attendedAppts
+    const attendedLeads = productionAppts
       .map((a: any) => ({
         name: a.patientName || "Sem nome",
         date: String(a.attendedAt || "").slice(0, 10),
         phone: a.patientPhone,
+        status: a.status,
       }))
       .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""));
 
@@ -358,12 +374,12 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       ? Math.round((surveys.reduce((s: number, sv: any) => s + (sv.score || 0), 0) / surveys.length) * 10) / 10
       : 0;
 
-    // Trend 90d — conta atendidos por dia
+    // Trend 90d — conta volume operacional por dia
     const trend90d = Array.from({ length: 90 }, (_, i) => {
       const target = new Date(now);
       target.setDate(target.getDate() - (89 - i));
       const dateStr = target.toISOString().split("T")[0];
-      return attendedAppts.filter((a: any) =>
+      return productionAppts.filter((a: any) =>
         (a.attendedAt || a.createdAt || "").startsWith(dateStr)
       ).length;
     });
@@ -574,17 +590,34 @@ function generateWeeklyReport(
   const prevWeekEnd = new Date(weekStart);
 
   const appointments = rawData.appointments || [];
+  const budgets = rawData.budgets || [];
   const surveys = rawData.surveys || [];
   const dentists = rawData.dentists || [];
 
+  const normalize = (v: string) =>
+    (v || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const entityKey = (dentistId: string, patientId?: string, patientName?: string) => {
+    if (patientId) return `${dentistId}::id::${patientId}`;
+    return `${dentistId}::name::${normalize(patientName || "")}`;
+  };
+
+  const isOperationalStatus = (status?: string) =>
+    status === "attended" || status === "scheduled" || status === "confirmed";
+
   const attendedWeek = appointments.filter((a: any) => {
-    if (a.status !== "attended") return false;
+    if (!isOperationalStatus(a.status)) return false;
     const dt = new Date(a.attendedAt || a.createdAt || 0);
     return dt >= weekStart && dt <= now;
   });
 
   const attendedPrevWeek = appointments.filter((a: any) => {
-    if (a.status !== "attended") return false;
+    if (!isOperationalStatus(a.status)) return false;
     const dt = new Date(a.attendedAt || a.createdAt || 0);
     return dt >= prevWeekStart && dt < prevWeekEnd;
   });
@@ -616,22 +649,39 @@ function generateWeeklyReport(
       const dt = new Date(a.attendedAt || a.createdAt || 0);
       return a.dentistId === d.id && dt >= weekStart && dt <= now;
     });
-    const dentistAttendedWeek = dentistApptsWeek.filter((a: any) => a.status === "attended").length;
-    const dentistPipelineWeek = dentistApptsWeek.filter((a: any) => a.status === "scheduled" || a.status === "confirmed").length;
-    const conversionRate =
-      dentistAttendedWeek + dentistPipelineWeek > 0
-        ? (dentistAttendedWeek / (dentistAttendedWeek + dentistPipelineWeek)) * 100
-        : 0;
+    const dentistOperationalWeek = dentistApptsWeek.filter((a: any) => isOperationalStatus(a.status)).length;
+
+    const dentistBudgetsWeek = budgets.filter((b: any) => {
+      const dt = new Date(b.budgetAt || b.createdAt || 0);
+      return b.dentistId === d.id && dt >= weekStart && dt <= now;
+    });
+
+    const dentistBudgetSet = new Set<string>();
+    dentistBudgetsWeek.forEach((b: any) => {
+      dentistBudgetSet.add(entityKey(d.id, b.patientId, b.patientName));
+    });
+
+    const dentistConvertedSet = new Set<string>();
+    dentistApptsWeek
+      .filter((a: any) => a.status === "attended")
+      .forEach((a: any) => {
+        const key = entityKey(d.id, a.patientId, a.patientName);
+        if (dentistBudgetSet.has(key)) dentistConvertedSet.add(key);
+      });
+
+    const conversionRate = dentistBudgetSet.size > 0
+      ? (dentistConvertedSet.size / dentistBudgetSet.size) * 100
+      : 0;
 
     const dentistApptsPrevWeek = appointments.filter((a: any) => {
       const dt = new Date(a.attendedAt || a.createdAt || 0);
-      return a.dentistId === d.id && a.status === "attended" && dt >= prevWeekStart && dt < prevWeekEnd;
+      return a.dentistId === d.id && isOperationalStatus(a.status) && dt >= prevWeekStart && dt < prevWeekEnd;
     }).length;
 
     const trend: "up" | "down" | "stable" =
-      dentistAttendedWeek > dentistApptsPrevWeek
+      dentistOperationalWeek > dentistApptsPrevWeek
         ? "up"
-        : dentistAttendedWeek < dentistApptsPrevWeek
+        : dentistOperationalWeek < dentistApptsPrevWeek
         ? "down"
         : "stable";
 
@@ -646,16 +696,19 @@ function generateWeeklyReport(
     return {
       dentistId: d.id,
       name: d.name,
-      attended: dentistAttendedWeek,
+      attended: dentistOperationalWeek,
       target: weekTarget,
-      deltaToTarget: dentistAttendedWeek - weekTarget,
-      avgDaily: dentistAttendedWeek / 7,
+      deltaToTarget: dentistOperationalWeek - weekTarget,
+      avgDaily: dentistOperationalWeek / 7,
       trend,
       conversionRate: Math.round(conversionRate * 10) / 10,
       conversionTarget,
       conversionDelta: Math.round((conversionRate - conversionTarget) * 10) / 10,
       satisfaction: Math.round(satisfaction * 10) / 10,
       surveyCount: dentistSurveys.length,
+      budgetCount: dentistBudgetSet.size,
+      convertedCount: dentistConvertedSet.size,
+      pendingBudgetCount: Math.max(0, dentistBudgetSet.size - dentistConvertedSet.size),
     };
   });
 
@@ -691,20 +744,39 @@ function generateWeeklyReport(
     .filter((d) => d.surveyCount > 0)
     .sort((a, b) => b.satisfaction - a.satisfaction)[0];
 
-  const currentWeekConvBase = appointments.filter((a: any) => {
-    const dt = new Date(a.attendedAt || a.createdAt || 0);
+  const currentWeekConvBase = budgets.filter((b: any) => {
+    const dt = new Date(b.budgetAt || b.createdAt || 0);
     return dt >= weekStart && dt <= now;
   });
-  const prevWeekConvBase = appointments.filter((a: any) => {
+  const prevWeekConvBase = budgets.filter((b: any) => {
+    const dt = new Date(b.budgetAt || b.createdAt || 0);
+    return dt >= prevWeekStart && dt < prevWeekEnd;
+  });
+  const weekBudgetSet = new Set<string>();
+  currentWeekConvBase.forEach((b: any) => weekBudgetSet.add(entityKey(b.dentistId, b.patientId, b.patientName)));
+  const weekConvertedSet = new Set<string>();
+  attendedWeek
+    .filter((a: any) => a.status === "attended")
+    .forEach((a: any) => {
+      const key = entityKey(a.dentistId, a.patientId, a.patientName);
+      if (weekBudgetSet.has(key)) weekConvertedSet.add(key);
+    });
+
+  const prevWeekBudgetSet = new Set<string>();
+  prevWeekConvBase.forEach((b: any) => prevWeekBudgetSet.add(entityKey(b.dentistId, b.patientId, b.patientName)));
+  const prevWeekAttended = appointments.filter((a: any) => {
+    if (a.status !== "attended") return false;
     const dt = new Date(a.attendedAt || a.createdAt || 0);
     return dt >= prevWeekStart && dt < prevWeekEnd;
   });
-  const currentWeekConv = currentWeekConvBase.length > 0
-    ? (currentWeekConvBase.filter((a: any) => a.status === "attended").length / currentWeekConvBase.length) * 100
-    : 0;
-  const prevWeekConv = prevWeekConvBase.length > 0
-    ? (prevWeekConvBase.filter((a: any) => a.status === "attended").length / prevWeekConvBase.length) * 100
-    : 0;
+  const prevWeekConvertedSet = new Set<string>();
+  prevWeekAttended.forEach((a: any) => {
+    const key = entityKey(a.dentistId, a.patientId, a.patientName);
+    if (prevWeekBudgetSet.has(key)) prevWeekConvertedSet.add(key);
+  });
+
+  const currentWeekConv = weekBudgetSet.size > 0 ? (weekConvertedSet.size / weekBudgetSet.size) * 100 : 0;
+  const prevWeekConv = prevWeekBudgetSet.size > 0 ? (prevWeekConvertedSet.size / prevWeekBudgetSet.size) * 100 : 0;
 
   const currentWeekSatSurveys = surveys.filter((s: any) => {
     const dt = new Date(s.createdAt || 0);
