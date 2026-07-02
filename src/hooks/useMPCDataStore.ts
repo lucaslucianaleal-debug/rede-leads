@@ -7,7 +7,7 @@ export type MPCStore = {
   dentists: Array<{ id: string; name: string; specialty?: string; dailyTarget: number; workDays?: number[]; isOrcamentista?: boolean; startDate?: string; leadId?: string }>;
   appointments: Array<{ id: string; dentistId: string; patientName: string; patientId?: string; patientPhone?: string; status: "scheduled" | "confirmed" | "attended"; attendedAt: string; attendedBy?: string; saleValue?: number; saleProcedure?: string }>;
   budgets: Array<{ id: string; dentistId: string; patientName: string; patientId?: string; patientPhone?: string; budgetAt: string; procedure?: string; source?: string; saleValue?: number; saleProcedure?: string }>;
-  surveys: Array<{ id: string; leadId?: string; sector: "reception" | "clinic" | "ortho" | "sales" | "dentist"; dentistId?: string; score: number; comment?: string; createdAt: string }>;
+  surveys: Array<{ id: string; leadId?: string; patientName?: string; sector: "reception" | "clinic" | "ortho" | "sales" | "dentist"; dentistId?: string; score: number; comment?: string; createdAt: string }>;
   averageTicket: number;
 };
 

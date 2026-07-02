@@ -329,6 +329,16 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
     if (nextStoreSnapshot) await mutations.saveNow(nextStoreSnapshot);
   };
 
+  const deleteSurvey = async (surveyId: string) => {
+    let nextStoreSnapshot: MPCStore | null = null;
+    mutations.setStore((prev) => {
+      const surveys = (prev.surveys || []).filter((s: any) => s.id !== surveyId);
+      nextStoreSnapshot = { ...prev, surveys };
+      return nextStoreSnapshot;
+    });
+    if (nextStoreSnapshot) await mutations.saveNow(nextStoreSnapshot);
+  };
+
   if (dentists.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
@@ -843,6 +853,18 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                   .sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
                   .map((sv: any) => (
                     <div key={sv.id} className="p-3 border border-slate-200 rounded bg-slate-50">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs text-slate-700">
+                          Paciente: <span className="font-medium">{sv.patientName || (sv.leadId ? (crmById.get(sv.leadId)?.nome || sv.leadId) : "Não identificado")}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void deleteSurvey(sv.id)}
+                          className="px-2 py-1 text-[11px] rounded border border-rose-300 text-rose-700 hover:bg-rose-50"
+                        >
+                          Apagar
+                        </button>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
                         <div>
                           <label className="text-[11px] text-slate-600 block mb-1">Data</label>

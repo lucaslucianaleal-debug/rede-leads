@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { SectorHealth } from "@/types/mpc";
 import { ChevronRight } from "lucide-react";
 import { MPCStore } from "@/hooks/useMPCDataStore";
+import { useLeads } from "@/hooks/useLeads";
 
 type MPCSectorHealthProps = {
   sectors: SectorHealth[];
@@ -86,6 +87,12 @@ function SectorCard({ sector, onDetails }: { sector: SectorHealth; onDetails: ()
 
 export default function MPCSectorHealth({ sectors, store, mutations }: MPCSectorHealthProps) {
   const [selectedSector, setSelectedSector] = useState<SectorHealth | null>(null);
+  const { allLeads } = useLeads();
+
+  const crmById = new Map<string, { nome?: string }>();
+  allLeads.forEach((l: any) => {
+    if (l?.id) crmById.set(l.id, { nome: l.nome });
+  });
 
   const sectorMap: Record<string, string> = {
     "Recepção": "reception",
@@ -105,6 +112,16 @@ export default function MPCSectorHealth({ sectors, store, mutations }: MPCSector
           ...(patch.comment !== undefined ? { comment: patch.comment } : {}),
         };
       });
+      nextStoreSnapshot = { ...prev, surveys };
+      return nextStoreSnapshot;
+    });
+    if (nextStoreSnapshot) await mutations.saveNow(nextStoreSnapshot);
+  };
+
+  const deleteSurvey = async (surveyId: string) => {
+    let nextStoreSnapshot: MPCStore | null = null;
+    mutations.setStore((prev) => {
+      const surveys = (prev.surveys || []).filter((s: any) => s.id !== surveyId);
       nextStoreSnapshot = { ...prev, surveys };
       return nextStoreSnapshot;
     });
@@ -162,6 +179,18 @@ export default function MPCSectorHealth({ sectors, store, mutations }: MPCSector
                       .sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
                       .map((sv: any) => (
                         <div key={sv.id} className="p-2 rounded border border-slate-200 bg-slate-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-xs text-slate-700">
+                              Paciente: <span className="font-medium">{sv.patientName || (sv.leadId ? (crmById.get(sv.leadId)?.nome || sv.leadId) : "Não identificado")}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void deleteSurvey(sv.id)}
+                              className="px-2 py-1 text-[11px] rounded border border-rose-300 text-rose-700 hover:bg-rose-50"
+                            >
+                              Apagar
+                            </button>
+                          </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                             <div>
                               <label className="text-[11px] text-slate-600 block mb-1">Data</label>

@@ -238,6 +238,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
       records.push({
         id: `survey_${baseTs}_${sector}_${idx}`,
         leadId: surveyForm.leadId || undefined,
+        patientName: surveyForm.patientName || undefined,
         sector,
         score: surveyForm.score,
         comment: surveyForm.comment,
@@ -249,6 +250,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
       records.push({
         id: `survey_${baseTs}_${dentistId}_${idx}`,
         leadId: surveyForm.leadId || undefined,
+        patientName: surveyForm.patientName || undefined,
         sector: "dentist",
         dentistId,
         score: surveyForm.score,
