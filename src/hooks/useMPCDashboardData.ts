@@ -459,7 +459,6 @@ function calculateSectorHealth(rawData: any): SectorHealth[] {
   const sectors = [
     { name: "Recepção", key: "reception" },
     { name: "Clínica", key: "clinic" },
-    { name: "Ortodontia", key: "ortho" },
     { name: "Comercial", key: "sales" },
     { name: "Dentistas", key: "dentist" },
   ];
