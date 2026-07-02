@@ -4,20 +4,48 @@ import { DentistPerformance } from "@/types/mpc";
 type Props = { dentists: DentistPerformance[] };
 
 function Sparkline({ data }: { data: number[] }) {
-  const w = 80; const h = 24;
+  const w = 168; const h = 44;
   if (!data || data.every(v => v === 0)) {
-    return <svg width={w} height={h}><line x1="0" y1={h/2} x2={w} y2={h/2} stroke="#e2e8f0" strokeWidth={1} strokeDasharray="3,2"/></svg>;
+    return (
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+        <line x1="0" y1={h/2} x2={w} y2={h/2} stroke="#e2e8f0" strokeWidth={1} strokeDasharray="3,2"/>
+      </svg>
+    );
   }
   const max = Math.max(...data, 1);
   const step = w / (data.length - 1);
   const points = data.map((v, i) => `${i * step},${h - (v / max) * (h - 2) - 1}`).join(" ");
+  const areaPoints = `0,${h} ${points} ${w},${h}`;
   const lastVal = data[data.length - 1];
   const color = lastVal >= (max * 0.8) ? "#10B981" : lastVal >= (max * 0.4) ? "#F59E0B" : "#EF4444";
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+      <polyline points={points} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
+      <polygon points={areaPoints} fill={color} fillOpacity={0.08} />
     </svg>
   );
+}
+
+function getTrendSummary(data: number[]) {
+  if (!data || data.length < 8 || data.every((v) => v === 0)) {
+    return { label: "sem dados", deltaPct: 0, color: "text-slate-400" };
+  }
+
+  const half = Math.floor(data.length / 2);
+  const first = data.slice(0, half);
+  const second = data.slice(half);
+
+  const avg = (arr: number[]) => arr.reduce((s, v) => s + v, 0) / Math.max(1, arr.length);
+  const firstAvg = avg(first);
+  const secondAvg = avg(second);
+
+  const deltaPct = firstAvg > 0
+    ? ((secondAvg - firstAvg) / firstAvg) * 100
+    : secondAvg > 0 ? 100 : 0;
+
+  if (deltaPct > 8) return { label: "crescente", deltaPct, color: "text-emerald-600" };
+  if (deltaPct < -8) return { label: "em queda", deltaPct, color: "text-rose-600" };
+  return { label: "estável", deltaPct, color: "text-amber-600" };
 }
 
 function StatusBadge({ status, todayAttended, dailyTarget }: { status: DentistPerformance["status"]; todayAttended: number; dailyTarget: number }) {
@@ -80,6 +108,7 @@ export default function MPCDentistPerformance({ dentists }: Props) {
       <div className="divide-y divide-slate-100">
         {dentists.map((d) => {
           const isExpanded = expandedId === d.id;
+          const trend = getTrendSummary(d.trend90d);
           return (
             <div key={d.id} className="px-6 py-4">
               <button
@@ -95,10 +124,17 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     {d.specialty && <span className="text-xs text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">{d.specialty}</span>}
                   </div>
                   <StatusBadge status={d.status} todayAttended={d.todayAttended} dailyTarget={d.dailyTarget} />
+                  <p className="text-xs text-slate-500 mt-2">
+                    Orçamentos: <span className="font-semibold text-slate-700">{d.budgetLeads.length}</span>
+                    {" · "}
+                    Atendimentos: <span className="font-semibold text-slate-700">{d.attendedLeads.length}</span>
+                    {" · "}
+                    Convertidos: <span className="font-semibold text-emerald-700">{d.convertedLeads.length}</span>
+                  </p>
                 </div>
 
                 {/* Métricas */}
-                <div className="flex items-center gap-6 text-right shrink-0">
+                <div className="flex items-center gap-5 text-right shrink-0">
                   {/* Hoje */}
                   <div>
                     <div className="text-xs text-slate-400 mb-0.5">Hoje</div>
@@ -124,7 +160,7 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                   <div>
                     <div className="text-xs text-slate-400 mb-0.5">Conversão</div>
                     <div className="text-lg font-semibold text-slate-700">{d.conversionRate}%</div>
-                    <div className="text-xs text-slate-400">orç.→atend.</div>
+                    <div className="text-xs text-slate-400">{d.convertedLeads.length}/{d.budgetLeads.length} pac.</div>
                   </div>
                   {/* Satisfação */}
                   <div>
@@ -135,9 +171,12 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     <div className="text-xs text-slate-400">média</div>
                   </div>
                   {/* Tendência */}
-                  <div className="flex flex-col items-center">
+                  <div className="flex flex-col items-end w-44">
                     <div className="text-xs text-slate-400 mb-1">Tendência 90d</div>
                     <Sparkline data={d.trend90d} />
+                    <div className={`text-xs font-semibold mt-1 ${trend.color}`}>
+                      {trend.label} ({trend.deltaPct >= 0 ? "+" : ""}{Math.round(trend.deltaPct)}%)
+                    </div>
                   </div>
                 </div>
               </div>
