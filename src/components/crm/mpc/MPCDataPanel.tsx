@@ -231,10 +231,12 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     if (sectorTargets.length === 0 && dentistTargets.length === 0) return;
 
     const now = new Date().toISOString();
+    const baseTs = Date.now();
+    const records: any[] = [];
 
-    sectorTargets.forEach((sector) => {
-      addSurvey({
-        id: `survey_${Date.now()}_${sector}`,
+    sectorTargets.forEach((sector, idx) => {
+      records.push({
+        id: `survey_${baseTs}_${sector}_${idx}`,
         leadId: surveyForm.leadId || undefined,
         sector,
         score: surveyForm.score,
@@ -243,9 +245,9 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
       });
     });
 
-    dentistTargets.forEach((dentistId) => {
-      addSurvey({
-        id: `survey_${Date.now()}_${dentistId}`,
+    dentistTargets.forEach((dentistId, idx) => {
+      records.push({
+        id: `survey_${baseTs}_${dentistId}_${idx}`,
         leadId: surveyForm.leadId || undefined,
         sector: "dentist",
         dentistId,
@@ -254,6 +256,10 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
         createdAt: now,
       });
     });
+
+    const nextStore = { ...store, surveys: [...(store.surveys || []), ...records] };
+    setStore(nextStore);
+    void saveNow(nextStore);
 
     showSuccess(`Pesquisa de "${surveyForm.patientName}" registrada para ${sectorTargets.length + dentistTargets.length} avaliados - ${"⭐".repeat(surveyForm.score)}`);
     setSurveyForm({ leadId: "", patientName: "", sectors: ["clinic"], dentistIds: [], score: 5, comment: "" });

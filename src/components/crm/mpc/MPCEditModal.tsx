@@ -11,7 +11,7 @@ type EditModalProps = {
 };
 
 export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalProps) {
-  const { store, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, setStore } = useMPCDataStore(clinicId || "demo");
+  const { store, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, setStore, saveNow } = useMPCDataStore(clinicId || "demo");
   const { allLeads } = useLeads();
   const { currentClinic } = useAuth();
   
@@ -140,13 +140,16 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
   };
 
   const handleAddSurvey = () => {
-    addSurvey({
+    const survey = {
       id: `survey_${Date.now()}`,
       sector: surveyForm.sector,
       score: surveyForm.score,
       comment: surveyForm.comment,
       createdAt: new Date().toISOString(),
-    });
+    };
+    const nextStore = { ...store, surveys: [...(store.surveys || []), survey] };
+    setStore(nextStore);
+    void saveNow(nextStore);
     setSurveyForm({ sector: "clinic", score: 5, comment: "" });
   };
 
