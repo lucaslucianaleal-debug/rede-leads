@@ -28,24 +28,28 @@ function Sparkline({ data }: { data: number[] }) {
 
 function getTrendSummary(data: number[]) {
   if (!data || data.length < 8 || data.every((v) => v === 0)) {
-    return { label: "sem dados", deltaPct: 0, color: "text-slate-400" };
+    return { label: "sem dados", deltaPct: 0, color: "text-slate-400", current: 0, previous: 0 };
   }
 
-  const half = Math.floor(data.length / 2);
-  const first = data.slice(0, half);
-  const second = data.slice(half);
+  const windowSize = Math.min(30, Math.floor(data.length / 2));
+  const previousWindow = data.slice(-(windowSize * 2), -windowSize);
+  const currentWindow = data.slice(-windowSize);
 
   const avg = (arr: number[]) => arr.reduce((s, v) => s + v, 0) / Math.max(1, arr.length);
-  const firstAvg = avg(first);
-  const secondAvg = avg(second);
+  const firstAvg = avg(previousWindow);
+  const secondAvg = avg(currentWindow);
+
+  const sum = (arr: number[]) => arr.reduce((s, v) => s + v, 0);
+  const previousTotal = sum(previousWindow);
+  const currentTotal = sum(currentWindow);
 
   const deltaPct = firstAvg > 0
     ? ((secondAvg - firstAvg) / firstAvg) * 100
     : secondAvg > 0 ? 100 : 0;
 
-  if (deltaPct > 8) return { label: "crescente", deltaPct, color: "text-emerald-600" };
-  if (deltaPct < -8) return { label: "em queda", deltaPct, color: "text-rose-600" };
-  return { label: "estável", deltaPct, color: "text-amber-600" };
+  if (deltaPct > 8) return { label: "crescente", deltaPct, color: "text-emerald-600", current: currentTotal, previous: previousTotal };
+  if (deltaPct < -8) return { label: "em queda", deltaPct, color: "text-rose-600", current: currentTotal, previous: previousTotal };
+  return { label: "estável", deltaPct, color: "text-amber-600", current: currentTotal, previous: previousTotal };
 }
 
 function StatusBadge({ status, todayAttended, dailyTarget }: { status: DentistPerformance["status"]; todayAttended: number; dailyTarget: number }) {
@@ -133,9 +137,9 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                   </div>
                   <StatusBadge status={d.status} todayAttended={d.todayAttended} dailyTarget={d.dailyTarget} />
                   <p className="text-xs text-slate-500 mt-2">
-                    Orçamentos: <span className="font-semibold text-slate-700">{d.budgetLeads.length}</span>
-                    {" · "}
                     Atend. Totais: <span className="font-semibold text-slate-700">{d.attendedLeads.length}</span>
+                    {" · "}
+                    Orçamentos: <span className="font-semibold text-slate-700">{d.budgetLeads.length}</span>
                     {" · "}
                     Ret./Fech.: <span className="font-semibold text-emerald-700">{d.convertedLeads.length}</span>
                   </p>
@@ -184,6 +188,9 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     <Sparkline data={d.trend90d} />
                     <div className={`text-xs font-semibold mt-1 ${trend.color}`}>
                       {trend.label} ({trend.deltaPct >= 0 ? "+" : ""}{Math.round(trend.deltaPct)}%)
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      30d atual ({trend.current}) vs 30d ant. ({trend.previous})
                     </div>
                   </div>
                 </div>

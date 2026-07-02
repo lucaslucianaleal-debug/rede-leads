@@ -458,6 +458,7 @@ export default function MPCWeeklyReport({ report, store }: Props) {
         <section>
           <h3 className="font-semibold text-slate-900 mb-2">2 e 3. Volume e conversão por dentista</h3>
           <p className="text-xs text-slate-500 mb-2">Atendimentos totais = atendidos/agendados/confirmados + avaliações com orçamento.</p>
+          <p className="text-xs text-slate-500 mb-2">Tendência = comparação do período selecionado com o período imediatamente anterior (mesma duração).</p>
           <div className="overflow-x-auto">
             <table className="min-w-full border border-slate-200 rounded-lg text-xs md:text-sm">
               <thead className="bg-slate-50 text-slate-600">
