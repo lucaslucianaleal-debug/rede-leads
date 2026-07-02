@@ -491,10 +491,8 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       }))
       .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""));
 
-    // Satisfação por dentista: prioriza avaliações marcadas para o dentista
-    const dentistSpecificSurveys = surveys.filter((sv: any) => sv.sector === "dentist" && sv.dentistId === d.id);
-    const dentistLegacySurveys = surveys.filter((sv: any) => sv.sector === "clinic" || sv.sector === "ortho");
-    const dentistSurveySource = dentistSpecificSurveys.length > 0 ? dentistSpecificSurveys : dentistLegacySurveys;
+    // Satisfação por dentista: estritamente individual (sector=dentist + dentistId)
+    const dentistSurveySource = surveys.filter((sv: any) => sv.sector === "dentist" && sv.dentistId === d.id);
     const avgSatisfaction = dentistSurveySource.length > 0
       ? Math.round((dentistSurveySource.reduce((s: number, sv: any) => s + (sv.score || 0), 0) / dentistSurveySource.length) * 10) / 10
       : 0;
@@ -849,12 +847,9 @@ function generateWeeklyReport(
         : "stable";
 
     const dentistSurveys = surveys.filter((s: any) => {
-      if (s.sector === "dentist" && s.dentistId === d.id) {
-        const dt = new Date(s.createdAt || 0);
-        return dt >= weekStart && dt <= now;
-      }
-      if (!s.leadId) return false;
-      return attendedWeek.some((a: any) => a.dentistId === d.id && a.patientId === s.leadId);
+      if (!(s.sector === "dentist" && s.dentistId === d.id)) return false;
+      const dt = new Date(s.createdAt || 0);
+      return dt >= weekStartEffective && dt <= now;
     });
     const satisfaction = dentistSurveys.length > 0
       ? dentistSurveys.reduce((acc: number, s: any) => acc + (s.score || 0), 0) / dentistSurveys.length
