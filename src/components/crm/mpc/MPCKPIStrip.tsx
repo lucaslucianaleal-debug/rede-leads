@@ -85,20 +85,11 @@ export default function MPCKPIStrip({ metrics }: MPCKPIStripProps) {
       format: "number" as const,
     },
     {
-      label: "Conversão",
+      label: "Conversão (Orç. → Atend.)",
       value: metrics.conversao.total,
       meta: metrics.conversao.meta,
       percentual: metrics.conversao.percentualMeta,
       trend: metrics.conversao.tendencia,
-      unit: "%",
-      format: "number" as const,
-    },
-    {
-      label: "Comparecimento",
-      value: metrics.comparecimento.total,
-      meta: metrics.comparecimento.meta,
-      percentual: metrics.comparecimento.percentualMeta,
-      trend: metrics.comparecimento.tendencia,
       unit: "%",
       format: "number" as const,
     },
@@ -133,7 +124,7 @@ export default function MPCKPIStrip({ metrics }: MPCKPIStripProps) {
   return (
     <div>
       <h2 className="text-lg font-bold text-slate-900 mb-4">Resumo Executivo</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {kpis.map((kpi, idx) => (
           <KPICard
             key={idx}

@@ -120,6 +120,12 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     <div className="text-lg font-semibold text-slate-700">{d.monthAttended}</div>
                     <div className="text-xs text-slate-400">atendidos</div>
                   </div>
+                  {/* Conversão */}
+                  <div>
+                    <div className="text-xs text-slate-400 mb-0.5">Conversão</div>
+                    <div className="text-lg font-semibold text-slate-700">{d.conversionRate}%</div>
+                    <div className="text-xs text-slate-400">orç.→atend.</div>
+                  </div>
                   {/* Satisfação */}
                   <div>
                     <div className="text-xs text-slate-400 mb-0.5">Satisfação</div>

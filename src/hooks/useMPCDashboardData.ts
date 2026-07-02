@@ -53,8 +53,22 @@ function calculateMetrics(rawData: any): MPCMetrics {
   today.setHours(0, 0, 0, 0);
   
   const appointments = rawData.appointments || [];
+  const budgets = rawData.budgets || [];
   const surveys = rawData.surveys || [];
   const dentists = rawData.dentists || [];
+
+  const normalize = (v: string) =>
+    (v || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const entityKey = (dentistId: string, patientId?: string, patientName?: string) => {
+    if (patientId) return `${dentistId}::id::${patientId}`;
+    return `${dentistId}::name::${normalize(patientName || "")}`;
+  };
 
   // Produção: pacientes atendidos hoje vs meta diária
   const attendedToday = appointments.filter((a: any) => {
@@ -66,15 +80,21 @@ function calculateMetrics(rawData: any): MPCMetrics {
   
   const productionMeta = dentists.reduce((sum: number, d: any) => sum + (d.dailyTarget || 10), 0);
 
-  // Conversão: agendados → atendidos (taxa de conversão)
-  const scheduled = appointments.filter((a: any) => a.status === "scheduled").length;
-  const attended = appointments.filter((a: any) => a.status === "attended").length;
-  const conversionRate = scheduled > 0 ? (attended / scheduled) * 100 : 100; // Se nenhum agendado, 100%
+  // Conversão real: orçamento -> atendimento (deduplicado por dentista + paciente)
+  const budgetSet = new Set<string>();
+  budgets.forEach((b: any) => {
+    budgetSet.add(entityKey(b.dentistId, b.patientId, b.patientName));
+  });
 
-  // Comparecimento: confirmados que comparecem (taxa de comparecimento real)
-  const confirmed = appointments.filter((a: any) => a.status === "confirmed").length;
-  const attendedFromConfirmed = appointments.filter((a: any) => a.status === "confirmed" && a.status === "attended").length;
-  const attendanceRate = confirmed > 0 ? (attendedFromConfirmed / confirmed) * 100 : 100;
+  const convertedSet = new Set<string>();
+  appointments
+    .filter((a: any) => a.status === "attended")
+    .forEach((a: any) => {
+      const k = entityKey(a.dentistId, a.patientId, a.patientName);
+      if (budgetSet.has(k)) convertedSet.add(k);
+    });
+
+  const conversionRate = budgetSet.size > 0 ? (convertedSet.size / budgetSet.size) * 100 : 0;
 
   // Satisfação: média de surveys recentes (últimos 30 dias)
   const thirtyDaysAgo = new Date();
@@ -97,9 +117,8 @@ function calculateMetrics(rawData: any): MPCMetrics {
   const metaGeralPct = productionMeta > 0
     ? Math.min(100, (
         ((attendedToday / productionMeta) * 100) * 0.35 +
-        (conversionRate || 0) * 0.25 +
-        (attendanceRate || 100) * 0.20 +
-        (avgSatisfaction > 0 ? (avgSatisfaction / 5) * 100 : 100) * 0.20
+        (conversionRate || 0) * 0.35 +
+        (avgSatisfaction > 0 ? (avgSatisfaction / 5) * 100 : 100) * 0.30
       ))
     : 0;
 
@@ -117,9 +136,9 @@ function calculateMetrics(rawData: any): MPCMetrics {
       tendencia: 0,
     },
     comparecimento: {
-      total: Math.round(attendanceRate * 10) / 10,
-      meta: 90,
-      percentualMeta: (attendanceRate / 90) * 100,
+      total: 0,
+      meta: 0,
+      percentualMeta: 0,
       tendencia: 0,
     },
     satisfacao: {
@@ -271,7 +290,6 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     const dentistAppts = appointments.filter((a: any) => a.dentistId === d.id);
     const dentistBudgets = budgets.filter((b: any) => b.dentistId === d.id);
     const attendedAppts = dentistAppts.filter((a: any) => a.status === "attended");
-    const scheduledCount = dentistAppts.filter((a: any) => a.status === "scheduled").length;
 
     // Contagens por período
     const totalAttended = attendedAppts.length;
@@ -290,10 +308,6 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       const d = new Date(a.attendedAt || a.createdAt || 0);
       return d >= monthAgo;
     }).length;
-
-    const conversionRate = scheduledCount > 0
-      ? (totalAttended / (scheduledCount + totalAttended)) * 100
-      : totalAttended > 0 ? 100 : 0;
 
     const budgetMap = new Map<string, any>();
     dentistBudgets.forEach((b: any) => {
@@ -319,6 +333,10 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
         };
       })
       .slice(0, 40);
+
+    const conversionRate = budgetMap.size > 0
+      ? (convertedLeads.length / budgetMap.size) * 100
+      : 0;
 
     const attendedLeads = attendedAppts
       .map((a: any) => ({
