@@ -331,8 +331,7 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
           attendedDate: String(a?.attendedAt || "").slice(0, 10),
           phone: a.patientPhone || b?.patientPhone,
         };
-      })
-      .slice(0, 40);
+      });
 
     const conversionRate = budgetMap.size > 0
       ? (convertedLeads.length / budgetMap.size) * 100
@@ -344,8 +343,7 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
         date: String(a.attendedAt || "").slice(0, 10),
         phone: a.patientPhone,
       }))
-      .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""))
-      .slice(0, 60);
+      .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""));
 
     const budgetLeads = dentistBudgets
       .map((b: any) => ({
@@ -353,8 +351,7 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
         date: String(b.budgetAt || "").slice(0, 10),
         phone: b.patientPhone,
       }))
-      .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""))
-      .slice(0, 60);
+      .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""));
 
     // Satisfação média de toda a clínica (surveys não têm dentistId)
     const avgSatisfaction = surveys.length > 0
