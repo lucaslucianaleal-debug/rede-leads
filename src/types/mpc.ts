@@ -64,8 +64,8 @@ export interface DentistPerformance {
   satisfaction: number; // 0-5
   status: "ok" | "warning" | "critical" | "none"; // none = sem dados ainda
   trend90d: number[]; // últimos 90 dias
-  attendedLeads: Array<{ name: string; date: string; phone?: string; status?: string }>;
-  budgetLeads: Array<{ name: string; date: string; phone?: string }>;
+  attendedLeads: Array<{ id?: string; sourceType?: "appointment" | "budget"; patientId?: string; name: string; date: string; phone?: string; status?: string; saleValue?: number; saleProcedure?: string; attendedBy?: string }>;
+  budgetLeads: Array<{ id?: string; patientId?: string; name: string; date: string; phone?: string; procedure?: string }>;
   convertedLeads: Array<{ name: string; budgetDate?: string; attendedDate?: string; phone?: string }>;
   lastUpdated: Date;
 }

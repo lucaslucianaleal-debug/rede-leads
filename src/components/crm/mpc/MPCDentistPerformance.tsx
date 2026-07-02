@@ -1,7 +1,26 @@
-﻿import React, { useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import { DentistPerformance } from "@/types/mpc";
+import { MPCStore } from "@/hooks/useMPCDataStore";
+import { useLeads } from "@/hooks/useLeads";
 
-type Props = { dentists: DentistPerformance[] };
+type Props = {
+  dentists: DentistPerformance[];
+  store: MPCStore;
+  mutations: {
+    setStore: (s: MPCStore | ((prev: MPCStore) => MPCStore)) => void;
+    saveNow: (nextStore?: MPCStore) => Promise<void>;
+  };
+};
+
+function parseDateToISO(dateRaw: string) {
+  const input = dateRaw.trim();
+  if (!input) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    const dt = new Date(`${input}T12:00:00`);
+    return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+  }
+  return null;
+}
 
 function Sparkline({ data }: { data: number[] }) {
   const w = 168; const h = 44;
@@ -96,9 +115,32 @@ function statusLabel(status?: string) {
   return "Sem status";
 }
 
-export default function MPCDentistPerformance({ dentists }: Props) {
+export default function MPCDentistPerformance({ dentists, store, mutations }: Props) {
+  const { allLeads } = useLeads();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchByDentist, setSearchByDentist] = useState<Record<string, { attended: string; budget: string; converted: string }>>({});
+  const [editingLead, setEditingLead] = useState<null | {
+    dentistId: string;
+    sourceType: "appointment" | "budget";
+    recordId: string;
+    patientId?: string;
+    name: string;
+    phone?: string;
+    date: string;
+    status?: string;
+    saleValue?: number;
+    saleProcedure?: string;
+    attendedBy?: string;
+    crmQuery: string;
+  }>(null);
+
+  const crmMatches = useMemo(() => {
+    if (!editingLead?.crmQuery.trim()) return [];
+    const q = editingLead.crmQuery.toLowerCase();
+    return allLeads
+      .filter((l) => (l.nome || "").toLowerCase().includes(q) || (l.telefone || "").includes(q))
+      .slice(0, 8);
+  }, [editingLead?.crmQuery, allLeads]);
 
   const getSearch = (dentistId: string) =>
     searchByDentist[dentistId] || { attended: "", budget: "", converted: "" };
@@ -113,6 +155,82 @@ export default function MPCDentistPerformance({ dentists }: Props) {
         [field]: value,
       },
     }));
+  };
+
+  const openEditLead = (dentistId: string, lead: any) => {
+    if (!lead?.id || !lead?.sourceType) return;
+    setEditingLead({
+      dentistId,
+      sourceType: lead.sourceType,
+      recordId: lead.id,
+      patientId: lead.patientId,
+      name: lead.name || "",
+      phone: lead.phone || "",
+      date: lead.date || "",
+      status: lead.status,
+      saleValue: typeof lead.saleValue === "number" ? lead.saleValue : undefined,
+      saleProcedure: lead.saleProcedure || "",
+      attendedBy: lead.attendedBy || "",
+      crmQuery: "",
+    });
+  };
+
+  const applyLeadSync = (lead: any) => {
+    setEditingLead((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        patientId: lead.id,
+        name: lead.nome || prev.name,
+        phone: lead.telefone || prev.phone,
+        crmQuery: "",
+      };
+    });
+  };
+
+  const saveEditedLead = async () => {
+    if (!editingLead) return;
+    const isoDate = parseDateToISO(editingLead.date) || undefined;
+    let nextStoreSnapshot: MPCStore | null = null;
+
+    mutations.setStore((prev) => {
+      if (editingLead.sourceType === "appointment") {
+        const appointments = prev.appointments.map((a: any) => {
+          if (a.id !== editingLead.recordId) return a;
+          return {
+            ...a,
+            patientId: editingLead.patientId || undefined,
+            patientName: editingLead.name,
+            patientPhone: editingLead.phone || undefined,
+            attendedAt: isoDate || a.attendedAt,
+            status: editingLead.status === "scheduled" || editingLead.status === "confirmed" || editingLead.status === "attended" ? editingLead.status : a.status,
+            saleValue: typeof editingLead.saleValue === "number" ? editingLead.saleValue : undefined,
+            saleProcedure: editingLead.saleProcedure || undefined,
+            attendedBy: editingLead.attendedBy || a.attendedBy,
+          };
+        });
+        nextStoreSnapshot = { ...prev, appointments };
+        return nextStoreSnapshot;
+      }
+
+      const budgets = (prev.budgets || []).map((b: any) => {
+        if (b.id !== editingLead.recordId) return b;
+        return {
+          ...b,
+          patientId: editingLead.patientId || undefined,
+          patientName: editingLead.name,
+          patientPhone: editingLead.phone || undefined,
+          budgetAt: isoDate || b.budgetAt,
+          saleValue: typeof editingLead.saleValue === "number" ? editingLead.saleValue : undefined,
+          saleProcedure: editingLead.saleProcedure || undefined,
+        };
+      });
+      nextStoreSnapshot = { ...prev, budgets };
+      return nextStoreSnapshot;
+    });
+
+    if (nextStoreSnapshot) await mutations.saveNow(nextStoreSnapshot);
+    setEditingLead(null);
   };
 
   if (dentists.length === 0) {
@@ -170,6 +288,15 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                   .includes(convertedQuery)
               )
             : sortedConverted;
+
+          const leadFrequency = sortedAttended.reduce((acc, lead) => {
+            const key = String(lead.patientId || `${(lead.name || "").toLowerCase()}::${lead.phone || ""}`).trim();
+            acc.set(key, (acc.get(key) || 0) + 1);
+            return acc;
+          }, new Map<string, number>());
+
+          const repeatedVisits = Array.from(leadFrequency.values()).reduce((sum, count) => sum + Math.max(0, count - 1), 0);
+          const uniquePatients = leadFrequency.size;
 
           return (
             <div key={d.id} className="px-6 py-4">
@@ -256,6 +383,7 @@ export default function MPCDentistPerformance({ dentists }: Props) {
               </div>
 
               {isExpanded && (
+                <>
                 <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
@@ -268,6 +396,7 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                       placeholder="Pesquisar lead por nome, telefone ou data"
                       className="w-full mb-2 px-2 py-1.5 border border-slate-300 rounded text-xs text-slate-800 bg-white"
                     />
+                    <p className="text-[11px] text-slate-500 mb-1">Pacientes únicos: {uniquePatients} · Reincidências: {repeatedVisits}</p>
                     <p className="text-[11px] text-slate-400 mb-2">Ordenado por data mais recente</p>
                     {filteredAttended.length === 0 ? (
                       <p className="text-xs text-slate-500">Nenhum atendimento/agendamento registrado.</p>
@@ -275,11 +404,25 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
                         {filteredAttended.map((lead, idx) => (
                           <div key={`${lead.name}_${lead.date}_${idx}`} className="text-xs text-slate-700 border-b border-slate-200 pb-1">
-                            <p className="font-medium text-slate-900">{lead.name}</p>
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-medium text-slate-900">{lead.name}</p>
+                              {(lead.id && lead.sourceType) && (
+                                <button
+                                  type="button"
+                                  onClick={() => openEditLead(d.id, lead)}
+                                  className="text-[11px] px-1.5 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-white"
+                                >
+                                  Editar
+                                </button>
+                              )}
+                            </div>
                             <p>
                               {lead.date || "sem data"} · {statusLabel(lead.status)}
                               {lead.phone ? ` · ${lead.phone}` : ""}
                             </p>
+                            {typeof lead.saleValue === "number" && (
+                              <p className="text-[11px] text-emerald-700">Venda: R$ {Math.round(lead.saleValue).toLocaleString("pt-BR")}{lead.saleProcedure ? ` · ${lead.saleProcedure}` : ""}</p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -304,7 +447,18 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
                         {filteredBudgets.map((lead, idx) => (
                           <div key={`${lead.name}_${lead.date}_${idx}`} className="text-xs text-slate-700 border-b border-slate-200 pb-1">
-                            <p className="font-medium text-slate-900">{lead.name}</p>
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-medium text-slate-900">{lead.name}</p>
+                              {lead.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => openEditLead(d.id, { ...lead, sourceType: "budget", status: "budget" })}
+                                  className="text-[11px] px-1.5 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-white"
+                                >
+                                  Editar
+                                </button>
+                              )}
+                            </div>
                             <p>{lead.date || "sem data"}{lead.phone ? ` · ${lead.phone}` : ""}</p>
                           </div>
                         ))}
@@ -339,6 +493,98 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     )}
                   </div>
                 </div>
+
+                {editingLead && editingLead.dentistId === d.id && (
+                  <div className="lg:col-span-3 bg-white border border-slate-300 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-slate-900">Editar e Sincronizar Lead</p>
+                      <button type="button" onClick={() => setEditingLead(null)} className="text-xs text-slate-500 hover:text-slate-800">Fechar</button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <input
+                        value={editingLead.name}
+                        onChange={(e) => setEditingLead((prev) => prev ? { ...prev, name: e.target.value } : prev)}
+                        placeholder="Nome"
+                        className="px-2 py-1.5 border border-slate-300 rounded text-xs"
+                      />
+                      <input
+                        value={editingLead.phone || ""}
+                        onChange={(e) => setEditingLead((prev) => prev ? { ...prev, phone: e.target.value } : prev)}
+                        placeholder="Telefone"
+                        className="px-2 py-1.5 border border-slate-300 rounded text-xs"
+                      />
+                      <input
+                        type="date"
+                        value={editingLead.date || ""}
+                        onChange={(e) => setEditingLead((prev) => prev ? { ...prev, date: e.target.value } : prev)}
+                        className="px-2 py-1.5 border border-slate-300 rounded text-xs"
+                      />
+                      {editingLead.sourceType === "appointment" ? (
+                        <select
+                          value={editingLead.status || "attended"}
+                          onChange={(e) => setEditingLead((prev) => prev ? { ...prev, status: e.target.value } : prev)}
+                          className="px-2 py-1.5 border border-slate-300 rounded text-xs"
+                        >
+                          <option value="attended">Atendido</option>
+                          <option value="confirmed">Confirmado</option>
+                          <option value="scheduled">Agendado</option>
+                        </select>
+                      ) : (
+                        <input value="Orçamento" disabled className="px-2 py-1.5 border border-slate-200 rounded text-xs bg-slate-100 text-slate-500" />
+                      )}
+                      <input
+                        type="number"
+                        value={editingLead.saleValue ?? ""}
+                        onChange={(e) => setEditingLead((prev) => prev ? { ...prev, saleValue: e.target.value ? Number(e.target.value) : undefined } : prev)}
+                        placeholder="Valor da venda"
+                        className="px-2 py-1.5 border border-slate-300 rounded text-xs"
+                      />
+                      <input
+                        value={editingLead.saleProcedure || ""}
+                        onChange={(e) => setEditingLead((prev) => prev ? { ...prev, saleProcedure: e.target.value } : prev)}
+                        placeholder="Procedimento / tipo de venda"
+                        className="px-2 py-1.5 border border-slate-300 rounded text-xs"
+                      />
+                      <input
+                        value={editingLead.attendedBy || ""}
+                        onChange={(e) => setEditingLead((prev) => prev ? { ...prev, attendedBy: e.target.value } : prev)}
+                        placeholder="Quem atendeu"
+                        className="px-2 py-1.5 border border-slate-300 rounded text-xs"
+                      />
+                    </div>
+
+                    <div className="mt-2">
+                      <input
+                        value={editingLead.crmQuery}
+                        onChange={(e) => setEditingLead((prev) => prev ? { ...prev, crmQuery: e.target.value } : prev)}
+                        placeholder="Buscar no banco CRM por nome ou telefone para sincronizar"
+                        className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs"
+                      />
+                      {editingLead.crmQuery.trim() && (
+                        <div className="mt-1 max-h-28 overflow-y-auto border border-slate-200 rounded bg-slate-50">
+                          {crmMatches.length === 0 ? (
+                            <p className="text-xs text-slate-500 px-2 py-1.5">Nenhum lead encontrado</p>
+                          ) : crmMatches.map((lead) => (
+                            <button
+                              key={lead.id}
+                              type="button"
+                              onClick={() => applyLeadSync(lead)}
+                              className="w-full text-left px-2 py-1.5 text-xs hover:bg-white border-b border-slate-200 last:border-b-0"
+                            >
+                              {lead.nome} · {lead.telefone}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-[11px] text-slate-500">Lead vinculado: {editingLead.patientId || "não sincronizado"}</p>
+                      <button type="button" onClick={() => void saveEditedLead()} className="px-3 py-1.5 rounded bg-slate-900 text-white text-xs hover:bg-slate-800">Salvar edição</button>
+                    </div>
+                  </div>
+                )}
+                </>
               )}
             </div>
           );

@@ -89,7 +89,7 @@ export default function MPCDashboard({ data, isLoading = false, store, mutations
 
         {/* 4. Performance por Dentista */}
         <section className="mb-8">
-          <MPCDentistPerformance dentists={data.dentistPerformance} />
+          <MPCDentistPerformance dentists={data.dentistPerformance} store={store} mutations={mutations} />
         </section>
 
         {/* 5. Saúde dos Setores */}

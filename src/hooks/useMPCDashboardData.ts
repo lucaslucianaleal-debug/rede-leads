@@ -371,26 +371,41 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
 
     const attendedLeads = productionAppts
       .map((a: any) => ({
+        id: a.id,
+        sourceType: "appointment" as const,
+        patientId: a.patientId,
         name: a.patientName || "Sem nome",
         date: String(a.attendedAt || a.createdAt || "").slice(0, 10),
         phone: a.patientPhone,
         status: a.status,
+        saleValue: typeof a.saleValue === "number" ? a.saleValue : undefined,
+        saleProcedure: a.saleProcedure,
+        attendedBy: a.attendedBy || d.name,
       }))
       .concat(
         dentistBudgets.map((b: any) => ({
+          id: b.id,
+          sourceType: "budget" as const,
+          patientId: b.patientId,
           name: b.patientName || "Sem nome",
           date: String(b.budgetAt || b.createdAt || "").slice(0, 10),
           phone: b.patientPhone,
           status: "budget",
+          saleValue: typeof b.saleValue === "number" ? b.saleValue : undefined,
+          saleProcedure: b.saleProcedure || b.procedure,
+          attendedBy: d.name,
         }))
       )
       .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""));
 
     const budgetLeads = dentistBudgets
       .map((b: any) => ({
+        id: b.id,
+        patientId: b.patientId,
         name: b.patientName || "Sem nome",
         date: String(b.budgetAt || "").slice(0, 10),
         phone: b.patientPhone,
+        procedure: b.procedure || b.saleProcedure,
       }))
       .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""));
 
