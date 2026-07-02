@@ -76,6 +76,18 @@ function parseDateTimeToISO(dateRaw: string, timeRaw?: string) {
   return null;
 }
 
+function parseMoneyBRL(raw?: string) {
+  const input = String(raw || "").trim();
+  if (!input) return undefined;
+  const normalized = input
+    .replace(/R\$/gi, "")
+    .replace(/\./g, "")
+    .replace(/,/g, ".")
+    .replace(/\s+/g, "");
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
   const { setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, saveNow } = mutations;
   const { allLeads } = useLeads();
@@ -135,6 +147,8 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
   const [bulkText, setBulkText] = useState("");
   const [budgetBulkDentistId, setBudgetBulkDentistId] = useState("");
   const [budgetBulkText, setBudgetBulkText] = useState("");
+  const [salesBulkDentistId, setSalesBulkDentistId] = useState("");
+  const [salesBulkText, setSalesBulkText] = useState("");
 
   const filteredApptLeads = useMemo(() => {
     if (!apptSearchQuery.trim()) return [];
@@ -446,6 +460,144 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     );
 
     setBudgetBulkText("");
+  };
+
+  const handleBulkImportOrthoSales = () => {
+    if (!salesBulkDentistId || !salesBulkText.trim()) return;
+
+    const leadByNormalizedName = new Map<string, any>();
+    allLeads.forEach((lead) => {
+      const key = normalizeName(lead.nome || "");
+      if (key && !leadByNormalizedName.has(key)) {
+        leadByNormalizedName.set(key, lead);
+      }
+    });
+
+    const lines = salesBulkText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (lines.length === 0) return;
+
+    let createdBudgets = 0;
+    let createdAttended = 0;
+    let updatedAttended = 0;
+    let linkedCount = 0;
+    let invalidCount = 0;
+
+    const nextStore = {
+      ...store,
+      budgets: [...(store.budgets || [])],
+      appointments: [...(store.appointments || [])],
+    };
+
+    const dentistName = store.dentists.find((d) => d.id === salesBulkDentistId)?.name;
+
+    const normKey = (patientId?: string, name?: string) => {
+      if (patientId) return `id::${patientId}`;
+      return `name::${normalizeName(name || "")}`;
+    };
+
+    lines.forEach((line, idx) => {
+      // Formatos aceitos:
+      // Nome;Data;Valor(opcional);Servico(opcional)
+      // Nome|Data|Valor|Servico
+      const cols = line.split(/[;|\t]/).map((c) => c.trim());
+      if (cols.length < 2) {
+        invalidCount += 1;
+        return;
+      }
+
+      const [nameCol, dateCol, valueCol = "", serviceCol = ""] = cols;
+      if (idx === 0 && /nome/i.test(nameCol) && /data/i.test(dateCol)) return;
+
+      const patientName = nameCol;
+      const dateISO = parseDateTimeToISO(dateCol, "12:00");
+      if (!patientName || !dateISO) {
+        invalidCount += 1;
+        return;
+      }
+
+      const lead = leadByNormalizedName.get(normalizeName(patientName));
+      const patientId = lead?.id;
+      if (patientId) linkedCount += 1;
+
+      const saleValue = parseMoneyBRL(valueCol);
+      const service = serviceCol || lead?.servicoProcurado || "Ortodontia";
+      const key = normKey(patientId, patientName);
+
+      const budgetIdx = nextStore.budgets.findIndex((b: any) => {
+        if (b.dentistId !== salesBulkDentistId) return false;
+        return normKey(b.patientId, b.patientName) === key;
+      });
+
+      if (budgetIdx < 0) {
+        nextStore.budgets.push({
+          id: `bud_sale_${Date.now()}_${idx}`,
+          dentistId: salesBulkDentistId,
+          patientName,
+          patientId,
+          patientPhone: lead?.telefone,
+          budgetAt: dateISO,
+          procedure: service,
+          source: "import_ortho_sales",
+          saleValue,
+          saleProcedure: service,
+        });
+        createdBudgets += 1;
+      } else {
+        const current = nextStore.budgets[budgetIdx] as any;
+        nextStore.budgets[budgetIdx] = {
+          ...current,
+          patientId: current.patientId || patientId,
+          patientPhone: current.patientPhone || lead?.telefone,
+          saleValue: saleValue ?? current.saleValue,
+          saleProcedure: current.saleProcedure || service,
+          procedure: current.procedure || service,
+        };
+      }
+
+      const attendedCandidates = nextStore.appointments
+        .map((a: any, i: number) => ({ a, i }))
+        .filter(({ a }) => a.dentistId === salesBulkDentistId && a.status === "attended" && normKey(a.patientId, a.patientName) === key)
+        .sort((x, y) => String(y.a.attendedAt || "").localeCompare(String(x.a.attendedAt || "")));
+
+      if (attendedCandidates.length === 0) {
+        nextStore.appointments.push({
+          id: `apt_sale_${Date.now()}_${idx}`,
+          dentistId: salesBulkDentistId,
+          patientName,
+          patientId,
+          patientPhone: lead?.telefone,
+          status: "attended",
+          attendedAt: dateISO,
+          attendedBy: dentistName,
+          saleValue,
+          saleProcedure: service,
+        });
+        createdAttended += 1;
+      } else {
+        const idxTarget = attendedCandidates[0].i;
+        const curr = nextStore.appointments[idxTarget] as any;
+        nextStore.appointments[idxTarget] = {
+          ...curr,
+          patientId: curr.patientId || patientId,
+          patientPhone: curr.patientPhone || lead?.telefone,
+          attendedBy: curr.attendedBy || dentistName,
+          saleValue: saleValue ?? curr.saleValue,
+          saleProcedure: curr.saleProcedure || service,
+        };
+        updatedAttended += 1;
+      }
+    });
+
+    setStore(nextStore);
+    void saveNow(nextStore);
+    showSuccess(
+      `Reconciliação de vendas concluída · +${createdBudgets} orçamento(s), +${createdAttended} atendimento(s), ${updatedAttended} atendimento(s) atualizado(s), ${linkedCount} vinculado(s) ao CRM, ${invalidCount} inválido(s)`
+    );
+    setSalesBulkText("");
   };
 
   const autoLinkUnmatchedByName = () => {
@@ -778,6 +930,41 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                       className="w-full px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-40 flex items-center justify-center gap-2"
                     >
                       <Upload size={16} /> Importar Orçamentos
+                    </button>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200 space-y-3">
+                    <h4 className="text-sm font-semibold text-slate-900">Reconciliação de Vendas (Orto)</h4>
+
+                    <div>
+                      <label className="text-xs text-slate-600 mb-1 block">Dentista *</label>
+                      <select value={salesBulkDentistId} onChange={(e) => setSalesBulkDentistId(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm">
+                        <option value="">Selecione um dentista</option>
+                        {store.dentists.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="text-xs text-slate-600 bg-white border border-slate-200 rounded-lg p-3">
+                      Formato por linha: <strong>Nome;Data;Valor(opcional);Serviço(opcional)</strong><br />
+                      Exemplo:<br />
+                      Maria da Silva;06/05/2026;4200;Ortodontia<br />
+                      João Souza;2026-05-08;R$ 3.500,00;Alinhador
+                    </div>
+
+                    <textarea
+                      value={salesBulkText}
+                      onChange={(e) => setSalesBulkText(e.target.value)}
+                      placeholder="Cole aqui sua lista de vendas da orto"
+                      rows={6}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm resize-y"
+                    />
+
+                    <button
+                      onClick={handleBulkImportOrthoSales}
+                      disabled={!salesBulkDentistId || !salesBulkText.trim()}
+                      className="w-full px-4 py-2 bg-sky-700 text-white rounded-lg text-sm font-medium hover:bg-sky-600 disabled:opacity-40 flex items-center justify-center gap-2"
+                    >
+                      <Upload size={16} /> Reconsolidar Vendas de Orto
                     </button>
                   </div>
 
