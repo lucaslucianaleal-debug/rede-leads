@@ -59,6 +59,7 @@ export interface DentistPerformance {
   configuredDailyTarget?: number;
   isWorkingToday?: boolean;
   workDays?: number[];
+  startDate?: string;
   isOrcamentista?: boolean;
   hasConversionGoal?: boolean;
   attendanceRate?: number;
@@ -108,6 +109,7 @@ export interface MPCWeeklyDentistSummary {
   dentistId: string;
   name: string;
   isOrcamentista?: boolean;
+  startDate?: string;
   attended: number;
   target: number;
   deltaToTarget: number;

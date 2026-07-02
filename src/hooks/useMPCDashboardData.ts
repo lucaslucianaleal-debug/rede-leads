@@ -40,6 +40,41 @@ function countWorkingDays(start: Date, end: Date, workDays: number[]): number {
   return count;
 }
 
+function parseDateOnly(value?: string): Date | null {
+  if (!value) return null;
+  const s = String(value).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function resolveDentistStartDate(dentist: any, appointments?: any[], budgets?: any[]): Date | null {
+  const explicit = parseDateOnly(dentist?.startDate);
+  if (explicit) return explicit;
+
+  const dates: Date[] = [];
+  (appointments || []).forEach((a: any) => {
+    if (a?.dentistId !== dentist?.id) return;
+    const dt = new Date(a.attendedAt || a.createdAt || 0);
+    if (!Number.isNaN(dt.getTime())) dates.push(dt);
+  });
+  (budgets || []).forEach((b: any) => {
+    if (b?.dentistId !== dentist?.id) return;
+    const dt = new Date(b.budgetAt || b.createdAt || 0);
+    if (!Number.isNaN(dt.getTime())) dates.push(dt);
+  });
+
+  if (dates.length === 0) return null;
+  const min = new Date(Math.min(...dates.map((d) => d.getTime())));
+  min.setHours(0, 0, 0, 0);
+  return min;
+}
+
+function effectivePeriodStart(baseStart: Date, dentistStart: Date | null): Date {
+  if (!dentistStart) return new Date(baseStart);
+  return dentistStart > baseStart ? new Date(dentistStart) : new Date(baseStart);
+}
+
 // ════════════════════════════════════════════════════════════════
 // Hook Principal: useMPCDashboardData
 // Recebe o store diretamente — sem instância própria, sem problemas de sync
@@ -127,6 +162,8 @@ function calculateMetrics(rawData: any): MPCMetrics {
   }).length;
   
   const productionMeta = dentists.reduce((sum: number, d: any) => {
+    const dentistStart = resolveDentistStartDate(d, appointments, budgets);
+    if (dentistStart && dentistStart > today) return sum;
     if (!isWorkingOnDate(d, today)) return sum;
     return sum + (d.dailyTarget || 10);
   }, 0);
@@ -352,29 +389,41 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
   };
 
   return dentists.map((d: any) => {
+    const dentistStartDateObj = resolveDentistStartDate(d, appointments, budgets);
+    const dentistStartDate = dentistStartDateObj ? dentistStartDateObj.toISOString().slice(0, 10) : undefined;
+    const weekStartEffective = effectivePeriodStart(weekStart, dentistStartDateObj);
+    const monthStartEffective = effectivePeriodStart(monthStart, dentistStartDateObj);
+
     const dentistAppts = appointments.filter((a: any) => a.dentistId === d.id);
     const dentistBudgets = budgets.filter((b: any) => b.dentistId === d.id);
-    const productionAppts = dentistAppts.filter((a: any) => isOperationalStatus(a.status));
-    const attendedAppts = dentistAppts.filter((a: any) => a.status === "attended");
+    const isAfterStart = (value?: string) => {
+      if (!dentistStartDateObj) return true;
+      const dt = new Date(value || 0);
+      return !Number.isNaN(dt.getTime()) && dt >= dentistStartDateObj;
+    };
+
+    const productionAppts = dentistAppts.filter((a: any) => isOperationalStatus(a.status) && isAfterStart(a.attendedAt || a.createdAt));
+    const attendedAppts = dentistAppts.filter((a: any) => a.status === "attended" && isAfterStart(a.attendedAt || a.createdAt));
+    const dentistBudgetsAfterStart = dentistBudgets.filter((b: any) => isAfterStart(b.budgetAt || b.createdAt));
 
     // Contagens por período
-    const totalAttended = productionAppts.length + dentistBudgets.length;
+    const totalAttended = productionAppts.length + dentistBudgetsAfterStart.length;
 
     const todayAttended = productionAppts.filter((a: any) => {
       const d = a.attendedAt || a.createdAt || "";
       return d.startsWith(todayStr);
-    }).length + dentistBudgets.filter((b: any) => String(b.budgetAt || b.createdAt || "").startsWith(todayStr)).length;
+    }).length + dentistBudgetsAfterStart.filter((b: any) => String(b.budgetAt || b.createdAt || "").startsWith(todayStr)).length;
 
     const weekAttended = productionAppts.filter((a: any) => {
-      return inRange(a.attendedAt || a.createdAt, weekStart, now);
-    }).length + dentistBudgets.filter((b: any) => inRange(b.budgetAt || b.createdAt, weekStart, now)).length;
+      return inRange(a.attendedAt || a.createdAt, weekStartEffective, now);
+    }).length + dentistBudgetsAfterStart.filter((b: any) => inRange(b.budgetAt || b.createdAt, weekStartEffective, now)).length;
 
     const monthAttended = productionAppts.filter((a: any) => {
-      return inRange(a.attendedAt || a.createdAt, monthStart, now);
-    }).length + dentistBudgets.filter((b: any) => inRange(b.budgetAt || b.createdAt, monthStart, now)).length;
+      return inRange(a.attendedAt || a.createdAt, monthStartEffective, now);
+    }).length + dentistBudgetsAfterStart.filter((b: any) => inRange(b.budgetAt || b.createdAt, monthStartEffective, now)).length;
 
     const budgetMap = new Map<string, any>();
-    dentistBudgets.forEach((b: any) => {
+    dentistBudgetsAfterStart.forEach((b: any) => {
       const k = entityKey(d.id, b.patientId, b.patientName);
       if (!budgetMap.has(k)) budgetMap.set(k, b);
     });
@@ -416,7 +465,7 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
         attendedBy: a.attendedBy || d.name,
       }))
       .concat(
-        dentistBudgets.map((b: any) => ({
+        dentistBudgetsAfterStart.map((b: any) => ({
           id: b.id,
           sourceType: "budget" as const,
           patientId: b.patientId,
@@ -431,7 +480,7 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       )
       .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""));
 
-    const budgetLeads = dentistBudgets
+    const budgetLeads = dentistBudgetsAfterStart
       .map((b: any) => ({
         id: b.id,
         patientId: b.patientId,
@@ -459,7 +508,7 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
         (a.attendedAt || a.createdAt || "").startsWith(dateStr)
       ).length;
       const budgetCount = dentistBudgets.filter((b: any) =>
-        (b.budgetAt || b.createdAt || "").startsWith(dateStr)
+        isAfterStart(b.budgetAt || b.createdAt) && (b.budgetAt || b.createdAt || "").startsWith(dateStr)
       ).length;
       return opCount + budgetCount;
     });
@@ -467,9 +516,10 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     const configuredDailyTarget = d.dailyTarget || 10;
     const isOrcamentista = d.isOrcamentista !== false;
     const workDays = normalizeWorkDays(d.workDays);
-    const isWorkingToday = workDays.includes(now.getDay());
+    const hasStartedToday = !dentistStartDateObj || dentistStartDateObj <= startOfToday;
+    const isWorkingToday = hasStartedToday && workDays.includes(now.getDay());
     const dailyTarget = isWorkingToday ? configuredDailyTarget : 0;
-    const weekTarget = configuredDailyTarget * countWorkingDays(weekStart, now, workDays);
+    const weekTarget = configuredDailyTarget * countWorkingDays(weekStartEffective, now, workDays);
     const attendanceRate = weekTarget > 0 ? (weekAttended / weekTarget) * 100 : 0;
 
     // Status: "none" se nunca teve atendimento; caso contrário baseado em hoje vs meta
@@ -492,6 +542,7 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       configuredDailyTarget,
       isWorkingToday,
       workDays,
+      startDate: dentistStartDate,
       isOrcamentista,
       hasConversionGoal: isOrcamentista,
       attendanceRate: Math.round(attendanceRate * 10) / 10,
@@ -720,6 +771,8 @@ function generateWeeklyReport(
   const clinicAttended = attendedWeek.length;
   const getCapacityForDate = (date: Date) =>
     dentists.reduce((sum: number, d: any) => {
+      const dentistStart = resolveDentistStartDate(d, appointments, budgets);
+      if (dentistStart && date < dentistStart) return sum;
       if (!isWorkingOnDate(d, date)) return sum;
       return sum + (d.dailyTarget || 10);
     }, 0);
@@ -748,19 +801,22 @@ function generateWeeklyReport(
 
   const conversionTarget = 85;
   const dentistSummaries = dentistPerformance.map((d) => {
-    const isOrcamentista = (dentists.find((x: any) => x.id === d.id) || d).isOrcamentista !== false;
-    const workDays = normalizeWorkDays((dentists.find((x: any) => x.id === d.id) || d).workDays);
-    const weekTarget = (d.configuredDailyTarget || d.dailyTarget || 10) * countWorkingDays(weekStart, now, workDays);
+    const dentistRaw = (dentists.find((x: any) => x.id === d.id) || d) as any;
+    const isOrcamentista = dentistRaw.isOrcamentista !== false;
+    const workDays = normalizeWorkDays(dentistRaw.workDays);
+    const dentistStart = resolveDentistStartDate(dentistRaw, appointments, budgets);
+    const weekStartEffective = effectivePeriodStart(weekStart, dentistStart);
+    const weekTarget = (d.configuredDailyTarget || d.dailyTarget || 10) * countWorkingDays(weekStartEffective, now, workDays);
 
     const dentistApptsWeek = appointments.filter((a: any) => {
       const dt = new Date(a.attendedAt || a.createdAt || 0);
-      return a.dentistId === d.id && dt >= weekStart && dt <= now;
+      return a.dentistId === d.id && dt >= weekStartEffective && dt <= now;
     });
     const dentistOperationalWeek = dentistApptsWeek.filter((a: any) => isOperationalStatus(a.status)).length;
 
     const dentistBudgetsWeek = budgets.filter((b: any) => {
       const dt = new Date(b.budgetAt || b.createdAt || 0);
-      return b.dentistId === d.id && dt >= weekStart && dt <= now;
+      return b.dentistId === d.id && dt >= weekStartEffective && dt <= now;
     });
 
     const dentistBudgetSet = new Set<string>();
@@ -808,6 +864,7 @@ function generateWeeklyReport(
       dentistId: d.id,
       name: d.name,
       isOrcamentista,
+      startDate: dentistStart ? dentistStart.toISOString().slice(0, 10) : undefined,
       attended: dentistOperationalWeek,
       target: weekTarget,
       deltaToTarget: dentistOperationalWeek - weekTarget,

@@ -90,6 +90,39 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
 
   const isWorkingOnDate = (dentist: any, date: Date) => normalizeWorkDays(dentist?.workDays).includes(date.getDay());
 
+  const parseDateOnly = (value?: string) => {
+    if (!value) return null;
+    const s = String(value).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const d = new Date(`${s}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const resolveDentistStartDate = (dentist: any) => {
+    const explicit = parseDateOnly(dentist?.startDate);
+    if (explicit) return explicit;
+    const dates: Date[] = [];
+    appointments.forEach((a: any) => {
+      if (a?.dentistId !== dentist?.id) return;
+      const dt = new Date(a.attendedAt || a.createdAt || 0);
+      if (!Number.isNaN(dt.getTime())) dates.push(dt);
+    });
+    budgets.forEach((b: any) => {
+      if (b?.dentistId !== dentist?.id) return;
+      const dt = new Date(b.budgetAt || b.createdAt || 0);
+      if (!Number.isNaN(dt.getTime())) dates.push(dt);
+    });
+    if (dates.length === 0) return null;
+    const min = new Date(Math.min(...dates.map((d: Date) => d.getTime())));
+    min.setHours(0, 0, 0, 0);
+    return min;
+  };
+
+  const effectiveStart = (baseStart: Date, dentistStart: Date | null) => {
+    if (!dentistStart) return new Date(baseStart);
+    return dentistStart > baseStart ? new Date(dentistStart) : new Date(baseStart);
+  };
+
   const countWorkingDays = (a: Date, b: Date, workDays: number[]) => {
     const from = new Date(a);
     from.setHours(0, 0, 0, 0);
@@ -131,7 +164,11 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   const clinicAttended = attendedCurrent.length + budgetsCurrent.length;
   const clinicBudgets = budgetsCurrent.length;
   const getCapacityForDate = (date: Date) =>
-    dentists.reduce((sum, d: any) => (isWorkingOnDate(d, date) ? sum + (d.dailyTarget || 10) : sum), 0);
+    dentists.reduce((sum, d: any) => {
+      const dentistStart = resolveDentistStartDate(d);
+      if (dentistStart && date < dentistStart) return sum;
+      return isWorkingOnDate(d, date) ? sum + (d.dailyTarget || 10) : sum;
+    }, 0);
 
   const clinicCapacity = Array.from({ length: days }, (_, idx) => {
     const d = new Date(start);
@@ -153,21 +190,32 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   const conversionTarget = 85;
   const dentistSummaries = dentists.map((d: any) => {
     const isOrcamentista = d.isOrcamentista !== false;
+    const dentistStart = resolveDentistStartDate(d);
+    const startEffective = effectiveStart(start, dentistStart);
+    const prevStartEffective = effectiveStart(prevStart, dentistStart);
     const dentistCurrent = appointments.filter((a: any) => {
       if (!isOperationalStatus(a.status)) return false;
       const dt = new Date(a.attendedAt || a.createdAt || 0);
-      return a.dentistId === d.id && inRange(dt, start, end);
+      return a.dentistId === d.id && inRange(dt, startEffective, end);
     });
     const dentistPrevAttended = appointments.filter((a: any) => {
       if (!isOperationalStatus(a.status)) return false;
       const dt = new Date(a.attendedAt || a.createdAt || 0);
-      return a.dentistId === d.id && inRange(dt, prevStart, prevEnd);
+      return a.dentistId === d.id && inRange(dt, prevStartEffective, prevEnd);
     }).length;
 
     const attendedOnly = dentistCurrent.filter((a: any) => a.status === "attended");
-    const dentistBudgetsCurrent = budgetsCurrent.filter((b: any) => b.dentistId === d.id);
+    const dentistBudgetsCurrent = budgetsCurrent.filter((b: any) => {
+      if (b.dentistId !== d.id) return false;
+      const dt = new Date(b.budgetAt || b.createdAt || 0);
+      return inRange(dt, startEffective, end);
+    });
 
-    const dentistBudgetsPrev = budgetsPrev.filter((b: any) => b.dentistId === d.id).length;
+    const dentistBudgetsPrev = budgetsPrev.filter((b: any) => {
+      if (b.dentistId !== d.id) return false;
+      const dt = new Date(b.budgetAt || b.createdAt || 0);
+      return inRange(dt, prevStartEffective, prevEnd);
+    }).length;
     const attended = dentistCurrent.length + dentistBudgetsCurrent.length;
     const budgetSet = new Set<string>();
     dentistBudgetsCurrent.forEach((b: any) => {
@@ -184,7 +232,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const pendingBudgetCount = Math.max(0, budgetCount - convertedCount);
     const conversionRate = isOrcamentista && budgetCount > 0 ? (convertedCount / budgetCount) * 100 : 0;
     const workDays = normalizeWorkDays(d.workDays);
-    const workingDaysCount = countWorkingDays(start, end, workDays);
+    const workingDaysCount = countWorkingDays(startEffective, end, workDays);
     const target = (d.dailyTarget || 10) * workingDaysCount;
 
     const prevTotalAttendance = dentistPrevAttended + dentistBudgetsPrev;
@@ -210,6 +258,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
       dentistId: d.id,
       name: d.name,
       isOrcamentista,
+      startDate: dentistStart ? dentistStart.toISOString().slice(0, 10) : undefined,
       attended,
       target,
       deltaToTarget: attended - target,
@@ -520,7 +569,10 @@ export default function MPCWeeklyReport({ report, store }: Props) {
               <tbody>
                 {filteredReport.dentistSummaries.map((d) => (
                   <tr key={d.dentistId} className="border-t border-slate-100">
-                    <td className="px-3 py-2 font-medium text-slate-900">{d.name}</td>
+                    <td className="px-3 py-2 font-medium text-slate-900">
+                      <div>{d.name}</div>
+                      <div className="text-[11px] text-slate-500">Início: {d.startDate ? new Date(`${d.startDate}T12:00:00`).toLocaleDateString("pt-BR") : "não informado"}</div>
+                    </td>
                     <td className="px-3 py-2">{d.attended}</td>
                     <td className="px-3 py-2">{d.target}</td>
                     <td className="px-3 py-2">{d.avgDaily.toFixed(1)}</td>

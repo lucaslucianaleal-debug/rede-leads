@@ -414,6 +414,9 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                   <p className="text-xs text-slate-500 mt-1">
                     Perfil: <span className="font-medium text-slate-700">{d.isOrcamentista === false ? "Somente execução" : "Orçamentista"}</span>
                   </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Início: <span className="font-medium text-slate-700">{d.startDate ? new Date(`${d.startDate}T12:00:00`).toLocaleDateString("pt-BR") : "não informado"}</span>
+                  </p>
                   {scheduleEditingId === d.id && (
                     <div className="mt-2 p-2 rounded-lg border border-slate-200 bg-slate-50">
                       <p className="text-[11px] text-slate-600 mb-1">Editar dias de atendimento</p>

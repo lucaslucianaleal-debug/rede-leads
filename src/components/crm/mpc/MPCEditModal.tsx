@@ -16,7 +16,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
   const { currentClinic } = useAuth();
   
   const [tab, setTab] = useState<"dentistas" | "atendimentos" | "satisfacao">("dentistas");
-  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] as number[], isOrcamentista: true });
+  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] as number[], isOrcamentista: true, startDate: new Date().toISOString().slice(0, 10) });
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const weekdayOptions = [
@@ -81,6 +81,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
         dailyTarget: dentistForm.dailyTarget,
         workDays: dentistForm.workDays,
         isOrcamentista: dentistForm.isOrcamentista,
+        startDate: dentistForm.startDate,
       });
       setEditingId(null);
     } else {
@@ -90,9 +91,10 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
         dailyTarget: dentistForm.dailyTarget,
         workDays: dentistForm.workDays,
         isOrcamentista: dentistForm.isOrcamentista,
+        startDate: dentistForm.startDate,
       });
     }
-    setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true });
+    setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true, startDate: new Date().toISOString().slice(0, 10) });
   };
 
   const handleEditDentist = (id: string) => {
@@ -104,6 +106,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
         dailyTarget: d.dailyTarget,
         workDays: normalizeWorkDays((d as any).workDays),
         isOrcamentista: (d as any).isOrcamentista !== false,
+        startDate: (d as any).startDate || new Date().toISOString().slice(0, 10),
       });
       setEditingId(id);
     }
@@ -258,6 +261,15 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
                   </div>
                 </div>
                 <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Início da atuação</label>
+                  <input
+                    type="date"
+                    value={dentistForm.startDate}
+                    onChange={(e) => setDentistForm({ ...dentistForm, startDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                  />
+                </div>
+                <div>
                   <label className="text-xs text-slate-600 mb-1 block">Perfil de orçamento</label>
                   <label className="inline-flex items-center gap-2 text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-1.5">
                     <input
@@ -280,7 +292,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
                     <button
                       onClick={() => {
                         setEditingId(null);
-                        setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true });
+                        setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true, startDate: new Date().toISOString().slice(0, 10) });
                       }}
                       className="flex-1 px-4 py-2 border border-slate-300 text-slate-900 rounded-lg font-medium hover:bg-slate-50"
                     >
@@ -305,7 +317,7 @@ export default function MPCEditModal({ isOpen, onClose, clinicId }: EditModalPro
                         <div>
                           <p className="font-medium text-slate-900">{d.name}</p>
                           <p className="text-xs text-slate-600">
-                            {d.specialty} • Meta: {d.dailyTarget} pac/dia • Dias: {normalizeWorkDays((d as any).workDays).map((wd) => ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][wd]).join(", ")} • Perfil: {(d as any).isOrcamentista === false ? "somente execução" : "orçamentista"}
+                            {d.specialty} • Meta: {d.dailyTarget} pac/dia • Dias: {normalizeWorkDays((d as any).workDays).map((wd) => ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][wd]).join(", ")} • Perfil: {(d as any).isOrcamentista === false ? "somente execução" : "orçamentista"} • Início: {(d as any).startDate || "não informado"}
                           </p>
                         </div>
                         <div className="flex gap-2">

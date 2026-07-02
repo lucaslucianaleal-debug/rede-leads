@@ -5,8 +5,8 @@ import { useLeads } from "@/hooks/useLeads";
 
 type Mutations = {
   setStore: (s: MPCStore | ((prev: MPCStore) => MPCStore)) => void;
-  addDentist: (d: { name: string; specialty?: string; dailyTarget?: number; workDays?: number[]; isOrcamentista?: boolean }) => void;
-  updateDentist: (id: string, patch: Partial<{ name: string; specialty: string; dailyTarget: number; workDays: number[]; isOrcamentista: boolean }>) => void;
+  addDentist: (d: { name: string; specialty?: string; dailyTarget?: number; workDays?: number[]; isOrcamentista?: boolean; startDate?: string }) => void;
+  updateDentist: (id: string, patch: Partial<{ name: string; specialty: string; dailyTarget: number; workDays: number[]; isOrcamentista: boolean; startDate: string }>) => void;
   removeDentist: (id: string) => void;
   recordAppointment: (a: any) => void;
   addSurvey: (s: any) => void;
@@ -95,7 +95,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
   const [activeForm, setActiveForm] = useState<ActiveForm>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] as number[], isOrcamentista: true });
+  const [dentistForm, setDentistForm] = useState({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6] as number[], isOrcamentista: true, startDate: new Date().toISOString().slice(0, 10) });
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const weekdayOptions = [
@@ -195,14 +195,14 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     if (!dentistForm.name.trim()) return;
     if (dentistForm.workDays.length === 0) return;
     if (editingId) {
-      updateDentist(editingId, { name: dentistForm.name, specialty: dentistForm.specialty, dailyTarget: dentistForm.dailyTarget, workDays: dentistForm.workDays, isOrcamentista: dentistForm.isOrcamentista });
+      updateDentist(editingId, { name: dentistForm.name, specialty: dentistForm.specialty, dailyTarget: dentistForm.dailyTarget, workDays: dentistForm.workDays, isOrcamentista: dentistForm.isOrcamentista, startDate: dentistForm.startDate });
       setEditingId(null);
       showSuccess(`Dentista "${dentistForm.name}" atualizado`);
     } else {
-      addDentist({ name: dentistForm.name, specialty: dentistForm.specialty, dailyTarget: dentistForm.dailyTarget, workDays: dentistForm.workDays, isOrcamentista: dentistForm.isOrcamentista });
+      addDentist({ name: dentistForm.name, specialty: dentistForm.specialty, dailyTarget: dentistForm.dailyTarget, workDays: dentistForm.workDays, isOrcamentista: dentistForm.isOrcamentista, startDate: dentistForm.startDate });
       showSuccess(`Dentista "${dentistForm.name}" adicionado com sucesso`);
     }
-    setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true });
+    setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true, startDate: new Date().toISOString().slice(0, 10) });
   };
 
   const handleAddAppointment = () => {
@@ -757,7 +757,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
             <div className="space-y-3 max-w-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-900">{editingId ? "Editar Dentista" : "Adicionar Dentista"}</span>
-                <button onClick={() => { setActiveForm(null); setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true }); }} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                <button onClick={() => { setActiveForm(null); setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true, startDate: new Date().toISOString().slice(0, 10) }); }} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
@@ -771,6 +771,10 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Meta Diária (pacientes)</label>
                   <input type="number" min="1" value={dentistForm.dailyTarget} onChange={(e) => setDentistForm({ ...dentistForm, dailyTarget: Number(e.target.value) })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-600 mb-1 block">Início da atuação</label>
+                  <input type="date" value={dentistForm.startDate} onChange={(e) => setDentistForm({ ...dentistForm, startDate: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm" />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-slate-600 mb-1 block">Dias de atendimento</label>
@@ -807,7 +811,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                   {editingId ? "Atualizar" : "Adicionar"}
                 </button>
                 {editingId && (
-                  <button onClick={() => { setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true }); }} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-white">Cancelar</button>
+                  <button onClick={() => { setEditingId(null); setDentistForm({ name: "", specialty: "", dailyTarget: 10, workDays: [1, 2, 3, 4, 5, 6], isOrcamentista: true, startDate: new Date().toISOString().slice(0, 10) }); }} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-white">Cancelar</button>
                 )}
               </div>
               {store.dentists.length > 0 && (
@@ -821,9 +825,10 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                         <span className="text-slate-400 ml-2 text-xs">meta: {d.dailyTarget}/dia</span>
                         <span className="text-slate-400 ml-2 text-xs">dias: {(Array.isArray((d as any).workDays) && (d as any).workDays.length > 0 ? (d as any).workDays : [1,2,3,4,5,6]).map((wd: number) => ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"][wd]).join(", ")}</span>
                         <span className="text-slate-400 ml-2 text-xs">perfil: {(d as any).isOrcamentista === false ? "somente execução" : "orçamentista"}</span>
+                        <span className="text-slate-400 ml-2 text-xs">início: {(d as any).startDate || "não informado"}</span>
                       </div>
                       <div className="flex gap-1">
-                        <button onClick={() => { setEditingId(d.id); setDentistForm({ name: d.name, specialty: d.specialty || "", dailyTarget: d.dailyTarget, workDays: Array.isArray((d as any).workDays) && (d as any).workDays.length > 0 ? [...(d as any).workDays] : [1,2,3,4,5,6], isOrcamentista: (d as any).isOrcamentista !== false }); }} className="p-1 hover:bg-blue-50 rounded text-blue-500 text-xs">✏️</button>
+                        <button onClick={() => { setEditingId(d.id); setDentistForm({ name: d.name, specialty: d.specialty || "", dailyTarget: d.dailyTarget, workDays: Array.isArray((d as any).workDays) && (d as any).workDays.length > 0 ? [...(d as any).workDays] : [1,2,3,4,5,6], isOrcamentista: (d as any).isOrcamentista !== false, startDate: (d as any).startDate || new Date().toISOString().slice(0, 10) }); }} className="p-1 hover:bg-blue-50 rounded text-blue-500 text-xs">✏️</button>
                         <button onClick={() => removeDentist(d.id)} className="p-1 hover:bg-red-50 rounded text-red-400 text-xs">🗑️</button>
                       </div>
                     </div>
