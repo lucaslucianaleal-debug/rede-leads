@@ -246,7 +246,21 @@ function generateAlerts(rawData: any, metrics: MPCMetrics): MPCAlert[] {
 function calculateDentistPerformance(rawData: any): DentistPerformance[] {
   const dentists = rawData.dentists || [];
   const appointments = rawData.appointments || [];
+  const budgets = rawData.budgets || [];
   const surveys = rawData.surveys || [];
+
+  const normalize = (v: string) =>
+    (v || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const entityKey = (dentistId: string, patientId?: string, patientName?: string) => {
+    if (patientId) return `${dentistId}::id::${patientId}`;
+    return `${dentistId}::name::${normalize(patientName || "")}`;
+  };
 
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
@@ -255,6 +269,7 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
 
   return dentists.map((d: any) => {
     const dentistAppts = appointments.filter((a: any) => a.dentistId === d.id);
+    const dentistBudgets = budgets.filter((b: any) => b.dentistId === d.id);
     const attendedAppts = dentistAppts.filter((a: any) => a.status === "attended");
     const scheduledCount = dentistAppts.filter((a: any) => a.status === "scheduled").length;
 
@@ -279,6 +294,49 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     const conversionRate = scheduledCount > 0
       ? (totalAttended / (scheduledCount + totalAttended)) * 100
       : totalAttended > 0 ? 100 : 0;
+
+    const budgetMap = new Map<string, any>();
+    dentistBudgets.forEach((b: any) => {
+      const k = entityKey(d.id, b.patientId, b.patientName);
+      if (!budgetMap.has(k)) budgetMap.set(k, b);
+    });
+
+    const attendedMap = new Map<string, any>();
+    attendedAppts.forEach((a: any) => {
+      const k = entityKey(d.id, a.patientId, a.patientName);
+      if (!attendedMap.has(k)) attendedMap.set(k, a);
+    });
+
+    const convertedLeads = Array.from(attendedMap.entries())
+      .filter(([k]) => budgetMap.has(k))
+      .map(([k, a]) => {
+        const b = budgetMap.get(k);
+        return {
+          name: a.patientName || b?.patientName || "Sem nome",
+          budgetDate: String(b?.budgetAt || "").slice(0, 10),
+          attendedDate: String(a?.attendedAt || "").slice(0, 10),
+          phone: a.patientPhone || b?.patientPhone,
+        };
+      })
+      .slice(0, 40);
+
+    const attendedLeads = attendedAppts
+      .map((a: any) => ({
+        name: a.patientName || "Sem nome",
+        date: String(a.attendedAt || "").slice(0, 10),
+        phone: a.patientPhone,
+      }))
+      .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""))
+      .slice(0, 60);
+
+    const budgetLeads = dentistBudgets
+      .map((b: any) => ({
+        name: b.patientName || "Sem nome",
+        date: String(b.budgetAt || "").slice(0, 10),
+        phone: b.patientPhone,
+      }))
+      .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""))
+      .slice(0, 60);
 
     // Satisfação média de toda a clínica (surveys não têm dentistId)
     const avgSatisfaction = surveys.length > 0
@@ -320,6 +378,9 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       satisfaction: avgSatisfaction,
       status,
       trend90d,
+      attendedLeads,
+      budgetLeads,
+      convertedLeads,
       lastUpdated: new Date(),
     };
   });

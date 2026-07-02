@@ -1,4 +1,4 @@
-﻿import React from "react";
+﻿import React, { useState } from "react";
 import { DentistPerformance } from "@/types/mpc";
 
 type Props = { dentists: DentistPerformance[] };
@@ -57,6 +57,8 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
 }
 
 export default function MPCDentistPerformance({ dentists }: Props) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   if (dentists.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
@@ -77,9 +79,14 @@ export default function MPCDentistPerformance({ dentists }: Props) {
       {/* Cards por dentista */}
       <div className="divide-y divide-slate-100">
         {dentists.map((d) => {
-          const pctToday = d.dailyTarget > 0 ? (d.todayAttended / d.dailyTarget) * 100 : 0;
+          const isExpanded = expandedId === d.id;
           return (
             <div key={d.id} className="px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setExpandedId((prev) => (prev === d.id ? null : d.id))}
+                className="w-full text-left"
+              >
               <div className="flex items-start justify-between gap-4">
                 {/* Nome + especialidade */}
                 <div className="min-w-0 flex-1">
@@ -128,11 +135,71 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                   </div>
                 </div>
               </div>
+              </button>
 
               {/* Barra de progresso da meta diária */}
               <div className="mt-3">
                 <ProgressBar value={d.todayAttended} max={d.dailyTarget} />
               </div>
+
+              {isExpanded && (
+                <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                      Atendimentos ({d.attendedLeads.length})
+                    </p>
+                    {d.attendedLeads.length === 0 ? (
+                      <p className="text-xs text-slate-500">Nenhum atendimento registrado.</p>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto space-y-1.5">
+                        {d.attendedLeads.map((lead, idx) => (
+                          <div key={`${lead.name}_${lead.date}_${idx}`} className="text-xs text-slate-700 border-b border-slate-200 pb-1">
+                            <p className="font-medium text-slate-900">{lead.name}</p>
+                            <p>{lead.date || "sem data"}{lead.phone ? ` · ${lead.phone}` : ""}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                      Orçamentos ({d.budgetLeads.length})
+                    </p>
+                    {d.budgetLeads.length === 0 ? (
+                      <p className="text-xs text-slate-500">Nenhum orçamento registrado.</p>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto space-y-1.5">
+                        {d.budgetLeads.map((lead, idx) => (
+                          <div key={`${lead.name}_${lead.date}_${idx}`} className="text-xs text-slate-700 border-b border-slate-200 pb-1">
+                            <p className="font-medium text-slate-900">{lead.name}</p>
+                            <p>{lead.date || "sem data"}{lead.phone ? ` · ${lead.phone}` : ""}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">
+                      Convertidos ({d.convertedLeads.length})
+                    </p>
+                    {d.convertedLeads.length === 0 ? (
+                      <p className="text-xs text-emerald-700">Nenhum orçamento convertido ainda.</p>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto space-y-1.5">
+                        {d.convertedLeads.map((lead, idx) => (
+                          <div key={`${lead.name}_${lead.budgetDate}_${lead.attendedDate}_${idx}`} className="text-xs text-emerald-900 border-b border-emerald-200 pb-1">
+                            <p className="font-medium">{lead.name}</p>
+                            <p>Orçamento: {lead.budgetDate || "-"} · Atendimento: {lead.attendedDate || "-"}</p>
+                            {lead.phone && <p>{lead.phone}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

@@ -304,6 +304,35 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
         return;
       }
 
+      // Formato novo (imagem): CODIGO NOME DATA DENTISTA
+      // Ex.: 81977 BIANCA CRISTINA PRATES DO NASCIMENTO 06/05/2026 DRA BARBARA
+      const codeNameDateTail = line.match(/^(\d+)\s+(.+?)\s+(\d{1,2}\/\d{1,2}\/\d{4})(?:\s+(.+))?$/i);
+      if (codeNameDateTail) {
+        const extCode = (codeNameDateTail[1] || "").trim();
+        const patientName = (codeNameDateTail[2] || "").trim();
+        const date = (codeNameDateTail[3] || "").trim();
+        const tail = (codeNameDateTail[4] || "").trim();
+        const budgetAt = parseDateTimeToISO(date, "12:00");
+        if (!patientName || !budgetAt) {
+          invalidCount += 1;
+          return;
+        }
+        const leadId = leadByNormalizedName.get(normalizeName(patientName));
+        if (leadId) linkedCount += 1;
+        else noLeadCount += 1;
+
+        imported.push({
+          id: `bud_bulk_${Date.now()}_${idx}`,
+          dentistId: budgetBulkDentistId,
+          patientName,
+          patientId: leadId,
+          budgetAt,
+          procedure: undefined,
+          source: `import_code:${extCode}${tail ? `:${tail}` : ""}`,
+        });
+        return;
+      }
+
       // Alternativa por colunas: Nome;Data;Hora(opcional);Procedimento(opcional)
       const cols = line.split(/[;,|\t]/).map((c) => c.trim()).filter(Boolean);
       if (cols.length < 2) {
@@ -311,7 +340,15 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
         return;
       }
 
-      const [nameCol, dateCol, thirdCol = "", fourthCol = ""] = cols;
+      let [nameCol, dateCol, thirdCol = "", fourthCol = ""] = cols;
+
+      // Quando vier em colunas com código inicial (ex: [81977, NOME, 06/05/2026, DRA BARBARA])
+      if (/^\d+$/.test(nameCol) && !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateCol) && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(thirdCol)) {
+        nameCol = dateCol;
+        dateCol = thirdCol;
+        thirdCol = "";
+      }
+
       if (idx === 0 && /nome/i.test(nameCol) && /data/i.test(dateCol)) return;
 
       const timeLooksValid = /^\d{1,2}:\d{2}$/.test(thirdCol);
@@ -664,7 +701,8 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                     <div className="text-xs text-slate-600 bg-white border border-slate-200 rounded-lg p-3">
                       Formatos aceitos:<br />
                       1) <strong>- **Nome**: 05/06/2026, 08:49, Dra Barbara</strong><br />
-                      2) <strong>Nome;Data;Hora;Procedimento(opcional)</strong>
+                      2) <strong>Codigo Nome Data Dentista</strong> (ex.: 81977 NOME SOBRENOME 06/05/2026 DRA BARBARA)<br />
+                      3) <strong>Nome;Data;Hora;Procedimento(opcional)</strong>
                     </div>
 
                     <textarea
