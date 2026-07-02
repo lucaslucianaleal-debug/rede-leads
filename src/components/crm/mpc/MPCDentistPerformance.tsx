@@ -153,6 +153,7 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
   }>(null);
   const [scheduleEditingId, setScheduleEditingId] = useState<string | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState<number[]>([1, 2, 3, 4, 5, 6]);
+  const [satisfactionDentistId, setSatisfactionDentistId] = useState<string | null>(null);
 
   const normalizeWorkDays = (days: any) => {
     const arr = Array.isArray(days) ? days.map((d) => Number(d)).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [];
@@ -309,6 +310,23 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
     });
     if (nextStoreSnapshot) await mutations.saveNow(nextStoreSnapshot);
     setScheduleEditingId(null);
+  };
+
+  const saveSurveyEdit = async (surveyId: string, patch: { score?: number; comment?: string }) => {
+    let nextStoreSnapshot: MPCStore | null = null;
+    mutations.setStore((prev) => {
+      const surveys = (prev.surveys || []).map((s: any) => {
+        if (s.id !== surveyId) return s;
+        return {
+          ...s,
+          ...(patch.score !== undefined ? { score: patch.score } : {}),
+          ...(patch.comment !== undefined ? { comment: patch.comment } : {}),
+        };
+      });
+      nextStoreSnapshot = { ...prev, surveys };
+      return nextStoreSnapshot;
+    });
+    if (nextStoreSnapshot) await mutations.saveNow(nextStoreSnapshot);
   };
 
   if (dentists.length === 0) {
@@ -501,9 +519,16 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                   {/* Satisfação */}
                   <div>
                     <div className="text-xs text-slate-400 mb-0.5">Satisfação</div>
-                    <div className="text-lg font-semibold text-slate-700">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSatisfactionDentistId(d.id);
+                      }}
+                      className="text-lg font-semibold text-slate-700 hover:text-slate-900 underline-offset-2 hover:underline"
+                    >
                       {d.satisfaction > 0 ? `${d.satisfaction}/5` : <span className="text-slate-300 text-sm">—</span>}
-                    </div>
+                    </button>
                     <div className="text-xs text-slate-400">média</div>
                   </div>
                   {/* Tendência */}
@@ -792,6 +817,70 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
         <span>🔴 Muito abaixo = &lt;60%</span>
         <span>⏳ Sem dados = sem atendimentos registrados</span>
       </div>
+
+      {satisfactionDentistId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-2xl max-h-[85vh] overflow-auto p-4 border border-slate-200">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold text-slate-900">
+                Avaliações da dentista: {dentists.find((x) => x.id === satisfactionDentistId)?.name || "-"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSatisfactionDentistId(null)}
+                className="px-2 py-1 text-xs border border-slate-300 rounded text-slate-700"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {store.surveys.filter((s: any) => s.sector === "dentist" && s.dentistId === satisfactionDentistId).length === 0 ? (
+              <p className="text-sm text-slate-500">Sem avaliações individuais para esta dentista.</p>
+            ) : (
+              <div className="space-y-2">
+                {store.surveys
+                  .filter((s: any) => s.sector === "dentist" && s.dentistId === satisfactionDentistId)
+                  .sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+                  .map((sv: any) => (
+                    <div key={sv.id} className="p-3 border border-slate-200 rounded bg-slate-50">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                        <div>
+                          <label className="text-[11px] text-slate-600 block mb-1">Data</label>
+                          <div className="text-xs text-slate-700">{String(sv.createdAt || "").slice(0, 10) || "-"}</div>
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-slate-600 block mb-1">Nota</label>
+                          <select
+                            value={Number(sv.score || 0)}
+                            onChange={(e) => void saveSurveyEdit(sv.id, { score: Number(e.target.value) })}
+                            className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                          >
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-slate-600 block mb-1">Lead</label>
+                          <div className="text-xs text-slate-700">{sv.leadId || "-"}</div>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <label className="text-[11px] text-slate-600 block mb-1">Comentário</label>
+                        <input
+                          defaultValue={sv.comment || ""}
+                          onBlur={(e) => void saveSurveyEdit(sv.id, { comment: e.target.value })}
+                          placeholder="Editar comentário"
+                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                        />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

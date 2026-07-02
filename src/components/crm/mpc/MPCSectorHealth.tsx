@@ -1,9 +1,15 @@
 import React, { useState } from "react";
 import { SectorHealth } from "@/types/mpc";
 import { ChevronRight } from "lucide-react";
+import { MPCStore } from "@/hooks/useMPCDataStore";
 
 type MPCSectorHealthProps = {
   sectors: SectorHealth[];
+  store: MPCStore;
+  mutations: {
+    setStore: (s: MPCStore | ((prev: MPCStore) => MPCStore)) => void;
+    saveNow: (nextStore?: MPCStore) => Promise<void>;
+  };
 };
 
 function SectorCard({ sector, onDetails }: { sector: SectorHealth; onDetails: () => void }) {
@@ -78,8 +84,32 @@ function SectorCard({ sector, onDetails }: { sector: SectorHealth; onDetails: ()
   );
 }
 
-export default function MPCSectorHealth({ sectors }: MPCSectorHealthProps) {
+export default function MPCSectorHealth({ sectors, store, mutations }: MPCSectorHealthProps) {
   const [selectedSector, setSelectedSector] = useState<SectorHealth | null>(null);
+
+  const sectorMap: Record<string, string> = {
+    "Recepção": "reception",
+    "Clínica": "clinic",
+    "Comercial": "sales",
+    "Dentistas": "dentist",
+  };
+
+  const saveSurveyEdit = async (surveyId: string, patch: { score?: number; comment?: string }) => {
+    let nextStoreSnapshot: MPCStore | null = null;
+    mutations.setStore((prev) => {
+      const surveys = (prev.surveys || []).map((s: any) => {
+        if (s.id !== surveyId) return s;
+        return {
+          ...s,
+          ...(patch.score !== undefined ? { score: patch.score } : {}),
+          ...(patch.comment !== undefined ? { comment: patch.comment } : {}),
+        };
+      });
+      nextStoreSnapshot = { ...prev, surveys };
+      return nextStoreSnapshot;
+    });
+    if (nextStoreSnapshot) await mutations.saveNow(nextStoreSnapshot);
+  };
 
   return (
     <div>
@@ -121,6 +151,48 @@ export default function MPCSectorHealth({ sectors }: MPCSectorHealthProps) {
                 </ul>
               </div>
 
+              <div>
+                <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Avaliações do Setor</div>
+                {store.surveys.filter((s: any) => s.sector === (sectorMap[selectedSector.name] || "")).length === 0 ? (
+                  <p className="text-sm text-slate-500">Sem avaliações registradas para este setor.</p>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-auto">
+                    {store.surveys
+                      .filter((s: any) => s.sector === (sectorMap[selectedSector.name] || ""))
+                      .sort((a: any, b: any) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+                      .map((sv: any) => (
+                        <div key={sv.id} className="p-2 rounded border border-slate-200 bg-slate-50">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[11px] text-slate-600 block mb-1">Data</label>
+                              <div className="text-xs text-slate-700">{String(sv.createdAt || "").slice(0, 10) || "-"}</div>
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-600 block mb-1">Nota</label>
+                              <select
+                                value={Number(sv.score || 0)}
+                                onChange={(e) => void saveSurveyEdit(sv.id, { score: Number(e.target.value) })}
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                              >
+                                {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <label className="text-[11px] text-slate-600 block mb-1">Comentário</label>
+                            <input
+                              defaultValue={sv.comment || ""}
+                              onBlur={(e) => void saveSurveyEdit(sv.id, { comment: e.target.value })}
+                              className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                              placeholder="Editar comentário"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
                 <div>
                   <div className="text-xs text-slate-600">Status</div>
@@ -142,9 +214,7 @@ export default function MPCSectorHealth({ sectors }: MPCSectorHealthProps) {
               >
                 Fechar
               </button>
-              <button className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors">
-                Auditar
-              </button>
+              <button className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors">Auditar</button>
             </div>
           </div>
         </div>

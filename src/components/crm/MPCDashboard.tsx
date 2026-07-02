@@ -94,7 +94,7 @@ export default function MPCDashboard({ data, isLoading = false, store, mutations
 
         {/* 5. Saúde dos Setores */}
         <section className="mb-8">
-          <MPCSectorHealth sectors={data.sectorHealth} />
+          <MPCSectorHealth sectors={data.sectorHealth} store={store} mutations={mutations} />
         </section>
 
         {/* 6. Foco da Semana + Decisões Recomendadas (Side by side) */}
