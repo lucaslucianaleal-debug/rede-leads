@@ -359,6 +359,7 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
         const b = budgetMap.get(k);
         return {
           name: a.patientName || b?.patientName || "Sem nome",
+          patientId: a.patientId || b?.patientId,
           budgetDate: String(b?.budgetAt || "").slice(0, 10),
           attendedDate: String(a?.attendedAt || "").slice(0, 10),
           phone: a.patientPhone || b?.patientPhone,

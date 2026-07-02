@@ -117,6 +117,13 @@ function statusLabel(status?: string) {
 
 export default function MPCDentistPerformance({ dentists, store, mutations }: Props) {
   const { allLeads } = useLeads();
+  const crmById = useMemo(() => {
+    const map = new Map<string, { nome?: string; telefone?: string }>();
+    allLeads.forEach((l: any) => {
+      if (l?.id) map.set(l.id, { nome: l.nome, telefone: l.telefone });
+    });
+    return map;
+  }, [allLeads]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchByDentist, setSearchByDentist] = useState<Record<string, { attended: string; budget: string; converted: string }>>({});
   const [editingLead, setEditingLead] = useState<null | {
@@ -141,6 +148,22 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
       .filter((l) => (l.nome || "").toLowerCase().includes(q) || (l.telefone || "").includes(q))
       .slice(0, 8);
   }, [editingLead?.crmQuery, allLeads]);
+
+  const getSyncedIdentity = (patientId?: string, fallbackName?: string, fallbackPhone?: string) => {
+    const crmLead = patientId ? crmById.get(patientId) : undefined;
+    if (crmLead) {
+      return {
+        name: crmLead.nome || fallbackName || "Sem nome",
+        phone: crmLead.telefone || fallbackPhone,
+        synced: true,
+      };
+    }
+    return {
+      name: fallbackName || "Sem nome",
+      phone: fallbackPhone,
+      synced: false,
+    };
+  };
 
   const getSearch = (dentistId: string) =>
     searchByDentist[dentistId] || { attended: "", budget: "", converted: "" };
@@ -271,19 +294,25 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
 
           const filteredAttended = attendedQuery
             ? sortedAttended.filter((lead) =>
-                `${lead.name || ""} ${lead.date || ""} ${lead.phone || ""} ${statusLabel(lead.status)}`.toLowerCase().includes(attendedQuery)
+                (() => {
+                  const identity = getSyncedIdentity(lead.patientId, lead.name, lead.phone);
+                  return `${identity.name || ""} ${lead.date || ""} ${identity.phone || ""} ${statusLabel(lead.status)}`.toLowerCase().includes(attendedQuery);
+                })()
               )
             : sortedAttended;
 
           const filteredBudgets = budgetQuery
             ? sortedBudgets.filter((lead) =>
-                `${lead.name || ""} ${lead.date || ""} ${lead.phone || ""}`.toLowerCase().includes(budgetQuery)
+                (() => {
+                  const identity = getSyncedIdentity(lead.patientId, lead.name, lead.phone);
+                  return `${identity.name || ""} ${lead.date || ""} ${identity.phone || ""}`.toLowerCase().includes(budgetQuery);
+                })()
               )
             : sortedBudgets;
 
           const filteredConverted = convertedQuery
             ? sortedConverted.filter((lead) =>
-                `${lead.name || ""} ${lead.budgetDate || ""} ${lead.attendedDate || ""} ${lead.phone || ""}`
+                `${getSyncedIdentity(lead.patientId, lead.name, lead.phone).name || ""} ${lead.budgetDate || ""} ${lead.attendedDate || ""} ${getSyncedIdentity(lead.patientId, lead.name, lead.phone).phone || ""}`
                   .toLowerCase()
                   .includes(convertedQuery)
               )
@@ -403,9 +432,15 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                     ) : (
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
                         {filteredAttended.map((lead, idx) => (
+                          (() => {
+                            const identity = getSyncedIdentity(lead.patientId, lead.name, lead.phone);
+                            return (
                           <div key={`${lead.name}_${lead.date}_${idx}`} className="text-xs text-slate-700 border-b border-slate-200 pb-1">
                             <div className="flex items-start justify-between gap-2">
-                              <p className="font-medium text-slate-900">{lead.name}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium text-slate-900">{identity.name}</p>
+                                {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">CRM</span>}
+                              </div>
                               {(lead.id && lead.sourceType) && (
                                 <button
                                   type="button"
@@ -418,12 +453,14 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                             </div>
                             <p>
                               {lead.date || "sem data"} · {statusLabel(lead.status)}
-                              {lead.phone ? ` · ${lead.phone}` : ""}
+                              {identity.phone ? ` · ${identity.phone}` : ""}
                             </p>
                             {typeof lead.saleValue === "number" && (
                               <p className="text-[11px] text-emerald-700">Venda: R$ {Math.round(lead.saleValue).toLocaleString("pt-BR")}{lead.saleProcedure ? ` · ${lead.saleProcedure}` : ""}</p>
                             )}
                           </div>
+                            );
+                          })()
                         ))}
                       </div>
                     )}
@@ -446,9 +483,15 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                     ) : (
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
                         {filteredBudgets.map((lead, idx) => (
+                          (() => {
+                            const identity = getSyncedIdentity(lead.patientId, lead.name, lead.phone);
+                            return (
                           <div key={`${lead.name}_${lead.date}_${idx}`} className="text-xs text-slate-700 border-b border-slate-200 pb-1">
                             <div className="flex items-start justify-between gap-2">
-                              <p className="font-medium text-slate-900">{lead.name}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium text-slate-900">{identity.name}</p>
+                                {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">CRM</span>}
+                              </div>
                               {lead.id && (
                                 <button
                                   type="button"
@@ -459,8 +502,10 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                                 </button>
                               )}
                             </div>
-                            <p>{lead.date || "sem data"}{lead.phone ? ` · ${lead.phone}` : ""}</p>
+                            <p>{lead.date || "sem data"}{identity.phone ? ` · ${identity.phone}` : ""}</p>
                           </div>
+                            );
+                          })()
                         ))}
                       </div>
                     )}
@@ -483,11 +528,19 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                     ) : (
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
                         {filteredConverted.map((lead, idx) => (
+                          (() => {
+                            const identity = getSyncedIdentity(lead.patientId, lead.name, lead.phone);
+                            return (
                           <div key={`${lead.name}_${lead.budgetDate}_${lead.attendedDate}_${idx}`} className="text-xs text-emerald-900 border-b border-emerald-200 pb-1">
-                            <p className="font-medium">{lead.name}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-medium">{identity.name}</p>
+                              {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">CRM</span>}
+                            </div>
                             <p>Orçamento: {lead.budgetDate || "-"} · Atendimento: {lead.attendedDate || "-"}</p>
-                            {lead.phone && <p>{lead.phone}</p>}
+                            {identity.phone && <p>{identity.phone}</p>}
                           </div>
+                            );
+                          })()
                         ))}
                       </div>
                     )}

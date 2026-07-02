@@ -66,7 +66,7 @@ export interface DentistPerformance {
   trend90d: number[]; // últimos 90 dias
   attendedLeads: Array<{ id?: string; sourceType?: "appointment" | "budget"; patientId?: string; name: string; date: string; phone?: string; status?: string; saleValue?: number; saleProcedure?: string; attendedBy?: string }>;
   budgetLeads: Array<{ id?: string; patientId?: string; name: string; date: string; phone?: string; procedure?: string }>;
-  convertedLeads: Array<{ name: string; budgetDate?: string; attendedDate?: string; phone?: string }>;
+  convertedLeads: Array<{ name: string; patientId?: string; budgetDate?: string; attendedDate?: string; phone?: string }>;
   lastUpdated: Date;
 }
 
