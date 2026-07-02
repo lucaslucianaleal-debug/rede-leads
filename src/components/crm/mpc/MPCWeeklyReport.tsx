@@ -161,6 +161,10 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
       attended > prevTotalAttendance ? "up" : attended < prevTotalAttendance ? "down" : "stable";
 
     const dentistSurveys = surveys.filter((s: any) => {
+      if (s.sector === "dentist" && s.dentistId === d.id) {
+        const sdt = new Date(s.createdAt || 0);
+        return inRange(sdt, start, end);
+      }
       if (!s.leadId) return false;
       const sdt = new Date(s.createdAt || 0);
       if (!inRange(sdt, start, end)) return false;

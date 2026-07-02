@@ -98,9 +98,37 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
   const [showSurvSearch, setShowSurvSearch] = useState(false);
   const [surveyForm, setSurveyForm] = useState({
     leadId: "", patientName: "",
-    sector: "clinic" as "reception" | "clinic" | "ortho" | "sales",
+    sectors: ["clinic"] as Array<"reception" | "clinic" | "ortho" | "sales" | "dentist">,
+    dentistIds: [] as string[],
     score: 5, comment: "",
   });
+
+  const toggleSurveySector = (sector: "reception" | "clinic" | "ortho" | "sales" | "dentist") => {
+    setSurveyForm((prev) => {
+      const exists = prev.sectors.includes(sector);
+      const nextSectors = exists
+        ? prev.sectors.filter((s) => s !== sector)
+        : [...prev.sectors, sector];
+
+      return {
+        ...prev,
+        sectors: nextSectors,
+        dentistIds: sector === "dentist" && exists ? [] : prev.dentistIds,
+      };
+    });
+  };
+
+  const toggleSurveyDentist = (dentistId: string) => {
+    setSurveyForm((prev) => {
+      const exists = prev.dentistIds.includes(dentistId);
+      return {
+        ...prev,
+        dentistIds: exists
+          ? prev.dentistIds.filter((id) => id !== dentistId)
+          : [...prev.dentistIds, dentistId],
+      };
+    });
+  };
 
   const [bulkDentistId, setBulkDentistId] = useState("");
   const [bulkStatus, setBulkStatus] = useState<"scheduled" | "confirmed" | "attended">("attended");
@@ -163,16 +191,39 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
 
   const handleAddSurvey = () => {
     if (!surveyForm.patientName.trim()) return;
-    addSurvey({
-      id: `survey_${Date.now()}`,
-      leadId: surveyForm.leadId || undefined,
-      sector: surveyForm.sector,
-      score: surveyForm.score,
-      comment: surveyForm.comment,
-      createdAt: new Date().toISOString(),
+    const sectorTargets = surveyForm.sectors.filter((s) => s !== "dentist");
+    const includeDentists = surveyForm.sectors.includes("dentist");
+    const dentistTargets = includeDentists ? surveyForm.dentistIds : [];
+
+    if (sectorTargets.length === 0 && dentistTargets.length === 0) return;
+
+    const now = new Date().toISOString();
+
+    sectorTargets.forEach((sector) => {
+      addSurvey({
+        id: `survey_${Date.now()}_${sector}`,
+        leadId: surveyForm.leadId || undefined,
+        sector,
+        score: surveyForm.score,
+        comment: surveyForm.comment,
+        createdAt: now,
+      });
     });
-    showSuccess(`Pesquisa de "${surveyForm.patientName}" registrada - ${"⭐".repeat(surveyForm.score)}`);
-    setSurveyForm({ leadId: "", patientName: "", sector: "clinic", score: 5, comment: "" });
+
+    dentistTargets.forEach((dentistId) => {
+      addSurvey({
+        id: `survey_${Date.now()}_${dentistId}`,
+        leadId: surveyForm.leadId || undefined,
+        sector: "dentist",
+        dentistId,
+        score: surveyForm.score,
+        comment: surveyForm.comment,
+        createdAt: now,
+      });
+    });
+
+    showSuccess(`Pesquisa de "${surveyForm.patientName}" registrada para ${sectorTargets.length + dentistTargets.length} avaliados - ${"⭐".repeat(surveyForm.score)}`);
+    setSurveyForm({ leadId: "", patientName: "", sectors: ["clinic"], dentistIds: [], score: 5, comment: "" });
     setSurvSearchQuery("");
   };
 
@@ -814,7 +865,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
                     {filteredSurvLeads.length === 0 ? <div className="p-3 text-sm text-slate-500">Nenhum paciente encontrado</div>
                       : filteredSurvLeads.map(lead => (
-                        <button key={lead.id} onClick={() => { setSurveyForm({ ...surveyForm, patientName: lead.nome, leadId: lead.id }); setSurvSearchQuery(""); setShowSurvSearch(false); }} className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0">
+                          <button key={lead.id} onClick={() => { setSurveyForm((prev) => ({ ...prev, patientName: lead.nome, leadId: lead.id })); setSurvSearchQuery(""); setShowSurvSearch(false); }} className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0">
                           <p className="text-sm font-medium text-slate-900">{lead.nome}</p>
                           <p className="text-xs text-slate-500">{lead.telefone} · {lead.servicoProcurado || "Geral"}</p>
                         </button>
@@ -824,30 +875,62 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
               </div>
               <div>
                 <label className="text-xs text-slate-600 mb-1 block">Nome do Paciente *</label>
-                <input type="text" placeholder="Nome do paciente" value={surveyForm.patientName} onChange={(e) => setSurveyForm({ ...surveyForm, patientName: e.target.value, leadId: "" })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm" />
+                <input type="text" placeholder="Nome do paciente" value={surveyForm.patientName} onChange={(e) => setSurveyForm((prev) => ({ ...prev, patientName: e.target.value, leadId: "" }))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm" />
                 {surveyForm.leadId && <p className="text-xs text-emerald-600 mt-0.5">✓ Paciente CRM vinculado</p>}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-600 mb-1 block">Setor</label>
-                  <select value={surveyForm.sector} onChange={(e) => setSurveyForm({ ...surveyForm, sector: e.target.value as any })} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm">
-                    <option value="reception">Recepção</option>
-                    <option value="clinic">Clínica</option>
-                    <option value="ortho">Ortodontia</option>
-                    <option value="sales">Comercial</option>
-                  </select>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-600 block">Quem será avaliado? (pode marcar mais de um)</label>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-700">
+                  {[
+                    { key: "reception", label: "Recepção" },
+                    { key: "clinic", label: "Clínica" },
+                    { key: "ortho", label: "Ortodontia" },
+                    { key: "sales", label: "Comercial" },
+                    { key: "dentist", label: "Dentista(s)" },
+                  ].map((item) => (
+                    <label key={item.key} className="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        checked={surveyForm.sectors.includes(item.key as any)}
+                        onChange={() => toggleSurveySector(item.key as any)}
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  ))}
                 </div>
+
+                {surveyForm.sectors.includes("dentist") && (
+                  <div className="bg-white border border-slate-200 rounded-lg p-2">
+                    <p className="text-xs text-slate-600 mb-2">Selecione um ou mais dentistas:</p>
+                    <div className="grid grid-cols-1 gap-1.5 max-h-32 overflow-y-auto">
+                      {store.dentists.length === 0 ? (
+                        <p className="text-xs text-amber-700">Nenhum dentista cadastrado.</p>
+                      ) : store.dentists.map((dentist) => (
+                        <label key={dentist.id} className="flex items-center gap-2 text-xs text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={surveyForm.dentistIds.includes(dentist.id)}
+                            onChange={() => toggleSurveyDentist(dentist.id)}
+                          />
+                          <span>{dentist.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="text-xs text-slate-600 mb-1 block">Nota: {"⭐".repeat(surveyForm.score)}{"☆".repeat(5 - surveyForm.score)}</label>
-                  <input type="range" min="1" max="5" value={surveyForm.score} onChange={(e) => setSurveyForm({ ...surveyForm, score: Number(e.target.value) })} className="w-full mt-2" />
+                  <input type="range" min="1" max="5" value={surveyForm.score} onChange={(e) => setSurveyForm((prev) => ({ ...prev, score: Number(e.target.value) }))} className="w-full mt-2" />
                   <div className="flex justify-between text-xs text-slate-400"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
                 </div>
               </div>
               <div>
                 <label className="text-xs text-slate-600 mb-1 block">Comentário (opcional)</label>
-                <textarea placeholder="O que o paciente disse..." value={surveyForm.comment} onChange={(e) => setSurveyForm({ ...surveyForm, comment: e.target.value })} rows={2} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm resize-none" />
+                <textarea placeholder="O que o paciente disse..." value={surveyForm.comment} onChange={(e) => setSurveyForm((prev) => ({ ...prev, comment: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 bg-white text-sm resize-none" />
               </div>
-              <button onClick={handleAddSurvey} disabled={!surveyForm.patientName.trim()} className="w-full px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-40 flex items-center justify-center gap-2">
+              <button onClick={handleAddSurvey} disabled={!surveyForm.patientName.trim() || (surveyForm.sectors.filter((s) => s !== "dentist").length === 0 && (!surveyForm.sectors.includes("dentist") || surveyForm.dentistIds.length === 0))} className="w-full px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-40 flex items-center justify-center gap-2">
                 <Star size={16} /> Registrar Pesquisa
               </button>
             </div>

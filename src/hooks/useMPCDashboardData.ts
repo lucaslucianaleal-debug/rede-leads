@@ -394,9 +394,12 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       }))
       .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""));
 
-    // Satisfação média de toda a clínica (surveys não têm dentistId)
-    const avgSatisfaction = surveys.length > 0
-      ? Math.round((surveys.reduce((s: number, sv: any) => s + (sv.score || 0), 0) / surveys.length) * 10) / 10
+    // Satisfação por dentista: prioriza avaliações marcadas para o dentista
+    const dentistSpecificSurveys = surveys.filter((sv: any) => sv.sector === "dentist" && sv.dentistId === d.id);
+    const dentistLegacySurveys = surveys.filter((sv: any) => sv.sector === "clinic" || sv.sector === "ortho");
+    const dentistSurveySource = dentistSpecificSurveys.length > 0 ? dentistSpecificSurveys : dentistLegacySurveys;
+    const avgSatisfaction = dentistSurveySource.length > 0
+      ? Math.round((dentistSurveySource.reduce((s: number, sv: any) => s + (sv.score || 0), 0) / dentistSurveySource.length) * 10) / 10
       : 0;
 
     // Trend 90d — conta atendimentos totais (operacional + orçamentos)
@@ -458,6 +461,7 @@ function calculateSectorHealth(rawData: any): SectorHealth[] {
     { name: "Clínica", key: "clinic" },
     { name: "Ortodontia", key: "ortho" },
     { name: "Comercial", key: "sales" },
+    { name: "Dentistas", key: "dentist" },
   ];
 
   return sectors.map((sector) => {
@@ -715,6 +719,10 @@ function generateWeeklyReport(
         : "stable";
 
     const dentistSurveys = surveys.filter((s: any) => {
+      if (s.sector === "dentist" && s.dentistId === d.id) {
+        const dt = new Date(s.createdAt || 0);
+        return dt >= weekStart && dt <= now;
+      }
       if (!s.leadId) return false;
       return attendedWeek.some((a: any) => a.dentistId === d.id && a.patientId === s.leadId);
     });
