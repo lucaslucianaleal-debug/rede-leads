@@ -153,13 +153,15 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
     const crmLead = patientId ? crmById.get(patientId) : undefined;
     if (crmLead) {
       return {
-        name: crmLead.nome || fallbackName || "Sem nome",
+        name: fallbackName || "Sem nome",
+        crmName: crmLead.nome || undefined,
         phone: crmLead.telefone || fallbackPhone,
         synced: true,
       };
     }
     return {
       name: fallbackName || "Sem nome",
+      crmName: undefined,
       phone: fallbackPhone,
       synced: false,
     };
@@ -204,8 +206,7 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
       return {
         ...prev,
         patientId: lead.id,
-        name: lead.nome || prev.name,
-        phone: lead.telefone || prev.phone,
+        phone: prev.phone || lead.telefone || prev.phone,
         crmQuery: "",
       };
     });
@@ -439,7 +440,7 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-center gap-1.5">
                                 <p className="font-medium text-slate-900">{identity.name}</p>
-                                {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">CRM</span>}
+                                {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">SYNC</span>}
                               </div>
                               {(lead.id && lead.sourceType) && (
                                 <button
@@ -455,6 +456,9 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                               {lead.date || "sem data"} · {statusLabel(lead.status)}
                               {identity.phone ? ` · ${identity.phone}` : ""}
                             </p>
+                            {identity.synced && identity.crmName && identity.crmName !== identity.name && (
+                              <p className="text-[11px] text-emerald-700">CRM: {identity.crmName}</p>
+                            )}
                             {typeof lead.saleValue === "number" && (
                               <p className="text-[11px] text-emerald-700">Venda: R$ {Math.round(lead.saleValue).toLocaleString("pt-BR")}{lead.saleProcedure ? ` · ${lead.saleProcedure}` : ""}</p>
                             )}
@@ -490,7 +494,7 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-center gap-1.5">
                                 <p className="font-medium text-slate-900">{identity.name}</p>
-                                {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">CRM</span>}
+                                {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">SYNC</span>}
                               </div>
                               {lead.id && (
                                 <button
@@ -503,6 +507,10 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                               )}
                             </div>
                             <p>{lead.date || "sem data"}{identity.phone ? ` · ${identity.phone}` : ""}</p>
+                            {lead.procedure && <p className="text-[11px] text-slate-500">Serviço: {lead.procedure}</p>}
+                            {identity.synced && identity.crmName && identity.crmName !== identity.name && (
+                              <p className="text-[11px] text-emerald-700">CRM: {identity.crmName}</p>
+                            )}
                           </div>
                             );
                           })()
@@ -534,10 +542,13 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                           <div key={`${lead.name}_${lead.budgetDate}_${lead.attendedDate}_${idx}`} className="text-xs text-emerald-900 border-b border-emerald-200 pb-1">
                             <div className="flex items-center gap-1.5">
                               <p className="font-medium">{identity.name}</p>
-                              {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">CRM</span>}
+                              {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">SYNC</span>}
                             </div>
                             <p>Orçamento: {lead.budgetDate || "-"} · Atendimento: {lead.attendedDate || "-"}</p>
                             {identity.phone && <p>{identity.phone}</p>}
+                            {identity.synced && identity.crmName && identity.crmName !== identity.name && (
+                              <p className="text-[11px] text-emerald-700">CRM: {identity.crmName}</p>
+                            )}
                           </div>
                             );
                           })()

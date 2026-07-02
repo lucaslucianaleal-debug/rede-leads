@@ -308,11 +308,13 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     if (!budgetBulkDentistId || !budgetBulkText.trim()) return;
 
     const leadByNormalizedName = new Map<string, string>();
+    const leadById = new Map<string, any>();
     allLeads.forEach((lead) => {
       const key = normalizeName(lead.nome || "");
       if (key && !leadByNormalizedName.has(key)) {
         leadByNormalizedName.set(key, lead.id);
       }
+      if (lead.id) leadById.set(lead.id, lead);
     });
 
     const lines = budgetBulkText
@@ -340,6 +342,8 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
           return;
         }
         const leadId = leadByNormalizedName.get(normalizeName(patientName));
+        const lead = leadId ? leadById.get(leadId) : null;
+        const crmProcedure = lead?.servicoProcurado ? String(lead.servicoProcurado).trim() : undefined;
         if (leadId) linkedCount += 1;
         else noLeadCount += 1;
 
@@ -349,7 +353,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
           patientName,
           patientId: leadId,
           budgetAt,
-          procedure: undefined,
+          procedure: crmProcedure,
           source: extra || "import_markdown",
         });
         return;
@@ -369,6 +373,8 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
           return;
         }
         const leadId = leadByNormalizedName.get(normalizeName(patientName));
+        const lead = leadId ? leadById.get(leadId) : null;
+        const crmProcedure = lead?.servicoProcurado ? String(lead.servicoProcurado).trim() : undefined;
         if (leadId) linkedCount += 1;
         else noLeadCount += 1;
 
@@ -378,7 +384,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
           patientName,
           patientId: leadId,
           budgetAt,
-          procedure: undefined,
+          procedure: crmProcedure,
           source: `import_code:${extCode}${tail ? `:${tail}` : ""}`,
         });
         return;
@@ -411,6 +417,8 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
 
       const procedure = timeLooksValid ? fourthCol || undefined : thirdCol || undefined;
       const leadId = leadByNormalizedName.get(normalizeName(nameCol));
+      const lead = leadId ? leadById.get(leadId) : null;
+      const crmProcedure = lead?.servicoProcurado ? String(lead.servicoProcurado).trim() : undefined;
       if (leadId) linkedCount += 1;
       else noLeadCount += 1;
 
@@ -420,7 +428,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
         patientName: nameCol,
         patientId: leadId,
         budgetAt,
-        procedure,
+        procedure: procedure || crmProcedure,
         source: "import_table",
       });
     });
