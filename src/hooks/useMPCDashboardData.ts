@@ -305,13 +305,18 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
 
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
-  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
-  const monthAgo = new Date(now); monthAgo.setDate(monthAgo.getDate() - 30);
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
 
-  const inRange = (value: string | undefined, start?: Date) => {
+  const weekStart = new Date(startOfToday);
+  weekStart.setDate(weekStart.getDate() - 6); // janela de 7 dias (inclui hoje)
+
+  const monthStart = new Date(startOfToday);
+  monthStart.setDate(monthStart.getDate() - 29); // janela de 30 dias (inclui hoje)
+
+  const inRange = (value: string | undefined, start: Date, end: Date) => {
     const d = new Date(value || 0);
-    if (!start) return false;
-    return d >= start;
+    return d >= start && d <= end;
   };
 
   return dentists.map((d: any) => {
@@ -329,12 +334,12 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     }).length + dentistBudgets.filter((b: any) => String(b.budgetAt || b.createdAt || "").startsWith(todayStr)).length;
 
     const weekAttended = productionAppts.filter((a: any) => {
-      return inRange(a.attendedAt || a.createdAt, weekAgo);
-    }).length + dentistBudgets.filter((b: any) => inRange(b.budgetAt || b.createdAt, weekAgo)).length;
+      return inRange(a.attendedAt || a.createdAt, weekStart, now);
+    }).length + dentistBudgets.filter((b: any) => inRange(b.budgetAt || b.createdAt, weekStart, now)).length;
 
     const monthAttended = productionAppts.filter((a: any) => {
-      return inRange(a.attendedAt || a.createdAt, monthAgo);
-    }).length + dentistBudgets.filter((b: any) => inRange(b.budgetAt || b.createdAt, monthAgo)).length;
+      return inRange(a.attendedAt || a.createdAt, monthStart, now);
+    }).length + dentistBudgets.filter((b: any) => inRange(b.budgetAt || b.createdAt, monthStart, now)).length;
 
     const budgetMap = new Map<string, any>();
     dentistBudgets.forEach((b: any) => {

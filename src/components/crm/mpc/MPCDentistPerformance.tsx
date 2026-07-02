@@ -192,6 +192,9 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     <div className="text-[11px] text-slate-400">
                       30d atual ({trend.current}) vs 30d ant. ({trend.previous})
                     </div>
+                    <div className="text-[11px] text-slate-400">
+                      var. = (atual - anterior) / anterior
+                    </div>
                   </div>
                 </div>
               </div>
