@@ -88,6 +88,7 @@ function statusLabel(status?: string) {
   if (status === "attended") return "Atendido";
   if (status === "scheduled") return "Agendado";
   if (status === "confirmed") return "Confirmado";
+  if (status === "budget") return "Orçamento";
   return "Sem status";
 }
 
@@ -136,7 +137,7 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                     {" · "}
                     Atend. Totais: <span className="font-semibold text-slate-700">{d.attendedLeads.length}</span>
                     {" · "}
-                    Convertidos: <span className="font-semibold text-emerald-700">{d.convertedLeads.length}</span>
+                    Ret./Fech.: <span className="font-semibold text-emerald-700">{d.convertedLeads.length}</span>
                   </p>
                 </div>
 
@@ -167,7 +168,7 @@ export default function MPCDentistPerformance({ dentists }: Props) {
                   <div>
                     <div className="text-xs text-slate-400 mb-0.5">Conversão</div>
                     <div className="text-lg font-semibold text-slate-700">{d.conversionRate}%</div>
-                    <div className="text-xs text-slate-400">{d.convertedLeads.length}/{d.budgetLeads.length} pac.</div>
+                    <div className="text-xs text-slate-400">ret./fech. {d.convertedLeads.length}/{d.budgetLeads.length}</div>
                   </div>
                   {/* Satisfação */}
                   <div>
@@ -237,10 +238,10 @@ export default function MPCDentistPerformance({ dentists }: Props) {
 
                   <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">
-                      Convertidos ({d.convertedLeads.length})
+                      Retornos e Fechamentos ({d.convertedLeads.length})
                     </p>
                     {d.convertedLeads.length === 0 ? (
-                      <p className="text-xs text-emerald-700">Nenhum orçamento convertido ainda.</p>
+                      <p className="text-xs text-emerald-700">Nenhum orçamento com retorno/fechamento ainda.</p>
                     ) : (
                       <div className="max-h-56 overflow-y-auto space-y-1.5">
                         {d.convertedLeads.map((lead, idx) => (

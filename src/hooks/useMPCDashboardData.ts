@@ -73,13 +73,21 @@ function calculateMetrics(rawData: any): MPCMetrics {
   const isOperationalStatus = (status?: string) =>
     status === "attended" || status === "scheduled" || status === "confirmed";
 
-  // Produção: volume operacional (atendidos + agendados/confirmados) hoje vs meta diária
+  const isToday = (value?: string) => {
+    if (!value) return false;
+    const dt = new Date(value);
+    dt.setHours(0, 0, 0, 0);
+    return dt.getTime() === today.getTime();
+  };
+
+  // Produção: atendimentos totais = atendimentos operacionais + avaliações (orçamentos)
   const operationalToday = appointments.filter((a: any) => {
     if (!a.attendedAt && !a.createdAt) return false;
-    const att = new Date(a.attendedAt || a.createdAt || new Date());
-    att.setHours(0, 0, 0, 0);
-    return isOperationalStatus(a.status) && att.getTime() === today.getTime();
+    return isOperationalStatus(a.status) && isToday(a.attendedAt || a.createdAt);
   }).length;
+
+  const budgetsToday = budgets.filter((b: any) => isToday(b.budgetAt || b.createdAt)).length;
+  const totalAttendanceToday = operationalToday + budgetsToday;
 
   // Receita segue baseada em atendimentos concluídos
   const attendedToday = appointments.filter((a: any) => {
@@ -127,7 +135,7 @@ function calculateMetrics(rawData: any): MPCMetrics {
   // Meta Geral: combinação ponderada
   const metaGeralPct = productionMeta > 0
     ? Math.min(100, (
-        ((operationalToday / productionMeta) * 100) * 0.35 +
+        ((totalAttendanceToday / productionMeta) * 100) * 0.35 +
         (conversionRate || 0) * 0.35 +
         (avgSatisfaction > 0 ? (avgSatisfaction / 5) * 100 : 100) * 0.30
       ))
@@ -135,9 +143,9 @@ function calculateMetrics(rawData: any): MPCMetrics {
 
   return {
     producao: {
-      total: operationalToday,
+      total: totalAttendanceToday,
       meta: productionMeta || 1,
-      percentualMeta: productionMeta > 0 ? (operationalToday / productionMeta) * 100 : 0,
+      percentualMeta: productionMeta > 0 ? (totalAttendanceToday / productionMeta) * 100 : 0,
       tendencia: 0,
     },
     conversao: {
@@ -300,6 +308,12 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
   const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
   const monthAgo = new Date(now); monthAgo.setDate(monthAgo.getDate() - 30);
 
+  const inRange = (value: string | undefined, start?: Date) => {
+    const d = new Date(value || 0);
+    if (!start) return false;
+    return d >= start;
+  };
+
   return dentists.map((d: any) => {
     const dentistAppts = appointments.filter((a: any) => a.dentistId === d.id);
     const dentistBudgets = budgets.filter((b: any) => b.dentistId === d.id);
@@ -307,22 +321,20 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     const attendedAppts = dentistAppts.filter((a: any) => a.status === "attended");
 
     // Contagens por período
-    const totalAttended = productionAppts.length;
+    const totalAttended = productionAppts.length + dentistBudgets.length;
 
     const todayAttended = productionAppts.filter((a: any) => {
       const d = a.attendedAt || a.createdAt || "";
       return d.startsWith(todayStr);
-    }).length;
+    }).length + dentistBudgets.filter((b: any) => String(b.budgetAt || b.createdAt || "").startsWith(todayStr)).length;
 
     const weekAttended = productionAppts.filter((a: any) => {
-      const d = new Date(a.attendedAt || a.createdAt || 0);
-      return d >= weekAgo;
-    }).length;
+      return inRange(a.attendedAt || a.createdAt, weekAgo);
+    }).length + dentistBudgets.filter((b: any) => inRange(b.budgetAt || b.createdAt, weekAgo)).length;
 
     const monthAttended = productionAppts.filter((a: any) => {
-      const d = new Date(a.attendedAt || a.createdAt || 0);
-      return d >= monthAgo;
-    }).length;
+      return inRange(a.attendedAt || a.createdAt, monthAgo);
+    }).length + dentistBudgets.filter((b: any) => inRange(b.budgetAt || b.createdAt, monthAgo)).length;
 
     const budgetMap = new Map<string, any>();
     dentistBudgets.forEach((b: any) => {
@@ -355,10 +367,18 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     const attendedLeads = productionAppts
       .map((a: any) => ({
         name: a.patientName || "Sem nome",
-        date: String(a.attendedAt || "").slice(0, 10),
+        date: String(a.attendedAt || a.createdAt || "").slice(0, 10),
         phone: a.patientPhone,
         status: a.status,
       }))
+      .concat(
+        dentistBudgets.map((b: any) => ({
+          name: b.patientName || "Sem nome",
+          date: String(b.budgetAt || b.createdAt || "").slice(0, 10),
+          phone: b.patientPhone,
+          status: "budget",
+        }))
+      )
       .sort((x: any, y: any) => (y.date || "").localeCompare(x.date || ""));
 
     const budgetLeads = dentistBudgets
@@ -374,14 +394,18 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       ? Math.round((surveys.reduce((s: number, sv: any) => s + (sv.score || 0), 0) / surveys.length) * 10) / 10
       : 0;
 
-    // Trend 90d — conta volume operacional por dia
+    // Trend 90d — conta atendimentos totais (operacional + orçamentos)
     const trend90d = Array.from({ length: 90 }, (_, i) => {
       const target = new Date(now);
       target.setDate(target.getDate() - (89 - i));
       const dateStr = target.toISOString().split("T")[0];
-      return productionAppts.filter((a: any) =>
+      const opCount = productionAppts.filter((a: any) =>
         (a.attendedAt || a.createdAt || "").startsWith(dateStr)
       ).length;
+      const budgetCount = dentistBudgets.filter((b: any) =>
+        (b.budgetAt || b.createdAt || "").startsWith(dateStr)
+      ).length;
+      return opCount + budgetCount;
     });
 
     const dailyTarget = d.dailyTarget || 10;

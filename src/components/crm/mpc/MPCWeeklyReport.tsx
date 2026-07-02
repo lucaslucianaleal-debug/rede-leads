@@ -105,13 +105,8 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     return inRange(dt, prevStart, prevEnd);
   });
 
-  // Atendimentos totais = atendidos + agendados/confirmados (sem misturar orçamento).
-  const clinicAttendanceSet = new Set<string>();
-  attendedCurrent.forEach((a: any) => {
-    clinicAttendanceSet.add(`${entityKey(a.dentistId, a.patientId, a.patientName)}::${dayKey(a.attendedAt || a.createdAt)}`);
-  });
-
-  const clinicAttended = clinicAttendanceSet.size;
+  // Atendimentos totais = volume operacional + avaliações com orçamento.
+  const clinicAttended = attendedCurrent.length + budgetsCurrent.length;
   const clinicBudgets = budgetsCurrent.length;
   const dailyCapacity = dentists.reduce((sum, d) => sum + (d.dailyTarget || 10), 0);
   const clinicCapacity = dailyCapacity * days;
@@ -121,11 +116,9 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const d = new Date(start);
     d.setDate(start.getDate() + idx);
     const dateStr = toIsoDate(d);
-    const daySet = new Set<string>();
-    attendedCurrent
-      .filter((a: any) => String(a.attendedAt || a.createdAt || "").startsWith(dateStr))
-      .forEach((a: any) => daySet.add(entityKey(a.dentistId, a.patientId, a.patientName)));
-    const attended = daySet.size;
+    const attended =
+      attendedCurrent.filter((a: any) => String(a.attendedAt || a.createdAt || "").startsWith(dateStr)).length +
+      budgetsCurrent.filter((b: any) => String(b.budgetAt || b.createdAt || "").startsWith(dateStr)).length;
     return { date: dateStr, attended, capacity: dailyCapacity };
   }).filter((day) => day.capacity > 0 && day.attended < Math.ceil(day.capacity * 0.6));
 
@@ -145,12 +138,8 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const attendedOnly = dentistCurrent.filter((a: any) => a.status === "attended");
     const dentistBudgetsCurrent = budgetsCurrent.filter((b: any) => b.dentistId === d.id);
 
-    const attendedSet = new Set<string>();
-    dentistCurrent.forEach((a: any) => {
-      attendedSet.add(`${entityKey(d.id, a.patientId, a.patientName)}::${dayKey(a.attendedAt || a.createdAt)}`);
-    });
-
-    const attended = attendedSet.size;
+    const dentistBudgetsPrev = budgetsPrev.filter((b: any) => b.dentistId === d.id).length;
+    const attended = dentistCurrent.length + dentistBudgetsCurrent.length;
     const budgetSet = new Set<string>();
     dentistBudgetsCurrent.forEach((b: any) => {
       budgetSet.add(entityKey(d.id, b.patientId, b.patientName));
@@ -167,8 +156,9 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const conversionRate = budgetCount > 0 ? (convertedCount / budgetCount) * 100 : 0;
     const target = (d.dailyTarget || 10) * days;
 
+    const prevTotalAttendance = dentistPrevAttended + dentistBudgetsPrev;
     const trend: "up" | "down" | "stable" =
-      attended > dentistPrevAttended ? "up" : attended < dentistPrevAttended ? "down" : "stable";
+      attended > prevTotalAttendance ? "up" : attended < prevTotalAttendance ? "down" : "stable";
 
     const dentistSurveys = surveys.filter((s: any) => {
       if (!s.leadId) return false;
@@ -454,7 +444,7 @@ export default function MPCWeeklyReport({ report, store }: Props) {
         <section>
           <h3 className="font-semibold text-slate-900 mb-2">1. A clínica operou dentro da capacidade esperada?</h3>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Atendimentos totais no período: <strong>{filteredReport.clinicAttended}</strong></li>
+            <li>Atendimentos totais no período (atendimento + avaliação): <strong>{filteredReport.clinicAttended}</strong></li>
             <li>Orçamentos no período: <strong>{filteredReport.clinicBudgets ?? 0}</strong></li>
             <li>Convertidos (orçamento → atendimento): <strong>{filteredReport.clinicConverted ?? 0}</strong></li>
             <li>Taxa de conversão dos orçamentos: <strong>{Math.round(filteredReport.budgetConversionRate ?? 0)}%</strong></li>
@@ -467,6 +457,7 @@ export default function MPCWeeklyReport({ report, store }: Props) {
 
         <section>
           <h3 className="font-semibold text-slate-900 mb-2">2 e 3. Volume e conversão por dentista</h3>
+          <p className="text-xs text-slate-500 mb-2">Atendimentos totais = atendidos/agendados/confirmados + avaliações com orçamento.</p>
           <div className="overflow-x-auto">
             <table className="min-w-full border border-slate-200 rounded-lg text-xs md:text-sm">
               <thead className="bg-slate-50 text-slate-600">
