@@ -129,9 +129,10 @@ function calculateMetrics(rawData: any): MPCMetrics {
       .replace(/\s+/g, " ")
       .trim();
 
-  const entityKey = (dentistId: string, patientId?: string, patientName?: string) => {
-    if (patientId) return `${dentistId}::id::${patientId}`;
-    return `${dentistId}::name::${normalize(patientName || "")}`;
+  const normalizePhone = (v?: string) => String(v || "").replace(/\D/g, "");
+  const personKey = (patientId?: string, patientName?: string, patientPhone?: string) => {
+    if (patientId) return `id::${patientId}`;
+    return `np::${normalize(patientName || "")}::${normalizePhone(patientPhone)}`;
   };
 
   const isOperationalStatus = (status?: string) =>
@@ -171,14 +172,14 @@ function calculateMetrics(rawData: any): MPCMetrics {
   // Conversão real: orçamento -> atendimento (deduplicado por dentista + paciente)
   const budgetSet = new Set<string>();
   budgets.forEach((b: any) => {
-    budgetSet.add(entityKey(b.dentistId, b.patientId, b.patientName));
+    budgetSet.add(personKey(b.patientId, b.patientName, b.patientPhone));
   });
 
   const convertedSet = new Set<string>();
   appointments
     .filter((a: any) => a.status === "attended")
     .forEach((a: any) => {
-      const k = entityKey(a.dentistId, a.patientId, a.patientName);
+      const k = personKey(a.patientId, a.patientName, a.patientPhone);
       if (budgetSet.has(k)) convertedSet.add(k);
     });
 
@@ -364,9 +365,10 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
       .replace(/\s+/g, " ")
       .trim();
 
-  const entityKey = (dentistId: string, patientId?: string, patientName?: string) => {
-    if (patientId) return `${dentistId}::id::${patientId}`;
-    return `${dentistId}::name::${normalize(patientName || "")}`;
+  const normalizePhone = (v?: string) => String(v || "").replace(/\D/g, "");
+  const personKey = (patientId?: string, patientName?: string, patientPhone?: string) => {
+    if (patientId) return `id::${patientId}`;
+    return `np::${normalize(patientName || "")}::${normalizePhone(patientPhone)}`;
   };
 
   const isOperationalStatus = (status?: string) =>
@@ -388,6 +390,21 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     return d >= start && d <= end;
   };
 
+  const allAttendedByPerson = new Map<string, Array<any>>();
+  appointments
+    .filter((a: any) => a.status === "attended")
+    .forEach((a: any) => {
+      const key = personKey(a.patientId, a.patientName, a.patientPhone);
+      const arr = allAttendedByPerson.get(key) || [];
+      arr.push(a);
+      allAttendedByPerson.set(key, arr);
+    });
+
+  allAttendedByPerson.forEach((arr, key) => {
+    arr.sort((x: any, y: any) => String(x.attendedAt || x.createdAt || "").localeCompare(String(y.attendedAt || y.createdAt || "")));
+    allAttendedByPerson.set(key, arr);
+  });
+
   return dentists.map((d: any) => {
     const dentistStartDateObj = resolveDentistStartDate(d, appointments, budgets);
     const dentistStartDate = dentistStartDateObj ? dentistStartDateObj.toISOString().slice(0, 10) : undefined;
@@ -403,7 +420,6 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
     };
 
     const productionAppts = dentistAppts.filter((a: any) => isOperationalStatus(a.status) && isAfterStart(a.attendedAt || a.createdAt));
-    const attendedAppts = dentistAppts.filter((a: any) => a.status === "attended" && isAfterStart(a.attendedAt || a.createdAt));
     const dentistBudgetsAfterStart = dentistBudgets.filter((b: any) => isAfterStart(b.budgetAt || b.createdAt));
 
     // Contagens por período
@@ -424,28 +440,27 @@ function calculateDentistPerformance(rawData: any): DentistPerformance[] {
 
     const budgetMap = new Map<string, any>();
     dentistBudgetsAfterStart.forEach((b: any) => {
-      const k = entityKey(d.id, b.patientId, b.patientName);
+      const k = personKey(b.patientId, b.patientName, b.patientPhone);
       if (!budgetMap.has(k)) budgetMap.set(k, b);
     });
 
-    const attendedMap = new Map<string, any>();
-    attendedAppts.forEach((a: any) => {
-      const k = entityKey(d.id, a.patientId, a.patientName);
-      if (!attendedMap.has(k)) attendedMap.set(k, a);
-    });
-
-    const convertedLeads = Array.from(attendedMap.entries())
-      .filter(([k]) => budgetMap.has(k))
-      .map(([k, a]) => {
-        const b = budgetMap.get(k);
+    const convertedLeads = Array.from(budgetMap.entries())
+      .map(([k, b]) => {
+        const budgetDate = new Date(b?.budgetAt || b?.createdAt || 0);
+        const matched = (allAttendedByPerson.get(k) || []).find((a: any) => {
+          const attendedDate = new Date(a?.attendedAt || a?.createdAt || 0);
+          return !Number.isNaN(attendedDate.getTime()) && attendedDate >= budgetDate;
+        });
+        if (!matched) return null;
         return {
-          name: a.patientName || b?.patientName || "Sem nome",
-          patientId: a.patientId || b?.patientId,
-          budgetDate: String(b?.budgetAt || "").slice(0, 10),
-          attendedDate: String(a?.attendedAt || "").slice(0, 10),
-          phone: a.patientPhone || b?.patientPhone,
+          name: matched.patientName || b?.patientName || "Sem nome",
+          patientId: matched.patientId || b?.patientId,
+          budgetDate: String(b?.budgetAt || b?.createdAt || "").slice(0, 10),
+          attendedDate: String(matched?.attendedAt || matched?.createdAt || "").slice(0, 10),
+          phone: matched.patientPhone || b?.patientPhone,
         };
-      });
+      })
+      .filter(Boolean) as Array<{ name: string; patientId?: string; budgetDate?: string; attendedDate?: string; phone?: string }>;
 
     const conversionRate = budgetMap.size > 0
       ? (convertedLeads.length / budgetMap.size) * 100
@@ -746,9 +761,10 @@ function generateWeeklyReport(
       .replace(/\s+/g, " ")
       .trim();
 
-  const entityKey = (dentistId: string, patientId?: string, patientName?: string) => {
-    if (patientId) return `${dentistId}::id::${patientId}`;
-    return `${dentistId}::name::${normalize(patientName || "")}`;
+  const normalizePhone = (v?: string) => String(v || "").replace(/\D/g, "");
+  const personKey = (patientId?: string, patientName?: string, patientPhone?: string) => {
+    if (patientId) return `id::${patientId}`;
+    return `np::${normalize(patientName || "")}::${normalizePhone(patientPhone)}`;
   };
 
   const isOperationalStatus = (status?: string) =>
@@ -797,6 +813,11 @@ function generateWeeklyReport(
     };
   }).filter((d) => d.capacity > 0 && d.attended < Math.ceil(d.capacity * 0.6));
 
+  const attendedWeekByPerson = new Set<string>();
+  attendedWeek
+    .filter((a: any) => a.status === "attended")
+    .forEach((a: any) => attendedWeekByPerson.add(personKey(a.patientId, a.patientName, a.patientPhone)));
+
   const conversionTarget = 85;
   const dentistSummaries = dentistPerformance.map((d) => {
     const dentistRaw = (dentists.find((x: any) => x.id === d.id) || d) as any;
@@ -819,16 +840,13 @@ function generateWeeklyReport(
 
     const dentistBudgetSet = new Set<string>();
     dentistBudgetsWeek.forEach((b: any) => {
-      dentistBudgetSet.add(entityKey(d.id, b.patientId, b.patientName));
+      dentistBudgetSet.add(personKey(b.patientId, b.patientName, b.patientPhone));
     });
 
     const dentistConvertedSet = new Set<string>();
-    dentistApptsWeek
-      .filter((a: any) => a.status === "attended")
-      .forEach((a: any) => {
-        const key = entityKey(d.id, a.patientId, a.patientName);
-        if (dentistBudgetSet.has(key)) dentistConvertedSet.add(key);
-      });
+    dentistBudgetSet.forEach((key) => {
+      if (attendedWeekByPerson.has(key)) dentistConvertedSet.add(key);
+    });
 
     const conversionRate = isOrcamentista && dentistBudgetSet.size > 0
       ? (dentistConvertedSet.size / dentistBudgetSet.size) * 100
@@ -918,17 +936,17 @@ function generateWeeklyReport(
     return dt >= prevWeekStart && dt < prevWeekEnd;
   });
   const weekBudgetSet = new Set<string>();
-  currentWeekConvBase.forEach((b: any) => weekBudgetSet.add(entityKey(b.dentistId, b.patientId, b.patientName)));
+  currentWeekConvBase.forEach((b: any) => weekBudgetSet.add(personKey(b.patientId, b.patientName, b.patientPhone)));
   const weekConvertedSet = new Set<string>();
   attendedWeek
     .filter((a: any) => a.status === "attended")
     .forEach((a: any) => {
-      const key = entityKey(a.dentistId, a.patientId, a.patientName);
+      const key = personKey(a.patientId, a.patientName, a.patientPhone);
       if (weekBudgetSet.has(key)) weekConvertedSet.add(key);
     });
 
   const prevWeekBudgetSet = new Set<string>();
-  prevWeekConvBase.forEach((b: any) => prevWeekBudgetSet.add(entityKey(b.dentistId, b.patientId, b.patientName)));
+  prevWeekConvBase.forEach((b: any) => prevWeekBudgetSet.add(personKey(b.patientId, b.patientName, b.patientPhone)));
   const prevWeekAttended = appointments.filter((a: any) => {
     if (a.status !== "attended") return false;
     const dt = new Date(a.attendedAt || a.createdAt || 0);
@@ -936,7 +954,7 @@ function generateWeeklyReport(
   });
   const prevWeekConvertedSet = new Set<string>();
   prevWeekAttended.forEach((a: any) => {
-    const key = entityKey(a.dentistId, a.patientId, a.patientName);
+    const key = personKey(a.patientId, a.patientName, a.patientPhone);
     if (prevWeekBudgetSet.has(key)) prevWeekConvertedSet.add(key);
   });
 

@@ -73,9 +73,10 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
       .replace(/\s+/g, " ")
       .trim();
 
-  const entityKey = (dentistId: string, patientId?: string, patientName?: string) => {
-    if (patientId) return `${dentistId}::id::${patientId}`;
-    return `${dentistId}::name::${normalize(patientName || "")}`;
+  const normalizePhone = (v?: string) => String(v || "").replace(/\D/g, "");
+  const personKey = (patientId?: string, patientName?: string, patientPhone?: string) => {
+    if (patientId) return `id::${patientId}`;
+    return `np::${normalize(patientName || "")}::${normalizePhone(patientPhone)}`;
   };
 
   const dayKey = (isoLike?: string) => String(isoLike || "").slice(0, 10);
@@ -143,6 +144,10 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     return inRange(dt, start, end);
   });
   const completedCurrent = attendedCurrent.filter((a: any) => a.status === "attended");
+  const completedCurrentByPerson = new Set<string>();
+  completedCurrent.forEach((a: any) => {
+    completedCurrentByPerson.add(personKey(a.patientId, a.patientName, a.patientPhone));
+  });
 
   const budgetsCurrent = budgets.filter((b: any) => {
     const dt = new Date(b.budgetAt || 0);
@@ -204,7 +209,6 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
       return a.dentistId === d.id && inRange(dt, prevStartEffective, prevEnd);
     }).length;
 
-    const attendedOnly = dentistCurrent.filter((a: any) => a.status === "attended");
     const dentistBudgetsCurrent = budgetsCurrent.filter((b: any) => {
       if (b.dentistId !== d.id) return false;
       const dt = new Date(b.budgetAt || b.createdAt || 0);
@@ -219,12 +223,11 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const attended = dentistCurrent.length + dentistBudgetsCurrent.length;
     const budgetSet = new Set<string>();
     dentistBudgetsCurrent.forEach((b: any) => {
-      budgetSet.add(entityKey(d.id, b.patientId, b.patientName));
+      budgetSet.add(personKey(b.patientId, b.patientName, b.patientPhone));
     });
     const convertedSet = new Set<string>();
-    attendedOnly.forEach((a: any) => {
-      const k = entityKey(d.id, a.patientId, a.patientName);
-      if (budgetSet.has(k)) convertedSet.add(k);
+    budgetSet.forEach((k) => {
+      if (completedCurrentByPerson.has(k)) convertedSet.add(k);
     });
 
     const budgetCount = budgetSet.size;
@@ -304,12 +307,12 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     : 0;
   const convPrevByDentist = dentists.filter((d: any) => d.isOrcamentista !== false).map((d: any) => {
     const dbPrev = budgetsPrev.filter((b: any) => b.dentistId === d.id);
-    const daPrev = attendedPrev.filter((a: any) => a.dentistId === d.id && a.status === "attended");
+    const daPrev = attendedPrev.filter((a: any) => a.status === "attended");
     const bSet = new Set<string>();
-    dbPrev.forEach((b: any) => bSet.add(entityKey(d.id, b.patientId, b.patientName)));
+    dbPrev.forEach((b: any) => bSet.add(personKey(b.patientId, b.patientName, b.patientPhone)));
     const cSet = new Set<string>();
     daPrev.forEach((a: any) => {
-      const k = entityKey(d.id, a.patientId, a.patientName);
+      const k = personKey(a.patientId, a.patientName, a.patientPhone);
       if (bSet.has(k)) cSet.add(k);
     });
     return bSet.size > 0 ? (cSet.size / bSet.size) * 100 : 0;
@@ -349,14 +352,14 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   }
 
   const allBudgetSet = new Set<string>();
-  budgetsCurrent.forEach((b: any) => allBudgetSet.add(entityKey(b.dentistId, b.patientId, b.patientName)));
+  budgetsCurrent.forEach((b: any) => allBudgetSet.add(personKey(b.patientId, b.patientName, b.patientPhone)));
   const allConvertedSet = new Set<string>();
   completedCurrent.forEach((a: any) => {
-    const k = entityKey(a.dentistId, a.patientId, a.patientName);
+    const k = personKey(a.patientId, a.patientName, a.patientPhone);
     if (allBudgetSet.has(k)) allConvertedSet.add(k);
   });
   const pendingBudgetPatients = budgetsCurrent
-    .filter((b: any) => !allConvertedSet.has(entityKey(b.dentistId, b.patientId, b.patientName)))
+    .filter((b: any) => !allConvertedSet.has(personKey(b.patientId, b.patientName, b.patientPhone)))
     .map((b: any) => String(b.patientName || ""))
     .filter(Boolean)
     .slice(0, 20);
