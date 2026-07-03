@@ -145,8 +145,14 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   });
   const completedCurrent = attendedCurrent.filter((a: any) => a.status === "attended");
   const completedCurrentByPerson = new Set<string>();
+  const firstCompletedDateByPerson = new Map<string, Date>();
   completedCurrent.forEach((a: any) => {
-    completedCurrentByPerson.add(personKey(a.patientId, a.patientName, a.patientPhone));
+    const key = personKey(a.patientId, a.patientName, a.patientPhone);
+    const dt = new Date(a.attendedAt || a.createdAt || 0);
+    if (Number.isNaN(dt.getTime())) return;
+    completedCurrentByPerson.add(key);
+    const prev = firstCompletedDateByPerson.get(key);
+    if (!prev || dt < prev) firstCompletedDateByPerson.set(key, dt);
   });
 
   const budgetsCurrent = budgets.filter((b: any) => {
@@ -222,12 +228,44 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     }).length;
     const attended = dentistCurrent.length + dentistBudgetsCurrent.length;
     const budgetSet = new Set<string>();
-    dentistBudgetsCurrent.forEach((b: any) => {
-      budgetSet.add(personKey(b.patientId, b.patientName, b.patientPhone));
-    });
+    const budgetDateByPerson = new Map<string, Date>();
+    budgets
+      .filter((b: any) => {
+        if (b.dentistId !== d.id) return false;
+        const dt = new Date(b.budgetAt || b.createdAt || 0);
+        return inRange(dt, startEffective, end);
+      })
+      .forEach((b: any) => {
+        const key = personKey(b.patientId, b.patientName, b.patientPhone);
+        const dt = new Date(b.budgetAt || b.createdAt || 0);
+        if (Number.isNaN(dt.getTime())) return;
+        budgetSet.add(key);
+        const prev = budgetDateByPerson.get(key);
+        if (!prev || dt < prev) budgetDateByPerson.set(key, dt);
+      });
+
+    budgets
+      .filter((b: any) => {
+        if (b.dentistId !== d.id) return false;
+        const dt = new Date(b.budgetAt || b.createdAt || 0);
+        return dt <= end;
+      })
+      .forEach((b: any) => {
+        const key = personKey(b.patientId, b.patientName, b.patientPhone);
+        const dt = new Date(b.budgetAt || b.createdAt || 0);
+        if (Number.isNaN(dt.getTime())) return;
+        budgetSet.add(key);
+        const prev = budgetDateByPerson.get(key);
+        if (!prev || dt < prev) budgetDateByPerson.set(key, dt);
+      });
+
     const convertedSet = new Set<string>();
     budgetSet.forEach((k) => {
-      if (completedCurrentByPerson.has(k)) convertedSet.add(k);
+      if (!completedCurrentByPerson.has(k)) return;
+      const budgetDate = budgetDateByPerson.get(k);
+      const attendedDate = firstCompletedDateByPerson.get(k);
+      if (!budgetDate || !attendedDate) return;
+      if (attendedDate >= budgetDate) convertedSet.add(k);
     });
 
     const budgetCount = budgetSet.size;
@@ -306,14 +344,29 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     ? dentistsForConversion.reduce((acc, d) => acc + (d.conversionRate || 0), 0) / dentistsForConversion.length
     : 0;
   const convPrevByDentist = dentists.filter((d: any) => d.isOrcamentista !== false).map((d: any) => {
-    const dbPrev = budgetsPrev.filter((b: any) => b.dentistId === d.id);
+    const dbPrev = budgets.filter((b: any) => {
+      if (b.dentistId !== d.id) return false;
+      const dt = new Date(b.budgetAt || b.createdAt || 0);
+      return dt < prevEnd;
+    });
     const daPrev = attendedPrev.filter((a: any) => a.status === "attended");
     const bSet = new Set<string>();
-    dbPrev.forEach((b: any) => bSet.add(personKey(b.patientId, b.patientName, b.patientPhone)));
+    const bDateMap = new Map<string, Date>();
+    dbPrev.forEach((b: any) => {
+      const key = personKey(b.patientId, b.patientName, b.patientPhone);
+      const dt = new Date(b.budgetAt || b.createdAt || 0);
+      if (Number.isNaN(dt.getTime())) return;
+      bSet.add(key);
+      const prev = bDateMap.get(key);
+      if (!prev || dt < prev) bDateMap.set(key, dt);
+    });
     const cSet = new Set<string>();
     daPrev.forEach((a: any) => {
       const k = personKey(a.patientId, a.patientName, a.patientPhone);
-      if (bSet.has(k)) cSet.add(k);
+      const attendedDate = new Date(a.attendedAt || a.createdAt || 0);
+      const budgetDate = bDateMap.get(k);
+      if (!budgetDate || Number.isNaN(attendedDate.getTime())) return;
+      if (attendedDate >= budgetDate && bSet.has(k)) cSet.add(k);
     });
     return bSet.size > 0 ? (cSet.size / bSet.size) * 100 : 0;
   });
@@ -352,14 +405,34 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   }
 
   const allBudgetSet = new Set<string>();
-  budgetsCurrent.forEach((b: any) => allBudgetSet.add(personKey(b.patientId, b.patientName, b.patientPhone)));
+  const allBudgetDateByPerson = new Map<string, Date>();
+  budgets
+    .filter((b: any) => {
+      const dt = new Date(b.budgetAt || b.createdAt || 0);
+      return dt <= end;
+    })
+    .forEach((b: any) => {
+      const key = personKey(b.patientId, b.patientName, b.patientPhone);
+      const dt = new Date(b.budgetAt || b.createdAt || 0);
+      if (Number.isNaN(dt.getTime())) return;
+      allBudgetSet.add(key);
+      const prev = allBudgetDateByPerson.get(key);
+      if (!prev || dt < prev) allBudgetDateByPerson.set(key, dt);
+    });
   const allConvertedSet = new Set<string>();
   completedCurrent.forEach((a: any) => {
     const k = personKey(a.patientId, a.patientName, a.patientPhone);
-    if (allBudgetSet.has(k)) allConvertedSet.add(k);
+    const attendedDate = new Date(a.attendedAt || a.createdAt || 0);
+    const budgetDate = allBudgetDateByPerson.get(k);
+    if (budgetDate && !Number.isNaN(attendedDate.getTime()) && attendedDate >= budgetDate && allBudgetSet.has(k)) allConvertedSet.add(k);
   });
   const pendingBudgetPatients = budgetsCurrent
-    .filter((b: any) => !allConvertedSet.has(personKey(b.patientId, b.patientName, b.patientPhone)))
+    .filter((b: any) => {
+      const key = personKey(b.patientId, b.patientName, b.patientPhone);
+      const bDate = new Date(b.budgetAt || b.createdAt || 0);
+      if (Number.isNaN(bDate.getTime()) || bDate > end) return false;
+      return !allConvertedSet.has(key);
+    })
     .map((b: any) => String(b.patientName || ""))
     .filter(Boolean)
     .slice(0, 20);
