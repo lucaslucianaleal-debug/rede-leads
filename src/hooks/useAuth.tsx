@@ -79,12 +79,18 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
           const profile = ud.exists() ? ud.data() : null;
           setUserProfile(profile);
           if (profile) {
+            const profileClinics = Array.isArray(profile.clinicIds)
+              ? profile.clinicIds.filter(Boolean)
+              : Array.isArray(profile.clinics)
+                ? profile.clinics.filter(Boolean)
+                : [];
+            const singleClinic = profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null);
             if (profile.role === "admin" || profile.role === "cliente") {
-              const val = selectedClinicState || currentClinic || profile.clinicId || null;
+              const val = selectedClinicState || currentClinic || singleClinic || null;
               persistClinic(val);
               console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val, "selectedClinic:", selectedClinicState);
             } else {
-              const clinicFromProfile = profile.clinicId || (profile.clinicIds && profile.clinicIds[0]) || null;
+              const clinicFromProfile = singleClinic;
               persistClinic(clinicFromProfile);
               console.log("[AuthProvider] user currentClinic ->", clinicFromProfile);
             }
@@ -141,7 +147,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       const singleClinic = profile ? (profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null)) : null;
       if (profile) {
         if (profile.role === "admin" || profile.role === "cliente") {
-          const val = clinic ?? selectedClinicState ?? currentClinic ?? profile.clinicId ?? null;
+          const val = clinic ?? selectedClinicState ?? currentClinic ?? singleClinic ?? null;
           persistClinic(val);
           console.log(`[AuthProvider][login] ${profile.role} set currentClinic ->`, val);
         } else {

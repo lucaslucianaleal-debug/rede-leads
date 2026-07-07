@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useClinics } from "@/hooks/useClinics";
 import { OnboardingModal } from "@/components/OnboardingModal";
@@ -16,17 +16,7 @@ export default function Landing() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
-  const [localClinic, setLocalClinic] = useState("");
-
-  useEffect(() => {
-    if (!localClinic && clinics.length > 0) {
-      setLocalClinic(clinics[0].id);
-      setSelectedClinic(clinics[0].id);
-    }
-  }, [clinics, localClinic, setSelectedClinic]);
-
   const handleOnboardingComplete = async (clinicId: string) => {
-    setLocalClinic(clinicId);
     setSelectedClinic(clinicId);
     await refetchClinics();
   };
@@ -44,10 +34,9 @@ export default function Landing() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = resolveEmail(username);
-    const clinic = localClinic || null;
     setLoading(true);
     try {
-      await (login as any)(email, password, clinic);
+      await (login as any)(email, password, null);
       toast.success("Bem-vindo!");
     } catch {
       toast.error(error || "Usuário ou senha incorretos.");
@@ -130,30 +119,6 @@ export default function Landing() {
               <CardContent>
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Clínica</Label>
-                    <select
-                      value={localClinic}
-                      onChange={(e) => {
-                        setLocalClinic(e.target.value);
-                        setSelectedClinic(e.target.value || null);
-                      }}
-                      className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2"
-                      disabled={clinicsLoading}
-                    >
-                      {clinicsLoading
-                        ? <option value="">Carregando clínicas...</option>
-                        : clinics.length === 0
-                          ? <option value="">Nenhuma clínica cadastrada</option>
-                          : clinics.map((clinic) => (
-                              <option key={clinic.id} value={clinic.id}>
-                                {clinic.name}
-                              </option>
-                            ))
-                      }
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
                     <Label htmlFor="username" className="text-slate-300">Usuário ou E-mail</Label>
                     <Input
                       id="username"
@@ -181,7 +146,7 @@ export default function Landing() {
                   <Button
                     type="submit"
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2"
-                    disabled={loading || clinicsLoading || clinics.length === 0}
+                    disabled={loading}
                   >
                     {loading ? "Entrando..." : "Entrar"}
                   </Button>
