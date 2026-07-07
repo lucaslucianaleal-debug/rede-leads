@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import SorteioCupons from "./pages/SorteioCupons";
 import VisitaComercial from "./pages/VisitaComercial";
 import Promotora from "./pages/Promotora";
+import MPCToolPage from "./pages/MPCToolPage";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
+      <Route path="/mpc-tool" element={<MPCToolPage />} />
       <Route path="/sorteio-cupons" element={<SorteioCupons />} />
       <Route path="/visita-comercial" element={<VisitaComercial />} />
       <Route path="/promotora" element={<Promotora />} />
