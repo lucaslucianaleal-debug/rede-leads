@@ -92,7 +92,7 @@ export function useCRMUsers() {
           ? `Usuário "${username}" já existe`
           : err.message || "Erro ao criar usuário";
       setError(errMsg);
-      throw err;
+      throw new Error(errMsg);
     } finally {
       setLoading(false);
     }

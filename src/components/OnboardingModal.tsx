@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { auth } from "@/lib/firebase";
+import { fetchSignInMethodsForEmail } from "firebase/auth";
 
 interface OnboardingModalProps {
   open: boolean;
@@ -39,6 +41,15 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
   const loading = clinicsLoading || usersLoading;
   const isCorretorModule = newClinicModule === "corretor";
 
+  const resolveEmail = (input: string): string => {
+    const trimmed = input.trim().toLowerCase();
+    const atIndex = trimmed.indexOf("@");
+    if (atIndex > 0 && trimmed.indexOf(".", atIndex) > atIndex) {
+      return trimmed;
+    }
+    return `${trimmed}@redeleads.app`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -61,6 +72,13 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
     }
 
     try {
+      const email = resolveEmail(username);
+      const methods = await fetchSignInMethodsForEmail(auth, email);
+      if (methods.length > 0) {
+        toast.error("Este usuário/e-mail já existe. Use outro login ou recupere a conta.");
+        return;
+      }
+
       // Create clinic first
       const clinic = await createClinic({
         id: newClinicId,
@@ -78,7 +96,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
       onComplete(clinic.id);
       onClose();
     } catch (err: any) {
-      toast.error(err.message || "Erro ao criar clínica e usuário");
+      toast.error(err.message || "Erro ao criar cadastro. Verifique se o usuário já existe.");
     }
   };
 
