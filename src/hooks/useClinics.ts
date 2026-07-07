@@ -76,12 +76,14 @@ export function useClinics() {
       const clinic: ClinicRecord = {
         id: clinicId,
         name: input.name.trim(),
-        address: input.address?.trim() || undefined,
-        phone: input.phone?.trim() || undefined,
-        color: input.color?.trim() || undefined,
-        logoUrl: input.logoUrl?.trim() || undefined,
+        ...(input.address?.trim() ? { address: input.address.trim() } : {}),
+        ...(input.phone?.trim() ? { phone: input.phone.trim() } : {}),
+        ...(input.color?.trim() ? { color: input.color.trim() } : {}),
+        ...(input.logoUrl?.trim() ? { logoUrl: input.logoUrl.trim() } : {}),
         module: input.module || "clinica",
-        customFields: input.customFields || undefined,
+        ...(input.customFields && Object.keys(input.customFields).length > 0
+          ? { customFields: input.customFields }
+          : {}),
         createdAt: new Date().toISOString(),
         createdBy: auth.currentUser?.uid || "system",
       };
