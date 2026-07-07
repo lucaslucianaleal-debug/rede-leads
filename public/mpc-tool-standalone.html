@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>MÉTODO MPC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0D10;
+  --panel:#12161B;
+  --panel-alt:#171C22;
+  --border:#232A31;
+  --text:#E7ECEF;
+  --text-dim:#8B98A3;
+  --accent:#1FB6A6;
+  --accent-dim:#134D48;
+  --accent-2:#5B8CFF;
+  --warn:#E3A63E;
+  --danger:#E2574C;
+  --ok:#35C46B;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;}
+h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+.mono{font-family:'IBM Plex Mono',monospace;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+#app{display:grid;grid-template-columns:220px 1fr;grid-template-rows:auto 1fr;height:100vh;grid-template-areas:"side top" "side main";}
+.topbar{grid-area:top;background:var(--panel);border-bottom:1px solid var(--border);padding:14px 22px;display:flex;flex-direction:column;gap:10px;}
+.topbar-row1{display:flex;align-items:center;justify-content:space-between;gap:20px;}
+.brand-mini{display:flex;align-items:center;gap:10px;}
+.pulse-strip{display:flex;gap:3px;align-items:center;}
+.pulse-seg{width:26px;height:8px;border-radius:2px;background:var(--border);}
+.pulse-seg.ok{background:var(--ok);}
+.pulse-seg.warn{background:var(--warn);}
+.pulse-seg.danger{background:var(--danger);}
+.pulse-seg.idle{background:var(--border);}
+.kpis{display:flex;gap:0;overflow-x:auto;}
+.kpi{padding:6px 18px;border-right:1px solid var(--border);min-width:110px;}
+.kpi:first-child{padding-left:0;}
+.kpi-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+.kpi-value{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;}
+.kpi-value.accent{color:var(--accent);}
+.kpi-value.editable{cursor:text;}
+.kpi input, .kpi-editable-text{background:transparent;border:none;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;width:100%;padding:0;}
+.kpi input:focus{outline:none;border-bottom:1px solid var(--accent);}
+
+.sidebar{grid-area:side;background:var(--panel);border-right:1px solid var(--border);padding:18px 12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;}
+.sidebar .logo{font-size:15px;font-weight:700;padding:4px 10px 16px 10px;letter-spacing:.02em;}
+.sidebar .logo span{color:var(--accent);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;color:var(--text-dim);cursor:pointer;text-decoration:none;font-size:12.5px;}
+.nav-item:hover{background:var(--panel-alt);color:var(--text);}
+.nav-item.active{background:var(--accent-dim);color:var(--accent);font-weight:600;}
+.nav-item svg{width:15px;height:15px;flex-shrink:0;}
+.nav-divider{height:1px;background:var(--border);margin:10px 6px;}
+
+main{grid-area:main;overflow-y:auto;padding:24px 28px 60px 28px;}
+.view-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;}
+.view-header h2{margin:0 0 4px 0;font-size:20px;}
+.view-header p{margin:0;color:var(--text-dim);font-size:12.5px;}
+.view-actions{display:flex;gap:8px;}
+
+.btn{background:var(--panel-alt);border:1px solid var(--border);color:var(--text);padding:7px 13px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#06201D;font-weight:600;}
+.btn.primary:hover{filter:brightness(1.1);color:#06201D;}
+.btn-add{margin-top:8px;background:transparent;border:1px dashed var(--border);color:var(--text-dim);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;width:100%;text-align:left;}
+.btn-add:hover{border-color:var(--accent);color:var(--accent);}
+
+.view-tabs{display:flex;gap:4px;margin-bottom:16px;background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:3px;width:fit-content;}
+.view-tab{padding:6px 14px;border-radius:5px;cursor:pointer;color:var(--text-dim);font-size:12px;}
+.view-tab.active{background:var(--accent-dim);color:var(--accent);font-weight:600;}
+
+/* Dashboard grid */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+.dash-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:.15s;position:relative;overflow:hidden;}
+.dash-card:hover{border-color:var(--accent);transform:translateY(-1px);}
+.dash-card .accent-bar{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);}
+.dash-card h3{font-size:13px;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;}
+.dash-card h3 svg{width:15px;height:15px;color:var(--accent);}
+.dash-card .metric{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;margin-bottom:2px;}
+.dash-card .sub{color:var(--text-dim);font-size:11px;}
+
+/* Table */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;}
+table.dtable{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.dtable th{text-align:left;background:var(--panel-alt);color:var(--text-dim);font-weight:600;padding:9px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.dtable td{padding:4px 8px;border-bottom:1px solid var(--border);vertical-align:middle;background:var(--panel);}
+table.dtable tr:hover td{background:var(--panel-alt);}
+table.dtable input, table.dtable select, table.dtable textarea{background:transparent;border:1px solid transparent;color:var(--text);font-family:inherit;font-size:12.5px;padding:5px 6px;border-radius:4px;width:100%;min-width:90px;}
+table.dtable input:hover, table.dtable select:hover{border-color:var(--border);}
+table.dtable input:focus, table.dtable select:focus, table.dtable textarea:focus{outline:none;border-color:var(--accent);background:var(--panel-alt);}
+.col-actions{width:34px;text-align:center;}
+.icon-btn{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:13px;padding:4px;border-radius:4px;}
+.icon-btn:hover{color:var(--danger);background:rgba(226,87,76,.1);}
+.icon-btn.link{color:var(--accent-2);}
+.icon-btn.link:hover{background:rgba(91,140,255,.1);color:var(--accent-2);}
+
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:600;white-space:nowrap;}
+.badge.b-gray{background:#2A313A;color:var(--text-dim);}
+.badge.b-blue{background:rgba(91,140,255,.15);color:var(--accent-2);}
+.badge.b-amber{background:rgba(227,166,62,.15);color:var(--warn);}
+.badge.b-green{background:rgba(53,196,107,.15);color:var(--ok);}
+.badge.b-teal{background:rgba(31,182,166,.15);color:var(--accent);}
+.badge.b-red{background:rgba(226,87,76,.15);color:var(--danger);}
+
+/* Kanban */
+.kanban{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;}
+.kanban-col{background:var(--panel);border:1px solid var(--border);border-radius:10px;min-width:250px;flex:1;padding:10px;}
+.kanban-col h4{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);margin:2px 6px 10px 6px;display:flex;justify-content:space-between;}
+.kanban-card{background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;cursor:grab;font-size:12px;}
+.kanban-card:hover{border-color:var(--accent);}
+.kanban-card .kc-title{font-weight:600;margin-bottom:6px;}
+.kanban-card .kc-meta{color:var(--text-dim);font-size:10.5px;display:flex;justify-content:space-between;}
+.kanban-col.dragover{border-color:var(--accent);background:var(--accent-dim);}
+
+/* Week calendar */
+.week-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+.day-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.day-card h4{margin:0 0 2px 0;font-size:13px;}
+.day-card .day-date{color:var(--text-dim);font-size:10.5px;margin-bottom:10px;}
+.day-row{display:flex;justify-content:space-between;font-size:11.5px;padding:5px 0;border-top:1px solid var(--border);}
+.day-row .lbl{color:var(--text-dim);}
+
+/* Timeline */
+.timeline{border-left:2px solid var(--border);margin-left:8px;}
+.tl-item{position:relative;padding:0 0 20px 22px;}
+.tl-item::before{content:'';position:absolute;left:-7px;top:2px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);}
+.tl-date{font-size:10.5px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;}
+.tl-title{font-weight:600;font-size:13px;margin:2px 0 4px 0;}
+.tl-sub{color:var(--text-dim);font-size:11.5px;}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100;}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;width:640px;max-width:92vw;max-height:88vh;overflow-y:auto;padding:26px;}
+.modal h2{margin-top:0;}
+.field-row{margin-bottom:14px;}
+.field-row label{display:block;font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
+.field-row input, .field-row select, .field-row textarea{width:100%;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);padding:9px 10px;border-radius:6px;font-family:inherit;font-size:12.5px;}
+.field-row textarea{min-height:60px;resize:vertical;}
+.field-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-close{position:absolute;top:20px;right:24px;background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;}
+.scene-block{border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--panel-alt);}
+.scene-block h5{margin:0 0 8px 0;color:var(--accent);font-size:11.5px;text-transform:uppercase;}
+
+.checklist{list-style:none;padding:0;margin:0;}
+.checklist li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+.checklist input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:20px;}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;}
+.stat-card .stat-label{color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+.stat-card .stat-value{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:600;}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.bar-row .bar-label{width:150px;font-size:11.5px;color:var(--text-dim);flex-shrink:0;}
+.bar-track{flex:1;background:var(--panel-alt);border-radius:4px;height:9px;overflow:hidden;}
+.bar-fill{height:100%;background:var(--accent);border-radius:4px;}
+.bar-val{width:60px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);}
+
+.empty{color:var(--text-dim);font-size:12.5px;padding:30px;text-align:center;border:1px dashed var(--border);border-radius:10px;}
+.link-text{color:var(--accent-2);cursor:pointer;text-decoration:underline;}
+
+/* ============ v1.1 additions ============ */
+.pulse-text{color:var(--text-dim);font-size:10.5px;}
+.pulse-alert{cursor:pointer;}
+.pulse-alert:hover{filter:brightness(1.2);}
+
+.context-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+.context-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.context-card.attn{border-color:var(--danger);}
+.context-card .ctx-label{color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+.context-card .ctx-value{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;line-height:1.2;}
+.context-card .ctx-sub{color:var(--text-dim);font-size:11px;margin-top:3px;}
+.context-card.ok .ctx-value{color:var(--ok);}
+.context-card.attn .ctx-value{color:var(--danger);}
+.context-card.clickable{cursor:pointer;}
+.context-card.clickable:hover{border-color:var(--accent);}
+
+.priority-section{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;}
+.priority-section h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);margin:0 0 12px 0;}
+.priority-row{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;background:var(--panel-alt);margin-bottom:7px;font-size:12.5px;}
+.priority-row.overdue{border-left:3px solid var(--danger);}
+.priority-row .pr-left{display:flex;align-items:center;gap:10px;}
+.priority-row .pr-done-btn{background:var(--accent-dim);color:var(--accent);border:none;padding:5px 11px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;}
+.priority-row .pr-done-btn:hover{filter:brightness(1.2);}
+
+.widget-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:20px;}
+.widget-card{background:var(--panel-alt);border:1px solid var(--border);border-radius:9px;padding:12px 14px;}
+.widget-card .w-label{color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
+.widget-card .w-value{font-size:12.5px;font-weight:600;line-height:1.35;}
+.widget-card .w-sub{color:var(--text-dim);font-size:10.5px;margin-top:2px;}
+
+.dash-card .insight{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);line-height:1.5;}
+.dash-card .insight .alert-line{color:var(--danger);}
+.dash-card{min-height:150px;display:flex;flex-direction:column;}
+
+.pipeline{display:flex;align-items:stretch;gap:6px;margin-bottom:18px;}
+.pipeline-step{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 10px;text-align:center;position:relative;}
+.pipeline-step .p-count{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;}
+.pipeline-step .p-label{color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;margin-top:4px;}
+.pipeline-arrow{align-self:center;color:var(--text-dim);font-size:16px;}
+
+tr.row-overdue td{background:rgba(226,87,76,.06);}
+tr.row-overdue td:first-child{box-shadow:inset 3px 0 0 var(--danger);}
+
+.day-card.is-today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.day-card.is-today h4::after{content:' · hoje';color:var(--accent);font-size:10px;font-weight:400;}
+
+/* Meta do Mês banner */
+.meta-banner{display:flex;align-items:center;gap:16px;padding:10px 22px;background:linear-gradient(90deg, var(--accent-dim), transparent);border-bottom:1px solid var(--border);}
+.meta-label{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--accent);}
+.meta-sub{font-size:10px;color:var(--text-dim);}
+.meta-bar-wrap{flex:1;max-width:340px;}
+.meta-bar-track{background:var(--panel-alt);border-radius:5px;height:10px;overflow:hidden;}
+.meta-bar-fill{height:100%;background:linear-gradient(90deg, var(--accent), var(--ok));border-radius:5px;transition:width .3s;}
+.meta-count{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--text);white-space:nowrap;}
+.meta-semaforo{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap;}
+.meta-semaforo.ok{background:rgba(53,196,107,.15);color:var(--ok);}
+.meta-semaforo.warn{background:rgba(227,166,62,.15);color:var(--warn);}
+.meta-semaforo.danger{background:rgba(226,87,76,.15);color:var(--danger);}
+
+/* Saúde da Semana */
+.week-health{display:flex;align-items:center;gap:14px;padding:8px 22px;border-bottom:1px solid var(--border);background:var(--panel);}
+.wh-bar-track{width:140px;background:var(--panel-alt);border-radius:5px;height:8px;overflow:hidden;}
+.wh-bar-fill{height:100%;background:var(--accent);border-radius:5px;transition:width .3s;}
+.wh-pct{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;color:var(--accent);width:34px;}
+.wh-days{display:flex;gap:10px;}
+.wh-day{font-size:11px;color:var(--text-dim);}
+.wh-day.done{color:var(--ok);font-weight:600;}
+.wh-sub{color:var(--text-dim);font-size:10.5px;margin-left:auto;}
+
+/* Campanha KPI card */
+.campanha-kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:18px;}
+.campanha-kpi h3{font-size:13px;margin:0 0 12px 0;display:flex;align-items:center;gap:8px;}
+.campanha-kpi .ck-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.ck-metric .ck-label{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+.ck-metric .ck-value{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;margin-bottom:6px;}
+.ck-metric .ck-track{background:var(--panel-alt);border-radius:4px;height:7px;overflow:hidden;}
+.ck-metric .ck-fill{height:100%;background:var(--accent-2);border-radius:4px;}
+
+/* Timeline do dia */
+.day-timeline{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:18px;}
+.day-timeline h3{font-size:13px;margin:0 0 12px 0;}
+.dt-row{display:flex;align-items:center;gap:12px;padding:7px 0;border-left:2px solid var(--border);padding-left:14px;position:relative;}
+.dt-row::before{content:'';position:absolute;left:-6px;top:12px;width:10px;height:10px;border-radius:50%;background:var(--border);}
+.dt-row.done::before{background:var(--ok);}
+.dt-time{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);width:44px;}
+.dt-label{font-size:12.5px;}
+.dt-row.done .dt-label{color:var(--ok);}
+
+/* Painel de Gargalos */
+.gargalo-panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:18px;}
+.gargalo-panel h3{font-size:13px;margin:0 0 10px 0;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;}
+.gargalo-main{display:flex;align-items:center;gap:12px;}
+.gargalo-arrow{font-size:18px;color:var(--danger);}
+.gargalo-label{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;}
+.gargalo-detail{color:var(--text-dim);font-size:11.5px;margin-top:2px;}
+
+.selo-toggle{border:1px solid var(--border);border-radius:12px;padding:2px 8px;}
+
+/* v1.3: Índice MPC */
+.score-mpc-card{background:linear-gradient(135deg, var(--panel), var(--accent-dim));border:1px solid var(--border);border-radius:12px;padding:18px 22px;margin-bottom:18px;}
+.score-label{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.score-value{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;line-height:1;}
+.score-value.ok{color:var(--ok);} .score-value.warn{color:var(--warn);} .score-value.danger{color:var(--danger);}
+.score-status{font-size:12px;font-weight:600;margin-top:2px;margin-bottom:12px;}
+.score-status.ok{color:var(--ok);} .score-status.warn{color:var(--warn);} .score-status.danger{color:var(--danger);}
+.score-breakdown{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 16px;margin-top:6px;}
+.sb-row{display:flex;align-items:center;gap:8px;}
+.sb-label{width:110px;font-size:10.5px;color:var(--text-dim);flex-shrink:0;}
+.sb-track{flex:1;background:rgba(255,255,255,.08);border-radius:4px;height:6px;overflow:hidden;}
+.sb-fill{height:100%;background:var(--accent);border-radius:4px;}
+.sb-val{width:28px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-dim);}
+
+/* v1.3: Painel Executivo */
+.executivo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;}
+.exec-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center;}
+.exec-label{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.exec-value{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;}
+.exec-value.ok{color:var(--ok);} .exec-value.warn{color:var(--warn);} .exec-value.danger{color:var(--danger);} .exec-value.gray{color:var(--text-dim);}
+
+/* v1.3: Centro de Decisão */
+.decisao-panel{background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:16px 18px;margin-bottom:18px;}
+.decisao-panel h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);margin:0 0 10px 0;}
+.decisao-line{font-size:13px;margin-bottom:8px;line-height:1.5;}
+.decisao-sugestao{font-size:13px;color:var(--accent);font-weight:600;margin-bottom:6px;}
+.decisao-impacto{font-size:11.5px;color:var(--text-dim);}
+
+/* v1.3: Jornada Completa */
+.jornada-panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:18px;}
+.jornada-panel h3{font-size:13px;margin:0 0 12px 0;}
+.jornada-flow{display:flex;align-items:stretch;gap:4px;overflow-x:auto;}
+.jornada-step{flex:1;min-width:74px;background:var(--panel-alt);border:1px solid var(--border);border-radius:7px;padding:8px 6px;text-align:center;}
+.j-count{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;}
+.j-label{font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.02em;margin-top:2px;}
+.jornada-arrow{align-self:center;color:var(--text-dim);font-size:12px;flex-shrink:0;}
+
+/* v1.3: Inteligência Histórica */
+.historico-panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:18px;}
+.historico-panel h3{font-size:13px;margin:0 0 10px 0;}
+.historico-insight{font-size:13px;margin-bottom:10px;line-height:1.5;}
+.historico-rank{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+.hr-row{display:flex;justify-content:space-between;font-size:12px;padding:5px 8px;background:var(--panel-alt);border-radius:6px;}
+.historico-note{font-size:10.5px;color:var(--text-dim);line-height:1.5;border-top:1px solid var(--border);padding-top:8px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="topbar" id="topbar"></div>
+  <main id="main"></main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+/* ---------- ICONS ---------- */
+const ICONS = {
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+  calendar:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  film:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 4v16M17 4v16M3 9h4M17 9h4M3 15h4M17 15h4"/></svg>',
+  script:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v5h5M9 12h6M9 16h6"/></svg>',
+  story:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+  ads:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-7v16l-18-7z"/><path d="M7 15v4a2 2 0 002 2h1"/></svg>',
+  commercial:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>',
+  folder:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6a2 2 0 012-2h5l2 2h7a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>',
+  list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  week:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M7 14h2M11 14h2M15 14h2M7 17h2M11 17h2"/></svg>',
+};
+function icon(name){return ICONS[name]||'';}
+
+/* ---------- STATE ---------- */
+let db = {
+  settings:{ semanaAtual:'Semana 28 — 06 a 10/07', objetivoSemana:'Aumentar conversão de avaliação para fechamento na unidade Olímpia', receitaGerada:0, alcance:0,
+    metaMesLabel:'Meta Julho', metaComparecimentos:50 },
+  calendar:[], content:[], roteiros:[], stories:[], metaads:[], comercial:[]
+};
+function ensureDefaults(){
+  if(db.settings.metaMesLabel===undefined) db.settings.metaMesLabel = 'Meta do Mês';
+  if(db.settings.metaComparecimentos===undefined) db.settings.metaComparecimentos = 50;
+  if(db.settings.orcamentoMensal===undefined) db.settings.orcamentoMensal = 0;
+  db.content.forEach(c=>{ if(c.impulsionado===undefined) c.impulsionado=false; });
+  db.comercial.forEach(c=>{
+    if(c.tempoRespostaMin===undefined) c.tempoRespostaMin='';
+    if(c.especialidade===undefined) c.especialidade='';
+    if(c.indicacoes===undefined) c.indicacoes=0;
+  });
+  db.metaads.forEach(m=>{
+    if(m.leadsGerados===undefined) m.leadsGerados='';
+    if(m.especialidade===undefined) m.especialidade='';
+  });
+}
+let view = 'dashboard';
+let calSubview = 'table';
+let openRoteiroId = null;
+let saveTimer = null;
+let dashboardMode = 'operacional';
+
+function uid(){ return 'id_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+
+const hasCloudStorage = (typeof window !== 'undefined') && !!window.storage && typeof window.storage.set === 'function';
+
+function getCloudUrl(){ try{ return localStorage.getItem('mpc-cloud-url') || ''; }catch(e){ return ''; } }
+function setCloudUrl(url){ try{ localStorage.setItem('mpc-cloud-url', url); }catch(e){ /* ignore */ } }
+
+async function loadData(){
+  if(hasCloudStorage){
+    try{
+      const res = await window.storage.get('mpc-db', false);
+      if(res && res.value){ db = JSON.parse(res.value); }
+    }catch(e){ /* no saved data yet, or cloud storage unavailable */ }
+  } else {
+    const cloudUrl = getCloudUrl();
+    if(cloudUrl){
+      try{
+        const res = await fetch(cloudUrl + '?t=' + Date.now());
+        const text = await res.text();
+        const parsed = JSON.parse(text);
+        if(parsed && parsed.settings){ db = parsed; }
+        else { tryLoadLocal(); }
+      }catch(e){ console.error('cloud load failed', e); tryLoadLocal(); }
+    } else {
+      tryLoadLocal();
+    }
+  }
+  ensureDefaults();
+  render();
+}
+function tryLoadLocal(){
+  try{
+    const raw = localStorage.getItem('mpc-db-local');
+    if(raw) db = JSON.parse(raw);
+  }catch(e){ /* localStorage also unavailable, fine — user can use Carregar Backup */ }
+}
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    if(hasCloudStorage){
+      try{
+        await window.storage.set('mpc-db', JSON.stringify(db), false);
+        updateSaveStatus('Salvo automaticamente ✓', false);
+        return;
+      }catch(e){ console.error('save failed', e); }
+    }
+    const cloudUrl = getCloudUrl();
+    if(cloudUrl){
+      try{
+        await fetch(cloudUrl, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(db) });
+        updateSaveStatus('Salvo na nuvem (Google Sheets) ✓', false);
+        return;
+      }catch(e){ console.error('cloud save failed', e); }
+    }
+    try{
+      localStorage.setItem('mpc-db-local', JSON.stringify(db));
+      updateSaveStatus('Salvo neste navegador ✓ (configure a Nuvem para sincronizar entre dispositivos)', false);
+    }catch(e){
+      updateSaveStatus('Salvamento automático indisponível — use "Baixar Backup" para não perder nada', true);
+    }
+  }, 400);
+}
+
+/* ---------- HELPERS ---------- */
+const WEEKDAYS = ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira'];
+
+/* ---------- v1.1 HELPERS: dates & insights ---------- */
+function parseDatePt(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(!m) return null;
+  let [_, d, mo, y] = m;
+  if(y.length===2) y = '20'+y;
+  const dt = new Date(Number(y), Number(mo)-1, Number(d));
+  return isNaN(dt.getTime()) ? null : dt;
+}
+function todayStart(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+function isOverdue(dateStr){
+  const d = parseDatePt(dateStr);
+  if(!d) return false;
+  return d.getTime() < todayStart().getTime();
+}
+function todayWeekdayName(){
+  const map = {1:'Segunda-feira',2:'Terça-feira',3:'Quarta-feira',4:'Quinta-feira',5:'Sexta-feira'};
+  return map[new Date().getDay()] || null;
+}
+function isStuckApproval(row){
+  return row.status==='Aguardando aprovação' && row.createdAt && (Date.now()-row.createdAt > 2*24*3600*1000);
+}
+function isOverdueRow(entity, row){
+  if(entity==='calendar') return isOverdue(row.prazo) && row.status !== 'Concluído';
+  if(entity==='content') return isOverdue(row.dataPublicacao) && row.status !== 'Publicado';
+  return false;
+}
+function computeInsights(){
+  const weekItems = currentWeekEntries();
+  const hojeWd = todayWeekdayName();
+  const hojeItems = hojeWd ? weekItems.filter(c=>c.dia===hojeWd) : [];
+  const hojePendentes = hojeItems.filter(c=>c.status!=='Concluído');
+
+  const overdueCalendar = db.calendar.filter(c=>isOverdueRow('calendar',c));
+  const overdueContent = db.content.filter(c=>isOverdueRow('content',c));
+  const stuckApprovals = db.calendar.filter(isStuckApproval);
+
+  const statusCounts = {};
+  db.calendar.filter(c=>c.status!=='Concluído').forEach(c=>{ statusCounts[c.status]=(statusCounts[c.status]||0)+1; });
+  let etapaTravada = null, etapaCount = 0;
+  ['Aguardando aprovação','Em andamento','Não iniciado'].forEach(s=>{
+    if((statusCounts[s]||0) > etapaCount){ etapaCount = statusCounts[s]; etapaTravada = s; }
+  });
+
+  const calendarScore = overdueCalendar.length + stuckApprovals.length;
+  const contentScore = overdueContent.length;
+  let areaAtencao = null, areaScore = 0;
+  if(calendarScore > areaScore){ areaScore = calendarScore; areaAtencao = 'Calendário Operacional'; }
+  if(contentScore > areaScore){ areaScore = contentScore; areaAtencao = 'Produção de Conteúdo'; }
+
+  return { hojeWd, hojeItems, hojePendentes, overdueCalendar, overdueContent, stuckApprovals, etapaTravada, etapaCount, areaAtencao, areaScore };
+}
+
+/* ---- v1.1 intelligence helpers ---- */
+function parseBRDate(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(!m) return null;
+  let [, d, mo, y] = m;
+  if(y.length===2) y = '20'+y;
+  const dt = new Date(Number(y), Number(mo)-1, Number(d));
+  if(isNaN(dt.getTime())) return null;
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+function todayDate(){ const t = new Date(); t.setHours(0,0,0,0); return t; }
+function todayWeekdayLabel(){
+  const map = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+  return map[new Date().getDay()];
+}
+function isCalendarOverdue(e){
+  const d = parseBRDate(e.prazo) || parseBRDate(e.data);
+  if(!d) return false;
+  return d < todayDate() && e.status !== 'Concluído';
+}
+function isContentOverdue(c){
+  const d = parseBRDate(c.dataPublicacao) || parseBRDate(c.dataGravacao);
+  if(!d) return false;
+  return d < todayDate() && c.status !== 'Publicado';
+}
+function computeStuckStage(){
+  const buckets = [
+    {label:'Calendário parado em "Aguardando aprovação"', count: db.calendar.filter(c=>c.status==='Aguardando aprovação').length, view:'calendar'},
+    {label:'Conteúdos parados em "Editando"', count: db.content.filter(c=>c.status==='Editando').length, view:'content'},
+    {label:'Conteúdos aprovados sem publicar', count: db.content.filter(c=>c.status==='Aprovado').length, view:'content'},
+    {label:'Roteiros sem aprovação', count: db.roteiros.filter(r=>r.status!=='Aprovado' && r.status!=='Publicado').length, view:'roteiros'},
+  ];
+  buckets.sort((a,b)=>b.count-a.count);
+  return buckets[0].count>0 ? buckets[0] : null;
+}
+function computeAreaAttention(){
+  const areas = [
+    {label:'Calendário Operacional', view:'calendar', count: db.calendar.filter(isCalendarOverdue).length},
+    {label:'Produção de Conteúdo', view:'content', count: db.content.filter(isContentOverdue).length},
+    {label:'Aprovações', view:'aprovacoes', count: db.calendar.filter(c=>c.status==='Aguardando aprovação').length},
+  ];
+  areas.sort((a,b)=>b.count-a.count);
+  return areas[0].count>0 ? areas[0] : null;
+}
+function computeTodayPriorities(){
+  const label = todayWeekdayLabel();
+  const items = currentWeekEntries().filter(e=>e.dia===label && e.status!=='Concluído');
+  const rank = e => isCalendarOverdue(e) ? 0 : (e.status==='Aguardando aprovação' ? 1 : (e.status==='Em andamento' ? 2 : 3));
+  return items.sort((a,b)=>rank(a)-rank(b));
+}
+
+function statusBadgeClass(status){
+  const map = {
+    'Não iniciado':'b-gray','Em andamento':'b-blue','Aguardando aprovação':'b-amber','Concluído':'b-green',
+    'Planejado':'b-gray','Gravado':'b-blue','Editando':'b-amber','Aprovado':'b-teal','Publicado':'b-green','Impulsionado':'b-teal',
+    'Planejamento':'b-gray','Ativa':'b-blue','Otimizando':'b-amber','Encerrada':'b-green'
+  };
+  return map[status] || 'b-gray';
+}
+function badge(status){ return `<span class="badge ${statusBadgeClass(status)}">${status||'—'}</span>`; }
+
+function newCalendarEntry(dia, data){
+  return {
+    id:uid(), dia, data, semana:db.settings.semanaAtual, objetivoEstrategico:'',
+    producao:'', stories:'', reels:'', metaads:'', comercial:'', responsavel:'', prazo:'',
+    status:'Não iniciado', observacoes:'',
+    objetivoDia:'', checklist:[
+      {label:'☀️ Story de Bom Dia', done:false},
+      {label:'Execução da atividade principal do calendário', done:false},
+      {label:'Atualização do Status', done:false},
+      {label:'Registro de observações', done:false}
+    ], arquivos:''
+  };
+}
+
+function currentWeekEntries(){
+  return db.calendar.filter(c=>c.semana === db.settings.semanaAtual);
+}
+
+/* ---------- RENDER: SIDEBAR ---------- */
+function renderSidebar(){
+  const items = [
+    {id:'dashboard', label:'Dashboard Principal', icon:'home'},
+    {id:'calendar', label:'Calendário Operacional', icon:'calendar'},
+    {id:'content', label:'Produção de Conteúdo', icon:'film'},
+    {id:'roteiros', label:'Roteiros de Gravação', icon:'script'},
+    {id:'stories', label:'Stories', icon:'story'},
+    {id:'metaads', label:'Meta Ads', icon:'ads'},
+    {id:'comercial', label:'Comercial', icon:'commercial'},
+    {id:'indicadores', label:'Indicadores', icon:'chart'},
+    {id:'arquivos', label:'Biblioteca de Arquivos', icon:'folder'},
+    {id:'aprovacoes', label:'Aprovações', icon:'check'},
+    {id:'tarefas', label:'Tarefas da Semana', icon:'list'},
+    {id:'semana', label:'Dashboard da Semana', icon:'week'},
+  ];
+  let html = `<div class="logo">MÉTODO <span>MPC</span></div>`;
+  items.forEach(it=>{
+    html += `<div class="nav-item ${view===it.id?'active':''}" data-view="${it.id}">${icon(it.icon)}<span>${it.label}</span></div>`;
+  });
+  document.getElementById('sidebar').innerHTML = html;
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    el.addEventListener('click', ()=>{ view = el.dataset.view; render(); });
+  });
+}
+
+/* ---------- RENDER: TOPBAR ---------- */
+function renderTopbar(){
+  const weekEntries = currentWeekEntries();
+  const total = weekEntries.length;
+  const done = weekEntries.filter(c=>c.status==='Concluído').length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  const producedContents = db.content.filter(c=>c.status && c.status!=='Planejado').length;
+  const publishedContents = db.content.filter(c=>c.status==='Publicado').length;
+  const leads = db.comercial.reduce((s,c)=>s+(Number(c.leadsRecebidos)||0),0);
+  const agendamentos = db.comercial.reduce((s,c)=>s+(Number(c.agendamentos)||0),0);
+
+  const dayOrder = ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira'];
+  const pulseSegs = dayOrder.map(d=>{
+    const e = weekEntries.find(x=>x.dia===d);
+    if(!e) return 'idle';
+    if(e.status==='Concluído') return 'ok';
+    if(e.status==='Aguardando aprovação') return 'warn';
+    if(e.status==='Em andamento') return 'warn';
+    return 'idle';
+  });
+  const overdueCount = db.calendar.filter(isCalendarOverdue).length + db.content.filter(isContentOverdue).length;
+  const meta = computeMetaMes();
+  const semaforo = computeSemaforo(meta.pct);
+  const dayShort = ['Seg','Ter','Qua','Qui','Sex'];
+
+  document.getElementById('topbar').innerHTML = `
+    <div class="meta-banner">
+      <div class="meta-left">
+        <div class="meta-label">${(meta.label||'Meta do Mês').toUpperCase()}</div>
+        <div class="meta-sub">${meta.target} comparecimentos</div>
+      </div>
+      <div class="meta-bar-wrap">
+        <div class="meta-bar-track"><div class="meta-bar-fill" style="width:${meta.pct}%"></div></div>
+      </div>
+      <div class="meta-count">${meta.total} / ${meta.target}</div>
+      <div class="meta-semaforo ${semaforo.cls}">${semaforo.emoji} ${semaforo.label}</div>
+      <button class="icon-btn link" data-action="edit-meta" title="Editar meta do mês">✎</button>
+    </div>
+    <div class="topbar-row1">
+      <div class="brand-mini">
+        <div class="pulse-strip">${pulseSegs.map(s=>`<div class="pulse-seg ${s}"></div>`).join('')}</div>
+        <span class="pulse-text">${pct}% concluído · ${done} feitas · ${total-done} pendentes</span>
+        ${overdueCount>0 ? `<span class="badge b-red pulse-alert" data-view="calendar">⚠ ${overdueCount} atrasada${overdueCount>1?'s':''}</span>` : ''}
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span id="save-status" style="font-size:10.5px;color:var(--text-dim);"></span>
+        <button class="btn" data-action="gerar-semana">+ Gerar Semana</button>
+        <button class="btn" data-action="download-backup" title="Salva um arquivo .json no seu computador">⬇ Baixar Backup</button>
+        <button class="btn" data-action="upload-backup" title="Carrega um arquivo .json salvo anteriormente">⬆ Carregar Backup</button>
+        <button class="btn" data-action="config-cloud" title="Conectar a uma planilha Google (Apps Script)">☁ Configurar Nuvem</button>
+        <input type="file" id="backup-file-input" accept="application/json" style="display:none;">
+      </div>
+    </div>
+    <div class="week-health">
+      <div class="wh-bar-track"><div class="wh-bar-fill" style="width:${pct}%"></div></div>
+      <span class="wh-pct">${pct}%</span>
+      <div class="wh-days">
+        ${dayOrder.map((d,i)=>{
+          const e = weekEntries.find(x=>x.dia===d);
+          const doneDay = e && e.status==='Concluído';
+          return `<span class="wh-day ${doneDay?'done':''}">${dayShort[i]} ${doneDay?'✔':'○'}</span>`;
+        }).join('')}
+      </div>
+      <span class="wh-sub">${done} de ${total||5} dias concluídos</span>
+    </div>
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">Semana Atual</div>
+        <input class="kpi-editable-text" id="inp-semana" value="${db.settings.semanaAtual}">
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Objetivo da Semana</div>
+        <input class="kpi-editable-text" id="inp-objetivo" value="${db.settings.objetivoSemana}">
+      </div>
+      <div class="kpi"><div class="kpi-label">% Execução</div><div class="kpi-value accent">${pct}%</div></div>
+      <div class="kpi"><div class="kpi-label">Conteúdos Produzidos</div><div class="kpi-value">${producedContents}</div></div>
+      <div class="kpi"><div class="kpi-label">Conteúdos Publicados</div><div class="kpi-value">${publishedContents}</div></div>
+      <div class="kpi"><div class="kpi-label">Leads Gerados</div><div class="kpi-value">${leads}</div></div>
+      <div class="kpi"><div class="kpi-label">Avaliações Agendadas</div><div class="kpi-value">${agendamentos}</div></div>
+    </div>`;
+  document.getElementById('inp-semana').addEventListener('change', e=>{ db.settings.semanaAtual = e.target.value; scheduleSave(); render(); });
+  document.getElementById('inp-objetivo').addEventListener('change', e=>{ db.settings.objetivoSemana = e.target.value; scheduleSave(); });
+  const gs = document.querySelector('[data-action="gerar-semana"]');
+  if(gs) gs.addEventListener('click', gerarSemana);
+  const db_btn = document.querySelector('[data-action="download-backup"]');
+  if(db_btn) db_btn.addEventListener('click', downloadBackup);
+  const ub_btn = document.querySelector('[data-action="upload-backup"]');
+  const fileInput = document.getElementById('backup-file-input');
+  if(ub_btn && fileInput){
+    ub_btn.addEventListener('click', ()=>fileInput.click());
+    fileInput.addEventListener('change', handleBackupFile);
+  }
+  const cc_btn = document.querySelector('[data-action="config-cloud"]');
+  if(cc_btn) cc_btn.addEventListener('click', openCloudConfig);
+  const em_btn = document.querySelector('[data-action="edit-meta"]');
+  if(em_btn) em_btn.addEventListener('click', openMetaConfig);
+  const pulseAlert = document.querySelector('.pulse-alert');
+  if(pulseAlert) pulseAlert.addEventListener('click', ()=>{ view = pulseAlert.dataset.view; render(); });
+  updateSaveStatus();
+}
+
+function computeMetaMes(){
+  const total = db.comercial.reduce((s,c)=>s+(Number(c.comparecimentos)||0),0);
+  const target = Number(db.settings.metaComparecimentos)||0;
+  const pct = target ? Math.min(100, Math.round(total/target*100)) : 0;
+  return { label: db.settings.metaMesLabel, total, target, pct };
+}
+function computeSemaforo(actualPct){
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const expectedPct = Math.round((now.getDate()/daysInMonth)*100) || 1;
+  if(actualPct >= expectedPct) return {emoji:'🟢', label:'Dentro da meta', cls:'ok'};
+  if(actualPct >= expectedPct*0.7) return {emoji:'🟡', label:'Atenção', cls:'warn'};
+  return {emoji:'🔴', label:'Fora da meta', cls:'danger'};
+}
+function openMetaConfig(){
+  const modal = document.createElement('div');
+  modal.className='modal-bg';
+  modal.innerHTML = `<div class="modal" style="position:relative;width:420px;">
+    <button class="modal-close" data-close>✕</button>
+    <h2>Editar Meta do Mês</h2>
+    <div class="field-row"><label>Nome da Meta</label><input id="f-meta-label" value="${db.settings.metaMesLabel}"></div>
+    <div class="field-row"><label>Meta de Comparecimentos</label><input id="f-meta-target" type="number" value="${db.settings.metaComparecimentos}"></div>
+    <div class="field-row"><label>Orçamento Mensal de Mídia (R$) — opcional, usado no Painel Executivo</label><input id="f-meta-budget" type="number" value="${db.settings.orcamentoMensal||0}"></div>
+    <button class="btn primary" id="f-meta-save">Salvar</button>
+  </div>`;
+  document.getElementById('modal-root').appendChild(modal);
+  modal.querySelector('[data-close]').addEventListener('click', ()=>modal.remove());
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  modal.querySelector('#f-meta-save').addEventListener('click', ()=>{
+    db.settings.metaMesLabel = modal.querySelector('#f-meta-label').value || 'Meta do Mês';
+    db.settings.metaComparecimentos = Number(modal.querySelector('#f-meta-target').value)||0;
+    db.settings.orcamentoMensal = Number(modal.querySelector('#f-meta-budget').value)||0;
+    scheduleSave(); modal.remove(); render();
+  });
+}
+
+function openCloudConfig(){
+  const currentUrl = getCloudUrl();
+  const modal = document.createElement('div');
+  modal.className = 'modal-bg';
+  modal.innerHTML = `<div class="modal" style="position:relative;width:520px;">
+    <button class="modal-close" data-close>✕</button>
+    <h2>☁ Configurar Nuvem (Google Sheets)</h2>
+    <p style="color:var(--text-dim);font-size:12.5px;">Cole abaixo a URL do App da Web gerada no Google Apps Script (termina em <span class="mono">/exec</span>). Isso fica salvo só neste navegador — não precisa refazer toda vez.</p>
+    <div class="field-row"><label>URL do App da Web</label><input id="f-cloud-url" placeholder="https://script.google.com/macros/s/XXXXX/exec" value="${currentUrl}"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn primary" id="f-cloud-save">Salvar e Sincronizar Agora</button>
+      ${currentUrl ? '<button class="btn" id="f-cloud-remove">Remover Conexão</button>' : ''}
+    </div>
+  </div>`;
+  document.getElementById('modal-root').appendChild(modal);
+  modal.querySelector('[data-close]').addEventListener('click', ()=>modal.remove());
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  modal.querySelector('#f-cloud-save').addEventListener('click', async ()=>{
+    const url = modal.querySelector('#f-cloud-url').value.trim();
+    if(!url){ alert('Cole a URL do App da Web primeiro.'); return; }
+    setCloudUrl(url);
+    modal.remove();
+    updateSaveStatus('Conectando à nuvem...', false);
+    scheduleSave();
+  });
+  const removeBtn = modal.querySelector('#f-cloud-remove');
+  if(removeBtn) removeBtn.addEventListener('click', ()=>{
+    setCloudUrl('');
+    modal.remove();
+    updateSaveStatus('Conexão com a nuvem removida', false);
+  });
+}
+
+function updateSaveStatus(msg, isError){
+  const el = document.getElementById('save-status');
+  if(!el) return;
+  if(msg){
+    el.textContent = msg;
+    el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
+  }
+}
+
+function downloadBackup(){
+  const dataStr = JSON.stringify(db, null, 2);
+  const blob = new Blob([dataStr], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  const stamp = now.toISOString().slice(0,16).replace(/[:T]/g,'-');
+  a.href = url;
+  a.download = `metodo-mpc-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  updateSaveStatus('Backup baixado ✓', false);
+}
+
+function handleBackupFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{
+      const parsed = JSON.parse(ev.target.result);
+      if(!parsed.settings || !parsed.calendar){ throw new Error('Formato inválido'); }
+      if(!confirm('Isso vai substituir todos os dados atuais pelos dados do backup. Continuar?')) return;
+      db = parsed;
+      openRoteiroId = null;
+      ensureDefaults();
+      scheduleSave();
+      render();
+      updateSaveStatus('Backup carregado ✓', false);
+    }catch(err){
+      alert('Não foi possível ler este arquivo de backup: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function gerarSemana(){
+  const base = new Date();
+  const day = base.getDay();
+  const monday = new Date(base); monday.setDate(base.getDate() - ((day+6)%7));
+  WEEKDAYS.forEach((wd,i)=>{
+    const d = new Date(monday); d.setDate(monday.getDate()+i);
+    const dataStr = d.toLocaleDateString('pt-BR');
+    const exists = db.calendar.find(c=>c.dia===wd && c.semana===db.settings.semanaAtual);
+    if(!exists) db.calendar.push(newCalendarEntry(wd, dataStr));
+    const sExists = db.stories.find(s=>s.dia===wd && s.semana===db.settings.semanaAtual);
+    if(!sExists) db.stories.push({id:uid(), dia:wd, semana:db.settings.semanaAtual, bomDia:'☀️ Story de Bom Dia', principal:'', responsavel:'', publicado:false});
+  });
+  scheduleSave(); render();
+}
+
+/* ---------- GENERIC TABLE ---------- */
+function cellInput(entity, row, col){
+  const val = row[col.key] ?? '';
+  if(col.type==='select'){
+    return `<select data-entity="${entity}" data-id="${row.id}" data-field="${col.key}" class="cell-input">
+      ${col.options.map(o=>`<option value="${o}" ${o===val?'selected':''}>${o}</option>`).join('')}
+    </select>`;
+  }
+  if(col.type==='checkbox'){
+    return `<input type="checkbox" data-entity="${entity}" data-id="${row.id}" data-field="${col.key}" class="cell-input" ${val?'checked':''}>`;
+  }
+  if(col.type==='number'){
+    return `<input type="number" data-entity="${entity}" data-id="${row.id}" data-field="${col.key}" class="cell-input" value="${val}">`;
+  }
+  if(col.type==='date'){
+    return `<input type="text" placeholder="dd/mm/aaaa" data-entity="${entity}" data-id="${row.id}" data-field="${col.key}" class="cell-input" value="${val}">`;
+  }
+  if(col.link){
+    return `<input type="text" data-entity="${entity}" data-id="${row.id}" data-field="${col.key}" class="cell-input" value="${val}">`;
+  }
+  return `<input type="text" data-entity="${entity}" data-id="${row.id}" data-field="${col.key}" class="cell-input" value="${val}">`;
+}
+
+function tableUI(entity, columns, rows, opts={}){
+  if(!rows.length) return `<div class="empty">Nenhum registro ainda. Clique em "Adicionar" para começar.</div>
+    <button class="btn-add" data-action="add-row" data-entity="${entity}">+ Adicionar registro</button>`;
+  let html = `<div class="table-wrap"><table class="dtable"><thead><tr>`;
+  columns.forEach(c=> html+=`<th>${c.label}</th>`);
+  if(opts.openable) html += `<th></th>`;
+  html += `<th class="col-actions"></th></tr></thead><tbody>`;
+  rows.forEach(row=>{
+    const overdue = isOverdueRow(entity, row);
+    const stuck = isStuckApproval(row);
+    html += `<tr data-id="${row.id}" class="${overdue?'row-overdue':''}">`;
+    columns.forEach(c=>{
+      if(c.badge){ html += `<td>${badge(row[c.key])}</td>`; return; }
+      if(c.key==='status'){
+        const selo = (entity==='content' && row.status==='Publicado')
+          ? `<button class="icon-btn selo-toggle" data-action="toggle-impulsionado" data-id="${row.id}" title="Clique para alternar" style="color:${row.impulsionado?'var(--ok)':'var(--text-dim)'};font-size:11px;">${row.impulsionado?'🟢 Impulsionado':'⚪ Orgânico'}</button>`
+          : '';
+        html += `<td style="display:flex;align-items:center;gap:6px;">${cellInput(entity,row,c)}${overdue?'<span title="Atrasado" style="color:var(--danger);">⚠</span>':(stuck?'<span title="Parado há mais de 2 dias" style="color:var(--warn);">⏳</span>':'')}${selo}</td>`;
+        return;
+      }
+      html += `<td>${cellInput(entity,row,c)}</td>`;
+    });
+    if(opts.openable) html += `<td><button class="icon-btn link" data-action="open-item" data-entity="${entity}" data-id="${row.id}" title="Abrir">↗</button></td>`;
+    html += `<td class="col-actions"><button class="icon-btn" data-action="delete-row" data-entity="${entity}" data-id="${row.id}" title="Excluir">✕</button></td>`;
+    html += `</tr>`;
+  });
+  html += `</tbody></table></div>
+  <button class="btn-add" data-action="add-row" data-entity="${entity}">+ Adicionar registro</button>`;
+  return html;
+}
+
+function bindTableEvents(container){
+  container.querySelectorAll('.cell-input').forEach(input=>{
+    const evt = input.type==='checkbox' ? 'change' : (input.tagName==='SELECT' ? 'change' : 'change');
+    input.addEventListener(evt, e=>{
+      const {entity, id, field} = e.target.dataset;
+      const row = db[entity].find(r=>r.id===id);
+      if(!row) return;
+      row[field] = e.target.type==='checkbox' ? e.target.checked : e.target.value;
+      scheduleSave();
+      if(entity==='calendar' || entity==='content' || entity==='comercial') renderTopbarOnly();
+    });
+  });
+  container.querySelectorAll('[data-action="toggle-impulsionado"]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.currentTarget.dataset.id;
+      const row = db.content.find(r=>r.id===id);
+      if(row){ row.impulsionado = !row.impulsionado; scheduleSave(); render(); }
+    });
+  });
+  container.querySelectorAll('[data-action="delete-row"]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const {entity, id} = e.currentTarget.dataset;
+      if(!confirm('Excluir este registro?')) return;
+      db[entity] = db[entity].filter(r=>r.id!==id);
+      scheduleSave(); render();
+    });
+  });
+  container.querySelectorAll('[data-action="add-row"]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const entity = e.currentTarget.dataset.entity;
+      db[entity].push(ENTITY_FACTORY[entity]());
+      scheduleSave(); render();
+    });
+  });
+  container.querySelectorAll('[data-action="open-item"]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const {entity, id} = e.currentTarget.dataset;
+      if(entity==='roteiros'){ openRoteiroId = id; render(); }
+    });
+  });
+}
+function renderTopbarOnly(){ renderTopbar(); }
+
+const ENTITY_FACTORY = {
+  calendar: ()=>Object.assign(newCalendarEntry('Segunda-feira', ''), {createdAt:Date.now()}),
+  content: ()=>({id:uid(), createdAt:Date.now(), nome:'', especialidade:'', semana:db.settings.semanaAtual, objetivo:'', tipo:'Reels', responsavel:'', dataGravacao:'', dataPublicacao:'', status:'Planejado', impulsionado:false}),
+  roteiros: ()=>({id:uid(), createdAt:Date.now(), nome:'Novo roteiro', semana:db.settings.semanaAtual, especialidade:'', objetivo:'', doutora:'', tempo:'', link:'', status:'Planejado',
+    objetivoEstrategico:'', mensagemCentral:'', ambiente:'', cena1:'', cena2:'', cena3:'', cena4:'', cena5:'', broll:'', legendas:'', cta:''}),
+  stories: ()=>({id:uid(), createdAt:Date.now(), dia:'Segunda-feira', semana:db.settings.semanaAtual, bomDia:'☀️ Story de Bom Dia', principal:'', responsavel:'', publicado:false}),
+  metaads: ()=>({id:uid(), createdAt:Date.now(), campanha:'', objetivo:'', criativo:'', publico:'', investimento:'', leadsGerados:'', especialidade:'', dataInicio:'', dataFinal:'', status:'Planejamento'}),
+  comercial: ()=>({id:uid(), createdAt:Date.now(), semana:db.settings.semanaAtual, especialidade:'', leadsRecebidos:0, leadsRespondidos:0, agendamentos:0, confirmacoes:0, comparecimentos:0, indicacoes:0, fechamentos:0, tempoRespostaMin:'', observacoes:''}),
+};
+
+/* ---------- VIEWS ---------- */
+function viewHeader(title, sub, actionsHtml=''){
+  return `<div class="view-header"><div><h2>${title}</h2><p>${sub}</p></div><div class="view-actions">${actionsHtml}</div></div>`;
+}
+
+function renderDashboard(){
+  const todayLabel = todayWeekdayLabel();
+  const weekEntries = currentWeekEntries();
+  const todayEntries = weekEntries.filter(e=>e.dia===todayLabel);
+  const todayPending = todayEntries.filter(e=>e.status!=='Concluído').length;
+  const overdueCount = db.calendar.filter(isCalendarOverdue).length + db.content.filter(isContentOverdue).length;
+  const stuck = computeStuckStage();
+  const attention = computeAreaAttention();
+  const indice = computeIndiceMPC();
+
+  let html = viewHeader('Dashboard Principal', 'Centro operacional do Método MPC — marketing, mídia paga e conversão comercial em um único lugar.',
+    `<button class="btn" data-action="toggle-dash-mode">${dashboardMode==='operacional' ? '👔 Modo Executivo' : '🔧 Modo Operacional'}</button>`);
+
+  if(dashboardMode==='executivo'){
+    const exec = computePainelExecutivo();
+    html += `<div class="score-mpc-card">
+      <div class="score-label">ÍNDICE MPC</div>
+      <div class="score-value ${indice.cls}">${indice.overall}/100</div>
+      <div class="score-status ${indice.cls}">${indice.label}</div>
+    </div>`;
+    html += `<div class="executivo-grid">
+      <div class="exec-card"><div class="exec-label">Meta</div><div class="exec-value">${exec.metaPct}%</div></div>
+      <div class="exec-card"><div class="exec-label">Campanhas</div><div class="exec-value ${exec.campanhasCls}">${exec.campanhasLabel}</div></div>
+      <div class="exec-card"><div class="exec-label">Financeiro</div><div class="exec-value ${exec.financeiroCls}">${exec.financeiroLabel}</div></div>
+      <div class="exec-card"><div class="exec-label">Maior Gargalo</div><div class="exec-value">${exec.gargaloLabel}</div></div>
+      <div class="exec-card"><div class="exec-label">Comparecimentos</div><div class="exec-value">${exec.comparecimentosTotal}/${exec.comparecimentosTarget}</div></div>
+    </div>`;
+    document.getElementById('main').innerHTML = html;
+    bindDashModeToggle();
+    return;
+  }
+
+  /* 2. Score Geral (Índice MPC) */
+  html += `<div class="score-mpc-card">
+    <div class="score-label">ÍNDICE MPC</div>
+    <div class="score-value ${indice.cls}">${indice.overall}/100</div>
+    <div class="score-status ${indice.cls}">${indice.label}</div>
+    <div class="score-breakdown">
+      ${scoreBar('Produção', indice.producaoScore)}
+      ${scoreBar('Calendário', indice.calendarioScore)}
+      ${scoreBar('Aprovações', indice.aprovacoesScore)}
+      ${scoreBar('Campanhas', indice.campanhasScore)}
+      ${scoreBar('Comparecimentos', indice.comparecimentosScore)}
+    </div>
+  </div>`;
+
+  /* 1. Context strip */
+  html += `<div class="context-strip">
+    <div class="context-card ${todayPending>0?'attn':'ok'} clickable" data-view="tarefas">
+      <div class="ctx-label">Hoje (${todayLabel==='Domingo'||todayLabel==='Sábado' ? 'fim de semana' : todayLabel})</div>
+      <div class="ctx-value">${todayPending}</div>
+      <div class="ctx-sub">${todayPending>0 ? 'atividades pendentes hoje' : 'tudo em dia por hoje ✓'}</div>
+    </div>
+    <div class="context-card ${overdueCount>0?'attn':'ok'} clickable" data-view="calendar">
+      <div class="ctx-label">Atrasadas</div>
+      <div class="ctx-value">${overdueCount}</div>
+      <div class="ctx-sub">${overdueCount>0 ? 'itens com prazo vencido' : 'nenhum atraso registrado'}</div>
+    </div>
+    <div class="context-card ${stuck?'attn':'ok'} clickable" data-view="${stuck?stuck.view:'calendar'}">
+      <div class="ctx-label">Etapa Travada</div>
+      <div class="ctx-value">${stuck ? stuck.count : '—'}</div>
+      <div class="ctx-sub">${stuck ? stuck.label : 'nenhuma etapa acumulando itens'}</div>
+    </div>
+    <div class="context-card ${attention?'attn':'ok'} clickable" data-view="${attention?attention.view:'dashboard'}">
+      <div class="ctx-label">Área que Exige Atenção</div>
+      <div class="ctx-value">${attention ? attention.label : '—'}</div>
+      <div class="ctx-sub">${attention ? attention.count+' item(ns) precisando de ação' : 'nenhuma área crítica agora'}</div>
+    </div>
+  </div>`;
+
+  /* 6. Painel de Gargalos */
+  const gargalo = computeGargalo();
+  html += `<div class="gargalo-panel"><h3>Maior Gargalo da Semana</h3>
+    <div class="gargalo-main"><span class="gargalo-arrow">↓</span>
+      <div><div class="gargalo-label">${gargalo.label}</div><div class="gargalo-detail">${gargalo.detail}</div></div>
+    </div>
+  </div>`;
+
+  /* 1. Centro de Decisão */
+  const decisao = computeCentroDecisao();
+  html += `<div class="decisao-panel"><h3>Recomendação MPC</h3>`;
+  if(!decisao.available){
+    html += `<div class="empty" style="padding:14px;">${decisao.message}</div>`;
+  } else {
+    html += `<div class="decisao-body">
+      <div class="decisao-line">Campanha de <strong>${decisao.bestLabel}</strong> apresenta CPL ${decisao.diffPct}% menor que <strong>${decisao.worstLabel}</strong> (R$ ${decisao.bestCPL} vs R$ ${decisao.worstCPL}).</div>
+      <div class="decisao-sugestao">Sugestão: redistribuir ~R$ ${numFmt(decisao.realocar)} de ${decisao.worstLabel} para ${decisao.bestLabel}.</div>
+      <div class="decisao-impacto">Impacto estimado: ${decisao.hasConvRate ? `+${decisao.comparecimentosGanhos} comparecimento(s) no período` : 'cadastre dados de Leads/Comparecimentos no Comercial para estimar o impacto em comparecimentos'}.</div>
+    </div>`;
+  }
+  html += `</div>`;
+
+  /* Agenda Crítica (antes "Prioridades do Dia") */
+  const priorities = computeTodayPriorities();
+  html += `<div class="priority-section"><h3>Agenda Crítica — ${todayLabel}</h3>`;
+  if(!priorities.length){
+    html += `<div class="empty" style="padding:16px;">Nenhuma atividade pendente para hoje. 🎉</div>`;
+  } else {
+    priorities.forEach(p=>{
+      const overdue = isCalendarOverdue(p);
+      html += `<div class="priority-row ${overdue?'overdue':''}">
+        <div class="pr-left">${badge(p.status)} <span>${p.objetivoEstrategico || p.producao || 'Atividade sem título'}</span> ${overdue?'<span style="color:var(--danger);font-size:10.5px;">⚠ atrasada</span>':''}</div>
+        <button class="pr-done-btn" data-action="quick-complete" data-id="${p.id}">✓ Concluir</button>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  /* 2. Campanha KPI + 5. Linha do Tempo de hoje, lado a lado */
+  html += `<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;align-items:start;">`;
+  html += renderCampanhaKPI();
+  html += renderDayTimeline();
+  html += `</div>`;
+
+  /* 3. Jornada Completa */
+  html += renderJornadaCompleta();
+
+  /* 5. Inteligência Histórica */
+  html += renderInteligenciaHistorica();
+
+  /* 9. Smart widgets */
+  html += renderSmartWidgets();
+
+  /* 3. Cards with insight lines */
+  const blocks = [
+    {id:'calendar', icon:'calendar', title:'Calendário Operacional', metric:db.calendar.length, sub:'atividades registradas', insight:calendarInsight()},
+    {id:'content', icon:'film', title:'Produção de Conteúdo', metric:db.content.length, sub:'conteúdos no pipeline', insight:contentInsight()},
+    {id:'roteiros', icon:'script', title:'Roteiros de Gravação', metric:db.roteiros.length, sub:'roteiros cadastrados', insight:roteirosInsight()},
+    {id:'stories', icon:'story', title:'Stories', metric:db.stories.filter(s=>s.publicado).length+'/'+db.stories.length, sub:'publicados / total', insight:storiesInsight()},
+    {id:'metaads', icon:'ads', title:'Meta Ads', metric:db.metaads.filter(m=>m.status==='Ativa').length, sub:'campanhas ativas', insight:metaAdsInsight()},
+    {id:'comercial', icon:'commercial', title:'Comercial', metric:db.comercial.reduce((s,c)=>s+(Number(c.leadsRecebidos)||0),0), sub:'leads recebidos', insight:comercialInsight()},
+    {id:'indicadores', icon:'chart', title:'Indicadores', metric:'—', sub:'painel de performance', insight:'Taxa de conversão e CAC calculados automaticamente.'},
+    {id:'arquivos', icon:'folder', title:'Biblioteca de Arquivos', metric:'—', sub:'materiais e links', insight:'Links vinculados por dia e por roteiro.'},
+    {id:'aprovacoes', icon:'check', title:'Aprovações', metric:countAguardando(), sub:'aguardando aprovação', insight:aprovacoesInsight()},
+    {id:'tarefas', icon:'list', title:'Tarefas da Semana', metric:currentWeekEntries().length, sub:'itens desta semana', insight:''},
+  ];
+  html += `<div class="dash-grid">`;
+  blocks.forEach(b=>{
+    html += `<div class="dash-card" data-view="${b.id}"><div class="accent-bar"></div>
+      <h3>${icon(b.icon)} ${b.title}</h3>
+      <div class="metric">${b.metric}</div>
+      <div class="sub">${b.sub}</div>
+      ${b.insight ? `<div class="insight">${b.insight}</div>` : ''}
+      </div>`;
+  });
+  html += `</div>`;
+  document.getElementById('main').innerHTML = html;
+
+  document.querySelectorAll('.dash-card').forEach(c=>c.addEventListener('click', ()=>{ view=c.dataset.view; render(); }));
+  document.querySelectorAll('.context-card.clickable').forEach(c=>c.addEventListener('click', ()=>{ view=c.dataset.view; render(); }));
+  document.querySelectorAll('[data-action="quick-complete"]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.currentTarget.dataset.id;
+      const item = db.calendar.find(c=>c.id===id);
+      if(item){
+        item.status = 'Concluído';
+        if(item.checklist) item.checklist.forEach(c=>c.done=true);
+        scheduleSave(); render();
+      }
+    });
+  });
+  bindDashModeToggle();
+}
+function scoreBar(label, val){
+  return `<div class="sb-row"><span class="sb-label">${label}</span><div class="sb-track"><div class="sb-fill" style="width:${val}%"></div></div><span class="sb-val">${val}</span></div>`;
+}
+function bindDashModeToggle(){
+  const btn = document.querySelector('[data-action="toggle-dash-mode"]');
+  if(btn) btn.addEventListener('click', ()=>{ dashboardMode = dashboardMode==='operacional' ? 'executivo' : 'operacional'; render(); });
+}
+function countAguardando(){
+  return db.calendar.filter(c=>c.status==='Aguardando aprovação').length;
+}
+
+/* ---- insight line builders (v1.1) ---- */
+function calendarInsight(){
+  const overdue = db.calendar.find(isCalendarOverdue);
+  if(overdue) return `<span class="alert-line">⚠ Atrasado: ${overdue.dia} — ${overdue.objetivoEstrategico||overdue.producao||'sem título'}</span>`;
+  const next = [...db.calendar].filter(c=>c.status!=='Concluído' && parseBRDate(c.data)).sort((a,b)=>parseBRDate(a.data)-parseBRDate(b.data))[0];
+  return next ? `Próximo: ${next.dia} — ${next.data}` : 'Nenhuma atividade futura cadastrada.';
+}
+function contentInsight(){
+  const overdue = db.content.find(isContentOverdue);
+  const nextRec = [...db.content].filter(c=>c.status==='Planejado' && parseBRDate(c.dataGravacao)).sort((a,b)=>parseBRDate(a.dataGravacao)-parseBRDate(b.dataGravacao))[0];
+  let lines = [];
+  if(nextRec) lines.push(`Próxima gravação: ${nextRec.nome||'sem nome'} · ${nextRec.dataGravacao}`);
+  if(overdue) lines.push(`<span class="alert-line">⚠ Atrasado: ${overdue.nome||'sem nome'}</span>`);
+  return lines.length ? lines.join('<br>') : 'Nenhum conteúdo planejado ainda.';
+}
+function roteirosInsight(){
+  const pending = db.roteiros.find(r=>r.status!=='Aprovado' && r.status!=='Publicado');
+  return pending ? `Pendente de revisão: ${pending.nome}` : 'Todos os roteiros aprovados ou publicados.';
+}
+function storiesInsight(){
+  const label = todayWeekdayLabel();
+  const s = db.stories.find(x=>x.dia===label && x.semana===db.settings.semanaAtual);
+  if(!s) return 'Nenhum story configurado para hoje.';
+  return `Hoje: Bom Dia ${s.bomDia?'✓':'—'} · Principal ${s.principal?'✓':'—'} · ${s.publicado?'Publicado ✓':'Não publicado'}`;
+}
+function metaAdsInsight(){
+  const active = db.metaads.find(m=>m.status==='Ativa');
+  return active ? `Ativa: ${active.campanha||'sem nome'} · R$ ${numFmt(active.investimento)}` : 'Nenhuma campanha ativa no momento.';
+}
+function comercialInsight(){
+  if(!db.comercial.length) return 'Nenhum registro comercial ainda.';
+  const last = db.comercial[db.comercial.length-1];
+  return `Última semana registrada: ${last.semana||'—'} · ${last.leadsRecebidos||0} leads`;
+}
+function aprovacoesInsight(){
+  const items = db.calendar.filter(c=>c.status==='Aguardando aprovação');
+  return items.length ? `Mais antigo: ${items[0].dia} — ${items[0].objetivoEstrategico||items[0].producao||'sem título'}` : 'Nada aguardando aprovação.';
+}
+
+/* ---- v1.3: Índice MPC (Score Geral) ---- */
+function computeIndiceMPC(){
+  const producaoScore = db.content.length ? Math.round(db.content.filter(c=>c.status==='Publicado').length/db.content.length*100) : 100;
+  const we = currentWeekEntries();
+  const calendarioScore = we.length ? Math.round(we.filter(c=>c.status==='Concluído').length/we.length*100) : 100;
+  const aprovacoesPend = db.calendar.filter(c=>c.status==='Aguardando aprovação').length;
+  const aprovacoesScore = Math.max(0, 100 - aprovacoesPend*20);
+  const campanhasTotal = db.metaads.length;
+  const campanhasScore = campanhasTotal ? Math.round(db.metaads.filter(m=>m.status==='Ativa'||m.status==='Otimizando').length/campanhasTotal*100) : 100;
+  const comparecimentosScore = computeMetaMes().pct;
+  const overall = Math.round((producaoScore+calendarioScore+aprovacoesScore+campanhasScore+comparecimentosScore)/5);
+  let label='Saudável', cls='ok';
+  if(overall<50){ label='Crítico'; cls='danger'; } else if(overall<80){ label='Atenção'; cls='warn'; }
+  return { overall, label, cls, producaoScore, calendarioScore, aprovacoesScore, campanhasScore, comparecimentosScore };
+}
+
+/* ---- v1.3: Painel Executivo (visão de 5 segundos) ---- */
+function computePainelExecutivo(){
+  const meta = computeMetaMes();
+  const campanhasTotal = db.metaads.length;
+  const campanhasSaudaveis = db.metaads.filter(m=>m.status==='Ativa'||m.status==='Otimizando').length;
+  const campanhasLabel = campanhasTotal===0 ? 'Sem campanhas cadastradas' : (campanhasSaudaveis===campanhasTotal ? 'Saudáveis' : (campanhasSaudaveis>0 ? 'Atenção' : 'Críticas'));
+  const investimentoAtivo = db.metaads.filter(m=>m.status==='Ativa'||m.status==='Otimizando').reduce((s,m)=>s+(Number(m.investimento)||0),0);
+  const orcamento = Number(db.settings.orcamentoMensal)||0;
+  const financeiroLabel = orcamento ? (investimentoAtivo<=orcamento ? 'Dentro do orçamento' : 'Acima do orçamento') : 'Orçamento não definido';
+  const gargalo = computeGargalo();
+  return { metaPct:meta.pct, campanhasLabel, campanhasCls: campanhasLabel==='Saudáveis'?'ok':(campanhasLabel==='Atenção'?'warn':'danger'),
+    financeiroLabel, financeiroCls: financeiroLabel==='Dentro do orçamento'?'ok':(financeiroLabel==='Orçamento não definido'?'gray':'danger'),
+    gargaloLabel: gargalo.label, comparecimentosTotal: meta.total, comparecimentosTarget: meta.target };
+}
+
+/* ---- v1.3: Centro de Decisão (recomendação real baseada em CPL) ---- */
+function computeCentroDecisao(){
+  const active = db.metaads.filter(m => (m.status==='Ativa'||m.status==='Otimizando') && Number(m.investimento)>0 && Number(m.leadsGerados)>0);
+  if(active.length < 2){
+    return { available:false, message:'Preencha "Investimento" e "Leads Gerados" em pelo menos 2 campanhas ativas em Meta Ads para o sistema calcular uma recomendação real de realocação de verba.' };
+  }
+  const withCPL = active.map(m=>({ ...m, cpl: Number(m.investimento)/Number(m.leadsGerados) })).sort((a,b)=>a.cpl-b.cpl);
+  const best = withCPL[0], worst = withCPL[withCPL.length-1];
+  if(Math.abs(best.cpl-worst.cpl) < 0.01){
+    return { available:false, message:'As campanhas ativas têm CPL (custo por lead) equivalente — nenhuma realocação de verba se justifica no momento.' };
+  }
+  const diffPct = Math.round((worst.cpl-best.cpl)/worst.cpl*100);
+  const realocar = Math.round(Number(worst.investimento)*0.1);
+  const leadsGanhos = realocar / best.cpl;
+  const totalLeads = db.comercial.reduce((s,c)=>s+(Number(c.leadsRecebidos)||0),0);
+  const totalComp = db.comercial.reduce((s,c)=>s+(Number(c.comparecimentos)||0),0);
+  const convRate = totalLeads ? totalComp/totalLeads : 0;
+  const comparecimentosGanhos = Math.max(0, Math.round(leadsGanhos*convRate));
+  return {
+    available:true,
+    bestLabel: best.especialidade || best.campanha || 'Campanha A',
+    worstLabel: worst.especialidade || worst.campanha || 'Campanha B',
+    diffPct, realocar, comparecimentosGanhos,
+    bestCPL: best.cpl.toFixed(2), worstCPL: worst.cpl.toFixed(2),
+    hasConvRate: totalLeads>0
+  };
+}
+
+/* ---- v1.3: Linha da Jornada Completa ---- */
+function renderJornadaCompleta(){
+  const stages = [
+    {label:'Planejamento', count: db.content.filter(c=>c.status==='Planejado').length},
+    {label:'Gravação', count: db.content.filter(c=>c.status==='Gravado').length},
+    {label:'Edição', count: db.content.filter(c=>c.status==='Editando').length},
+    {label:'Aprovação', count: db.content.filter(c=>c.status==='Aprovado').length},
+    {label:'Publicação', count: db.content.filter(c=>c.status==='Publicado').length},
+    {label:'Impulsionamento', count: db.content.filter(c=>c.impulsionado).length},
+    {label:'Leads', count: db.comercial.reduce((s,c)=>s+(Number(c.leadsRecebidos)||0),0)},
+    {label:'Agendamento', count: db.comercial.reduce((s,c)=>s+(Number(c.agendamentos)||0),0)},
+    {label:'Comparecimento', count: db.comercial.reduce((s,c)=>s+(Number(c.comparecimentos)||0),0)},
+    {label:'Indicação', count: db.comercial.reduce((s,c)=>s+(Number(c.indicacoes)||0),0)},
+  ];
+  return `<div class="jornada-panel"><h3>Jornada Completa do Método MPC</h3>
+    <div class="jornada-flow">
+      ${stages.map((s,i)=>`<div class="jornada-step"><div class="j-count">${s.count}</div><div class="j-label">${s.label}</div></div>${i<stages.length-1?'<div class="jornada-arrow">→</div>':''}`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ---- v1.3: Inteligência Histórica (real, sem estatística inventada) ---- */
+function renderInteligenciaHistorica(){
+  const bySpec = {};
+  db.comercial.forEach(c=>{
+    const k = c.especialidade && c.especialidade.trim();
+    if(!k) return;
+    bySpec[k] = (bySpec[k]||0) + (Number(c.comparecimentos)||0);
+  });
+  const ranked = Object.entries(bySpec).sort((a,b)=>b[1]-a[1]);
+  let html = `<div class="historico-panel"><h3>Inteligência Histórica</h3>`;
+  if(!ranked.length){
+    html += `<div class="empty" style="padding:14px;">Preencha o campo "Especialidade" nos registros de Comercial para o sistema começar a identificar quais especialidades performam melhor, com dados reais.</div>`;
+  } else {
+    const top = ranked[0];
+    html += `<div class="historico-insight"><strong>${top[0]}</strong> tem o maior volume acumulado de comparecimentos registrados: <strong>${top[1]}</strong>.</div>
+    <div class="historico-rank">${ranked.map(([k,v])=>`<div class="hr-row"><span>${k}</span><span class="mono">${v}</span></div>`).join('')}</div>`;
+  }
+  html += `<div class="historico-note">Análises por vídeo, roteiro ou doutora específica (ex: "vídeos da Dra. X geram Y% mais comparecimentos") exigem ligar a Produção de Conteúdo aos resultados comerciais — ainda não implementado, para evitar apresentar estatísticas sem base de dados real. Posso planejar isso como próxima etapa se fizer sentido.</div></div>`;
+  return html;
+}
+
+/* ---- 6. Painel de Gargalos ---- */
+function computeGargalo(){
+  const aprovacoesPendentes = db.calendar.filter(c=>c.status==='Aguardando aprovação').length;
+  const weekEntries = currentWeekEntries();
+  const todayLabel = todayWeekdayLabel();
+  const todayIdx = WEEKDAYS.indexOf(todayLabel);
+  let diasSemStory = 0;
+  if(todayIdx >= 0){
+    for(let i=todayIdx;i>=0;i--){
+      const s = db.stories.find(x=>x.dia===WEEKDAYS[i] && x.semana===db.settings.semanaAtual);
+      if(s && s.publicado) break;
+      diasSemStory++;
+    }
+  }
+  const comercialComTempo = [...db.comercial].filter(c=>c.tempoRespostaMin!=='' && c.tempoRespostaMin!=null);
+  const ultimoTempo = comercialComTempo.length ? Number(comercialComTempo[comercialComTempo.length-1].tempoRespostaMin) : null;
+
+  if(aprovacoesPendentes >= 2){
+    return {label:'Aprovação de Vídeos', detail:`${aprovacoesPendentes} pendências acumuladas`};
+  }
+  if(diasSemStory >= 2){
+    return {label:'Stories', detail:`${diasSemStory} dias sem publicar`};
+  }
+  if(ultimoTempo !== null && ultimoTempo > 15){
+    return {label:'Comercial — Tempo de Resposta', detail:`Tempo médio de resposta: ${ultimoTempo} minutos`};
+  }
+  if(aprovacoesPendentes === 1){
+    return {label:'Aprovação de Vídeos', detail:'1 pendência em aberto'};
+  }
+  return {label:'Nenhum gargalo crítico', detail:'A operação está fluindo dentro do esperado.'};
+}
+
+/* ---- 2. Campanha KPI ---- */
+function renderCampanhaKPI(){
+  const active = db.metaads.find(m=>m.status==='Ativa');
+  const leads = db.comercial.reduce((s,c)=>s+(Number(c.leadsRecebidos)||0),0);
+  const agendamentos = db.comercial.reduce((s,c)=>s+(Number(c.agendamentos)||0),0);
+  const comparecimentos = db.comercial.reduce((s,c)=>s+(Number(c.comparecimentos)||0),0);
+  const metaLeads = Number(db.settings.metaComparecimentos||0) * 4.4;   // referência proporcional ao funil
+  const metaAgend = Number(db.settings.metaComparecimentos||0) * 1.9;
+  const metaComp = Number(db.settings.metaComparecimentos||0);
+  function row(label, val, target){
+    const pct = target ? Math.min(100, Math.round(val/target*100)) : 0;
+    return `<div class="ck-metric">
+      <div class="ck-label">${label}</div>
+      <div class="ck-value">${val} / ${Math.round(target)}</div>
+      <div class="ck-track"><div class="ck-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }
+  return `<div class="campanha-kpi">
+    <h3>${icon('ads')} ${active ? active.campanha||'Campanha Ativa' : 'Nenhuma Campanha Ativa'}</h3>
+    <div class="ck-row">
+      ${row('Leads', leads, metaLeads)}
+      ${row('Agendamentos', agendamentos, metaAgend)}
+      ${row('Comparecimentos', comparecimentos, metaComp)}
+    </div>
+  </div>`;
+}
+
+/* ---- 5. Linha do Tempo de Hoje ---- */
+function renderDayTimeline(){
+  const label = todayWeekdayLabel();
+  const item = db.calendar.find(c=>c.dia===label && c.semana===db.settings.semanaAtual);
+  const story = db.stories.find(s=>s.dia===label && s.semana===db.settings.semanaAtual);
+  const steps = [
+    {time:'08:30', label:'Story de Bom Dia', done: !!(story && story.bomDia && (item?.checklist?.[0]?.done))},
+    {time:'10:00', label:'Execução da Atividade Principal', done: !!(item?.checklist?.[1]?.done)},
+    {time:'14:00', label:'Aprovação', done: !!(item && item.status!=='Aguardando aprovação' && item.status!=='Não iniciado' && item.status!=='Em andamento') || !!(item?.checklist?.[2]?.done)},
+    {time:'16:00', label:'Publicação', done: !!(item && item.status==='Concluído')},
+  ];
+  return `<div class="day-timeline"><h3>Linha do Tempo — Hoje</h3>
+    ${steps.map(s=>`<div class="dt-row ${s.done?'done':''}"><span class="dt-time">${s.time}</span><span class="dt-label">${s.done?'✓':'○'} ${s.label}</span></div>`).join('')}
+  </div>`;
+}
+
+/* ---- 9. Smart widgets row ---- */
+function renderSmartWidgets(){
+  const nextRec = [...db.content].filter(c=>c.status==='Planejado' && parseBRDate(c.dataGravacao)).sort((a,b)=>parseBRDate(a.dataGravacao)-parseBRDate(b.dataGravacao))[0];
+  const lastPublished = [...db.content].filter(c=>c.status==='Publicado' && parseBRDate(c.dataPublicacao)).sort((a,b)=>parseBRDate(b.dataPublicacao)-parseBRDate(a.dataPublicacao))[0];
+  const todayLabel = todayWeekdayLabel();
+  const todayStory = db.stories.find(s=>s.dia===todayLabel && s.semana===db.settings.semanaAtual);
+  const activeCampaign = db.metaads.find(m=>m.status==='Ativa');
+  const lastComercial = db.comercial[db.comercial.length-1];
+  const lastApproval = [...db.calendar].reverse().find(c=>c.status==='Concluído' && c.objetivoDia !== undefined);
+
+  const widgets = [
+    {label:'Próxima Gravação', value: nextRec ? (nextRec.nome||'Sem nome') : '—', sub: nextRec ? nextRec.dataGravacao : 'nada agendado'},
+    {label:'Último Vídeo Publicado', value: lastPublished ? (lastPublished.nome||'Sem nome') : '—', sub: lastPublished ? lastPublished.dataPublicacao : 'nenhum publicado ainda'},
+    {label:'Stories de Hoje', value: todayStory ? (todayStory.principal || todayStory.bomDia || '—') : '—', sub: todayStory ? (todayStory.publicado?'publicado ✓':'pendente') : 'sem story hoje'},
+    {label:'Campanha Ativa', value: activeCampaign ? (activeCampaign.campanha||'Sem nome') : '—', sub: activeCampaign ? ('R$ '+numFmt(activeCampaign.investimento)) : 'nenhuma ativa'},
+    {label:'Lead Mais Recente', value: lastComercial ? (lastComercial.leadsRecebidos+' leads') : '—', sub: lastComercial ? lastComercial.semana : 'sem registro'},
+    {label:'Última Aprovação', value: lastApproval ? (lastApproval.objetivoEstrategico||lastApproval.producao||'Atividade') : '—', sub: lastApproval ? lastApproval.data : 'nenhuma recente'},
+  ];
+  return `<div class="widget-row">${widgets.map(w=>`
+    <div class="widget-card">
+      <div class="w-label">${w.label}</div>
+      <div class="w-value">${w.value}</div>
+      <div class="w-sub">${w.sub}</div>
+    </div>`).join('')}</div>`;
+}
+
+function renderCalendar(){
+  let html = viewHeader('Calendário Operacional', 'Planejamento diário: produção, stories, reels, Meta Ads e comercial.');
+  html += `<div class="view-tabs">
+    ${['table','kanban','calendar','timeline'].map(v=>`<div class="view-tab ${calSubview===v?'active':''}" data-sub="${v}">${({table:'Tabela',kanban:'Kanban por Status',calendar:'Calendário',timeline:'Timeline'})[v]}</div>`).join('')}
+  </div>`;
+
+  if(calSubview==='table'){
+    const cols = [
+      {key:'dia', label:'Dia'}, {key:'data', label:'Data'}, {key:'semana', label:'Semana'},
+      {key:'objetivoEstrategico', label:'Objetivo Estratégico'}, {key:'producao', label:'Produção'},
+      {key:'stories', label:'Stories'}, {key:'reels', label:'Reels'}, {key:'metaads', label:'Meta Ads'},
+      {key:'comercial', label:'Comercial'}, {key:'responsavel', label:'Responsável'}, {key:'prazo', label:'Prazo'},
+      {key:'status', label:'Status', type:'select', options:['Não iniciado','Em andamento','Aguardando aprovação','Concluído'], badge:false},
+      {key:'observacoes', label:'Observações'},
+    ];
+    // status column needs select type explicitly for input rendering
+    cols.find(c=>c.key==='status').type='select';
+    cols.find(c=>c.key==='status').options=['Não iniciado','Em andamento','Aguardando aprovação','Concluído'];
+    html += tableUI('calendar', cols, db.calendar, {openable:true});
+  } else if(calSubview==='kanban'){
+    html += renderKanban();
+  } else if(calSubview==='calendar'){
+    html += renderCalendarGrid();
+  } else if(calSubview==='timeline'){
+    html += renderTimeline();
+  }
+  document.getElementById('main').innerHTML = html;
+  document.querySelectorAll('.view-tab').forEach(t=>t.addEventListener('click', ()=>{ calSubview=t.dataset.sub; render(); }));
+  bindTableEvents(document.getElementById('main'));
+  bindKanbanEvents();
+  document.querySelectorAll('[data-action="open-item"]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const {id} = e.currentTarget.dataset;
+      openDayDetail(id);
+    });
+  });
+}
+
+function renderKanban(){
+  const statuses = ['Não iniciado','Em andamento','Aguardando aprovação','Concluído'];
+  let html = `<div class="kanban">`;
+  statuses.forEach(st=>{
+    const items = db.calendar.filter(c=>c.status===st);
+    html += `<div class="kanban-col" data-status="${st}">
+      <h4>${st} <span>${items.length}</span></h4>`;
+    items.forEach(it=>{
+      html += `<div class="kanban-card" draggable="true" data-id="${it.id}">
+        <div class="kc-title">${it.dia||'Sem dia'} ${it.data?('· '+it.data):''}</div>
+        <div class="kc-meta"><span>${it.responsavel||'—'}</span><span>${it.prazo||''}</span></div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+function bindKanbanEvents(){
+  document.querySelectorAll('.kanban-card').forEach(card=>{
+    card.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', card.dataset.id); });
+    card.addEventListener('click', ()=>{ openDayDetail(card.dataset.id); });
+  });
+  document.querySelectorAll('.kanban-col').forEach(col=>{
+    col.addEventListener('dragover', e=>{ e.preventDefault(); col.classList.add('dragover'); });
+    col.addEventListener('dragleave', ()=>col.classList.remove('dragover'));
+    col.addEventListener('drop', e=>{
+      e.preventDefault(); col.classList.remove('dragover');
+      const id = e.dataTransfer.getData('text/plain');
+      const item = db.calendar.find(c=>c.id===id);
+      if(item){ item.status = col.dataset.status; scheduleSave(); render(); }
+    });
+  });
+}
+
+function renderCalendarGrid(){
+  const weeks = [...new Set(db.calendar.map(c=>c.semana))];
+  if(!weeks.length) return `<div class="empty">Nenhuma atividade cadastrada. Use "Gerar Semana" no topo ou adicione manualmente na visão Tabela.</div>`;
+  const todayLabel = todayWeekdayLabel();
+  let html = '';
+  weeks.forEach(w=>{
+    const weekEntries = db.calendar.filter(c=>c.semana===w);
+    const doneCount = weekEntries.filter(c=>c.status==='Concluído').length;
+    html += `<h3 style="margin:18px 0 10px 0;font-size:14px;display:flex;align-items:center;gap:10px;">${w} <span style="font-size:11px;color:var(--text-dim);font-weight:400;">${doneCount}/${weekEntries.length} dias concluídos</span></h3><div class="week-grid">`;
+    WEEKDAYS.forEach(wd=>{
+      const e = db.calendar.find(c=>c.dia===wd && c.semana===w);
+      const isToday = wd===todayLabel && w===db.settings.semanaAtual;
+      html += `<div class="day-card ${isToday?'is-today':''}">
+        <h4>${wd}</h4><div class="day-date">${e?e.data:'—'}</div>
+        <div class="day-row"><span class="lbl">Produção</span><span>${e?.producao||'—'}</span></div>
+        <div class="day-row"><span class="lbl">Stories</span><span>${e?.stories||'—'}</span></div>
+        <div class="day-row"><span class="lbl">Meta Ads</span><span>${e?.metaads||'—'}</span></div>
+        <div class="day-row"><span class="lbl">Comercial</span><span>${e?.comercial||'—'}</span></div>
+        <div class="day-row"><span class="lbl">Status</span><span>${e?badge(e.status):'—'}</span></div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  return html;
+}
+
+function renderTimeline(){
+  const items = [...db.calendar].sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  if(!items.length) return `<div class="empty">Sem itens para exibir na timeline.</div>`;
+  let html = `<div class="timeline">`;
+  items.forEach(it=>{
+    html += `<div class="tl-item">
+      <div class="tl-date">${it.data||'sem data'} · ${it.dia}</div>
+      <div class="tl-title">${it.objetivoEstrategico || it.producao || 'Atividade sem título'}</div>
+      <div class="tl-sub">${badge(it.status)} &nbsp; Responsável: ${it.responsavel||'—'}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function openDayDetail(id){
+  const item = db.calendar.find(c=>c.id===id);
+  if(!item) return;
+  const modal = document.createElement('div');
+  modal.className='modal-bg';
+  modal.innerHTML = `<div class="modal" style="position:relative;">
+    <button class="modal-close" data-close>✕</button>
+    <h2>${item.dia} — ${item.data||'sem data'}</h2>
+    <div class="field-row"><label>Objetivo do Dia</label><textarea id="f-objdia">${item.objetivoDia||''}</textarea></div>
+    <div class="field-row"><label>Checklist Padrão</label>
+      <ul class="checklist" id="f-checklist">
+        ${item.checklist.map((c,i)=>`<li><input type="checkbox" data-i="${i}" ${c.done?'checked':''}> ${c.label}</li>`).join('')}
+      </ul>
+    </div>
+    <div class="field-grid2">
+      <div class="field-row"><label>Responsável</label><input id="f-resp" value="${item.responsavel||''}"></div>
+      <div class="field-row"><label>Prazo</label><input id="f-prazo" value="${item.prazo||''}"></div>
+    </div>
+    <div class="field-row"><label>Arquivos</label><input id="f-arquivos" placeholder="Links de arquivos" value="${item.arquivos||''}"></div>
+    <div class="field-row"><label>Observações</label><textarea id="f-obs">${item.observacoes||''}</textarea></div>
+    <div class="field-row"><label>Status</label>
+      <select id="f-status">
+        ${['Não iniciado','Em andamento','Aguardando aprovação','Concluído'].map(s=>`<option ${s===item.status?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn primary" id="f-save">Salvar</button>
+  </div>`;
+  document.getElementById('modal-root').appendChild(modal);
+  modal.querySelector('[data-close]').addEventListener('click', ()=>modal.remove());
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  modal.querySelectorAll('#f-checklist input').forEach(cb=>{
+    cb.addEventListener('change', e=>{ item.checklist[e.target.dataset.i].done = e.target.checked; scheduleSave(); });
+  });
+  modal.querySelector('#f-save').addEventListener('click', ()=>{
+    item.objetivoDia = modal.querySelector('#f-objdia').value;
+    item.responsavel = modal.querySelector('#f-resp').value;
+    item.prazo = modal.querySelector('#f-prazo').value;
+    item.arquivos = modal.querySelector('#f-arquivos').value;
+    item.observacoes = modal.querySelector('#f-obs').value;
+    item.status = modal.querySelector('#f-status').value;
+    scheduleSave(); modal.remove(); render();
+  });
+}
+
+function renderContent(){
+  let html = viewHeader('Produção de Conteúdo', 'Controle de toda a produção audiovisual da clínica.');
+  const stages = ['Planejado','Gravado','Editando','Aprovado','Publicado'];
+  html += `<div class="pipeline">`;
+  stages.forEach((s,i)=>{
+    const count = db.content.filter(c=>c.status===s).length;
+    html += `<div class="pipeline-step"><div class="p-count">${count}</div><div class="p-label">${s}</div></div>`;
+    if(i<stages.length-1) html += `<div class="pipeline-arrow">→</div>`;
+  });
+  html += `</div>`;
+  const cols = [
+    {key:'nome', label:'Nome do Conteúdo'}, {key:'especialidade', label:'Especialidade'}, {key:'semana', label:'Semana'},
+    {key:'objetivo', label:'Objetivo'},
+    {key:'tipo', label:'Tipo', type:'select', options:['Reels','Story','Carrossel','Anúncio','Bastidores']},
+    {key:'responsavel', label:'Responsável'}, {key:'dataGravacao', label:'Data Gravação'}, {key:'dataPublicacao', label:'Data Publicação'},
+    {key:'status', label:'Status', type:'select', options:['Planejado','Gravado','Editando','Aprovado','Publicado']},
+  ];
+  html += tableUI('content', cols, db.content);
+  document.getElementById('main').innerHTML = html;
+  bindTableEvents(document.getElementById('main'));
+}
+
+function renderRoteiros(){
+  if(openRoteiroId){ renderRoteiroDetail(openRoteiroId); return; }
+  let html = viewHeader('Roteiros de Gravação', 'Clique em ↗ para abrir o roteiro completo com cenas, CTA e legendas.');
+  const cols = [
+    {key:'nome', label:'Nome'}, {key:'semana', label:'Semana'}, {key:'especialidade', label:'Especialidade'},
+    {key:'objetivo', label:'Objetivo'}, {key:'doutora', label:'Doutora'}, {key:'tempo', label:'Tempo'},
+    {key:'link', label:'Link do Documento'},
+    {key:'status', label:'Status', type:'select', options:['Planejado','Gravado','Editando','Aprovado','Publicado']},
+  ];
+  html += tableUI('roteiros', cols, db.roteiros, {openable:true});
+  document.getElementById('main').innerHTML = html;
+  bindTableEvents(document.getElementById('main'));
+}
+
+function renderRoteiroDetail(id){
+  const r = db.roteiros.find(x=>x.id===id);
+  if(!r){ openRoteiroId=null; renderRoteiros(); return; }
+  const fields = [
+    ['objetivoEstrategico','Objetivo Estratégico'], ['mensagemCentral','Mensagem Central'], ['ambiente','Ambiente'],
+    ['cena1','Cena 1'], ['cena2','Cena 2'], ['cena3','Cena 3'], ['cena4','Cena 4'], ['cena5','Cena 5'],
+    ['broll','B-roll'], ['legendas','Legendas'], ['cta','CTA'],
+  ];
+  let html = `<button class="btn" id="back-roteiros" style="margin-bottom:14px;">← Voltar aos Roteiros</button>`;
+  html += viewHeader(r.nome||'Roteiro', `${r.especialidade||''} · ${r.doutora||''} · ${r.tempo||''}`);
+  fields.forEach(([key,label])=>{
+    html += `<div class="scene-block"><h5>${label}</h5><textarea data-field="${key}" style="width:100%;background:transparent;border:none;color:var(--text);font-family:inherit;font-size:12.5px;min-height:50px;resize:vertical;">${r[key]||''}</textarea></div>`;
+  });
+  document.getElementById('main').innerHTML = html;
+  document.getElementById('back-roteiros').addEventListener('click', ()=>{ openRoteiroId=null; render(); });
+  document.querySelectorAll('[data-field]').forEach(ta=>{
+    ta.addEventListener('change', e=>{ r[e.target.dataset.field] = e.target.value; scheduleSave(); });
+  });
+}
+
+function renderStories(){
+  let html = viewHeader('Stories', 'Story de Bom Dia com recorrência diária + Story Principal do dia.');
+  const cols = [
+    {key:'dia', label:'Dia'}, {key:'semana', label:'Semana'},
+    {key:'bomDia', label:'Story de Bom Dia'}, {key:'principal', label:'Story Principal'},
+    {key:'responsavel', label:'Responsável'}, {key:'publicado', label:'Publicado', type:'checkbox'},
+  ];
+  html += tableUI('stories', cols, db.stories);
+  document.getElementById('main').innerHTML = html;
+  bindTableEvents(document.getElementById('main'));
+}
+
+function renderMetaAds(){
+  let html = viewHeader('Meta Ads', 'Campanhas de mídia paga: investimento, público e status.');
+  const cols = [
+    {key:'campanha', label:'Campanha'}, {key:'especialidade', label:'Especialidade'}, {key:'objetivo', label:'Objetivo'}, {key:'criativo', label:'Criativo'},
+    {key:'publico', label:'Público'}, {key:'investimento', label:'Investimento (R$)', type:'number'}, {key:'leadsGerados', label:'Leads Gerados', type:'number'},
+    {key:'dataInicio', label:'Data Início'}, {key:'dataFinal', label:'Data Final'},
+    {key:'status', label:'Status', type:'select', options:['Planejamento','Ativa','Otimizando','Encerrada']},
+  ];
+  html += tableUI('metaads', cols, db.metaads);
+  document.getElementById('main').innerHTML = html;
+  bindTableEvents(document.getElementById('main'));
+}
+
+function renderComercial(){
+  let html = viewHeader('Comercial', 'Funil comercial por semana: leads, agendamentos e fechamentos.');
+  const cols = [
+    {key:'semana', label:'Semana'},
+    {key:'especialidade', label:'Especialidade'},
+    {key:'leadsRecebidos', label:'Leads Recebidos', type:'number'},
+    {key:'leadsRespondidos', label:'Leads Respondidos', type:'number'},
+    {key:'agendamentos', label:'Agendamentos', type:'number'},
+    {key:'confirmacoes', label:'Confirmações', type:'number'},
+    {key:'comparecimentos', label:'Comparecimentos', type:'number'},
+    {key:'indicacoes', label:'Indicações', type:'number'},
+    {key:'fechamentos', label:'Fechamentos', type:'number'},
+    {key:'tempoRespostaMin', label:'Tempo Resposta (min)', type:'number'},
+    {key:'observacoes', label:'Observações'},
+  ];
+  html += tableUI('comercial', cols, db.comercial);
+  document.getElementById('main').innerHTML = html;
+  bindTableEvents(document.getElementById('main'));
+}
+
+function renderIndicadores(){
+  const produzidos = db.content.filter(c=>c.status && c.status!=='Planejado').length;
+  const publicados = db.content.filter(c=>c.status==='Publicado').length;
+  const storiesPub = db.stories.filter(s=>s.publicado).length;
+  const leads = db.comercial.reduce((s,c)=>s+(Number(c.leadsRecebidos)||0),0);
+  const agendamentos = db.comercial.reduce((s,c)=>s+(Number(c.agendamentos)||0),0);
+  const comparecimentos = db.comercial.reduce((s,c)=>s+(Number(c.comparecimentos)||0),0);
+  const fechamentos = db.comercial.reduce((s,c)=>s+(Number(c.fechamentos)||0),0);
+  const investimentoTotal = db.metaads.reduce((s,m)=>s+(Number(m.investimento)||0),0);
+  const taxaConversao = leads ? ((fechamentos/leads)*100).toFixed(1) : '0.0';
+  const cac = fechamentos ? (investimentoTotal/fechamentos).toFixed(2) : '—';
+
+  let html = viewHeader('Indicadores', 'Painel consolidado de performance de marketing e conversão.');
+  html += `<div class="stat-grid">
+    ${statCard('Conteúdos Produzidos', produzidos)}
+    ${statCard('Conteúdos Publicados', publicados)}
+    ${statCard('Stories Publicados', storiesPub)}
+    ${statCard('Alcance', numFmt(db.settings.alcance), true, 'alcance')}
+    ${statCard('Leads', leads)}
+    ${statCard('Agendamentos', agendamentos)}
+    ${statCard('Comparecimentos', comparecimentos)}
+    ${statCard('Taxa de Conversão', taxaConversao+'%')}
+    ${statCard('CAC', cac!=='—'?('R$ '+cac):'—')}
+    ${statCard('Receita Gerada', 'R$ '+numFmt(db.settings.receitaGerada), true, 'receitaGerada')}
+  </div>
+  <h3 style="font-size:13px;margin:20px 0 12px 0;">Funil Comercial</h3>
+  ${barRow('Leads Recebidos', leads, leads)}
+  ${barRow('Agendamentos', agendamentos, leads)}
+  ${barRow('Comparecimentos', comparecimentos, leads)}
+  ${barRow('Fechamentos', fechamentos, leads)}
+  `;
+  document.getElementById('main').innerHTML = html;
+  document.querySelectorAll('[data-editable-stat]').forEach(el=>{
+    el.addEventListener('change', e=>{
+      db.settings[e.target.dataset.editableStat] = Number(e.target.value)||0;
+      scheduleSave(); render();
+    });
+  });
+}
+function numFmt(n){ return Number(n||0).toLocaleString('pt-BR'); }
+function statCard(label, value, editable=false, field=''){
+  return `<div class="stat-card"><div class="stat-label">${label}</div>
+    ${editable
+      ? `<input data-editable-stat="${field}" value="${db.settings[field]}" style="background:transparent;border:none;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:600;width:100%;padding:0;">`
+      : `<div class="stat-value">${value}</div>`}
+  </div>`;
+}
+function barRow(label, val, max){
+  const pct = max ? Math.min(100, Math.round(val/max*100)) : 0;
+  return `<div class="bar-row"><div class="bar-label">${label}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><div class="bar-val">${val}</div></div>`;
+}
+
+function renderArquivos(){
+  let html = viewHeader('Biblioteca de Arquivos', 'Links de materiais, roteiros e criativos centralizados (referência).');
+  html += `<div class="empty">Adicione links de arquivos diretamente no campo "Arquivos" de cada dia do Calendário Operacional, ou no campo "Link do Documento" de cada Roteiro. Esta biblioteca reúne esses links por dia:</div>
+  <div class="table-wrap" style="margin-top:14px;"><table class="dtable"><thead><tr><th>Dia</th><th>Semana</th><th>Arquivos</th></tr></thead><tbody>
+  ${db.calendar.filter(c=>c.arquivos).map(c=>`<tr><td>${c.dia}</td><td>${c.semana}</td><td>${c.arquivos}</td></tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--text-dim);">Nenhum arquivo vinculado ainda.</td></tr>'}
+  </tbody></table></div>`;
+  document.getElementById('main').innerHTML = html;
+}
+
+function renderAprovacoes(){
+  const items = db.calendar.filter(c=>c.status==='Aguardando aprovação');
+  let html = viewHeader('Aprovações', 'Itens do Calendário Operacional aguardando aprovação.');
+  if(!items.length){ html += `<div class="empty">Nenhum item aguardando aprovação no momento.</div>`; }
+  else {
+    html += `<div class="table-wrap"><table class="dtable"><thead><tr><th>Dia</th><th>Data</th><th>Produção</th><th>Responsável</th><th>Status</th></tr></thead><tbody>`;
+    items.forEach(i=> html += `<tr><td>${i.dia}</td><td>${i.data}</td><td>${i.producao||'—'}</td><td>${i.responsavel||'—'}</td><td>${badge(i.status)}</td></tr>`);
+    html += `</tbody></table></div>`;
+  }
+  document.getElementById('main').innerHTML = html;
+}
+
+function renderTarefas(){
+  const items = currentWeekEntries();
+  let html = viewHeader('Tarefas da Semana', `Itens vinculados a: ${db.settings.semanaAtual}`);
+  if(!items.length){ html += `<div class="empty">Nenhuma tarefa para a semana atual. Use "Gerar Semana" no topo.</div>`; }
+  else {
+    html += `<div class="table-wrap"><table class="dtable"><thead><tr><th>Dia</th><th>Objetivo do Dia</th><th>Responsável</th><th>Prazo</th><th>Status</th></tr></thead><tbody>`;
+    items.forEach(i=> html += `<tr><td>${i.dia}</td><td>${i.objetivoDia||i.objetivoEstrategico||'—'}</td><td>${i.responsavel||'—'}</td><td>${i.prazo||'—'}</td><td>${badge(i.status)}</td></tr>`);
+    html += `</tbody></table></div>`;
+  }
+  document.getElementById('main').innerHTML = html;
+}
+
+function renderSemana(){
+  const items = currentWeekEntries();
+  let html = viewHeader('Dashboard da Semana', db.settings.semanaAtual);
+  if(!items.length){ html += `<div class="empty">Nenhum dado para esta semana ainda. Use "Gerar Semana".</div>`; document.getElementById('main').innerHTML = html; return; }
+  html += `<div class="week-grid">`;
+  WEEKDAYS.forEach(wd=>{
+    const e = items.find(c=>c.dia===wd);
+    const s = db.stories.find(x=>x.dia===wd && x.semana===db.settings.semanaAtual);
+    html += `<div class="day-card"><h4>${wd}</h4><div class="day-date">${e?e.data:'—'}</div>
+      <div class="day-row"><span class="lbl">Produção</span><span>${e?.producao||'—'}</span></div>
+      <div class="day-row"><span class="lbl">Stories</span><span>${s?(s.principal||s.bomDia):'—'}</span></div>
+      <div class="day-row"><span class="lbl">Meta Ads</span><span>${e?.metaads||'—'}</span></div>
+      <div class="day-row"><span class="lbl">Comercial</span><span>${e?.comercial||'—'}</span></div>
+      <div class="day-row"><span class="lbl">Status</span><span>${e?badge(e.status):'—'}</span></div>
+    </div>`;
+  });
+  html += `</div>`;
+  document.getElementById('main').innerHTML = html;
+}
+
+/* ---------- MAIN RENDER ---------- */
+function render(){
+  renderSidebar();
+  renderTopbar();
+  switch(view){
+    case 'dashboard': renderDashboard(); break;
+    case 'calendar': renderCalendar(); break;
+    case 'content': renderContent(); break;
+    case 'roteiros': renderRoteiros(); break;
+    case 'stories': renderStories(); break;
+    case 'metaads': renderMetaAds(); break;
+    case 'comercial': renderComercial(); break;
+    case 'indicadores': renderIndicadores(); break;
+    case 'arquivos': renderArquivos(); break;
+    case 'aprovacoes': renderAprovacoes(); break;
+    case 'tarefas': renderTarefas(); break;
+    case 'semana': renderSemana(); break;
+    default: renderDashboard();
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
