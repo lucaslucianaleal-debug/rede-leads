@@ -86,9 +86,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
                 : [];
             const singleClinic = profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null);
             if (profile.role === "admin" || profile.role === "cliente") {
-              const val = selectedClinicState || currentClinic || singleClinic || null;
+              const val = singleClinic || null;
               persistClinic(val);
-              console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val, "selectedClinic:", selectedClinicState);
+              console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val);
             } else {
               const clinicFromProfile = singleClinic;
               persistClinic(clinicFromProfile);
@@ -147,12 +147,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       const singleClinic = profile ? (profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null)) : null;
       if (profile) {
         if (profile.role === "admin" || profile.role === "cliente") {
-          const val = clinic ?? selectedClinicState ?? currentClinic ?? singleClinic ?? null;
+          const val = clinic ?? singleClinic ?? null;
           persistClinic(val);
           console.log(`[AuthProvider][login] ${profile.role} set currentClinic ->`, val);
         } else {
           // Outros roles têm restrição à clínica atribuída
-          const effective = clinic ?? selectedClinicState ?? currentClinic ?? singleClinic ?? null;
+          const effective = clinic ?? singleClinic ?? null;
           const allowed = profile.clinicId === effective || (Array.isArray(profile.clinicIds) && profile.clinicIds.includes(effective)) || (Array.isArray(profile.clinics) && profile.clinics.includes(effective));
           if (effective && allowed) {
             setSelectedClinic(effective);
