@@ -29,6 +29,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
   const [newClinicAddress, setNewClinicAddress] = useState("");
   const [newClinicPhone, setNewClinicPhone] = useState("");
   const [newClinicColor, setNewClinicColor] = useState("#E6FFFA");
+  const [newClinicModule, setNewClinicModule] = useState<"clinica" | "imobiliaria">("clinica");
 
   // User form
   const [username, setUsername] = useState("");
@@ -65,13 +66,14 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
         name: newClinicName,
         address: newClinicAddress,
         phone: newClinicPhone,
-        color: newClinicColor,
+          color: newClinicColor,
+          module: newClinicModule,
       });
 
       // Create user with the new clinic
       await createUser(username, password, "admin", clinic.id);
 
-      toast.success(`Clínica e usuário criados com sucesso!`);
+      toast.success(`${newClinicModule === "clinica" ? "Clínica" : "Conta (Imobiliária)"} e usuário criados com sucesso!`);
       onComplete(clinic.id);
       onClose();
     } catch (err: any) {
@@ -85,7 +87,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
         <DialogHeader>
           <DialogTitle>Bem-vindo ao Rede Leads</DialogTitle>
           <DialogDescription>
-            Crie sua clínica e primeira conta para começar
+            Crie sua conta e primeiro espaço para começar
           </DialogDescription>
         </DialogHeader>
 
@@ -93,6 +95,18 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
           {/* Clinic Info */}
           <div className="space-y-2">
             <h4 className="font-semibold text-sm">Informações da Clínica</h4>
+            <div className="space-y-2">
+              <Label htmlFor="clinic-module">Tipo</Label>
+              <select
+                id="clinic-module"
+                value={newClinicModule}
+                onChange={(e) => setNewClinicModule(e.target.value as "clinica" | "imobiliaria")}
+                className="w-full bg-slate-700 border-slate-600 text-white rounded px-3 py-2"
+              >
+                <option value="clinica">Clínica (Padrão)</option>
+                <option value="imobiliaria">Imobiliária</option>
+              </select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="clinic-name">Nome da clínica *</Label>
               <Input

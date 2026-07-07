@@ -72,6 +72,8 @@ export interface Lead {
   _deleted?: boolean;
   deletedAt?: string;
   deletedBy?: string;
+  // Campos personalizados por módulo (ex.: CRECI, imobiliaria)
+  customFields?: Record<string, any>;
 }
 
 export interface ReminderStatus {

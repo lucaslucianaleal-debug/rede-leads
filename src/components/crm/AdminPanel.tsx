@@ -60,6 +60,8 @@ export function AdminPanel() {
   const [newClinicAddress, setNewClinicAddress] = useState("");
   const [newClinicColor, setNewClinicColor] = useState("#E6FFFA");
   const [newClinicLogoUrl, setNewClinicLogoUrl] = useState("");
+  const [newClinicModule, setNewClinicModule] = useState<"clinica" | "imobiliaria">("clinica");
+  const [newClinicCustomFields, setNewClinicCustomFields] = useState("{}");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,12 +73,21 @@ export function AdminPanel() {
   const handleCreateClinic = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      let parsedCustom: Record<string, any> | undefined = undefined;
+      try {
+        parsedCustom = newClinicCustomFields ? JSON.parse(newClinicCustomFields) : undefined;
+      } catch (err) {
+        toast.error("JSON inválido em Campos Personalizados");
+        return;
+      }
       const clinic = await createClinic({
         id: newClinicId,
         name: newClinicName,
         address: newClinicAddress,
         color: newClinicColor,
         logoUrl: newClinicLogoUrl,
+        module: newClinicModule,
+        customFields: parsedCustom,
       });
       toast.success(`Clínica "${clinic.name}" criada com sucesso!`);
       setClinicForUser(clinic.id);
@@ -85,6 +96,8 @@ export function AdminPanel() {
       setNewClinicAddress("");
       setNewClinicColor("#E6FFFA");
       setNewClinicLogoUrl("");
+      setNewClinicModule("clinica");
+      setNewClinicCustomFields("{}");
     } catch {
       toast.error(clinicsError || "Erro ao criar clínica");
     }
@@ -206,6 +219,29 @@ export function AdminPanel() {
                   type="color"
                   value={newClinicColor}
                   onChange={(e) => setNewClinicColor(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="new-clinic-module">Tipo</Label>
+                <select
+                  id="new-clinic-module"
+                  value={newClinicModule}
+                  onChange={(e) => setNewClinicModule(e.target.value as "clinica" | "imobiliaria")}
+                  className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
+                >
+                  <option value="clinica">Clínica</option>
+                  <option value="imobiliaria">Imobiliária</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-clinic-logo">Campos Personalizados (JSON)</Label>
+                <Input
+                  id="new-clinic-customfields"
+                  placeholder='{"creci": "string", "imobiliaria": "string"}'
+                  value={newClinicCustomFields}
+                  onChange={(e) => setNewClinicCustomFields(e.target.value)}
                 />
               </div>
             </div>

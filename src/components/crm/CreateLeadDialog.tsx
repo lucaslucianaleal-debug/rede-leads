@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { maskPhone, isValidPhone } from "@/lib/phone";
 import { useLeads } from "@/hooks/useLeads";
+import { useClinics } from "@/hooks/useClinics";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,7 +68,11 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
     observacao: "",
     followUpCount: 0,
     lembretes: { h24: false, today: false },
+    customFields: {},
   });
+
+  const { clinics } = useClinics();
+  const [dynamicFields, setDynamicFields] = useState<Record<string, any> | null>(null);
 
   useEffect(() => {
     if (!open || !clinicId) return;
@@ -75,6 +80,15 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
       fetchedClinic.current = clinicId;
     }
     fetchActiveCampaignList(clinicId).then(setCampaigns);
+
+    const clinic = clinics.find((c) => c.id === clinicId);
+    if (clinic && clinic.customFields) {
+      setDynamicFields(clinic.customFields);
+      // initialize form customFields with empty values for each key
+      setForm((f) => ({ ...f, customFields: { ...(f.customFields || {}), ...Object.keys(clinic.customFields).reduce((acc, k) => ({ ...acc, [k]: "" }), {}) } }));
+    } else {
+      setDynamicFields(null);
+    }
   }, [clinicId, open]);
 
   const selectValue = (val: any) => (val === "" || val === undefined ? "none" : String(val));
@@ -330,6 +344,30 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
               placeholder="Notas sobre o lead"
             />
           </div>
+
+          {/* Dynamic custom fields from clinic */}
+          {dynamicFields && Object.keys(dynamicFields).length > 0 && (
+            <div className="col-span-2 border-t pt-3 space-y-3">
+              <h4 className="text-sm font-semibold">Informações adicionais</h4>
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(dynamicFields).map(([key, def]) => {
+                  const label = typeof def === "string" ? key : def.label || key;
+                  const type = typeof def === "string" ? "text" : def.type || "text";
+                  return (
+                    <div className="space-y-1" key={key}>
+                      <Label>{label}</Label>
+                      <Input
+                        value={(form.customFields && form.customFields[key]) || ""}
+                        onChange={(e) => set("customFields", { ...(form.customFields || {}), [key]: e.target.value })}
+                        placeholder={typeof def === "string" ? def : (def.placeholder || "")}
+                        type={type === "number" ? "number" : "text"}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">

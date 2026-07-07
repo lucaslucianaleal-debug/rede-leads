@@ -188,14 +188,14 @@ export default function Landing() {
                 </form>
                 <div className="mt-4 pt-4 border-t border-slate-700">
                   <p className="text-center text-xs text-slate-500 mb-2">
-                    {clinics.length > 0 ? "Quer criar nova clínica?" : "Ainda não tem clínica cadastrada?"}
+                    {clinics.length > 0 ? "Quer criar nova conta?" : "Ainda não tem conta cadastrada?"}
                   </p>
                   <Button
                     type="button"
                     onClick={() => setOnboardingOpen(true)}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
                   >
-                    {clinics.length > 0 ? "Criar Clínica" : "Cadastrar Clínica"}
+                    Criar Conta
                   </Button>
                 </div>
               </CardContent>
