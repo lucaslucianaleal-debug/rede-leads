@@ -63,6 +63,7 @@ export function AdminPanel() {
   const [newClinicModule, setNewClinicModule] = useState<"clinica" | "corretor">("clinica");
   const [newClinicCustomFields, setNewClinicCustomFields] = useState("{}");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const isCorretorModule = newClinicModule === "corretor";
 
   useEffect(() => {
     if (!clinicForUser && clinics.length > 0) {
@@ -89,7 +90,7 @@ export function AdminPanel() {
         module: newClinicModule,
         customFields: parsedCustom,
       });
-      toast.success(`Clínica "${clinic.name}" criada com sucesso!`);
+      toast.success(`${isCorretorModule ? "Corretor" : "Clínica"} "${clinic.name}" criado(a) com sucesso!`);
       setClinicForUser(clinic.id);
       setNewClinicId("");
       setNewClinicName("");
@@ -179,24 +180,24 @@ export function AdminPanel() {
 
         {/* Create Clinic Form */}
         <div className="space-y-4 border-b pb-4">
-          <h3 className="font-semibold">Criar Nova Clínica</h3>
+          <h3 className="font-semibold">{isCorretorModule ? "Criar Novo Corretor" : "Criar Nova Clínica"}</h3>
           <form onSubmit={handleCreateClinic} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="new-clinic-name">Nome da clínica</Label>
+                <Label htmlFor="new-clinic-name">{isCorretorModule ? "Nome do corretor" : "Nome da clínica"}</Label>
                 <Input
                   id="new-clinic-name"
-                  placeholder="Odontocompany Ribeirão"
+                  placeholder={isCorretorModule ? "Henrique" : "Odontocompany Ribeirão"}
                   value={newClinicName}
                   onChange={(e) => setNewClinicName(e.target.value)}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-clinic-id">ID da clínica</Label>
+                <Label htmlFor="new-clinic-id">{isCorretorModule ? "ID do corretor" : "ID da clínica"}</Label>
                 <Input
                   id="new-clinic-id"
-                  placeholder="odontocompany-ribeirao"
+                  placeholder={isCorretorModule ? "henrique-corretor" : "odontocompany-ribeirao"}
                   value={newClinicId}
                   onChange={(e) => setNewClinicId(e.target.value)}
                 />
@@ -213,7 +214,7 @@ export function AdminPanel() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-clinic-color">Cor</Label>
+                <Label htmlFor="new-clinic-color">{isCorretorModule ? "Cor do painel" : "Cor"}</Label>
                 <Input
                   id="new-clinic-color"
                   type="color"
@@ -255,7 +256,7 @@ export function AdminPanel() {
               />
             </div>
             <Button type="submit" disabled={clinicsLoading} className="w-full">
-              {clinicsLoading ? "Criando clínica..." : "Criar Clínica"}
+              {clinicsLoading ? "Criando..." : isCorretorModule ? "Criar Corretor" : "Criar Clínica"}
             </Button>
           </form>
         </div>

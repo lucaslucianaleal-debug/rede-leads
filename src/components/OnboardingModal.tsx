@@ -37,13 +37,14 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const loading = clinicsLoading || usersLoading;
+  const isCorretorModule = newClinicModule === "corretor";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validations
     if (!newClinicName.trim()) {
-      toast.error("Informe o nome da clínica");
+      toast.error(isCorretorModule ? "Informe o nome do corretor" : "Informe o nome da clínica");
       return;
     }
     if (!username.trim()) {
@@ -73,7 +74,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
       // Create user with the new clinic
       await createUser(username, password, "admin", clinic.id);
 
-      toast.success(`${newClinicModule === "clinica" ? "Clínica" : "Conta (Imobiliária)"} e usuário criados com sucesso!`);
+      toast.success(`${newClinicModule === "clinica" ? "Clínica" : "Corretor"} e usuário criados com sucesso!`);
       onComplete(clinic.id);
       onClose();
     } catch (err: any) {
@@ -94,7 +95,9 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Clinic Info */}
           <div className="space-y-2">
-            <h4 className="font-semibold text-sm">Informações da Clínica</h4>
+            <h4 className="font-semibold text-sm">
+              {isCorretorModule ? "Informações do Corretor" : "Informações da Clínica"}
+            </h4>
             <div className="space-y-2">
               <Label htmlFor="clinic-module">Tipo</Label>
               <select
@@ -108,10 +111,10 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="clinic-name">Nome da clínica *</Label>
+              <Label htmlFor="clinic-name">{isCorretorModule ? "Nome do corretor *" : "Nome da clínica *"}</Label>
               <Input
                 id="clinic-name"
-                placeholder="ex: Odontocompany"
+                placeholder={isCorretorModule ? "ex: Henrique" : "ex: Odontocompany"}
                 value={newClinicName}
                 onChange={(e) => setNewClinicName(e.target.value)}
                 required
@@ -119,10 +122,10 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="clinic-id">ID da clínica</Label>
+              <Label htmlFor="clinic-id">{isCorretorModule ? "ID do corretor" : "ID da clínica"}</Label>
               <Input
                 id="clinic-id"
-                placeholder="ex: odontocompany-ribeirao"
+                placeholder={isCorretorModule ? "ex: henrique-corretor" : "ex: odontocompany-ribeirao"}
                 value={newClinicId}
                 onChange={(e) => setNewClinicId(e.target.value)}
                 className="bg-slate-700 border-slate-600 text-white"
@@ -150,7 +153,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="clinic-color">Cor da clínica</Label>
+              <Label htmlFor="clinic-color">{isCorretorModule ? "Cor do painel" : "Cor da clínica"}</Label>
               <Input
                 id="clinic-color"
                 type="color"
@@ -202,7 +205,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
           </div>
 
           <Button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-700">
-            {loading ? "Criando..." : "Criar Clínica e Conta"}
+            {loading ? "Criando..." : isCorretorModule ? "Criar Corretor e Conta" : "Criar Clínica e Conta"}
           </Button>
         </form>
       </DialogContent>
