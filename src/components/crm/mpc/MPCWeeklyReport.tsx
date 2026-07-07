@@ -244,21 +244,6 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
         if (!prev || dt < prev) budgetDateByPerson.set(key, dt);
       });
 
-    budgets
-      .filter((b: any) => {
-        if (b.dentistId !== d.id) return false;
-        const dt = new Date(b.budgetAt || b.createdAt || 0);
-        return dt <= end;
-      })
-      .forEach((b: any) => {
-        const key = personKey(b.patientId, b.patientName, b.patientPhone);
-        const dt = new Date(b.budgetAt || b.createdAt || 0);
-        if (Number.isNaN(dt.getTime())) return;
-        budgetSet.add(key);
-        const prev = budgetDateByPerson.get(key);
-        if (!prev || dt < prev) budgetDateByPerson.set(key, dt);
-      });
-
     const convertedSet = new Set<string>();
     budgetSet.forEach((k) => {
       if (!completedCurrentByPerson.has(k)) return;
@@ -347,7 +332,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
     const dbPrev = budgets.filter((b: any) => {
       if (b.dentistId !== d.id) return false;
       const dt = new Date(b.budgetAt || b.createdAt || 0);
-      return dt < prevEnd;
+      return inRange(dt, prevStart, prevEnd);
     });
     const daPrev = attendedPrev.filter((a: any) => a.status === "attended");
     const bSet = new Set<string>();
@@ -409,7 +394,7 @@ function generateReportByRange(store: MPCStore, start: Date, end: Date): MPCWeek
   budgets
     .filter((b: any) => {
       const dt = new Date(b.budgetAt || b.createdAt || 0);
-      return dt <= end;
+      return inRange(dt, start, end);
     })
     .forEach((b: any) => {
       const key = personKey(b.patientId, b.patientName, b.patientPhone);
