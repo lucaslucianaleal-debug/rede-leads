@@ -128,9 +128,7 @@ export function useLeads() {
     busca: "",
   });
 
-  // Use clinic-specific document when available. Prefer `currentClinic`,
-  // but fall back to `selectedClinic` (chosen on login form) to avoid
-  // race conditions while auth state resolves.
+  // Use clinic-specific document when available.
   const { currentClinic, selectedClinic, user } = useAuth();
   const userId = user?.uid || null;
 
@@ -141,7 +139,7 @@ export function useLeads() {
     canWriteRef.current = false;
     setCanWrite(false);
     setLoading(true);
-    const effectiveClinic = currentClinic || selectedClinic || undefined;
+    const effectiveClinic = currentClinic || undefined;
     const targetDoc = resolveTargetDoc(effectiveClinic);
     // Sanitize clinic id for logging
     const clinicLabel = typeof effectiveClinic === 'string' ? String(effectiveClinic).replace(/[^\w\-]/g, '') : effectiveClinic;

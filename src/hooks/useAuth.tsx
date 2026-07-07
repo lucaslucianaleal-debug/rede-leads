@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from "react";
+import React, { useState, useEffect, createContext, useContext, useRef } from "react";
 import { auth, db } from "@/lib/firebase";
 import {
   signInWithEmailAndPassword,
@@ -32,6 +32,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
+  const lastUidRef = useRef<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +72,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser && lastUidRef.current && lastUidRef.current !== currentUser.uid) {
+        // Usuário mudou: limpa seleção anterior para não herdar clínica de outro login
+        setSelectedClinic(null);
+        persistClinic(null);
+      }
+      lastUidRef.current = currentUser?.uid || null;
+
       setUser(currentUser as User | null);
       setLoading(false);
       if (currentUser) {
@@ -84,7 +92,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
               : Array.isArray(profile.clinics)
                 ? profile.clinics.filter(Boolean)
                 : [];
-            const singleClinic = profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null);
+            const hasMultipleAccess = profileClinics.length > 1;
+            const singleClinic = hasMultipleAccess
+              ? null
+              : profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null);
             if (profile.role === "admin" || profile.role === "cliente") {
               const val = singleClinic || null;
               persistClinic(val);
@@ -144,7 +155,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         : profile && Array.isArray(profile.clinics)
           ? profile.clinics.filter(Boolean)
           : [];
-      const singleClinic = profile ? (profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null)) : null;
+      const hasMultipleAccess = profileClinics.length > 1;
+      const singleClinic = profile
+        ? (hasMultipleAccess ? null : (profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null)))
+        : null;
       if (profile) {
         if (profile.role === "admin" || profile.role === "cliente") {
           const val = clinic ?? singleClinic ?? null;
