@@ -73,6 +73,7 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
 
   const { clinics } = useClinics();
   const [dynamicFields, setDynamicFields] = useState<Record<string, any> | null>(null);
+  const currentClinicObj = clinics.find((c) => c.id === clinicId);
 
   useEffect(() => {
     if (!open || !clinicId) return;
@@ -82,10 +83,16 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
     fetchActiveCampaignList(clinicId).then(setCampaigns);
 
     const clinic = clinics.find((c) => c.id === clinicId);
-    if (clinic && clinic.customFields) {
-      setDynamicFields(clinic.customFields);
+    const defaultCorretorFields: Record<string, any> = {
+      endereco: { label: "Endereço", placeholder: "Rua, número, bairro, cidade" },
+      creci: { label: "CRECI", placeholder: "Número do CRECI" },
+    };
+
+    const fields = clinic ? (clinic.customFields || (clinic.module === "corretor" ? defaultCorretorFields : null)) : null;
+    if (fields) {
+      setDynamicFields(fields);
       // initialize form customFields with empty values for each key
-      setForm((f) => ({ ...f, customFields: { ...(f.customFields || {}), ...Object.keys(clinic.customFields).reduce((acc, k) => ({ ...acc, [k]: "" }), {}) } }));
+      setForm((f) => ({ ...f, customFields: { ...(f.customFields || {}), ...Object.keys(fields).reduce((acc, k) => ({ ...acc, [k]: "" }), {}) } }));
     } else {
       setDynamicFields(null);
     }
@@ -155,13 +162,15 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
     }
   };
 
+  const dialogTitle = currentClinicObj && currentClinicObj.module === "corretor" ? "Criar Corretor" : "Criar Novo Lead";
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Criar Novo Lead</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
           <div className="text-xs text-muted-foreground mt-1">
-            Preencha os campos abaixo para adicionar um novo lead
+            Preencha os campos abaixo para adicionar um novo {currentClinicObj && currentClinicObj.module === "corretor" ? "corretor" : "lead"}
           </div>
         </DialogHeader>
 
