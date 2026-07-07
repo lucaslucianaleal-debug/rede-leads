@@ -314,6 +314,48 @@ tr.row-overdue td:first-child{box-shadow:inset 3px 0 0 var(--danger);}
 </div>
 <div id="modal-root"></div>
 
+<script type="module">
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCzwAWRef44wB5tc98eFupuNK6C2Q7x4Eg",
+  authDomain: "rede-leads.firebaseapp.com",
+  projectId: "rede-leads",
+  storageBucket: "rede-leads.firebasestorage.app",
+  messagingSenderId: "245830989556",
+  appId: "1:245830989556:web:077187fa9244d614bb50a1",
+  measurementId: "G-X4MCYRWDTM"
+};
+
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const firestore = getFirestore(app);
+
+const params = new URLSearchParams(window.location.search);
+const clinicFromQuery = params.get("clinicId") || "";
+const clinicId = clinicFromQuery.trim() || "odontocompany-olimpia";
+const storageDocRef = doc(firestore, "clinics", clinicId, "mpc", "toolStandalone");
+
+window.storage = {
+  async get(key) {
+    if (key !== "mpc-db") return { value: null };
+    const snap = await getDoc(storageDocRef);
+    if (!snap.exists()) return { value: null };
+    const payload = snap.data()?.payload;
+    return { value: typeof payload === "string" ? payload : null };
+  },
+  async set(key, value) {
+    if (key !== "mpc-db") return;
+    await setDoc(storageDocRef, {
+      payload: String(value || ""),
+      clinicId,
+      updatedAt: new Date().toISOString(),
+      source: "mpc-tool-standalone"
+    }, { merge: true });
+  }
+};
+</script>
+
 <script>
 /* ---------- ICONS ---------- */
 const ICONS = {
