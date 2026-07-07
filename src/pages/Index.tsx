@@ -1,5 +1,6 @@
 import { useLeads } from "@/hooks/useLeads";
 import { useAuth } from "@/hooks/useAuth";
+import { useClinics } from "@/hooks/useClinics";
 import { ClinicChip } from "@/components/ClinicChip";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useConversations } from "@/hooks/useConversations";
@@ -53,6 +54,7 @@ import { useMPCDataStore } from "@/hooks/useMPCDataStore";
 
 const CRMDashboard = () => {
   const { user, currentClinic, setSelectedClinic } = useAuth();
+  const { clinics } = useClinics();
   const { permissions, isReceptionist, role } = useUserPermissions();
   const {
     leads,
@@ -105,6 +107,8 @@ const CRMDashboard = () => {
   const [isClient, setIsClient] = useState(false);
   const [clientClinicIds, setClientClinicIds] = useState<string[]>([]);
   const isMpcToolOnly = role === "mpc_tool";
+  const currentClinicRecord = clinics.find((c) => c.id === currentClinic);
+  const isCorretorModule = currentClinicRecord?.module === "corretor";
 
   // ...chat logic removido...
 
@@ -120,6 +124,13 @@ const CRMDashboard = () => {
       setClientClinicIds([]);
     }
   }, [role]);
+
+  useEffect(() => {
+    if (!isCorretorModule) return;
+    if (["mpc", "novos-leads", "roi-custos"].includes(activeTab)) {
+      setActiveTab("dashboard");
+    }
+  }, [activeTab, isCorretorModule]);
 
   // Calcular quantidade de duplicatas
   const duplicatesInfo = useMemo(() => {
@@ -224,12 +235,12 @@ const CRMDashboard = () => {
   const tabsMenuItems = [
     { value: "dashboard", label: "Dashboard" },
     { value: "dashboard-executivo", label: "Command Center" },
-    { value: "mpc", label: "Painel MPC" },
+    ...(!isCorretorModule ? [{ value: "mpc", label: "Painel MPC" }] : []),
     { value: "agenda", label: "Agenda do Dia" },
     { value: "all-leads", label: "Todos os Leads" },
-    { value: "novos-leads", label: "Novos Leads" },
+    ...(!isCorretorModule ? [{ value: "novos-leads", label: "Novos Leads" }] : []),
     { value: "regua-followup", label: "Rotina de Contatos" },
-    { value: "roi-custos", label: "ROI/Custos" },
+    ...(!isCorretorModule ? [{ value: "roi-custos", label: "ROI/Custos" }] : []),
     { value: "externos", label: "Serviços Externos" },
   ];
 
@@ -508,10 +519,12 @@ const CRMDashboard = () => {
               <LayoutDashboard className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Command Center</span>
             </TabsTrigger>
-            <TabsTrigger value="mpc" className="flex items-center gap-1.5">
-              <TrendingUp className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Painel MPC</span>
-            </TabsTrigger>
+            {!isCorretorModule && (
+              <TabsTrigger value="mpc" className="flex items-center gap-1.5">
+                <TrendingUp className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Painel MPC</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="agenda" className="flex items-center gap-1.5">
               <CalendarCheck className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Agenda do Dia</span>
@@ -520,23 +533,27 @@ const CRMDashboard = () => {
               <Database className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Todos os Leads</span>
             </TabsTrigger>
-            <TabsTrigger value="novos-leads" className="flex items-center gap-1.5">
-              <Inbox className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Novos Leads</span>
-              {newLeadsCount > 0 && (
-                <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white leading-none">
-                  {newLeadsCount}
-                </span>
-              )}
-            </TabsTrigger>
+            {!isCorretorModule && (
+              <TabsTrigger value="novos-leads" className="flex items-center gap-1.5">
+                <Inbox className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Novos Leads</span>
+                {newLeadsCount > 0 && (
+                  <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white leading-none">
+                    {newLeadsCount}
+                  </span>
+                )}
+              </TabsTrigger>
+            )}
             <TabsTrigger value="regua-followup" className="flex items-center gap-1.5">
               <BookOpen className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Rotina de Contatos</span>
             </TabsTrigger>
-            <TabsTrigger value="roi-custos" className="flex items-center gap-1.5">
-              <DollarSign className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">ROI/Custos</span>
-            </TabsTrigger>
+            {!isCorretorModule && (
+              <TabsTrigger value="roi-custos" className="flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">ROI/Custos</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="externos" className="flex items-center gap-1.5">
               <Ticket className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Serviços Externos</span>
@@ -592,9 +609,11 @@ const CRMDashboard = () => {
             <DashboardExecutivo />
           </TabsContent>
 
-          <TabsContent value="mpc" className="mt-6">
-            <MPCDashboard data={mpcData} isLoading={mpcLoading} store={mpcStore} mutations={mpcMutations} />
-          </TabsContent>
+          {!isCorretorModule && (
+            <TabsContent value="mpc" className="mt-6">
+              <MPCDashboard data={mpcData} isLoading={mpcLoading} store={mpcStore} mutations={mpcMutations} />
+            </TabsContent>
+          )}
 
           <TabsContent value="agenda" className="mt-6">
             <AgendaDoDia
@@ -623,9 +642,11 @@ const CRMDashboard = () => {
             />
           </TabsContent>
 
-          <TabsContent value="novos-leads" className="mt-6">
-            <NewLeadsTab onCreateLead={handleCreateLead} onCountChange={setNewLeadsCount} />
-          </TabsContent>
+          {!isCorretorModule && (
+            <TabsContent value="novos-leads" className="mt-6">
+              <NewLeadsTab onCreateLead={handleCreateLead} onCountChange={setNewLeadsCount} />
+            </TabsContent>
+          )}
 
           <TabsContent value="regua-followup" className="mt-6">
             <FollowUpRuler
@@ -638,9 +659,11 @@ const CRMDashboard = () => {
             />
           </TabsContent>
 
-          <TabsContent value="roi-custos" className="mt-6">
-            <ROIAnalysisView leads={leads} clinicId={currentClinic ?? user?.uid} />
-          </TabsContent>
+          {!isCorretorModule && (
+            <TabsContent value="roi-custos" className="mt-6">
+              <ROIAnalysisView leads={leads} clinicId={currentClinic ?? user?.uid} />
+            </TabsContent>
+          )}
 
           <TabsContent value="externos" className="mt-6">
             <ServicosExternos onRegisterCall={handleRegisterCall} />
