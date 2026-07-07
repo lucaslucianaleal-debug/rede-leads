@@ -870,20 +870,6 @@ function generateWeeklyReport(
         if (!prev || dt < prev) dentistEarliestBudgetByPerson.set(key, dt);
       });
 
-    budgets
-      .filter((b: any) => {
-        const dt = new Date(b.budgetAt || b.createdAt || 0);
-        return b.dentistId === d.id && dt <= now;
-      })
-      .forEach((b: any) => {
-        const key = personKey(b.patientId, b.patientName, b.patientPhone);
-        const dt = new Date(b.budgetAt || b.createdAt || 0);
-        if (Number.isNaN(dt.getTime())) return;
-        dentistBudgetSet.add(key);
-        const prev = dentistEarliestBudgetByPerson.get(key);
-        if (!prev || dt < prev) dentistEarliestBudgetByPerson.set(key, dt);
-      });
-
     const dentistConvertedSet = new Set<string>();
     attendedWeekByPerson.forEach((attendedDate, key) => {
       const budgetDate = dentistEarliestBudgetByPerson.get(key);
@@ -971,11 +957,11 @@ function generateWeeklyReport(
 
   const currentWeekConvBase = budgets.filter((b: any) => {
     const dt = new Date(b.budgetAt || b.createdAt || 0);
-    return dt <= now;
+    return dt >= weekStart && dt <= now;
   });
   const prevWeekConvBase = budgets.filter((b: any) => {
     const dt = new Date(b.budgetAt || b.createdAt || 0);
-    return dt < prevWeekEnd;
+    return dt >= prevWeekStart && dt < prevWeekEnd;
   });
   const weekBudgetSet = new Set<string>();
   const weekBudgetDateByPerson = new Map<string, Date>();
