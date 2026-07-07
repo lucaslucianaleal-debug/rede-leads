@@ -8,8 +8,8 @@ export interface ClinicRecord {
   logoUrl?: string;
   color?: string;
   // 'clinica' is the default for backwards compatibility
-  module?: "clinica" | "imobiliaria";
-  // Campos personalizados por módulo (p.ex. para imobiliária: CRECI, imobiliaria, areas)
+  module?: "clinica" | "corretor";
+  // Campos personalizados por módulo (p.ex. para corretor: CRECI, corretor, areas)
   customFields?: Record<string, any>;
   createdAt?: string;
   createdBy?: string;

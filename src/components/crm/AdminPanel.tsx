@@ -60,7 +60,7 @@ export function AdminPanel() {
   const [newClinicAddress, setNewClinicAddress] = useState("");
   const [newClinicColor, setNewClinicColor] = useState("#E6FFFA");
   const [newClinicLogoUrl, setNewClinicLogoUrl] = useState("");
-  const [newClinicModule, setNewClinicModule] = useState<"clinica" | "imobiliaria">("clinica");
+  const [newClinicModule, setNewClinicModule] = useState<"clinica" | "corretor">("clinica");
   const [newClinicCustomFields, setNewClinicCustomFields] = useState("{}");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -228,18 +228,18 @@ export function AdminPanel() {
                 <select
                   id="new-clinic-module"
                   value={newClinicModule}
-                  onChange={(e) => setNewClinicModule(e.target.value as "clinica" | "imobiliaria")}
+                  onChange={(e) => setNewClinicModule(e.target.value as "clinica" | "corretor")}
                   className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
                 >
                   <option value="clinica">Clínica</option>
-                  <option value="imobiliaria">Imobiliária</option>
+                  <option value="corretor">Corretor</option>
                 </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-clinic-logo">Campos Personalizados (JSON)</Label>
                 <Input
                   id="new-clinic-customfields"
-                  placeholder='{"creci": "string", "imobiliaria": "string"}'
+                  placeholder='{"creci": "string", "corretor": "string"}'
                   value={newClinicCustomFields}
                   onChange={(e) => setNewClinicCustomFields(e.target.value)}
                 />

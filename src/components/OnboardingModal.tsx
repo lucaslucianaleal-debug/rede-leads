@@ -29,7 +29,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
   const [newClinicAddress, setNewClinicAddress] = useState("");
   const [newClinicPhone, setNewClinicPhone] = useState("");
   const [newClinicColor, setNewClinicColor] = useState("#E6FFFA");
-  const [newClinicModule, setNewClinicModule] = useState<"clinica" | "imobiliaria">("clinica");
+  const [newClinicModule, setNewClinicModule] = useState<"clinica" | "corretor">("clinica");
 
   // User form
   const [username, setUsername] = useState("");
@@ -100,11 +100,11 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
               <select
                 id="clinic-module"
                 value={newClinicModule}
-                onChange={(e) => setNewClinicModule(e.target.value as "clinica" | "imobiliaria")}
+                onChange={(e) => setNewClinicModule(e.target.value as "clinica" | "corretor")}
                 className="w-full bg-slate-700 border-slate-600 text-white rounded px-3 py-2"
               >
                 <option value="clinica">Clínica (Padrão)</option>
-                <option value="imobiliaria">Imobiliária</option>
+                <option value="corretor">Corretor</option>
               </select>
             </div>
             <div className="space-y-2">

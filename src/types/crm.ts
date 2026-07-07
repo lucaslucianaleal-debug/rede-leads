@@ -72,7 +72,7 @@ export interface Lead {
   _deleted?: boolean;
   deletedAt?: string;
   deletedBy?: string;
-  // Campos personalizados por módulo (ex.: CRECI, imobiliaria)
+  // Campos personalizados por módulo (ex.: CRECI, corretor)
   customFields?: Record<string, any>;
 }
 
