@@ -22,14 +22,21 @@ function AppRoutes() {
   const { user, loading, currentClinic, setSelectedClinic, userProfile } = useAuth();
   const { clinics } = useClinics();
 
-  const availableClinicIds = userProfile
+  const rawClinicValues = userProfile
     ? [
         ...(userProfile.clinicId ? [userProfile.clinicId] : []),
         ...(Array.isArray(userProfile.clinicIds) ? userProfile.clinicIds : []),
         ...(Array.isArray(userProfile.clinics) ? userProfile.clinics : []),
-      ].filter(Boolean)
+      ]
     : [];
-  const uniqueClinicIds = Array.from(new Set(availableClinicIds));
+  const normalizedClinicValues = rawClinicValues
+    .filter(Boolean)
+    .map((v: any) => String(v).trim());
+  const hasWildcardAccess = normalizedClinicValues.includes("*");
+  const explicitClinicIds = Array.from(new Set(normalizedClinicValues.filter((v: string) => v !== "*")));
+  const uniqueClinicIds = hasWildcardAccess
+    ? clinics.map((c) => c.id)
+    : explicitClinicIds;
   const needsClinicSelection = !!user && !currentClinic && uniqueClinicIds.length > 1;
 
   // Public routes — no auth required

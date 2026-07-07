@@ -9,6 +9,20 @@ import {
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
+const normalizeProfileClinics = (profile: any) => {
+  const raw = [
+    ...(profile?.clinicId ? [profile.clinicId] : []),
+    ...(Array.isArray(profile?.clinicIds) ? profile.clinicIds : []),
+    ...(Array.isArray(profile?.clinics) ? profile.clinics : []),
+  ]
+    .filter(Boolean)
+    .map((v: any) => String(v).trim());
+
+  const hasWildcard = raw.includes("*");
+  const explicit = Array.from(new Set(raw.filter((v: string) => v !== "*")));
+  return { hasWildcard, explicit };
+};
+
 type AuthContextType = {
   user: User | null;
   loading: boolean;
@@ -60,6 +74,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       else localStorage.removeItem('crm_selected_clinic');
     } catch {}
     setSelectedClinicState(val);
+    // Reflete imediatamente no contexto atual
+    persistClinic(val);
   };
 
   useEffect(() => {
@@ -72,6 +88,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setLoading(true);
       if (currentUser && lastUidRef.current && lastUidRef.current !== currentUser.uid) {
         // Usuário mudou: limpa seleção anterior para não herdar clínica de outro login
         setSelectedClinic(null);
@@ -80,22 +97,15 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       lastUidRef.current = currentUser?.uid || null;
 
       setUser(currentUser as User | null);
-      setLoading(false);
       if (currentUser) {
         try {
           const ud = await getDoc(doc(db, "users", currentUser.uid));
           const profile = ud.exists() ? ud.data() : null;
           setUserProfile(profile);
           if (profile) {
-            const profileClinics = Array.isArray(profile.clinicIds)
-              ? profile.clinicIds.filter(Boolean)
-              : Array.isArray(profile.clinics)
-                ? profile.clinics.filter(Boolean)
-                : [];
-            const hasMultipleAccess = profileClinics.length > 1;
-            const singleClinic = hasMultipleAccess
-              ? null
-              : profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null);
+            const normalized = normalizeProfileClinics(profile);
+            const hasMultipleAccess = normalized.hasWildcard || normalized.explicit.length > 1;
+            const singleClinic = hasMultipleAccess ? null : (normalized.explicit[0] || null);
             if (profile.role === "admin" || profile.role === "cliente") {
               const val = singleClinic || null;
               persistClinic(val);
@@ -111,12 +121,14 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         }
       } else {
         setUserProfile(null);
+        setSelectedClinic(null);
         persistClinic(null);
         setClinicMeta(null);
       }
+      setLoading(false);
     });
     return unsubscribe;
-  }, [selectedClinicState, currentClinic]);
+  }, []);
 
   // Load clinic metadata when currentClinic changes
   useEffect(() => {
@@ -150,14 +162,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       const ud = await getDoc(doc(db, "users", uid));
       const profile = ud.exists() ? ud.data() : null;
       setUserProfile(profile);
-      const profileClinics = profile && Array.isArray(profile.clinicIds)
-        ? profile.clinicIds.filter(Boolean)
-        : profile && Array.isArray(profile.clinics)
-          ? profile.clinics.filter(Boolean)
-          : [];
-      const hasMultipleAccess = profileClinics.length > 1;
+      const normalized = normalizeProfileClinics(profile);
+      const hasMultipleAccess = normalized.hasWildcard || normalized.explicit.length > 1;
       const singleClinic = profile
-        ? (hasMultipleAccess ? null : (profile.clinicId || (profileClinics.length === 1 ? profileClinics[0] : null)))
+        ? (hasMultipleAccess ? null : (normalized.explicit[0] || null))
         : null;
       if (profile) {
         if (profile.role === "admin" || profile.role === "cliente") {
