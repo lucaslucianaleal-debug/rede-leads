@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "editor" | "viewer" | "recepcao" | "cliente";
+export type UserRole = "admin" | "editor" | "viewer" | "recepcao" | "cliente" | "mpc_tool";
 
 export interface ClinicRecord {
   id: string;
@@ -61,6 +61,13 @@ export const rolePermissions: Record<UserRole, UserPermissions> = {
   cliente: {
     canView: true,
     canEdit: false,
+    canImport: false,
+    canDelete: false,
+    canManageUsers: false,
+  },
+  mpc_tool: {
+    canView: true,
+    canEdit: true,
     canImport: false,
     canDelete: false,
     canManageUsers: false,

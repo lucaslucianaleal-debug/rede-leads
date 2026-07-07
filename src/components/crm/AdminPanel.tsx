@@ -131,6 +131,7 @@ export function AdminPanel() {
       viewer: "bg-gray-100 text-gray-800",
       recepcao: "bg-green-100 text-green-800",
       cliente: "bg-purple-100 text-purple-800",
+      mpc_tool: "bg-cyan-100 text-cyan-800",
     };
     return colors[role];
   };
@@ -142,6 +143,7 @@ export function AdminPanel() {
       viewer: "Visualizador",
       recepcao: "Recepção",
       cliente: "Cliente",
+      mpc_tool: "MPC Tool",
     };
     return labels[role];
   };
@@ -268,6 +270,9 @@ export function AdminPanel() {
                   <SelectItem value="cliente">
                     Cliente (Acesso limitado a leads)
                   </SelectItem>
+                  <SelectItem value="mpc_tool">
+                    MPC Tool (Somente painel operacional MPC)
+                  </SelectItem>
                   <SelectItem value="admin">
                     Administrador (Acesso total)
                   </SelectItem>
@@ -339,6 +344,8 @@ export function AdminPanel() {
                             </SelectItem>
                             <SelectItem value="editor">Editor</SelectItem>
                             <SelectItem value="recepcao">Recepção</SelectItem>
+                            <SelectItem value="cliente">Cliente</SelectItem>
+                            <SelectItem value="mpc_tool">MPC Tool</SelectItem>
                             <SelectItem value="admin">
                               Administrador
                             </SelectItem>
