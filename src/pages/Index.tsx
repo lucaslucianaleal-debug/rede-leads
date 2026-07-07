@@ -45,6 +45,7 @@ import { ptBR } from "date-fns/locale";
 import { useRef, useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { Navigate } from "react-router-dom";
 import DashboardExecutivo from "./DashboardExecutivo";
 import MPCDashboard from "@/components/crm/MPCDashboard";
 import { useMPCDashboardData } from "@/hooks/useMPCDashboardData";
@@ -104,7 +105,6 @@ const CRMDashboard = () => {
   const [isClient, setIsClient] = useState(false);
   const [clientClinicIds, setClientClinicIds] = useState<string[]>([]);
   const isMpcToolOnly = role === "mpc_tool";
-  const mpcToolUrl = `/mpc-tool-standalone.html?clinicId=${encodeURIComponent(currentClinic || "odontocompany-olimpia")}`;
 
   // ...chat logic removido...
 
@@ -120,12 +120,6 @@ const CRMDashboard = () => {
       setClientClinicIds([]);
     }
   }, [role]);
-
-  useEffect(() => {
-    if (isMpcToolOnly) {
-      setActiveTab("mpc-tool");
-    }
-  }, [isMpcToolOnly]);
 
   // Calcular quantidade de duplicatas
   const duplicatesInfo = useMemo(() => {
@@ -231,7 +225,6 @@ const CRMDashboard = () => {
     { value: "dashboard", label: "Dashboard" },
     { value: "dashboard-executivo", label: "Command Center" },
     { value: "mpc", label: "Painel MPC" },
-    { value: "mpc-tool", label: "MPC Tool Operacional" },
     { value: "agenda", label: "Agenda do Dia" },
     { value: "all-leads", label: "Todos os Leads" },
     { value: "novos-leads", label: "Novos Leads" },
@@ -245,6 +238,10 @@ const CRMDashboard = () => {
     setShowClearDuplicatesDialog(false);
     toast.success(`${removedCount} duplicata(s) removida(s)! Mantidos os registros mais recentes.`);
   };
+
+  if (isMpcToolOnly) {
+    return <Navigate to="/mpc-tool" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -271,7 +268,7 @@ const CRMDashboard = () => {
             >
               Executivo
             </button>
-            {!isReceptionist && !isMpcToolOnly && (
+            {!isReceptionist && (
               <>
                 <input type="file" ref={fileRef} accept=".csv" onChange={handleImport} className="hidden" />
 
@@ -465,22 +462,6 @@ const CRMDashboard = () => {
               {/* Dashboard Executivo temporarily hidden */}
             </Tabs>
           </div>
-        ) : isMpcToolOnly ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="w-full">
-              <TabsList className="w-full sm:max-w-md justify-start gap-2">
-                <TabsTrigger value="mpc-tool" className="flex items-center gap-1.5">
-                  <CalendarCheck className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">MPC Tool Operacional</span>
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            <TabsContent value="mpc-tool" className="mt-6">
-              <div className="w-full rounded-lg overflow-hidden border border-border bg-background" style={{ height: "calc(100vh - 240px)" }}>
-                <iframe title="MPC Tool Operacional" src={mpcToolUrl} className="w-full h-full border-0" />
-              </div>
-            </TabsContent>
-          </Tabs>
         ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="w-full flex flex-col gap-3 lg:block">
@@ -530,10 +511,6 @@ const CRMDashboard = () => {
             <TabsTrigger value="mpc" className="flex items-center gap-1.5">
               <TrendingUp className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Painel MPC</span>
-            </TabsTrigger>
-            <TabsTrigger value="mpc-tool" className="flex items-center gap-1.5">
-              <CalendarCheck className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">MPC Tool Operacional</span>
             </TabsTrigger>
             <TabsTrigger value="agenda" className="flex items-center gap-1.5">
               <CalendarCheck className="h-4 w-4 shrink-0" />
@@ -617,12 +594,6 @@ const CRMDashboard = () => {
 
           <TabsContent value="mpc" className="mt-6">
             <MPCDashboard data={mpcData} isLoading={mpcLoading} store={mpcStore} mutations={mpcMutations} />
-          </TabsContent>
-
-          <TabsContent value="mpc-tool" className="mt-6">
-            <div className="w-full rounded-lg overflow-hidden border border-border bg-background" style={{ height: "calc(100vh - 240px)" }}>
-              <iframe title="MPC Tool Operacional" src={mpcToolUrl} className="w-full h-full border-0" />
-            </div>
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6">
