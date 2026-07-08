@@ -234,7 +234,7 @@ const CRMDashboard = () => {
 
   const tabsMenuItems = [
     { value: "dashboard", label: "Dashboard" },
-    { value: "dashboard-executivo", label: "Command Center" },
+    { value: "dashboard-executivo", label: "Meta & Campanhas" },
     ...(!isCorretorModule ? [{ value: "mpc", label: "Painel MPC" }] : []),
     { value: "agenda", label: "Agenda do Dia" },
     { value: "all-leads", label: "Todos os Leads" },
@@ -275,9 +275,9 @@ const CRMDashboard = () => {
             <button
               onClick={() => setActiveTab('dashboard-executivo')}
               className="ml-2 inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all bg-secondary/10 text-foreground hover:bg-secondary/20"
-              aria-label="Abrir Dashboard Executivo"
+              aria-label="Abrir Meta e Campanhas"
             >
-              Executivo
+              Meta & Campanhas
             </button>
             {!isReceptionist && (
               <>
@@ -517,7 +517,7 @@ const CRMDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="dashboard-executivo" className="flex items-center gap-1.5">
               <LayoutDashboard className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Command Center</span>
+              <span className="hidden sm:inline">Meta & Campanhas</span>
             </TabsTrigger>
             {!isCorretorModule && (
               <TabsTrigger value="mpc" className="flex items-center gap-1.5">

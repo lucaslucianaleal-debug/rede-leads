@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Campaign } from "@/types/commandCenter";
 import type { Diagnostic } from "@/types/commandCenter";
-import { fetchCampaigns, createCampaign, upsertDailyMetric, updateCampaign, deleteDailyMetric } from "@/services/campaignService";
+import { fetchCampaigns, createCampaign, upsertDailyMetric, updateCampaign, deleteDailyMetric, deleteCampaign } from "@/services/campaignService";
 import type { CampaignDailyMetric } from "@/types/commandCenter";
 
 export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' = 'mes') {
@@ -64,6 +64,11 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
     await load();
   };
 
+  const handleDeleteCampaign = async (campaignId: string) => {
+    await deleteCampaign(clinicId, campaignId);
+    await load();
+  };
+
   return {
     campaigns,
     diagnostics,
@@ -74,5 +79,6 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
     handleDeleteDailyMetric,
     handleSaveCampaignFinance,
     handleToggleActive,
+    handleDeleteCampaign,
   };
 }

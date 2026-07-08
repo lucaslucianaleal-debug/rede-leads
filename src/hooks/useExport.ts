@@ -21,15 +21,17 @@ export function useExport() {
       if (!element) return;
 
       const canvas = await html2canvas(element, {
-        scale: 1.5,
+        scale: 2,
         useCORS: true,
         backgroundColor: "#0f0f0f",
       });
 
-      const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const topMarginFirstPage = 22;
+      const topMarginOtherPages = 10;
+      const pxPerMm = canvas.width / pdfWidth;
 
       // Header
       pdf.setFontSize(14);
@@ -39,8 +41,44 @@ export function useExport() {
       pdf.setFont("helvetica", "normal");
       pdf.text(`Período: ${period} · Gerado em: ${new Date().toLocaleString("pt-BR")}`, 14, 18);
 
-      // Dashboard screenshot
-      pdf.addImage(imgData, "PNG", 0, 22, pdfWidth, pdfHeight);
+      // Paginação real do canvas para evitar truncamento
+      let offsetYpx = 0;
+      let isFirstPage = true;
+
+      while (offsetYpx < canvas.height) {
+        const topMargin = isFirstPage ? topMarginFirstPage : topMarginOtherPages;
+        const availableHeightMm = pdfHeight - topMargin;
+        const sliceHeightPx = Math.min(canvas.height - offsetYpx, Math.floor(availableHeightMm * pxPerMm));
+
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeightPx;
+        const ctx = pageCanvas.getContext("2d");
+        if (!ctx) break;
+
+        ctx.drawImage(
+          canvas,
+          0,
+          offsetYpx,
+          canvas.width,
+          sliceHeightPx,
+          0,
+          0,
+          canvas.width,
+          sliceHeightPx
+        );
+
+        const imgData = pageCanvas.toDataURL("image/png");
+        const renderedHeightMm = sliceHeightPx / pxPerMm;
+        pdf.addImage(imgData, "PNG", 0, topMargin, pdfWidth, renderedHeightMm);
+
+        offsetYpx += sliceHeightPx;
+        isFirstPage = false;
+        if (offsetYpx < canvas.height) {
+          pdf.addPage();
+        }
+      }
+
       pdf.save(`OdontoCompany_Briefing_${new Date().toISOString().split("T")[0]}.pdf`);
     } finally {
       setExporting(false);

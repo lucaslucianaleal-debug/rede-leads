@@ -15,9 +15,7 @@ interface TopbarProps {
 }
 
 const LAYERS: { id: LayerType; label: string; icon: string }[] = [
-  { id: "ops", label: "Operacional", icon: "⊞" },
-  { id: "meta", label: "Meta Ads", icon: "📢" },
-  { id: "wa", label: "WhatsApp", icon: "💬" },
+  { id: "meta", label: "Meta & Campanhas", icon: "📢" },
 ];
 
 const PERIODS: { id: PeriodType; label: string }[] = [

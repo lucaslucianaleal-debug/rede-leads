@@ -13,6 +13,7 @@ interface Props {
   onSaveDailyMetric: (campaignId: string, metric: CampaignDailyMetric) => Promise<void>;
   onDeleteDailyMetric: (campaignId: string, date: string) => Promise<void>;
   onToggleActive: (campaignId: string, active: boolean) => Promise<void>;
+  onDeleteCampaign: (campaignId: string) => Promise<void>;
   onSaveCampaignFinance: (campaignId: string, data: { fundsAdded: number; taxCost: number }) => Promise<void>;
   onReload: () => void;
 }
@@ -173,6 +174,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance }: {
   onDailyMetric: (c: Campaign, metric?: CampaignDailyMetric) => void;
   onToggle: (c: Campaign) => void;
   onFinance: (c: Campaign) => void;
+  onDelete: (c: Campaign) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const receita = c.completed * ticketMedio;
@@ -287,6 +289,13 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance }: {
           <button onClick={() => onToggle(c)} style={{ border: "0.5px solid #3a3a3a", color: c.active ? "#ef4444" : "#10b981", fontSize: "11px" }} className="ml-auto px-3 py-1.5 rounded hover:bg-[#323232]">
             {c.active ? "Pausar" : "Ativar"}
           </button>
+          <button
+            onClick={() => onDelete(c)}
+            style={{ border: "0.5px solid #3a3a3a", color: "#ef4444", fontSize: "11px" }}
+            className="px-3 py-1.5 rounded hover:bg-[#323232]"
+          >
+            Excluir
+          </button>
         </div>
       </div>
 
@@ -333,7 +342,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance }: {
   );
 }
 
-export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCampaign, onSaveDailyMetric, onDeleteDailyMetric, onToggleActive, onSaveCampaignFinance, onReload }: Props) {
+export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCampaign, onSaveDailyMetric, onDeleteDailyMetric, onToggleActive, onDeleteCampaign, onSaveCampaignFinance, onReload }: Props) {
   const [dailyModal, setDailyModal] = useState<{ campaign: Campaign; metric?: CampaignDailyMetric } | null>(null);
   const [financeModal, setFinanceModal] = useState<Campaign | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -379,7 +388,20 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
       {active.length > 0 && (
         <div className="space-y-3 mb-3">
           {active.map(c => (
-            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })} onToggle={camp => onToggleActive(camp.id, !camp.active)} onFinance={camp => setFinanceModal(camp)} />
+            <CampaignRow
+              key={c.id}
+              c={c}
+              ticketMedio={ticketMedio}
+              onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })}
+              onToggle={camp => onToggleActive(camp.id, !camp.active)}
+              onFinance={camp => setFinanceModal(camp)}
+              onDelete={async (camp) => {
+                const ok = window.confirm(`Excluir a campanha "${camp.name}"? Esta ação não pode ser desfeita.`);
+                if (!ok) return;
+                await onDeleteCampaign(camp.id);
+                onReload();
+              }}
+            />
           ))}
         </div>
       )}
@@ -388,7 +410,20 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
         <div className="space-y-2">
           <p style={{ color: "#555", fontSize: "10px" }} className="uppercase tracking-wider mt-2">Pausadas</p>
           {paused.map(c => (
-            <CampaignRow key={c.id} c={c} ticketMedio={ticketMedio} onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })} onToggle={camp => onToggleActive(camp.id, !camp.active)} onFinance={camp => setFinanceModal(camp)} />
+            <CampaignRow
+              key={c.id}
+              c={c}
+              ticketMedio={ticketMedio}
+              onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })}
+              onToggle={camp => onToggleActive(camp.id, !camp.active)}
+              onFinance={camp => setFinanceModal(camp)}
+              onDelete={async (camp) => {
+                const ok = window.confirm(`Excluir a campanha "${camp.name}"? Esta ação não pode ser desfeita.`);
+                if (!ok) return;
+                await onDeleteCampaign(camp.id);
+                onReload();
+              }}
+            />
           ))}
         </div>
       )}
