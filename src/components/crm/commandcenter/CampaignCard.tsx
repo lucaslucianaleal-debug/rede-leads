@@ -168,7 +168,7 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
   );
 }
 
-function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance }: {
+function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDelete }: {
   c: Campaign;
   ticketMedio: number;
   onDailyMetric: (c: Campaign, metric?: CampaignDailyMetric) => void;

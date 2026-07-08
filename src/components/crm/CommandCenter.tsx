@@ -3,6 +3,7 @@ import type { LayerType, PeriodType } from "@/types/commandCenter";
 import { useMetaAds } from "@/hooks/useMetaAds";
 import { useActions } from "@/hooks/useActions";
 import { useExport } from "@/hooks/useExport";
+import { useAuth } from "@/hooks/useAuth";
 import Topbar from "./commandcenter/Topbar";
 import DiagnosticCard from "./commandcenter/DiagnosticCard";
 import CampaignCard from "./commandcenter/CampaignCard";
@@ -12,9 +13,9 @@ const unitToClinicId: Record<string, string> = {
   olimpia: "odontocompany-olimpia",
   badybassit: "odontocompany-badybassit",
   novohorizonte: "odontocompany-novohorizonte",
-  all: "odontocompany-olimpia", // Default para "Toda a rede" — mostra Olimpia por enquanto
 };
 export default function CommandCenter() {
+  const { currentClinic } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const [layer, setLayer] = useState<LayerType>("meta");
   const [period, setPeriod] = useState<PeriodType>("mes");
@@ -36,7 +37,10 @@ export default function CommandCenter() {
     }
   }, [ticketMedio]);
 
-  const clinicId = unitToClinicId[unit] || "odontocompany-olimpia";
+  const clinicId =
+    unit === "all"
+      ? (currentClinic || "odontocompany-olimpia")
+      : (unitToClinicId[unit] || currentClinic || "odontocompany-olimpia");
   const { campaigns, diagnostics: metaDiagnostics, reload: reloadCampaigns, handleAddCampaign, handleSaveDailyMetric, handleDeleteDailyMetric, handleSaveCampaignFinance, handleToggleActive, handleDeleteCampaign } = useMetaAds(unit, clinicId, ticketMedio, period);
   const { execute } = useActions(unit);
   const { exportPDF, exporting } = useExport();
