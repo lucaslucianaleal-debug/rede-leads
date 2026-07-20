@@ -194,6 +194,7 @@ function resolveLeadDate(lead: any) {
  */
 export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' = 'mes'): Promise<Campaign[]> {
   try {
+    const { start, end } = getPeriodRange(period);
     const colRef = collection(db, "clinics", clinicId, "campaigns");
     const snapshot = await getDocs(colRef);
     const sharedSnap = await getDoc(getSharedCampaignDoc(clinicId));
@@ -213,7 +214,6 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         }));
 
         const leads = await fetchLeadsFromClinic(clinicId);
-          const { start, end } = getPeriodRange(period);
         const restored = backupCampaigns.map((campaign: any, idx: number) => {
           const data = toCampaignDataSnapshot(campaign, campaign.id, clinicId);
             const filteredMetrics = (data.dailyMetrics || []).filter((m: CampaignDailyMetric) => {
