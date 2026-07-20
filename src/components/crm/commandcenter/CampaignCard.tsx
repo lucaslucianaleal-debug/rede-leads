@@ -130,8 +130,8 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
         <div className="h-[130px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 30, left: -18, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#3a3a3a" opacity={0.3} />
-              <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} />
+              <CartesianGrid strokeDasharray="2 2" stroke="#4a4a4a" opacity={0.45} vertical horizontal />
+              <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} interval={0} minTickGap={12} />
               <YAxis yAxisId="left" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} label={{ value: "Cliques", angle: -90, position: "insideLeft", style: { fontSize: 8, fill: "#888" } }} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9, fill: "#888" }} axisLine={false} tickLine={false} label={{ value: "CPC (R$)", angle: 90, position: "insideRight", style: { fontSize: 8, fill: "#888" } }} />
               <Tooltip
@@ -144,8 +144,8 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
                 }}
               />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "10px", paddingTop: "4px" }} />
-              <Line yAxisId="left" type="monotone" dataKey="clicks" name="Cliques" stroke="#06b6d4" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-              <Line yAxisId="right" type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+              <Line yAxisId="left" type="monotone" dataKey="clicks" name="Cliques" stroke="#06b6d4" strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "#06b6d4" }} activeDot={{ r: 4 }} />
+              <Line yAxisId="right" type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: "#f59e0b" }} activeDot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -246,8 +246,8 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
             <div className="h-[70px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={miniChartData} margin={{ top: 4, right: 8, left: -26, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#3a3a3a" opacity={0.25} />
-                  <XAxis dataKey="date" tick={{ fontSize: 8, fill: "#777" }} axisLine={false} tickLine={false} />
+                  <CartesianGrid strokeDasharray="2 2" stroke="#4a4a4a" opacity={0.4} vertical horizontal />
+                  <XAxis dataKey="date" tick={{ fontSize: 8, fill: "#777" }} axisLine={false} tickLine={false} interval={0} minTickGap={10} />
                   <YAxis yAxisId="left" hide />
                   <YAxis yAxisId="right" orientation="right" hide />
                   <Tooltip
@@ -259,8 +259,8 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
                       return [value, name];
                     }}
                   />
-                  <Line yAxisId="left" type="monotone" dataKey="clicks" name="Cliques" stroke="#06b6d4" strokeWidth={1.75} dot={false} />
-                  <Line yAxisId="right" type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={1.75} dot={false} />
+                  <Line yAxisId="left" type="monotone" dataKey="clicks" name="Cliques" stroke="#06b6d4" strokeWidth={1.75} dot={{ r: 1.5, strokeWidth: 0, fill: "#06b6d4" }} />
+                  <Line yAxisId="right" type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={1.75} dot={{ r: 1.5, strokeWidth: 0, fill: "#f59e0b" }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -439,7 +439,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
       </div>
 
       {active.length > 0 && (
-        <div className="space-y-3 mb-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
           {active.map(c => (
             <CampaignRow
               key={c.id}
@@ -462,22 +462,24 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
       {paused.length > 0 && (
         <div className="space-y-2">
           <p style={{ color: "#555", fontSize: "10px" }} className="uppercase tracking-wider mt-2">Pausadas</p>
-          {paused.map(c => (
-            <CampaignRow
-              key={c.id}
-              c={c}
-              ticketMedio={ticketMedio}
-              onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })}
-              onToggle={camp => onToggleActive(camp.id, !camp.active)}
-              onFinance={camp => setFinanceModal(camp)}
-              onDelete={async (camp) => {
-                const ok = window.confirm(`Excluir a campanha "${camp.name}"? Esta ação não pode ser desfeita.`);
-                if (!ok) return;
-                await onDeleteCampaign(camp.id);
-                onReload();
-              }}
-            />
-          ))}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {paused.map(c => (
+              <CampaignRow
+                key={c.id}
+                c={c}
+                ticketMedio={ticketMedio}
+                onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })}
+                onToggle={camp => onToggleActive(camp.id, !camp.active)}
+                onFinance={camp => setFinanceModal(camp)}
+                onDelete={async (camp) => {
+                  const ok = window.confirm(`Excluir a campanha "${camp.name}"? Esta ação não pode ser desfeita.`);
+                  if (!ok) return;
+                  await onDeleteCampaign(camp.id);
+                  onReload();
+                }}
+              />
+            ))}
+          </div>
         </div>
       )}
 

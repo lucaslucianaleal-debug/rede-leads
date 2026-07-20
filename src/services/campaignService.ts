@@ -136,6 +136,59 @@ function calcCampaignTotals(dailyMetrics: CampaignDailyMetric[]) {
   );
 }
 
+function parseFlexibleDate(value?: string) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    const iso = new Date(raw);
+    return isValid(iso) ? iso : null;
+  }
+
+  const br = parse(raw, "dd/MM/yyyy", new Date());
+  if (isValid(br)) return br;
+
+  const parsed = new Date(raw);
+  return isValid(parsed) ? parsed : null;
+}
+
+function getPeriodRange(period: 'hoje' | 'semana' | 'mes') {
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
+
+  if (period === 'hoje') {
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+
+  if (period === 'semana') {
+    start.setDate(now.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+
+  start.setDate(1);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+function inRange(date: Date, start: Date, end: Date) {
+  return date.getTime() >= start.getTime() && date.getTime() <= end.getTime();
+}
+
+function resolveLeadDate(lead: any) {
+  return parseFlexibleDate(lead?.dataCriacao)
+    || parseFlexibleDate(lead?.createdAt)
+    || parseFlexibleDate(lead?.created_at)
+    || parseFlexibleDate(lead?.dataCadastro)
+    || null;
+}
+
 /**
  * Busca todas as campanhas de uma clínica e enriquece com dados reais de leads
  */
@@ -160,14 +213,23 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         }));
 
         const leads = await fetchLeadsFromClinic(clinicId);
+          const { start, end } = getPeriodRange(period);
         const restored = backupCampaigns.map((campaign: any, idx: number) => {
           const data = toCampaignDataSnapshot(campaign, campaign.id, clinicId);
-          const campaignLeads = leads.filter(l => l.metaCampanhaId === campaign.id);
+            const filteredMetrics = (data.dailyMetrics || []).filter((m: CampaignDailyMetric) => {
+              const dt = parseFlexibleDate(m.date);
+              return dt ? inRange(dt, start, end) : false;
+            });
+            const campaignLeads = leads.filter(l => {
+              if (l.metaCampanhaId !== campaign.id) return false;
+              const dt = resolveLeadDate(l);
+              return dt ? inRange(dt, start, end) : false;
+            });
           const leadsCount = campaignLeads.length;
           const scheduledCount = campaignLeads.filter(l => l.dataAgendamento?.trim()).length;
           const completedCount = campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length;
-          const totals = calcCampaignTotals(data.dailyMetrics || []);
-          return buildCampaignFromSnapshot(campaign.id, clinicId, data, idx, ticketMedio, leadsCount, scheduledCount, completedCount, totals);
+            const totals = calcCampaignTotals(filteredMetrics);
+            return buildCampaignFromSnapshot(campaign.id, clinicId, { ...data, dailyMetrics: filteredMetrics }, idx, ticketMedio, leadsCount, scheduledCount, completedCount, totals);
         });
 
         await persistCampaignBackup(clinicId, backupCampaigns);
@@ -185,14 +247,21 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         const data = docSnap.data();
         const dailyMetrics: CampaignDailyMetric[] = Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [];
 
-        // Meta Ads precisa mostrar o desempenho completo da campanha, sem filtro de período.
-        const totals = calcCampaignTotals(dailyMetrics);
-        const campaignLeads = leads.filter(l => l.metaCampanhaId === docSnap.id);
+        const filteredMetrics = dailyMetrics.filter((m) => {
+          const dt = parseFlexibleDate(m.date);
+          return dt ? inRange(dt, start, end) : false;
+        });
+        const totals = calcCampaignTotals(filteredMetrics);
+        const campaignLeads = leads.filter(l => {
+          if (l.metaCampanhaId !== docSnap.id) return false;
+          const dt = resolveLeadDate(l);
+          return dt ? inRange(dt, start, end) : false;
+        });
 
         return buildCampaignFromSnapshot(
           docSnap.id,
           clinicId,
-          { ...data, dailyMetrics },
+          { ...data, dailyMetrics: filteredMetrics },
           idx,
           ticketMedio,
           campaignLeads.length,

@@ -75,7 +75,7 @@ export default function CommandCenter() {
         <div className="w-full max-w-[1600px] mx-auto space-y-4 md:space-y-6">
           {/* META ADS */}
           {layer === "meta" && (
-            <div className="space-y-6 max-w-4xl">
+            <div className="space-y-6">
               {/* Diagnósticos Meta */}
               {metaDiagnostics.length > 0 && (
                 <section>

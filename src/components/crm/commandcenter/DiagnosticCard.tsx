@@ -53,21 +53,13 @@ const labels = {
 };
 
 export default function DiagnosticCard({ diagnostics, onAction }: DiagnosticCardProps) {
-  // Mostrar todos se <= 4, senão colapsar os de baixa prioridade
-  const [expanded, setExpanded] = useState(false);
-
-  const crits = diagnostics.filter(d => d.type === "crit");
-  const imps = diagnostics.filter(d => d.type === "imp");
-  const rest = diagnostics.filter(d => d.type === "ok" || d.type === "info");
-
-  // Sempre mostrar urgentes + atenções; colapsar ok/info
-  const visible = expanded ? diagnostics : [...crits, ...imps, ...(crits.length + imps.length < 3 ? rest.slice(0, 3 - crits.length - imps.length) : [])];
-  const hiddenCount = diagnostics.length - visible.length;
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   return (
-    <div className="space-y-2">
-      {visible.map((d, i) => {
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      {diagnostics.map((d, i) => {
         const cfg = typeConfig[d.type];
+        const isExpanded = expandedIndex === i;
         return (
           <div
             key={i}
@@ -78,8 +70,12 @@ export default function DiagnosticCard({ diagnostics, onAction }: DiagnosticCard
             }}
             className="p-3 rounded-lg"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
+            <button
+              type="button"
+              onClick={() => setExpandedIndex(isExpanded ? null : i)}
+              className="w-full text-left"
+            >
+              <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 mb-1">
                   <span
                     style={{ color: cfg.badge, background: cfg.badgeBg, fontSize: "9px" }}
@@ -87,47 +83,42 @@ export default function DiagnosticCard({ diagnostics, onAction }: DiagnosticCard
                   >
                     {labels[d.type]}
                   </span>
+                  <span style={{ color: cfg.textMuted, fontSize: "10px" }} className="uppercase tracking-wider">
+                    {isExpanded ? "▲ Recolher" : "▼ Expandir"}
+                  </span>
                 </div>
-                <p style={{ color: cfg.textMain, fontSize: "12px" }} className="font-semibold leading-snug mb-0.5">
-                  {d.title}
-                </p>
-                <p style={{ color: cfg.textMuted, fontSize: "11px" }} className="leading-snug">
+              </div>
+              <p style={{ color: cfg.textMain, fontSize: "12px" }} className="font-semibold leading-snug mb-0.5">
+                {d.title}
+              </p>
+              {!isExpanded && (
+                <p style={{ color: cfg.textMuted, fontSize: "11px" }} className="leading-snug line-clamp-2">
                   {d.description}
                 </p>
-              </div>
-
-              {d.action && d.actionId && (
-                <button
-                  onClick={() => onAction?.(d.actionId!)}
-                  style={{ color: cfg.badge, borderColor: cfg.border, fontSize: "11px" }}
-                  className="shrink-0 px-3 py-1.5 rounded border font-medium whitespace-nowrap transition-opacity hover:opacity-80"
-                >
-                  {d.action} ↗
-                </button>
               )}
-            </div>
+            </button>
+
+            {isExpanded && (
+              <div className="mt-2 pt-2" style={{ borderTop: `0.5px dashed ${cfg.border}` }}>
+                <p style={{ color: cfg.textMain, fontSize: "12px" }} className="font-semibold leading-snug mb-0.5">
+                  {d.description}
+                </p>
+                {d.action && d.actionId && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => onAction?.(d.actionId!)}
+                      style={{ color: cfg.badge, borderColor: cfg.border, fontSize: "11px" }}
+                      className="px-3 py-1.5 rounded border font-medium whitespace-nowrap transition-opacity hover:opacity-80"
+                    >
+                      {d.action} ↗
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
-
-      {hiddenCount > 0 && (
-        <button
-          onClick={() => setExpanded(true)}
-          style={{ color: "#666", fontSize: "11px" }}
-          className="w-full py-2 text-center hover:text-white transition-colors"
-        >
-          + {hiddenCount} insight{hiddenCount > 1 ? "s" : ""} adicionais — clique para ver
-        </button>
-      )}
-      {expanded && rest.length > 0 && (
-        <button
-          onClick={() => setExpanded(false)}
-          style={{ color: "#555", fontSize: "11px" }}
-          className="w-full py-1 text-center hover:text-white transition-colors"
-        >
-          ▲ Recolher
-        </button>
-      )}
     </div>
   );
 }
