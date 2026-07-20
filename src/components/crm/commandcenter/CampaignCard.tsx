@@ -4,7 +4,7 @@ import CampaignDailyModal from "./CampaignDailyModal";
 import CampaignFinanceModal from "./CampaignFinanceModal";
 import CreateCampaignModal from "./CreateCampaignModal";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
-import { buildCampaignDecision } from "@/lib/mpcDecisionEngine";
+import { buildBudgetAllocationPlan, buildCampaignDecision, buildConfidenceContext, buildMondayActions, buildStrategicContext } from "@/lib/mpcDecisionEngine";
 
 interface Props {
   campaigns: Campaign[];
@@ -182,6 +182,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
   const receita = c.completed * ticketMedio;
   const custoReal = c.totalSpend + c.taxCost;
   const decision = buildCampaignDecision(c);
+  const confidenceCtx = buildConfidenceContext(c);
   const funnelScore = Math.round((
     scoreLowerIsBetter(c.cacLead, 8) +
     scoreLowerIsBetter(c.cacAgendamento, 20) +
@@ -246,7 +247,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
               <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider font-semibold">Centro de decisao MPC</p>
               <p style={{ color: decision.color, fontSize: "12px" }} className="font-bold mt-0.5">{decision.emoji} {decision.title}</p>
             </div>
-            <span style={{ color: "#aaa", fontSize: "10px" }} className="uppercase">Confianca: {decision.confidence}</span>
+            <span style={{ color: confidenceCtx.color, fontSize: "10px" }} className="uppercase">{confidenceCtx.emoji} Confianca {confidenceCtx.label}</span>
           </div>
 
           <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" } } className="rounded p-2 mb-2">
@@ -266,6 +267,11 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
 
           {decisionExpanded && (
             <div className="mt-2 space-y-1">
+              <div className="mb-1">
+                {confidenceCtx.checks.map((check, idx) => (
+                  <p key={idx} style={{ color: "#9ca3af", fontSize: "10px" }}>- {check}</p>
+                ))}
+              </div>
               {decision.reasons.map((reason, idx) => (
                 <p key={idx} style={{ color: "#cfcfcf", fontSize: "10px" }}>• {reason}</p>
               ))}
@@ -435,6 +441,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const [dailyModal, setDailyModal] = useState<{ campaign: Campaign; metric?: CampaignDailyMetric } | null>(null);
   const [financeModal, setFinanceModal] = useState<Campaign | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [availableBudget, setAvailableBudget] = useState(300);
 
   const active = campaigns.filter(c => c.active);
   const paused = campaigns.filter(c => !c.active);
@@ -443,6 +450,11 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const totalCompleted = campaigns.reduce((a, c) => a + c.completed, 0);
   const receita = totalCompleted * ticketMedio;
   const totalCompletedRate = totalLeads > 0 ? Math.round((totalCompleted / totalLeads) * 100) : 0;
+  const strategicRanking = active
+    .map((c) => ({ campaign: c, ctx: buildStrategicContext(c, ticketMedio) }))
+    .sort((a, b) => b.ctx.priorityScore - a.ctx.priorityScore);
+  const allocationPlan = buildBudgetAllocationPlan(active, ticketMedio, availableBudget);
+  const mondayActions = buildMondayActions(active, ticketMedio);
 
   return (
     <>
@@ -473,6 +485,67 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
           <p style={{ color: "#555", fontSize: "12px" }} className="text-center py-1">Nenhuma campanha criada ainda</p>
         )}
       </div>
+
+      {active.length > 0 && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 mb-4">
+          <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
+            <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider mb-2">Prioridade estrategica</p>
+            <div className="space-y-2">
+              {strategicRanking.slice(0, 3).map(({ campaign, ctx }, idx) => (
+                <div key={campaign.id} style={{ background: "#262626", border: `0.5px solid ${ctx.decision.color}` }} className="rounded p-2">
+                  <p style={{ color: "#999", fontSize: "9px" }} className="uppercase">Prioridade {idx + 1}</p>
+                  <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">{campaign.name}</p>
+                  <p style={{ color: "#fbbf24", fontSize: "10px" }}>{"★".repeat(ctx.priorityStars)}{"☆".repeat(5 - ctx.priorityStars)}</p>
+                  <p style={{ color: "#aaa", fontSize: "10px" }}>{ctx.decision.recommendation}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider">Centro de alocacao de verba</p>
+              <div className="flex items-center gap-1">
+                <span style={{ color: "#999", fontSize: "10px" }}>R$</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={10}
+                  value={availableBudget}
+                  onChange={(e) => setAvailableBudget(Number(e.target.value || 0))}
+                  style={{ background: "#262626", border: "0.5px solid #3a3a3a", color: "#fff", fontSize: "11px", width: 90 }}
+                  className="rounded px-2 py-1"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {allocationPlan.items.slice(0, 3).map((item) => (
+                <div key={item.campaignId} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+                  <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">{item.campaignName}</p>
+                  <p style={{ color: "#10b981", fontSize: "11px" }} className="font-bold">{fmt(item.allocated)}</p>
+                  <p style={{ color: "#aaa", fontSize: "10px" }}>+{item.expectedLeads} leads | +{item.expectedCompleted} comparecimentos</p>
+                  <p style={{ color: "#10b981", fontSize: "10px" }}>Receita potencial: {fmt(item.expectedRevenue)}</p>
+                </div>
+              ))}
+            </div>
+            <p style={{ color: "#777", fontSize: "10px" }} className="mt-2">Reserva estrategica: {fmt(allocationPlan.reserve)}</p>
+          </div>
+
+          <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
+            <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider mb-2">O que fazer segunda-feira</p>
+            <div className="space-y-2">
+              {mondayActions.map((action, idx) => (
+                <div key={`${idx}-${action.title}`} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+                  <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">{idx + 1}. {action.title}</p>
+                  <p style={{ color: "#9ca3af", fontSize: "10px" }}>{action.impact}</p>
+                  <p style={{ color: "#777", fontSize: "10px" }}>{action.reason}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {active.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">

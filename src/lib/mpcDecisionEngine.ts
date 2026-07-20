@@ -27,6 +27,55 @@ export interface CampaignDecision {
   confidence: "baixa" | "media" | "alta";
 }
 
+export interface ConfidenceContext {
+  label: "Baixa" | "Media" | "Alta";
+  color: string;
+  emoji: string;
+  checks: string[];
+}
+
+export interface ImpactProjection {
+  increasePct: number;
+  extraSpend: number;
+  leads: number;
+  scheduled: number;
+  completed: number;
+  revenue: number;
+}
+
+export interface CampaignStrategicContext {
+  campaignId: string;
+  campaignName: string;
+  priorityScore: number;
+  priorityStars: number;
+  priorityLabel: string;
+  decision: CampaignDecision;
+  confidenceContext: ConfidenceContext;
+  projection20: ImpactProjection;
+}
+
+export interface AllocationItem {
+  campaignId: string;
+  campaignName: string;
+  allocated: number;
+  expectedLeads: number;
+  expectedCompleted: number;
+  expectedRevenue: number;
+  reason: string;
+}
+
+export interface BudgetAllocationPlan {
+  totalBudget: number;
+  reserve: number;
+  items: AllocationItem[];
+}
+
+export interface MondayAction {
+  title: string;
+  impact: string;
+  reason: string;
+}
+
 const TARGETS = {
   cpl: 8,
   cacAgendamento: 20,
@@ -83,6 +132,14 @@ function computeConfidence(campaign: Campaign): "baixa" | "media" | "alta" {
   if (campaign.totalSpend < 50 || campaign.leads < 8) return "baixa";
   if (campaign.totalSpend < 150 || campaign.leads < 20) return "media";
   return "alta";
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function round(value: number) {
+  return Math.round(value * 10) / 10;
 }
 
 export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
@@ -227,4 +284,165 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
     nextReview: "Reavaliar apos mais dados de funil (7 dias).",
     confidence: computeConfidence(campaign),
   };
+}
+
+export function buildConfidenceContext(campaign: Campaign): ConfidenceContext {
+  const spend = (campaign.totalSpend || 0) + (campaign.taxCost || 0);
+  const metricsDays = new Set((campaign.allDailyMetrics || campaign.dailyMetrics || []).map((m) => m.date)).size;
+  const checks = [
+    `${campaign.leads} leads avaliados`,
+    `${metricsDays} dias com dados`,
+    `R$${spend.toFixed(0)} investidos`,
+  ];
+
+  if (campaign.leads >= 15 && metricsDays >= 7 && spend >= 80) {
+    return { label: "Alta", color: "#10b981", emoji: "🟢", checks };
+  }
+  if (campaign.leads >= 6 && metricsDays >= 4 && spend >= 30) {
+    return { label: "Media", color: "#f59e0b", emoji: "🟡", checks };
+  }
+  return { label: "Baixa", color: "#ef4444", emoji: "🔴", checks };
+}
+
+export function projectImpact(campaign: Campaign, ticketMedio: number, increasePct = 20): ImpactProjection {
+  const spend = (campaign.totalSpend || 0) + (campaign.taxCost || 0);
+  const baseForIncrease = campaign.budget > 0 ? campaign.budget : Math.max(spend, 10);
+  const extraSpend = baseForIncrease * (increasePct / 100);
+
+  const leadPerReal = spend > 0 ? campaign.leads / spend : 0;
+  const expectedLeads = extraSpend * leadPerReal;
+  const conv = campaign.conversionRate > 0 ? campaign.conversionRate / 100 : 0;
+  const show = campaign.showUpRate > 0 ? campaign.showUpRate / 100 : 0;
+  const expectedScheduled = expectedLeads * conv;
+  const expectedCompleted = expectedScheduled * show;
+  const expectedRevenue = expectedCompleted * ticketMedio;
+
+  return {
+    increasePct,
+    extraSpend: round(extraSpend),
+    leads: round(expectedLeads),
+    scheduled: round(expectedScheduled),
+    completed: round(expectedCompleted),
+    revenue: round(expectedRevenue),
+  };
+}
+
+export function buildStrategicContext(campaign: Campaign, ticketMedio: number): CampaignStrategicContext {
+  const decision = buildCampaignDecision(campaign);
+  const confidenceContext = buildConfidenceContext(campaign);
+  const projection20 = projectImpact(campaign, ticketMedio, 20);
+
+  const revenuePotential = campaign.completed * ticketMedio;
+  const efficiencyScore = clamp((TARGETS.cpl / Math.max(campaign.cacLead || TARGETS.cpl, 0.1)) * 25, 0, 35);
+  const conversionScore = clamp((campaign.conversionRate / TARGETS.conversionRate) * 20, 0, 20);
+  const showUpScore = clamp((campaign.showUpRate / TARGETS.showUpRate) * 15, 0, 15);
+  const revenueScore = clamp(revenuePotential / 200, 0, 20);
+  const confidenceBonus = confidenceContext.label === "Alta" ? 10 : confidenceContext.label === "Media" ? 5 : 0;
+  const pausePenalty = decision.action === "pausar" ? -30 : 0;
+  const priorityScore = Math.round(clamp(efficiencyScore + conversionScore + showUpScore + revenueScore + confidenceBonus + pausePenalty, 0, 100));
+  const priorityStars = clamp(Math.round(priorityScore / 20), 1, 5);
+
+  return {
+    campaignId: campaign.id,
+    campaignName: campaign.name,
+    priorityScore,
+    priorityStars,
+    priorityLabel: `Prioridade ${priorityStars}`,
+    decision,
+    confidenceContext,
+    projection20,
+  };
+}
+
+export function buildBudgetAllocationPlan(campaigns: Campaign[], ticketMedio: number, totalBudget: number): BudgetAllocationPlan {
+  const active = campaigns.filter((c) => c.active);
+  if (active.length === 0 || totalBudget <= 0) {
+    return { totalBudget, reserve: totalBudget, items: [] };
+  }
+
+  const contexts = active
+    .map((c) => buildStrategicContext(c, ticketMedio))
+    .filter((ctx) => ctx.decision.action !== "pausar")
+    .sort((a, b) => b.priorityScore - a.priorityScore);
+
+  if (contexts.length === 0) {
+    return { totalBudget, reserve: totalBudget, items: [] };
+  }
+
+  const reserve = Math.round(totalBudget * 0.1);
+  const allocatable = totalBudget - reserve;
+  const weightSum = contexts.reduce((sum, ctx) => sum + Math.max(ctx.priorityScore, 1), 0);
+
+  const items: AllocationItem[] = contexts.map((ctx) => {
+    const ratio = Math.max(ctx.priorityScore, 1) / weightSum;
+    const allocated = Math.round(allocatable * ratio);
+    const campaign = active.find((c) => c.id === ctx.campaignId)!;
+    const projection = projectImpact(campaign, ticketMedio, campaign.budget > 0 ? (allocated / campaign.budget) * 100 : 20);
+    return {
+      campaignId: ctx.campaignId,
+      campaignName: ctx.campaignName,
+      allocated,
+      expectedLeads: projection.leads,
+      expectedCompleted: projection.completed,
+      expectedRevenue: projection.revenue,
+      reason: ctx.decision.recommendation,
+    };
+  });
+
+  return { totalBudget, reserve, items };
+}
+
+export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): MondayAction[] {
+  const contexts = campaigns
+    .filter((c) => c.active)
+    .map((c) => ({ campaign: c, ctx: buildStrategicContext(c, ticketMedio) }))
+    .sort((a, b) => b.ctx.priorityScore - a.ctx.priorityScore);
+
+  const actions: MondayAction[] = [];
+
+  contexts.forEach(({ campaign, ctx }) => {
+    if (ctx.decision.action === "pausar") {
+      actions.push({
+        title: `Pausar ${campaign.name}`,
+        impact: "Protege verba e evita desperdicio no curto prazo.",
+        reason: ctx.decision.recommendation,
+      });
+      return;
+    }
+
+    if (ctx.decision.action === "escalar_20" || ctx.decision.action === "escalar_30") {
+      actions.push({
+        title: `Ajustar ${campaign.name} (${ctx.decision.action === "escalar_30" ? "+30%" : "+20%"})`,
+        impact: `Impacto esperado: +${ctx.projection20.leads} leads, +${ctx.projection20.completed} comparecimentos, +R$${ctx.projection20.revenue.toFixed(0)}.`,
+        reason: ctx.decision.recommendation,
+      });
+      return;
+    }
+
+    if (ctx.decision.action === "otimizar") {
+      actions.push({
+        title: `Trocar criativo/publico em ${campaign.name}`,
+        impact: "Objetivo: recuperar tracao e reduzir custo por resultado.",
+        reason: ctx.decision.recommendation,
+      });
+      return;
+    }
+
+    actions.push({
+      title: `Manter ${campaign.name}`,
+      impact: "Continuar captacao enquanto acumula dados confiaveis.",
+      reason: ctx.decision.recommendation,
+    });
+  });
+
+  const lowShowUp = campaigns.find((c) => c.active && c.scheduled >= 6 && c.showUpRate > 0 && c.showUpRate < TARGETS.showUpRate);
+  if (lowShowUp) {
+    actions.push({
+      title: "Revisar tempo de resposta do comercial",
+      impact: "Potencial de ganho direto em comparecimento nas campanhas ativas.",
+      reason: `${lowShowUp.name} esta com comparecimento ${lowShowUp.showUpRate}% (meta ${TARGETS.showUpRate}%).`,
+    });
+  }
+
+  return actions.slice(0, 5);
 }
