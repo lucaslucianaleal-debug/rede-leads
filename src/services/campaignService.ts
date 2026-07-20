@@ -153,10 +153,17 @@ function parseFlexibleDate(value?: string) {
   return isValid(parsed) ? parsed : null;
 }
 
-function getPeriodRange(period: 'hoje' | 'semana' | 'mes') {
+function getPeriodRange(period: 'hoje' | 'semana' | 'mes' | 'historico') {
   const now = new Date();
   const start = new Date(now);
   const end = new Date(now);
+
+  if (period === 'historico') {
+    start.setFullYear(2000, 0, 1);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
 
   if (period === 'hoje') {
     start.setHours(0, 0, 0, 0);
@@ -192,7 +199,7 @@ function resolveLeadDate(lead: any) {
 /**
  * Busca todas as campanhas de uma clínica e enriquece com dados reais de leads
  */
-export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' = 'mes'): Promise<Campaign[]> {
+export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' | 'historico' = 'mes'): Promise<Campaign[]> {
   try {
     const { start, end } = getPeriodRange(period);
     const colRef = collection(db, "clinics", clinicId, "campaigns");

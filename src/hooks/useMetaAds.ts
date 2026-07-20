@@ -4,7 +4,7 @@ import type { Diagnostic } from "@/types/commandCenter";
 import { fetchCampaigns, createCampaign, upsertDailyMetric, updateCampaign, deleteDailyMetric, deleteCampaign } from "@/services/campaignService";
 import type { CampaignDailyMetric } from "@/types/commandCenter";
 
-export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' = 'mes') {
+export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' | 'historico' = 'mes') {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
 

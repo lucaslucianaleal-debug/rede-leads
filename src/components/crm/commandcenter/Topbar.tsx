@@ -22,6 +22,7 @@ const PERIODS: { id: PeriodType; label: string }[] = [
   { id: "hoje", label: "Hoje" },
   { id: "semana", label: "Semana" },
   { id: "mes", label: "Mês" },
+  { id: "historico", label: "Histórico" },
 ];
 
 export default function Topbar({

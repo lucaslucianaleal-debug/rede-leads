@@ -1,7 +1,7 @@
 // Command Center — tipos centrais
 
 export type LayerType = 'ops' | 'meta' | 'wa';
-export type PeriodType = 'hoje' | 'semana' | 'mes';
+export type PeriodType = 'hoje' | 'semana' | 'mes' | 'historico';
 
 export interface KPI {
   label: string;
