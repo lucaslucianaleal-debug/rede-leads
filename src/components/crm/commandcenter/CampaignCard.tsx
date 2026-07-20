@@ -179,6 +179,26 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
   const [expanded, setExpanded] = useState(false);
   const receita = c.completed * ticketMedio;
   const custoReal = c.totalSpend + c.taxCost;
+  const funnelScore = Math.round((
+    scoreLowerIsBetter(c.cacLead, 8) +
+    scoreLowerIsBetter(c.cacAgendamento, 20) +
+    scoreLowerIsBetter(c.cacComparecimento, 80) +
+    scoreHigherIsBetter(c.conversionRate, 35) +
+    scoreHigherIsBetter(c.showUpRate, 50)
+  ) / 5);
+
+  const miniChartData = [...c.dailyMetrics]
+    .sort((a, b) => {
+      const [da, ma, ya] = a.date.split("/").map(Number);
+      const [db, mb, yb] = b.date.split("/").map(Number);
+      return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db).getTime();
+    })
+    .slice(-7)
+    .map((item) => ({
+      date: item.date,
+      clicks: item.clicks || 0,
+      cpc: item.clicks > 0 ? Number((item.spend / item.clicks).toFixed(2)) : (item.spend || 0),
+    }));
 
   return (
     <div style={{ background: "#1e1e1e", border: `0.5px solid ${c.active ? "#3a3a3a" : "#2a2a2a"}` }} className="rounded-lg overflow-hidden">
@@ -194,28 +214,59 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
               {c.dateStart && <p style={{ color: "#555", fontSize: "10px" }}>{c.dateStart}{c.dateEnd ? ` — ${c.dateEnd}` : ""}</p>}
             </div>
           </div>
-          <FunnelHealthBadge score={Math.round((
-            scoreLowerIsBetter(c.cacLead, 8) +
-            scoreLowerIsBetter(c.cacAgendamento, 20) +
-            scoreLowerIsBetter(c.cacComparecimento, 80) +
-            scoreHigherIsBetter(c.conversionRate, 35) +
-            scoreHigherIsBetter(c.showUpRate, 50)
-          ) / 5)} />
+          <div className="flex items-center gap-2">
+            <button onClick={() => setExpanded(e => !e)} style={{ border: "0.5px solid #3a3a3a", color: "#999", fontSize: "11px" }} className="px-3 py-1.5 rounded hover:bg-[#323232]">
+              {expanded ? "▲ Recolher" : "▼ Expandir"}
+            </button>
+            <FunnelHealthBadge score={funnelScore} />
+          </div>
         </div>
 
-        {/* KPIs de decisão */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
+        {/* Resumo visível no modo recolhido */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
           {[
-            { label: "Custo/Lead", value: c.cacLead > 0 ? fmt(c.cacLead) : "—", good: c.cacLead > 0 && c.cacLead < 8, sub: "ideal: <R$8" },
-            { label: "Custo/Agendado", value: c.cacAgendamento > 0 ? fmt(c.cacAgendamento) : "—", good: c.cacAgendamento > 0 && c.cacAgendamento < 20, sub: "ideal: <R$20" },
-            { label: "Custo/Compareceu", value: c.cacComparecimento > 0 ? fmt(c.cacComparecimento) : "—", good: c.cacComparecimento > 0 && c.cacComparecimento < 80, sub: "ideal: <R$80" },
+            { label: "CPL", value: c.cacLead > 0 ? fmt(c.cacLead) : "—", good: c.cacLead > 0 && c.cacLead < 8 },
+            { label: "CAC Agendamento", value: c.cacAgendamento > 0 ? fmt(c.cacAgendamento) : "—", good: c.cacAgendamento > 0 && c.cacAgendamento < 20 },
+            { label: "CAC Comparecimento", value: c.cacComparecimento > 0 ? fmt(c.cacComparecimento) : "—", good: c.cacComparecimento > 0 && c.cacComparecimento < 80 },
+            { label: "Nota da campanha", value: funnelScore > 0 ? `${funnelScore}/100` : "—", good: funnelScore >= 75 },
           ].map(k => (
             <div key={k.label} style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="rounded p-2 text-center">
               <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider mb-1">{k.label}</p>
               <p style={{ color: k.good ? "#10b981" : k.value === "—" ? "#555" : "#f59e0b", fontSize: "12px" }} className="font-bold">{k.value}</p>
-              <p style={{ color: "#555", fontSize: "9px" }}>{k.sub}</p>
             </div>
           ))}
+        </div>
+
+        <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-2 mb-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider">Mini gráfico (7 dias)</p>
+            <p style={{ color: "#555", fontSize: "9px" }}>Cliques x CPC</p>
+          </div>
+          {miniChartData.length > 0 ? (
+            <div className="h-[70px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={miniChartData} margin={{ top: 4, right: 8, left: -26, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3a3a3a" opacity={0.25} />
+                  <XAxis dataKey="date" tick={{ fontSize: 8, fill: "#777" }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" hide />
+                  <YAxis yAxisId="right" orientation="right" hide />
+                  <Tooltip
+                    contentStyle={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a", borderRadius: 8, fontSize: "11px" }}
+                    labelStyle={{ color: "#fff" }}
+                    formatter={(value: any, name: any) => {
+                      if (name === "Cliques") return [fmtN(Number(value)), "Cliques"];
+                      if (name === "CPC") return [fmt(Number(value)), "CPC"];
+                      return [value, name];
+                    }}
+                  />
+                  <Line yAxisId="left" type="monotone" dataKey="clicks" name="Cliques" stroke="#06b6d4" strokeWidth={1.75} dot={false} />
+                  <Line yAxisId="right" type="monotone" dataKey="cpc" name="CPC" stroke="#f59e0b" strokeWidth={1.75} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p style={{ color: "#555", fontSize: "10px" }} className="text-center py-3">Sem métricas para montar o mini gráfico.</p>
+          )}
         </div>
 
         {/* Funil rápido */}
@@ -227,64 +278,12 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
           <span>{c.completed} compareceu</span>
         </div>
 
-        {/* Spend vs Budget */}
-        {c.budget > 0 && (
-          <div className="mb-3">
-            <div className="flex justify-between mb-1" style={{ fontSize: "10px", color: "#666" }}>
-              <span>Spend: {fmt(c.totalSpend)}</span>
-              <span>Budget: {fmt(c.budget)}</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-[#333] overflow-hidden">
-              <div className="h-full rounded-full" style={{
-                width: `${Math.min(Math.round((c.totalSpend / c.budget) * 100), 100)}%`,
-                background: c.totalSpend / c.budget > 0.9 ? "#ef4444" : c.totalSpend / c.budget > 0.7 ? "#f59e0b" : "#10b981"
-              }} />
-            </div>
-            <p style={{ color: "#555", fontSize: "9px", textAlign: "right", marginTop: "2px" }}>
-              {Math.round((c.totalSpend / c.budget) * 100)}% do budget usado
-            </p>
-          </div>
-        )}
-
-        <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3 mb-3 text-xs space-y-1">
-          <div className="flex items-center justify-between gap-3">
-            <span style={{ color: "#999" }}>Créditos/Fundos adicionados</span>
-            <strong style={{ color: "#fff" }}>{fmt(c.fundsAdded)}</strong>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span style={{ color: "#999" }}>Impostos / taxas</span>
-            <strong style={{ color: "#fff" }}>{fmt(c.taxCost)}</strong>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span style={{ color: "#999" }}>Custo real</span>
-            <strong style={{ color: "#fff" }}>{fmt(custoReal)}</strong>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span style={{ color: "#999" }}>Receita potencial</span>
-            <strong style={{ color: "#10b981" }}>{fmt(receita)}</strong>
-          </div>
-        </div>
-
-        <div className="mb-3">
-          {c.dailyMetrics.length > 0 ? (
-            <CampaignBusinessHealth campaign={c} ticketMedio={ticketMedio} />
-          ) : (
-            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3 text-center">
-              <p style={{ color: "#999", fontSize: "11px" }} className="font-medium">Sem gráfico ainda</p>
-              <p style={{ color: "#666", fontSize: "10px" }} className="mt-1">Lance métricas diárias para enxergar o funil de negócio da campanha.</p>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
           <button onClick={() => onDailyMetric(c)} style={{ background: "#D4537E", color: "#fff", fontSize: "11px" }} className="px-3 py-1.5 rounded font-medium hover:opacity-90">
             + Métricas do dia
           </button>
           <button onClick={() => onFinance(c)} style={{ border: "0.5px solid #3a3a3a", color: "#999", fontSize: "11px" }} className="px-3 py-1.5 rounded hover:bg-[#323232]">
             Financeiro
-          </button>
-          <button onClick={() => setExpanded(e => !e)} style={{ border: "0.5px solid #3a3a3a", color: "#999", fontSize: "11px" }} className="px-3 py-1.5 rounded hover:bg-[#323232]">
-            {expanded ? "▲ Fechar" : "▼ Histórico"}
           </button>
           <button onClick={() => onToggle(c)} style={{ border: "0.5px solid #3a3a3a", color: c.active ? "#ef4444" : "#10b981", fontSize: "11px" }} className="ml-auto px-3 py-1.5 rounded hover:bg-[#323232]">
             {c.active ? "Pausar" : "Ativar"}
@@ -297,10 +296,64 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
             Excluir
           </button>
         </div>
+
+        {!expanded && (
+          <p style={{ color: "#555", fontSize: "10px" }} className="mt-2">Clique em <strong>Expandir</strong> para ver o funil completo, financeiro detalhado e histórico diário.</p>
+        )}
+
       </div>
 
       {expanded && (
         <div style={{ borderTop: "0.5px solid #3a3a3a" }} className="p-4">
+          {/* Spend vs Budget */}
+          {c.budget > 0 && (
+            <div className="mb-3">
+              <div className="flex justify-between mb-1" style={{ fontSize: "10px", color: "#666" }}>
+                <span>Spend: {fmt(c.totalSpend)}</span>
+                <span>Budget: {fmt(c.budget)}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-[#333] overflow-hidden">
+                <div className="h-full rounded-full" style={{
+                  width: `${Math.min(Math.round((c.totalSpend / c.budget) * 100), 100)}%`,
+                  background: c.totalSpend / c.budget > 0.9 ? "#ef4444" : c.totalSpend / c.budget > 0.7 ? "#f59e0b" : "#10b981"
+                }} />
+              </div>
+              <p style={{ color: "#555", fontSize: "9px", textAlign: "right", marginTop: "2px" }}>
+                {Math.round((c.totalSpend / c.budget) * 100)}% do budget usado
+              </p>
+            </div>
+          )}
+
+          <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3 mb-3 text-xs space-y-1">
+            <div className="flex items-center justify-between gap-3">
+              <span style={{ color: "#999" }}>Créditos/Fundos adicionados</span>
+              <strong style={{ color: "#fff" }}>{fmt(c.fundsAdded)}</strong>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span style={{ color: "#999" }}>Impostos / taxas</span>
+              <strong style={{ color: "#fff" }}>{fmt(c.taxCost)}</strong>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span style={{ color: "#999" }}>Custo real</span>
+              <strong style={{ color: "#fff" }}>{fmt(custoReal)}</strong>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span style={{ color: "#999" }}>Receita potencial</span>
+              <strong style={{ color: "#10b981" }}>{fmt(receita)}</strong>
+            </div>
+          </div>
+
+          <div className="mb-3">
+            {c.dailyMetrics.length > 0 ? (
+              <CampaignBusinessHealth campaign={c} ticketMedio={ticketMedio} />
+            ) : (
+              <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3 text-center">
+                <p style={{ color: "#999", fontSize: "11px" }} className="font-medium">Sem gráfico ainda</p>
+                <p style={{ color: "#666", fontSize: "10px" }} className="mt-1">Lance métricas diárias para enxergar o funil de negócio da campanha.</p>
+              </div>
+            )}
+          </div>
+
           <p style={{ color: "#666", fontSize: "10px" }} className="uppercase tracking-wider mb-2">Histórico diário</p>
           {c.dailyMetrics.length > 0 ? (
             <div className="space-y-1">
