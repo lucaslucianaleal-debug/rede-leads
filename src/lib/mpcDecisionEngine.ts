@@ -25,6 +25,8 @@ export interface CampaignDecision {
   reasons: string[];
   nextReview: string;
   confidence: "baixa" | "media" | "alta";
+  confidencePct: number;
+  reviewDate: string;
 }
 
 export interface ConfidenceContext {
@@ -71,9 +73,34 @@ export interface BudgetAllocationPlan {
 }
 
 export interface MondayAction {
+  id: string;
   title: string;
   impact: string;
   reason: string;
+}
+
+export interface MarketingMasterStatus {
+  level: "saudavel" | "atencao" | "critico";
+  emoji: string;
+  label: string;
+  color: string;
+  reason: string;
+}
+
+export interface WeeklyRisk {
+  level: "baixo" | "medio" | "alto";
+  emoji: string;
+  label: string;
+  color: string;
+  reason: string;
+  potentialRevenueLoss: number;
+}
+
+export interface MonthlyProjection {
+  projectedCompleted: number;
+  targetCompleted: number;
+  missing: number;
+  probability: number;
 }
 
 const TARGETS = {
@@ -142,6 +169,16 @@ function round(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+function addDays(base: Date, days: number) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function formatPtDate(date: Date) {
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
   const spend = (campaign.totalSpend || 0) + (campaign.taxCost || 0);
   const status = stageByInvestment(spend);
@@ -159,6 +196,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
   const historicalCpc = avg(fullCpc.map((x) => x.cpc));
   const currentCpc = avg(recentCpc.map((x) => x.cpc));
   const cpcAboveHistoryPct = historicalCpc > 0 ? Math.round(((currentCpc - historicalCpc) / historicalCpc) * 100) : 0;
+  const confidenceLevel = computeConfidence(campaign);
+  const confidencePct = confidenceLevel === "alta" ? 82 : confidenceLevel === "media" ? 64 : 48;
+  const reviewDate = formatPtDate(addDays(new Date(), confidenceLevel === "baixa" ? 3 : confidenceLevel === "media" ? 2 : 1));
 
   const reasons: string[] = [];
 
@@ -188,7 +228,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
         ...reasons,
       ],
       nextReview: "Revisar apos novo criativo e nova segmentacao.",
-      confidence: computeConfidence(campaign),
+      confidence: confidenceLevel,
+      confidencePct,
+      reviewDate,
     };
   }
 
@@ -202,7 +244,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       recommendation: "Trocar criativo principal e ajustar publico antes de aumentar investimento.",
       reasons,
       nextReview: "Nova leitura apos 3 dias de veiculacao do novo criativo.",
-      confidence: computeConfidence(campaign),
+      confidence: confidenceLevel,
+      confidencePct,
+      reviewDate,
     };
   }
 
@@ -218,7 +262,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       recommendation: "Campanha promissora. Manter como esta ate atingir investimento minimo de R$50.",
       reasons,
       nextReview: "Reavaliar ao consumir mais R$30 ou atingir R$50 investidos.",
-      confidence: computeConfidence(campaign),
+      confidence: confidenceLevel,
+      confidencePct,
+      reviewDate,
     };
   }
 
@@ -235,7 +281,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
         : "Aumentar budget em 30% mantendo monitoramento diario.",
       reasons,
       nextReview: "Nova analise apos consumir mais R$50.",
-      confidence: computeConfidence(campaign),
+      confidence: confidenceLevel,
+      confidencePct,
+      reviewDate,
     };
   }
 
@@ -252,7 +300,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
         : "Aumentar budget em 20% com monitoramento de CPL e CAC.",
       reasons,
       nextReview: "Nova analise apos consumir mais R$30.",
-      confidence: computeConfidence(campaign),
+      confidence: confidenceLevel,
+      confidencePct,
+      reviewDate,
     };
   }
 
@@ -269,7 +319,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
         ...reasons,
       ],
       nextReview: "Reavaliar em 3 dias ou apos 10 novos leads.",
-      confidence: computeConfidence(campaign),
+      confidence: confidenceLevel,
+      confidencePct,
+      reviewDate,
     };
   }
 
@@ -282,7 +334,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
     recommendation: "Manter configuracao atual e seguir monitorando o funil.",
     reasons: reasons.length > 0 ? reasons : ["Sem sinal forte de alerta ou escala no momento."],
     nextReview: "Reavaliar apos mais dados de funil (7 dias).",
-    confidence: computeConfidence(campaign),
+    confidence: confidenceLevel,
+    confidencePct,
+    reviewDate,
   };
 }
 
@@ -403,6 +457,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
   contexts.forEach(({ campaign, ctx }) => {
     if (ctx.decision.action === "pausar") {
       actions.push({
+        id: `${campaign.id}-pausar`,
         title: `Pausar ${campaign.name}`,
         impact: "Protege verba e evita desperdicio no curto prazo.",
         reason: ctx.decision.recommendation,
@@ -412,6 +467,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
 
     if (ctx.decision.action === "escalar_20" || ctx.decision.action === "escalar_30") {
       actions.push({
+        id: `${campaign.id}-escalar`,
         title: `Ajustar ${campaign.name} (${ctx.decision.action === "escalar_30" ? "+30%" : "+20%"})`,
         impact: `Impacto esperado: +${ctx.projection20.leads} leads, +${ctx.projection20.completed} comparecimentos, +R$${ctx.projection20.revenue.toFixed(0)}.`,
         reason: ctx.decision.recommendation,
@@ -421,6 +477,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
 
     if (ctx.decision.action === "otimizar") {
       actions.push({
+        id: `${campaign.id}-otimizar`,
         title: `Trocar criativo/publico em ${campaign.name}`,
         impact: "Objetivo: recuperar tracao e reduzir custo por resultado.",
         reason: ctx.decision.recommendation,
@@ -429,6 +486,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
     }
 
     actions.push({
+      id: `${campaign.id}-manter`,
       title: `Manter ${campaign.name}`,
       impact: "Continuar captacao enquanto acumula dados confiaveis.",
       reason: ctx.decision.recommendation,
@@ -438,6 +496,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
   const lowShowUp = campaigns.find((c) => c.active && c.scheduled >= 6 && c.showUpRate > 0 && c.showUpRate < TARGETS.showUpRate);
   if (lowShowUp) {
     actions.push({
+      id: `comercial-${lowShowUp.id}`,
       title: "Revisar tempo de resposta do comercial",
       impact: "Potencial de ganho direto em comparecimento nas campanhas ativas.",
       reason: `${lowShowUp.name} esta com comparecimento ${lowShowUp.showUpRate}% (meta ${TARGETS.showUpRate}%).`,
@@ -445,4 +504,115 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
   }
 
   return actions.slice(0, 5);
+}
+
+export function buildMarketingMasterStatus(campaigns: Campaign[], ticketMedio: number): MarketingMasterStatus {
+  const active = campaigns.filter((c) => c.active);
+  if (active.length === 0) {
+    return {
+      level: "atencao",
+      emoji: "🟡",
+      label: "ATENCAO",
+      color: "#f59e0b",
+      reason: "Sem campanhas ativas no momento.",
+    };
+  }
+
+  const leads = active.reduce((a, c) => a + c.leads, 0);
+  const scheduled = active.reduce((a, c) => a + c.scheduled, 0);
+  const completed = active.reduce((a, c) => a + c.completed, 0);
+  const showUp = scheduled > 0 ? Math.round((completed / scheduled) * 100) : 0;
+  const potentialRevenue = completed * ticketMedio;
+  const pausedDecisionCount = active.map((c) => buildCampaignDecision(c)).filter((d) => d.action === "pausar").length;
+
+  if (pausedDecisionCount > 0 || leads < 5) {
+    return {
+      level: "critico",
+      emoji: "🔴",
+      label: "CRITICO",
+      color: "#ef4444",
+      reason: pausedDecisionCount > 0
+        ? "Ha campanha com recomendacao de pausa imediata."
+        : "Volume de leads insuficiente para sustentar a meta.",
+    };
+  }
+
+  if (showUp < TARGETS.showUpRate || potentialRevenue < ticketMedio * 4) {
+    return {
+      level: "atencao",
+      emoji: "🟡",
+      label: "ATENCAO",
+      color: "#f59e0b",
+      reason: showUp < TARGETS.showUpRate
+        ? "Funil de marketing esta ativo, mas o gargalo esta no comparecimento."
+        : "Campanhas ativas com retorno ainda abaixo do potencial.",
+    };
+  }
+
+  return {
+    level: "saudavel",
+    emoji: "🟢",
+    label: "SAUDAVEL",
+    color: "#10b981",
+    reason: "Funil esta saudavel e as campanhas mantem boa eficiencia.",
+  };
+}
+
+export function buildWeeklyRisk(campaigns: Campaign[], ticketMedio: number): WeeklyRisk {
+  const active = campaigns.filter((c) => c.active);
+  const scheduled = active.reduce((a, c) => a + c.scheduled, 0);
+  const completed = active.reduce((a, c) => a + c.completed, 0);
+  const showUp = scheduled > 0 ? completed / scheduled : 0;
+  const expectedCompleted = Math.round(scheduled * (TARGETS.showUpRate / 100));
+  const miss = Math.max(expectedCompleted - completed, 0);
+  const potentialRevenueLoss = miss * ticketMedio;
+
+  if (showUp < 0.35) {
+    return {
+      level: "alto",
+      emoji: "🔴",
+      label: "ALTO",
+      color: "#ef4444",
+      reason: "Comparecimentos muito abaixo da meta desta semana.",
+      potentialRevenueLoss,
+    };
+  }
+
+  if (showUp < 0.5) {
+    return {
+      level: "medio",
+      emoji: "🟠",
+      label: "MEDIO",
+      color: "#f59e0b",
+      reason: "Comparecimentos abaixo do esperado, exigir acao comercial.",
+      potentialRevenueLoss,
+    };
+  }
+
+  return {
+    level: "baixo",
+    emoji: "🟢",
+    label: "BAIXO",
+    color: "#10b981",
+    reason: "Ritmo de comparecimento dentro do esperado.",
+    potentialRevenueLoss,
+  };
+}
+
+export function buildMonthlyProjection(campaigns: Campaign[], targetCompleted = 50): MonthlyProjection {
+  const active = campaigns.filter((c) => c.active);
+  const completed = active.reduce((a, c) => a + c.completed, 0);
+  const missing = Math.max(targetCompleted - completed, 0);
+  const progress = targetCompleted > 0 ? completed / targetCompleted : 0;
+  const quality = active.length > 0
+    ? avg(active.map((c) => (buildCampaignDecision(c).action === "pausar" ? 0.3 : c.predictability > 0 ? c.predictability / 100 : 0.5)))
+    : 0;
+  const probability = Math.round(clamp((progress * 0.55 + quality * 0.45) * 100, 5, 95));
+
+  return {
+    projectedCompleted: completed,
+    targetCompleted,
+    missing,
+    probability,
+  };
 }

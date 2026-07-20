@@ -4,7 +4,7 @@ import CampaignDailyModal from "./CampaignDailyModal";
 import CampaignFinanceModal from "./CampaignFinanceModal";
 import CreateCampaignModal from "./CreateCampaignModal";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
-import { buildBudgetAllocationPlan, buildCampaignDecision, buildConfidenceContext, buildMondayActions, buildStrategicContext } from "@/lib/mpcDecisionEngine";
+import { buildBudgetAllocationPlan, buildCampaignDecision, buildConfidenceContext, buildMarketingMasterStatus, buildMondayActions, buildMonthlyProjection, buildStrategicContext, buildWeeklyRisk } from "@/lib/mpcDecisionEngine";
 
 interface Props {
   campaigns: Campaign[];
@@ -242,18 +242,24 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
         </div>
 
         <div style={{ background: "#1f1f1f", border: `0.5px solid ${decision.color}` }} className="rounded-lg p-3 mb-3">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <div>
-              <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider font-semibold">Centro de decisao MPC</p>
-              <p style={{ color: decision.color, fontSize: "12px" }} className="font-bold mt-0.5">{decision.emoji} {decision.title}</p>
+          <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider font-semibold mb-2">Centro de decisao MPC</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+            <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Status</p>
+              <p style={{ color: decision.color, fontSize: "11px" }} className="font-semibold">{decision.emoji} {decision.title}</p>
             </div>
-            <span style={{ color: confidenceCtx.color, fontSize: "10px" }} className="uppercase">{confidenceCtx.emoji} Confianca {confidenceCtx.label}</span>
-          </div>
-
-          <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" } } className="rounded p-2 mb-2">
-            <p style={{ color: "#999", fontSize: "9px" }} className="uppercase tracking-wider mb-1">Proxima decisao</p>
-            <p style={{ color: "#fff", fontSize: "11px" }} className="font-medium">{decision.recommendation}</p>
-            <p style={{ color: "#777", fontSize: "10px" }} className="mt-1">Revisao: {decision.nextReview}</p>
+            <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Proxima acao</p>
+              <p style={{ color: "#fff", fontSize: "11px" }} className="font-medium">{decision.recommendation}</p>
+            </div>
+            <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Revisar em</p>
+              <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">{decision.reviewDate}</p>
+            </div>
+            <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Confianca</p>
+              <p style={{ color: confidenceCtx.color, fontSize: "11px" }} className="font-semibold">{confidenceCtx.emoji} {decision.confidencePct}%</p>
+            </div>
           </div>
 
           <button
@@ -269,11 +275,11 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
             <div className="mt-2 space-y-1">
               <div className="mb-1">
                 {confidenceCtx.checks.map((check, idx) => (
-                  <p key={idx} style={{ color: "#9ca3af", fontSize: "10px" }}>- {check}</p>
+                  <p key={idx} style={{ color: "#9ca3af", fontSize: "10px" }}>✓ {check}</p>
                 ))}
               </div>
               {decision.reasons.map((reason, idx) => (
-                <p key={idx} style={{ color: "#cfcfcf", fontSize: "10px" }}>• {reason}</p>
+                <p key={idx} style={{ color: "#cfcfcf", fontSize: "10px" }}>✓ {reason}</p>
               ))}
             </div>
           )}
@@ -442,6 +448,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const [financeModal, setFinanceModal] = useState<Campaign | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [availableBudget, setAvailableBudget] = useState(300);
+  const [completedActions, setCompletedActions] = useState<string[]>([]);
 
   const active = campaigns.filter(c => c.active);
   const paused = campaigns.filter(c => !c.active);
@@ -455,6 +462,11 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
     .sort((a, b) => b.ctx.priorityScore - a.ctx.priorityScore);
   const allocationPlan = buildBudgetAllocationPlan(active, ticketMedio, availableBudget);
   const mondayActions = buildMondayActions(active, ticketMedio);
+  const visibleActions = mondayActions.filter((a) => !completedActions.includes(a.id));
+  const executedPct = mondayActions.length > 0 ? Math.round(((mondayActions.length - visibleActions.length) / mondayActions.length) * 100) : 0;
+  const masterStatus = buildMarketingMasterStatus(active, ticketMedio);
+  const weeklyRisk = buildWeeklyRisk(active, ticketMedio);
+  const monthlyProjection = buildMonthlyProjection(active, 50);
 
   return (
     <>
@@ -485,6 +497,14 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
           <p style={{ color: "#555", fontSize: "12px" }} className="text-center py-1">Nenhuma campanha criada ainda</p>
         )}
       </div>
+
+      {active.length > 0 && (
+        <div style={{ background: "#202020", border: `0.5px solid ${masterStatus.color}` }} className="rounded-lg p-4 mb-4">
+          <p style={{ color: "#777", fontSize: "10px" }} className="uppercase tracking-wider mb-1">Situacao do marketing</p>
+          <p style={{ color: masterStatus.color, fontSize: "22px" }} className="font-bold">{masterStatus.emoji} {masterStatus.label}</p>
+          <p style={{ color: "#cfcfcf", fontSize: "12px" }} className="mt-1">{masterStatus.reason}</p>
+        </div>
+      )}
 
       {active.length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 mb-4">
@@ -524,8 +544,9 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
                 <div key={item.campaignId} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
                   <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">{item.campaignName}</p>
                   <p style={{ color: "#10b981", fontSize: "11px" }} className="font-bold">{fmt(item.allocated)}</p>
-                  <p style={{ color: "#aaa", fontSize: "10px" }}>+{item.expectedLeads} leads | +{item.expectedCompleted} comparecimentos</p>
-                  <p style={{ color: "#10b981", fontSize: "10px" }}>Receita potencial: {fmt(item.expectedRevenue)}</p>
+                  <p style={{ color: "#aaa", fontSize: "10px" }}>Leads previstos: {item.expectedLeads}</p>
+                  <p style={{ color: "#aaa", fontSize: "10px" }}>Comparecimentos previstos: {item.expectedCompleted}</p>
+                  <p style={{ color: "#10b981", fontSize: "10px" }}>Retorno esperado: {fmt(item.expectedRevenue)}</p>
                 </div>
               ))}
             </div>
@@ -533,15 +554,35 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
           </div>
 
           <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
-            <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider mb-2">O que fazer segunda-feira</p>
+            <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider mb-2">Segunda-feira</p>
             <div className="space-y-2">
-              {mondayActions.map((action, idx) => (
-                <div key={`${idx}-${action.title}`} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+              {visibleActions.map((action, idx) => (
+                <div key={`${idx}-${action.id}`} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
                   <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">{idx + 1}. {action.title}</p>
                   <p style={{ color: "#9ca3af", fontSize: "10px" }}>{action.impact}</p>
                   <p style={{ color: "#777", fontSize: "10px" }}>{action.reason}</p>
+                  <div className="mt-1">
+                    <button
+                      onClick={() => setCompletedActions((prev) => [...prev, action.id])}
+                      style={{ border: "0.5px solid #3a3a3a", color: "#d1d5db", fontSize: "10px" }}
+                      className="px-2 py-1 rounded hover:bg-[#323232]"
+                    >
+                      ✓ Concluir
+                    </button>
+                  </div>
                 </div>
               ))}
+            </div>
+            <p style={{ color: executedPct === 100 ? "#10b981" : "#777", fontSize: "10px" } } className="mt-2">Plano executado: {executedPct}%</p>
+            <div style={{ background: "#262626", border: `0.5px solid ${weeklyRisk.color}` }} className="rounded p-2 mt-2">
+              <p style={{ color: weeklyRisk.color, fontSize: "11px" }} className="font-semibold">Risco da semana: {weeklyRisk.emoji} {weeklyRisk.label}</p>
+              <p style={{ color: "#aaa", fontSize: "10px" }}>{weeklyRisk.reason}</p>
+              <p style={{ color: "#ef4444", fontSize: "10px" }}>Receita em risco: {fmt(weeklyRisk.potentialRevenueLoss)}</p>
+            </div>
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" } } className="rounded p-2 mt-2">
+              <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">Probabilidade de bater a meta: {monthlyProjection.probability}%</p>
+              <p style={{ color: "#aaa", fontSize: "10px" }}>Ritmo atual: {monthlyProjection.projectedCompleted} comparecimentos.</p>
+              <p style={{ color: "#aaa", fontSize: "10px" }}>Meta: {monthlyProjection.targetCompleted} | Faltam: {monthlyProjection.missing}</p>
             </div>
           </div>
         </div>
