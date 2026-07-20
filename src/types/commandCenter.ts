@@ -49,6 +49,7 @@ export interface Campaign {
   fundsAdded: number; // créditos/fundos adicionados na conta de anúncios
   taxCost: number;    // impostos/taxas cobrados pela plataforma
   dailyMetrics: CampaignDailyMetric[];
+  allDailyMetrics?: CampaignDailyMetric[];
 
   // Calculados automaticamente (agregados de dailyMetrics):
   totalSpend: number;

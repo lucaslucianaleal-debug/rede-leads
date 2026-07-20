@@ -59,6 +59,7 @@ function buildCampaignFromSnapshot(
 ): Campaign {
   const color = data.color || CAMPAIGN_COLORS[idx % CAMPAIGN_COLORS.length];
   const dailyMetrics: CampaignDailyMetric[] = Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [];
+  const allDailyMetrics: CampaignDailyMetric[] = Array.isArray(data.allDailyMetrics) ? data.allDailyMetrics : dailyMetrics;
   const roas = (totals.totalSpend + (data.taxCost || 0)) > 0
     ? parseFloat(((completedCount * ticketMedio) / (totals.totalSpend + (data.taxCost || 0))).toFixed(2))
     : 0;
@@ -81,6 +82,7 @@ function buildCampaignFromSnapshot(
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     dailyMetrics,
+    allDailyMetrics,
     ...totals,
     leads: leadsCount,
     scheduled: scheduledCount,
@@ -236,7 +238,7 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
           const scheduledCount = campaignLeads.filter(l => l.dataAgendamento?.trim()).length;
           const completedCount = campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length;
             const totals = calcCampaignTotals(filteredMetrics);
-            return buildCampaignFromSnapshot(campaign.id, clinicId, { ...data, dailyMetrics: filteredMetrics }, idx, ticketMedio, leadsCount, scheduledCount, completedCount, totals);
+            return buildCampaignFromSnapshot(campaign.id, clinicId, { ...data, dailyMetrics: filteredMetrics, allDailyMetrics: data.dailyMetrics || [] }, idx, ticketMedio, leadsCount, scheduledCount, completedCount, totals);
         });
 
         await persistCampaignBackup(clinicId, backupCampaigns);
@@ -268,7 +270,7 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         return buildCampaignFromSnapshot(
           docSnap.id,
           clinicId,
-          { ...data, dailyMetrics: filteredMetrics },
+          { ...data, dailyMetrics: filteredMetrics, allDailyMetrics: dailyMetrics },
           idx,
           ticketMedio,
           campaignLeads.length,

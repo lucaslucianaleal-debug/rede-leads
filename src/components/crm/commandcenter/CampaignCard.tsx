@@ -4,6 +4,7 @@ import CampaignDailyModal from "./CampaignDailyModal";
 import CampaignFinanceModal from "./CampaignFinanceModal";
 import CreateCampaignModal from "./CreateCampaignModal";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
+import { buildCampaignDecision } from "@/lib/mpcDecisionEngine";
 
 interface Props {
   campaigns: Campaign[];
@@ -177,8 +178,10 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
   onDelete: (c: Campaign) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [decisionExpanded, setDecisionExpanded] = useState(false);
   const receita = c.completed * ticketMedio;
   const custoReal = c.totalSpend + c.taxCost;
+  const decision = buildCampaignDecision(c);
   const funnelScore = Math.round((
     scoreLowerIsBetter(c.cacLead, 8) +
     scoreLowerIsBetter(c.cacAgendamento, 20) +
@@ -235,6 +238,39 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
               <p style={{ color: k.good ? "#10b981" : k.value === "—" ? "#555" : "#f59e0b", fontSize: "12px" }} className="font-bold">{k.value}</p>
             </div>
           ))}
+        </div>
+
+        <div style={{ background: "#1f1f1f", border: `0.5px solid ${decision.color}` }} className="rounded-lg p-3 mb-3">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div>
+              <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider font-semibold">Centro de decisao MPC</p>
+              <p style={{ color: decision.color, fontSize: "12px" }} className="font-bold mt-0.5">{decision.emoji} {decision.title}</p>
+            </div>
+            <span style={{ color: "#aaa", fontSize: "10px" }} className="uppercase">Confianca: {decision.confidence}</span>
+          </div>
+
+          <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" } } className="rounded p-2 mb-2">
+            <p style={{ color: "#999", fontSize: "9px" }} className="uppercase tracking-wider mb-1">Proxima decisao</p>
+            <p style={{ color: "#fff", fontSize: "11px" }} className="font-medium">{decision.recommendation}</p>
+            <p style={{ color: "#777", fontSize: "10px" }} className="mt-1">Revisao: {decision.nextReview}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setDecisionExpanded((v) => !v)}
+            style={{ border: "0.5px solid #3a3a3a", color: "#bbb", fontSize: "10px" }}
+            className="px-2 py-1 rounded hover:bg-[#323232]"
+          >
+            {decisionExpanded ? "▲ Ocultar por que" : "▼ Ver por que"}
+          </button>
+
+          {decisionExpanded && (
+            <div className="mt-2 space-y-1">
+              {decision.reasons.map((reason, idx) => (
+                <p key={idx} style={{ color: "#cfcfcf", fontSize: "10px" }}>• {reason}</p>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-2 mb-3">
