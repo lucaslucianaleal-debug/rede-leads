@@ -560,7 +560,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
     if (ctx.decision.action === "escalar_20" || ctx.decision.action === "escalar_30") {
       actions.push({
         id: `${campaign.id}-escalar`,
-        title: `Ajustar ${campaign.name} (${ctx.decision.action === "escalar_30" ? "+30%" : "+20%"})`,
+        title: `Ajustar ${campaign.name}: R$${ctx.decision.budgetCurrent.toFixed(0)} -> R$${ctx.decision.budgetRecommended.toFixed(0)}/dia`,
         impact: `Impacto esperado: +${ctx.projection20.leads} leads, +${ctx.projection20.completed} comparecimentos, +R$${ctx.projection20.revenue.toFixed(0)}.`,
         reason: ctx.decision.recommendation,
         eta: "2 minutos",

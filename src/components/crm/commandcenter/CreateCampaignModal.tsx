@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 interface Props {
   clinicId: string;
-  onSave: (data: { name: string; dateStart: string; dateEnd: string; budget: number; fundsAdded?: number; taxCost?: number }) => Promise<void>;
+  onSave: (data: { name: string; dateStart: string; dateEnd: string; budget: number; dailyBudget?: number; fundsAdded?: number; taxCost?: number }) => Promise<void>;
   onClose: () => void;
 }
 
@@ -16,6 +16,7 @@ export default function CreateCampaignModal({ clinicId, onSave, onClose }: Props
   const [dateStart, setDateStart] = useState(todayStr());
   const [dateEnd, setDateEnd] = useState("");
   const [budget, setBudget] = useState("");
+  const [dailyBudget, setDailyBudget] = useState("15");
   const [fundsAdded, setFundsAdded] = useState("");
   const [taxCost, setTaxCost] = useState("");
   const [saving, setSaving] = useState(false);
@@ -32,6 +33,7 @@ export default function CreateCampaignModal({ clinicId, onSave, onClose }: Props
         dateStart,
         dateEnd,
         budget: parseFloat(budget) || 0,
+        dailyBudget: parseFloat(dailyBudget) || 15,
         fundsAdded: parseFloat(fundsAdded) || 0,
         taxCost: parseFloat(taxCost) || 0,
       });
@@ -96,6 +98,18 @@ export default function CreateCampaignModal({ clinicId, onSave, onClose }: Props
               placeholder="2500"
               value={budget}
               onChange={e => setBudget(e.target.value)}
+              style={{ background: "#1a1a1a", border: "0.5px solid #3a3a3a", color: "#fff", fontSize: "13px" }}
+              className="w-full px-3 py-2 rounded"
+            />
+          </div>
+
+          <div>
+            <label style={{ color: "#999", fontSize: "11px" }} className="block mb-1.5 uppercase tracking-wider">Orcamento diario (R$/dia)</label>
+            <input
+              type="number"
+              placeholder="15"
+              value={dailyBudget}
+              onChange={e => setDailyBudget(e.target.value)}
               style={{ background: "#1a1a1a", border: "0.5px solid #3a3a3a", color: "#fff", fontSize: "13px" }}
               className="w-full px-3 py-2 rounded"
             />

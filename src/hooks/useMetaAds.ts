@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Campaign } from "@/types/commandCenter";
+import type { Campaign, CampaignScaleEvent } from "@/types/commandCenter";
 import type { Diagnostic } from "@/types/commandCenter";
 import { fetchCampaigns, createCampaign, upsertDailyMetric, updateCampaign, deleteDailyMetric, deleteCampaign } from "@/services/campaignService";
 import type { CampaignDailyMetric } from "@/types/commandCenter";
@@ -40,11 +40,11 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
     }
   }
 
-  const handleAddCampaign = async (data: { name: string; dateStart: string; dateEnd: string; budget: number; fundsAdded?: number; taxCost?: number }) => {
+  const handleAddCampaign = async (data: { name: string; dateStart: string; dateEnd: string; budget: number; dailyBudget?: number; fundsAdded?: number; taxCost?: number }) => {
     await createCampaign(clinicId, data);
   };
 
-  const handleSaveCampaignFinance = async (campaignId: string, data: { fundsAdded: number; taxCost: number }) => {
+  const handleSaveCampaignFinance = async (campaignId: string, data: { fundsAdded: number; taxCost: number; dailyBudget?: number; lastBudgetChangeAt?: string; scaleHistory?: CampaignScaleEvent[] }) => {
     await updateCampaign(clinicId, campaignId, data);
     await load();
   };

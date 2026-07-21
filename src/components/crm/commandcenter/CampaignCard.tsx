@@ -10,12 +10,12 @@ interface Props {
   campaigns: Campaign[];
   clinicId: string;
   ticketMedio: number;
-  onAddCampaign: (data: { name: string; dateStart: string; dateEnd: string; budget: number; fundsAdded?: number; taxCost?: number }) => Promise<void>;
+  onAddCampaign: (data: { name: string; dateStart: string; dateEnd: string; budget: number; dailyBudget?: number; fundsAdded?: number; taxCost?: number }) => Promise<void>;
   onSaveDailyMetric: (campaignId: string, metric: CampaignDailyMetric) => Promise<void>;
   onDeleteDailyMetric: (campaignId: string, date: string) => Promise<void>;
   onToggleActive: (campaignId: string, active: boolean) => Promise<void>;
   onDeleteCampaign: (campaignId: string) => Promise<void>;
-  onSaveCampaignFinance: (campaignId: string, data: { fundsAdded: number; taxCost: number }) => Promise<void>;
+  onSaveCampaignFinance: (campaignId: string, data: { fundsAdded: number; taxCost: number; dailyBudget?: number; lastBudgetChangeAt?: string; scaleHistory?: any[] }) => Promise<void>;
   onReload: () => void;
 }
 
@@ -273,6 +273,14 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
               <p style={{ color: "#9ca3af", fontSize: "10px" }}>Revisar apos +R$50 investidos ou em 3 dias.</p>
             </div>
           )}
+
+          <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
+            <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Controle da escala</p>
+            <p style={{ color: "#d1d5db", fontSize: "10px" }}>Orcamento atual: R${(c.dailyBudget || decision.budgetCurrent).toFixed(0)}/dia</p>
+            <p style={{ color: "#d1d5db", fontSize: "10px" }}>Ultima alteracao: {c.lastBudgetChangeAt || "—"}</p>
+            <p style={{ color: "#d1d5db", fontSize: "10px" }}>Proxima revisao: apos +R$50 investidos</p>
+            <p style={{ color: "#d1d5db", fontSize: "10px" }}>Escalas realizadas: {(c.scaleHistory || []).length}</p>
+          </div>
 
           <button
             type="button"

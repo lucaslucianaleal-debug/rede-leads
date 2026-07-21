@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, arrayUnion } from "firebase/firestore";
-import type { Campaign, CampaignDailyMetric } from "@/types/commandCenter";
+import type { Campaign, CampaignDailyMetric, CampaignScaleEvent } from "@/types/commandCenter";
 import { fetchLeadsFromClinic } from "./firebaseQueries";
 import { parse, isValid } from "date-fns";
 
@@ -39,6 +39,9 @@ function toCampaignDataSnapshot(data: any, id: string, clinicId: string) {
     dateStart: data.dateStart || "",
     dateEnd: data.dateEnd || "",
     budget: data.budget || 0,
+    dailyBudget: data.dailyBudget || 15,
+    lastBudgetChangeAt: data.lastBudgetChangeAt || "",
+    scaleHistory: Array.isArray(data.scaleHistory) ? data.scaleHistory : [],
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     dailyMetrics: Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [],
@@ -79,6 +82,9 @@ function buildCampaignFromSnapshot(
     dateStart: data.dateStart || "",
     dateEnd: data.dateEnd || "",
     budget: data.budget || 0,
+    dailyBudget: data.dailyBudget || 15,
+    lastBudgetChangeAt: data.lastBudgetChangeAt || "",
+    scaleHistory: Array.isArray(data.scaleHistory) ? data.scaleHistory : [],
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     dailyMetrics,
@@ -297,6 +303,7 @@ export async function createCampaign(clinicId: string, data: {
   dateStart: string;
   dateEnd: string;
   budget: number;
+  dailyBudget?: number;
   fundsAdded?: number;
   taxCost?: number;
 }): Promise<string> {
@@ -308,6 +315,9 @@ export async function createCampaign(clinicId: string, data: {
     dateStart: data.dateStart,
     dateEnd: data.dateEnd,
     budget: data.budget,
+    dailyBudget: data.dailyBudget || 15,
+    lastBudgetChangeAt: data.dateStart || new Date().toISOString(),
+    scaleHistory: [],
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     active: true,
@@ -322,6 +332,9 @@ export async function createCampaign(clinicId: string, data: {
     dateStart: data.dateStart,
     dateEnd: data.dateEnd,
     budget: data.budget,
+    dailyBudget: data.dailyBudget || 15,
+    lastBudgetChangeAt: data.dateStart || new Date().toISOString(),
+    scaleHistory: [],
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     active: true,
@@ -393,7 +406,7 @@ export async function deleteDailyMetric(
 export async function updateCampaign(
   clinicId: string,
   campaignId: string,
-  fields: Partial<{ name: string; active: boolean; budget: number; dateEnd: string; fundsAdded: number; taxCost: number }>
+  fields: Partial<{ name: string; active: boolean; budget: number; dailyBudget: number; lastBudgetChangeAt: string; scaleHistory: CampaignScaleEvent[]; dateEnd: string; fundsAdded: number; taxCost: number }>
 ): Promise<void> {
   const docRef = doc(db, "clinics", clinicId, "campaigns", campaignId);
   await updateDoc(docRef, fields);

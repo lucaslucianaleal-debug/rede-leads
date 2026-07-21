@@ -37,6 +37,13 @@ export interface CampaignDailyMetric {
   reach: number;
 }
 
+export interface CampaignScaleEvent {
+  date: string; // DD/MM/YYYY
+  fromDailyBudget: number;
+  toDailyBudget: number;
+  note?: string;
+}
+
 export interface Campaign {
   id: string;
   clinicId: string;
@@ -46,6 +53,9 @@ export interface Campaign {
   dateStart: string; // DD/MM/YYYY
   dateEnd: string;   // DD/MM/YYYY
   budget: number;    // budget total planejado
+  dailyBudget: number; // budget diario configurado manualmente
+  lastBudgetChangeAt?: string;
+  scaleHistory?: CampaignScaleEvent[];
   fundsAdded: number; // créditos/fundos adicionados na conta de anúncios
   taxCost: number;    // impostos/taxas cobrados pela plataforma
   dailyMetrics: CampaignDailyMetric[];
