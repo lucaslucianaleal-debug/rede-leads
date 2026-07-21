@@ -54,6 +54,9 @@ export interface CampaignStrategicContext {
   decision: CampaignDecision;
   confidenceContext: ConfidenceContext;
   projection20: ImpactProjection;
+  why: string;
+  shortAction: string;
+  revenuePotential: number;
 }
 
 export interface AllocationItem {
@@ -77,6 +80,8 @@ export interface MondayAction {
   title: string;
   impact: string;
   reason: string;
+  eta: string;
+  due?: string;
 }
 
 export interface MarketingMasterStatus {
@@ -85,6 +90,15 @@ export interface MarketingMasterStatus {
   label: string;
   color: string;
   reason: string;
+}
+
+export interface MpcDiagnostic {
+  marketing: number;
+  comercial: number;
+  operacao: number;
+  marketingStatus: "good" | "warn" | "crit";
+  comercialStatus: "good" | "warn" | "crit";
+  operacaoStatus: "good" | "warn" | "crit";
 }
 
 export interface WeeklyRisk {
@@ -395,6 +409,21 @@ export function buildStrategicContext(campaign: Campaign, ticketMedio: number): 
   const pausePenalty = decision.action === "pausar" ? -30 : 0;
   const priorityScore = Math.round(clamp(efficiencyScore + conversionScore + showUpScore + revenueScore + confidenceBonus + pausePenalty, 0, 100));
   const priorityStars = clamp(Math.round(priorityScore / 20), 1, 5);
+  const why = campaign.cacLead > 0 && campaign.cacLead <= TARGETS.cpl
+    ? "Maior eficiencia"
+    : campaign.completed * ticketMedio >= ticketMedio * 3
+      ? "Maior potencial financeiro"
+      : "Ainda em aprendizado";
+
+  const shortAction = decision.action === "escalar_30"
+    ? "Escalar 30%"
+    : decision.action === "escalar_20"
+      ? "Escalar 20%"
+      : decision.action === "pausar"
+        ? "Pausar"
+        : decision.action === "otimizar"
+          ? "Otimizar"
+          : "Manter";
 
   return {
     campaignId: campaign.id,
@@ -405,6 +434,9 @@ export function buildStrategicContext(campaign: Campaign, ticketMedio: number): 
     decision,
     confidenceContext,
     projection20,
+    why,
+    shortAction,
+    revenuePotential,
   };
 }
 
@@ -461,6 +493,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
         title: `Pausar ${campaign.name}`,
         impact: "Protege verba e evita desperdicio no curto prazo.",
         reason: ctx.decision.recommendation,
+        eta: "2 minutos",
       });
       return;
     }
@@ -471,6 +504,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
         title: `Ajustar ${campaign.name} (${ctx.decision.action === "escalar_30" ? "+30%" : "+20%"})`,
         impact: `Impacto esperado: +${ctx.projection20.leads} leads, +${ctx.projection20.completed} comparecimentos, +R$${ctx.projection20.revenue.toFixed(0)}.`,
         reason: ctx.decision.recommendation,
+        eta: "2 minutos",
       });
       return;
     }
@@ -481,6 +515,8 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
         title: `Trocar criativo/publico em ${campaign.name}`,
         impact: "Objetivo: recuperar tracao e reduzir custo por resultado.",
         reason: ctx.decision.recommendation,
+        eta: "25 minutos",
+        due: "Terca-feira",
       });
       return;
     }
@@ -490,6 +526,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
       title: `Manter ${campaign.name}`,
       impact: "Continuar captacao enquanto acumula dados confiaveis.",
       reason: ctx.decision.recommendation,
+      eta: "Nenhuma acao",
     });
   });
 
@@ -500,10 +537,43 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
       title: "Revisar tempo de resposta do comercial",
       impact: "Potencial de ganho direto em comparecimento nas campanhas ativas.",
       reason: `${lowShowUp.name} esta com comparecimento ${lowShowUp.showUpRate}% (meta ${TARGETS.showUpRate}%).`,
+      eta: "10 minutos",
     });
   }
 
   return actions.slice(0, 5);
+}
+
+export function buildMpcDiagnostic(campaigns: Campaign[], targetCompleted = 50): MpcDiagnostic {
+  const active = campaigns.filter((c) => c.active);
+  const marketingRaw = active.length > 0
+    ? avg(active.map((c) => {
+      const cpl = c.cacLead > 0 ? c.cacLead : TARGETS.cpl * 2;
+      const conv = c.conversionRate;
+      return clamp((TARGETS.cpl / cpl) * 55 + (conv / TARGETS.conversionRate) * 45, 0, 100);
+    }))
+    : 0;
+
+  const scheduled = active.reduce((a, c) => a + c.scheduled, 0);
+  const completed = active.reduce((a, c) => a + c.completed, 0);
+  const showUp = scheduled > 0 ? (completed / scheduled) * 100 : 0;
+  const comercialRaw = clamp((showUp / TARGETS.showUpRate) * 100, 0, 100);
+  const operacaoRaw = clamp((completed / Math.max(targetCompleted, 1)) * 100, 0, 100);
+
+  const toStatus = (score: number): "good" | "warn" | "crit" => {
+    if (score >= 75) return "good";
+    if (score >= 50) return "warn";
+    return "crit";
+  };
+
+  return {
+    marketing: Math.round(marketingRaw),
+    comercial: Math.round(comercialRaw),
+    operacao: Math.round(operacaoRaw),
+    marketingStatus: toStatus(marketingRaw),
+    comercialStatus: toStatus(comercialRaw),
+    operacaoStatus: toStatus(operacaoRaw),
+  };
 }
 
 export function buildMarketingMasterStatus(campaigns: Campaign[], ticketMedio: number): MarketingMasterStatus {
