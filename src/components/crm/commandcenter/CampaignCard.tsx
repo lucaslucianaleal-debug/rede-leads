@@ -4,7 +4,7 @@ import CampaignDailyModal from "./CampaignDailyModal";
 import CampaignFinanceModal from "./CampaignFinanceModal";
 import CreateCampaignModal from "./CreateCampaignModal";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
-import { buildBudgetAllocationPlan, buildCampaignDecision, buildConfidenceContext, buildMarketingMasterStatus, buildMondayActions, buildMonthlyProjection, buildMpcDiagnostic, buildStrategicContext, buildWeeklyRisk } from "@/lib/mpcDecisionEngine";
+import { buildBudgetAllocationPlan, buildCampaignDecision, buildCampaignPerformance, buildConfidenceContext, buildMarketingMasterStatus, buildMondayActions, buildMonthlyProjection, buildMpcDiagnostic, buildStrategicContext, buildWeeklyRisk } from "@/lib/mpcDecisionEngine";
 
 interface Props {
   campaigns: Campaign[];
@@ -182,6 +182,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
   const receita = c.completed * ticketMedio;
   const custoReal = c.totalSpend + c.taxCost;
   const decision = buildCampaignDecision(c);
+  const performance = buildCampaignPerformance(c, ticketMedio);
   const confidenceCtx = buildConfidenceContext(c);
   const funnelScore = Math.round((
     scoreLowerIsBetter(c.cacLead, 8) +
@@ -222,28 +223,30 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
             <button onClick={() => setExpanded(e => !e)} style={{ border: "0.5px solid #3a3a3a", color: "#999", fontSize: "11px" }} className="px-3 py-1.5 rounded hover:bg-[#323232]">
               {expanded ? "▲ Recolher" : "▼ Expandir"}
             </button>
-            <FunnelHealthBadge score={funnelScore} />
+            <span style={{ color: performance.color, fontSize: "11px", border: `0.5px solid ${performance.color}` }} className="px-2 py-1 rounded font-semibold">
+              {performance.label}
+            </span>
           </div>
         </div>
 
-        {/* Linha 2: KPIs */}
+        {/* Linha 2: Modelo mental simples */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
           {[
-            { label: "CPL", value: c.cacLead > 0 ? fmt(c.cacLead) : "—", good: c.cacLead > 0 && c.cacLead < 8 },
-            { label: "CAC Agendamento", value: c.cacAgendamento > 0 ? fmt(c.cacAgendamento) : "—", good: c.cacAgendamento > 0 && c.cacAgendamento < 20 },
-            { label: "CAC Comparecimento", value: c.cacComparecimento > 0 ? fmt(c.cacComparecimento) : "—", good: c.cacComparecimento > 0 && c.cacComparecimento < 80 },
-            { label: "Nota da campanha", value: funnelScore > 0 ? `${funnelScore}/100` : "—", good: funnelScore >= 75 },
+            { label: "Performance", value: `${performance.label}`, color: performance.color },
+            { label: "Confianca", value: `${confidenceCtx.label} (${decision.confidencePct}%)`, color: confidenceCtx.color },
+            { label: "Decisao MPC", value: decision.action === "escalar_20" ? "Escalar" : decision.action === "otimizar" ? "Otimizar" : decision.action === "pausar" ? "Pausar" : decision.action === "aguardar_dados" ? "Aguardar" : "Manter", color: decision.color },
+            { label: "CPL", value: c.cacLead > 0 ? fmt(c.cacLead) : "—", color: c.cacLead > 0 && c.cacLead <= 8 ? "#10b981" : "#d1d5db" },
           ].map(k => (
             <div key={k.label} style={{ background: "#2a2a2a", border: "0.5px solid #3a3a3a" }} className="rounded p-2 text-center">
               <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider mb-1">{k.label}</p>
-              <p style={{ color: k.good ? "#10b981" : k.value === "—" ? "#555" : "#f59e0b", fontSize: "12px" }} className="font-bold">{k.value}</p>
+              <p style={{ color: k.color, fontSize: "12px" }} className="font-bold">{k.value}</p>
             </div>
           ))}
         </div>
 
         {/* Linha 3: Centro de decisao */}
         <div style={{ background: "#1f1f1f", border: `0.5px solid ${decision.color}` }} className="rounded-lg p-3 mb-3">
-          <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider font-semibold mb-2">Centro de decisao MPC</p>
+          <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider font-semibold mb-2">Diagnostico Inteligente MPC</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
             <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2">
               <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Status</p>
@@ -251,7 +254,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
             </div>
             <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2">
               <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Proxima acao</p>
-              <p style={{ color: "#fff", fontSize: "11px" }} className="font-medium">{decision.recommendation}</p>
+              <p style={{ color: "#fff", fontSize: "11px" }} className="font-medium">{decision.action === "escalar_20" ? `Escalar para R$${decision.budgetRecommended.toFixed(0)}/dia` : decision.recommendation}</p>
             </div>
             <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2">
               <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Revisar em</p>
@@ -262,6 +265,14 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
               <p style={{ color: confidenceCtx.color, fontSize: "11px" }} className="font-semibold">{confidenceCtx.emoji} {decision.confidencePct}%</p>
             </div>
           </div>
+
+          {decision.action === "escalar_20" && (
+            <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Orcamento atual: R${decision.budgetCurrent.toFixed(0)}/dia</p>
+              <p style={{ color: "#fff", fontSize: "10px" }}>Recomendado: R${decision.budgetRecommended.toFixed(0)}/dia</p>
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Revisar apos +R$50 investidos ou em 3 dias.</p>
+            </div>
+          )}
 
           <button
             type="button"
@@ -558,13 +569,12 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
             <div className="space-y-2">
               {strategicRanking.slice(0, 3).map(({ campaign, ctx }, idx) => (
                 <div key={campaign.id} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
-                  <p style={{ color: "#999", fontSize: "9px" }} className="uppercase">Prioridade {idx + 1}</p>
+                  <p style={{ color: "#999", fontSize: "9px" }} className="uppercase">{idx + 1 === 1 ? "Prioridade Alta" : idx + 1 === 2 ? "Prioridade Media" : "Prioridade Baixa"}</p>
                   <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">{campaign.name}</p>
-                  <p style={{ color: "#fbbf24", fontSize: "10px" }}>{"★".repeat(ctx.priorityStars)}{"☆".repeat(5 - ctx.priorityStars)}</p>
                   <p style={{ color: "#d1d5db", fontSize: "10px" }} className="font-medium">{ctx.why}</p>
                   <p style={{ color: "#9ca3af", fontSize: "10px" }}>CPL {campaign.cacLead > 0 ? fmt(campaign.cacLead) : "—"}</p>
                   <p style={{ color: "#9ca3af", fontSize: "10px" }}>Receita prevista {fmt(ctx.revenuePotential)}</p>
-                  <p style={{ color: "#60a5fa", fontSize: "10px" }}>{ctx.shortAction}</p>
+                  <p style={{ color: "#60a5fa", fontSize: "10px" }}>{ctx.shortAction === "Escalar 20%" ? `Escalar para R$${ctx.decision.budgetRecommended.toFixed(0)}/dia` : ctx.shortAction}</p>
                 </div>
               ))}
             </div>

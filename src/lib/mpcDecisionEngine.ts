@@ -27,6 +27,15 @@ export interface CampaignDecision {
   confidence: "baixa" | "media" | "alta";
   confidencePct: number;
   reviewDate: string;
+  budgetCurrent: number;
+  budgetRecommended: number;
+}
+
+export interface CampaignPerformance {
+  level: "excelente" | "boa" | "regular" | "ruim";
+  label: string;
+  color: string;
+  summary: string;
 }
 
 export interface ConfidenceContext {
@@ -183,6 +192,20 @@ function round(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+function resolveBudgetBase(campaign: Campaign) {
+  const spend = (campaign.totalSpend || 0) + (campaign.taxCost || 0);
+  return campaign.budget > 0 ? campaign.budget : Math.max(spend, 10);
+}
+
+function controlledScaleBudget(baseBudget: number) {
+  const increase = Math.min(baseBudget * 0.2, 5);
+  const safeIncrease = Math.max(increase, 1);
+  return {
+    current: round(baseBudget),
+    recommended: round(baseBudget + safeIncrease),
+  };
+}
+
 function addDays(base: Date, days: number) {
   const d = new Date(base);
   d.setDate(d.getDate() + days);
@@ -195,6 +218,7 @@ function formatPtDate(date: Date) {
 
 export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
   const spend = (campaign.totalSpend || 0) + (campaign.taxCost || 0);
+  const budgetScale = controlledScaleBudget(resolveBudgetBase(campaign));
   const status = stageByInvestment(spend);
   const label = statusLabel(status);
 
@@ -210,6 +234,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
   const historicalCpc = avg(fullCpc.map((x) => x.cpc));
   const currentCpc = avg(recentCpc.map((x) => x.cpc));
   const cpcAboveHistoryPct = historicalCpc > 0 ? Math.round(((currentCpc - historicalCpc) / historicalCpc) * 100) : 0;
+  const recentMetrics = recent.slice(-4);
+  const reachDown4d = recentMetrics.length >= 4 && recentMetrics[3].reach < recentMetrics[2].reach && recentMetrics[2].reach < recentMetrics[1].reach;
+  const impressionsUp4d = recentMetrics.length >= 4 && recentMetrics[3].impressions > recentMetrics[2].impressions && recentMetrics[2].impressions > recentMetrics[1].impressions;
   const confidenceLevel = computeConfidence(campaign);
   const confidencePct = confidenceLevel === "alta" ? 82 : confidenceLevel === "media" ? 64 : 48;
   const reviewDate = formatPtDate(addDays(new Date(), confidenceLevel === "baixa" ? 3 : confidenceLevel === "media" ? 2 : 1));
@@ -223,6 +250,10 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
 
   if (cpcRising3d && clicksFalling3d) {
     reasons.push("Nos ultimos 3 dias, CPC subiu e cliques cairam: sinal de fadiga do criativo/publico.");
+  }
+
+  if (reachDown4d && impressionsUp4d) {
+    reasons.push("Alcance caiu enquanto impressoes subiram: indicio de saturacao do publico.");
   }
 
   if (cpcAboveHistoryPct >= 60) {
@@ -245,6 +276,8 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
+      budgetCurrent: budgetScale.current,
+      budgetRecommended: budgetScale.recommended,
     };
   }
 
@@ -261,6 +294,8 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
+      budgetCurrent: budgetScale.current,
+      budgetRecommended: budgetScale.current,
     };
   }
 
@@ -275,48 +310,48 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       color: "#f59e0b",
       recommendation: "Campanha promissora. Manter como esta ate atingir investimento minimo de R$50.",
       reasons,
-      nextReview: "Reavaliar ao consumir mais R$30 ou atingir R$50 investidos.",
+      nextReview: "Reavaliar apos consumir mais R$50 de investimento ou em 3 dias.",
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
+      budgetCurrent: budgetScale.current,
+      budgetRecommended: budgetScale.current,
     };
   }
 
   if (goodCost && spend >= 50 && campaign.showUpRate >= TARGETS.showUpRate) {
-    const newBudget = campaign.budget > 0 ? campaign.budget * 1.3 : 0;
     return {
       status: "escala",
-      action: "escalar_30",
-      title: "ESCALAR CAMPANHA +30%",
+      action: "escalar_20",
+      title: "CAMPANHA VALIDADA",
       emoji: "🟢",
       color: "#10b981",
-      recommendation: newBudget > 0
-        ? `Aumentar budget em 30% (${campaign.budget.toFixed(0)} -> ${newBudget.toFixed(0)}).`
-        : "Aumentar budget em 30% mantendo monitoramento diario.",
+      recommendation: `Escalar gradualmente: ${budgetScale.current.toFixed(0)} -> ${budgetScale.recommended.toFixed(0)} por dia.`,
       reasons,
-      nextReview: "Nova analise apos consumir mais R$50.",
+      nextReview: "Revisar apos consumir mais R$50 de investimento ou em 3 dias.",
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
+      budgetCurrent: budgetScale.current,
+      budgetRecommended: budgetScale.recommended,
     };
   }
 
   if (goodCost && spend >= 50) {
-    const newBudget = campaign.budget > 0 ? campaign.budget * 1.2 : 0;
     return {
       status: "validando",
       action: "escalar_20",
-      title: "ESCALAR CAMPANHA +20%",
+      title: "INICIAR ESCALA CONTROLADA",
       emoji: "🟢",
       color: "#10b981",
-      recommendation: newBudget > 0
-        ? `Aumentar budget em 20% (${campaign.budget.toFixed(0)} -> ${newBudget.toFixed(0)}).`
-        : "Aumentar budget em 20% com monitoramento de CPL e CAC.",
+      recommendation: `Ajustar budget diario de ${budgetScale.current.toFixed(0)} para ${budgetScale.recommended.toFixed(0)}.`,
       reasons,
-      nextReview: "Nova analise apos consumir mais R$30.",
+      nextReview: "Revisar apos consumir mais R$50 de investimento ou em 3 dias.",
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
+      budgetCurrent: budgetScale.current,
+      budgetRecommended: budgetScale.recommended,
     };
   }
 
@@ -336,6 +371,8 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
+      budgetCurrent: budgetScale.current,
+      budgetRecommended: budgetScale.current,
     };
   }
 
@@ -351,7 +388,29 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
     confidence: confidenceLevel,
     confidencePct,
     reviewDate,
+    budgetCurrent: budgetScale.current,
+    budgetRecommended: budgetScale.current,
   };
+}
+
+export function buildCampaignPerformance(campaign: Campaign, ticketMedio: number): CampaignPerformance {
+  const receita = campaign.completed * ticketMedio;
+  const cplOk = campaign.cacLead > 0 && campaign.cacLead <= TARGETS.cpl;
+  const cacOk = campaign.cacAgendamento > 0 && campaign.cacAgendamento <= TARGETS.cacAgendamento;
+  const convOk = campaign.conversionRate >= TARGETS.conversionRate;
+
+  const score = (cplOk ? 30 : 10) + (cacOk ? 30 : 10) + (convOk ? 20 : 10) + (receita >= ticketMedio * 2 ? 20 : receita > 0 ? 10 : 0);
+
+  if (score >= 80) {
+    return { level: "excelente", label: "Excelente", color: "#10b981", summary: "Indicadores principais acima da meta." };
+  }
+  if (score >= 60) {
+    return { level: "boa", label: "Boa", color: "#3b82f6", summary: "Boa eficiencia, com pontos de ajuste." };
+  }
+  if (score >= 40) {
+    return { level: "regular", label: "Regular", color: "#f59e0b", summary: "Entrega parcial, precisa otimizar." };
+  }
+  return { level: "ruim", label: "Ruim", color: "#ef4444", summary: "Baixa eficiencia para o investimento atual." };
 }
 
 export function buildConfidenceContext(campaign: Campaign): ConfidenceContext {
@@ -430,7 +489,7 @@ export function buildStrategicContext(campaign: Campaign, ticketMedio: number): 
     campaignName: campaign.name,
     priorityScore,
     priorityStars,
-    priorityLabel: `Prioridade ${priorityStars}`,
+    priorityLabel: priorityScore >= 75 ? "Prioridade Alta" : priorityScore >= 50 ? "Prioridade Media" : "Prioridade Baixa",
     decision,
     confidenceContext,
     projection20,
@@ -567,9 +626,9 @@ export function buildMpcDiagnostic(campaigns: Campaign[], targetCompleted = 50):
   };
 
   return {
-    marketing: Math.round(marketingRaw),
-    comercial: Math.round(comercialRaw),
-    operacao: Math.round(operacaoRaw),
+    marketing: Math.round(marketingRaw / 10),
+    comercial: Math.round(comercialRaw / 10),
+    operacao: Math.round(operacaoRaw / 10),
     marketingStatus: toStatus(marketingRaw),
     comercialStatus: toStatus(comercialRaw),
     operacaoStatus: toStatus(operacaoRaw),
