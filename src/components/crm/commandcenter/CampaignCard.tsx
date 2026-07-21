@@ -567,7 +567,16 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
   const capacityGate = buildOperationalCapacityGate(active);
   const mondayActions = buildMondayActions(active, ticketMedio);
   const visibleActions = mondayActions.filter((a) => !completedActions.includes(a.id));
-  const executedPct = mondayActions.length > 0 ? Math.round(((mondayActions.length - visibleActions.length) / mondayActions.length) * 100) : 0;
+  const executeActions = visibleActions.filter((action) => {
+    const text = `${action.id} ${action.title}`.toLowerCase();
+    return /escalar|otimizar|pausar|comercial|trocar|ajustar/.test(text) && !/manter|aguardar dados/.test(text);
+  });
+  const monitorActions = visibleActions.filter((action) => {
+    const text = `${action.id} ${action.title}`.toLowerCase();
+    return /aguardar|monitorar|validar/.test(text);
+  });
+  const actionableTotal = executeActions.length + monitorActions.length;
+  const executedPct = actionableTotal > 0 ? Math.round((completedActions.length / (completedActions.length + actionableTotal)) * 100) : 100;
   const isOperacao = period === "operacao";
   const isCiclo = period === "ciclo";
   const isHistorico = period === "historico";
@@ -576,13 +585,24 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
     return d.action === "escalar_20" || d.action === "escalar_30";
   }).length;
   const pendingReviewCount = active.filter((c) => computeScaleCycleState(c).state === "pronto_reavaliar").length;
-  const videosPendingCount = visibleActions.filter((a) => /criativo|video|copy|publico/i.test(a.title)).length;
+  const videosPendingCount = executeActions.filter((a) => /criativo|video|copy|publico/i.test(a.title)).length;
   const pauseCandidates = active.filter((c) => buildCampaignDecision(c).action === "pausar").length;
+  const totalScheduled = active.reduce((sum, c) => sum + c.scheduled, 0);
+  const totalCompletedActive = active.reduce((sum, c) => sum + c.completed, 0);
+  const agendaOccupancyPct = Math.min(95, Math.max(5, Math.round((totalScheduled / Math.max(active.length * 20, 1)) * 100)));
+  const showUpPct = totalScheduled > 0 ? Math.round((totalCompletedActive / totalScheduled) * 100) : 0;
   const displayCampaigns = isHistorico ? campaigns : active;
   const masterStatus = buildMarketingMasterStatus(active, ticketMedio);
   const weeklyRisk = buildWeeklyRisk(active, ticketMedio);
-  const monthlyProjection = buildMonthlyProjection(active, 50);
+  const monthScopedActive: Campaign[] = active.map((campaign) => ({
+    ...campaign,
+    leads: campaign.monthLeads ?? campaign.leads,
+    scheduled: campaign.monthScheduled ?? campaign.scheduled,
+    completed: campaign.monthCompleted ?? campaign.completed,
+  }));
+  const monthlyProjection = buildMonthlyProjection(monthScopedActive, 50);
   const mpcDiagnostic = buildMpcDiagnostic(active, monthlyProjection.targetCompleted);
+  const currentMonthLabel = new Date().toLocaleDateString("pt-BR", { month: "long" });
 
   const statusChip = (status: "good" | "warn" | "crit") => {
     if (status === "good") return { color: "#10b981", label: "Boa" };
@@ -593,6 +613,60 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
   const marketingChip = statusChip(mpcDiagnostic.marketingStatus);
   const comercialChip = statusChip(mpcDiagnostic.comercialStatus);
   const operacaoChip = statusChip(mpcDiagnostic.operacaoStatus);
+
+  const decisionCandidates = active
+    .map((campaign) => ({ campaign, ctx: buildStrategicContext(campaign, ticketMedio) }))
+    .sort((a, b) => b.ctx.priorityScore - a.ctx.priorityScore);
+  const topScaleCandidate = decisionCandidates.find((x) => x.ctx.decision.action === "escalar_20" || x.ctx.decision.action === "escalar_30");
+  const topMonitorCandidate = decisionCandidates.find((x) => x.ctx.decision.action === "aguardar_dados");
+
+  const decisionOfDay = (() => {
+    if (topScaleCandidate && capacityGate.canScale) {
+      return {
+        title: "Aumente investimento hoje",
+        statusColor: "#10b981",
+        statusEmoji: "✅",
+        campaignName: topScaleCandidate.campaign.name,
+        recommendation: `R$${topScaleCandidate.ctx.decision.budgetCurrent.toFixed(0)} -> R$${topScaleCandidate.ctx.decision.budgetRecommended.toFixed(0)}/dia`,
+        reason: topScaleCandidate.ctx.decision.reasons.slice(0, 3),
+        impact: `Impacto esperado: +${topScaleCandidate.ctx.projection20.leads} leads, +${topScaleCandidate.ctx.projection20.completed} comparecimentos, receita potencial ${fmt(topScaleCandidate.ctx.projection20.revenue)}.`,
+      };
+    }
+
+    if (topScaleCandidate && !capacityGate.canScale) {
+      return {
+        title: "Hoje NAO aumente investimento",
+        statusColor: "#f59e0b",
+        statusEmoji: "⏸",
+        campaignName: topScaleCandidate.campaign.name,
+        recommendation: "Escala bloqueada por capacidade operacional",
+        reason: [capacityGate.reason],
+        impact: "Priorize destravar confirmacoes/agenda antes de novo volume de leads.",
+      };
+    }
+
+    if (topMonitorCandidate) {
+      return {
+        title: "Hoje NAO altere orcamento",
+        statusColor: "#3b82f6",
+        statusEmoji: "✅",
+        campaignName: topMonitorCandidate.campaign.name,
+        recommendation: "Campanha em observacao de escala",
+        reason: [topMonitorCandidate.ctx.decision.recommendation],
+        impact: topMonitorCandidate.ctx.decision.nextReview,
+      };
+    }
+
+    return {
+      title: "Sem decisao critica hoje",
+      statusColor: "#10b981",
+      statusEmoji: "✅",
+      campaignName: "Carteira estavel",
+      recommendation: "Nenhuma acao de escala obrigatoria no momento",
+      reason: ["As campanhas estao dentro do comportamento esperado para hoje."],
+      impact: "Manter monitoramento padrao.",
+    };
+  })();
 
   const makeId = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
@@ -690,12 +764,16 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
         <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h4 style={{ color: "#fff", fontSize: "14px" }} className="font-semibold">Central Operacional</h4>
-            <span style={{ color: "#999", fontSize: "11px" }}>{visibleActions.length} ações pendentes</span>
+            <span style={{ color: "#999", fontSize: "11px" }}>{actionableTotal} itens ativos</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
-              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Ações pendentes</p>
-              <p style={{ color: "#fff", fontSize: "16px" }} className="font-bold">{visibleActions.length}</p>
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Executar agora</p>
+              <p style={{ color: "#fff", fontSize: "16px" }} className="font-bold">{executeActions.length}</p>
+            </div>
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Monitorar</p>
+              <p style={{ color: "#f59e0b", fontSize: "16px" }} className="font-bold">{monitorActions.length}</p>
             </div>
             <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
               <p style={{ color: "#9ca3af", fontSize: "10px" }}>Escalas para executar</p>
@@ -718,13 +796,37 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
               <p style={{ color: "#f59e0b", fontSize: "16px" }} className="font-bold">{pauseCandidates}</p>
             </div>
           </div>
-          <p style={{ color: capacityGate.canScale ? "#10b981" : "#f59e0b", fontSize: "10px" }} className="mt-2">{capacityGate.reason}</p>
+          <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2 mt-2">
+            <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Capacidade Operacional</p>
+            <p style={{ color: capacityGate.canScale ? "#10b981" : "#f59e0b", fontSize: "11px" }} className="font-semibold">
+              {capacityGate.canScale ? "Disponivel para escalar" : "Atencao operacional"}
+            </p>
+            <p style={{ color: "#d1d5db", fontSize: "10px" }}>Agenda ocupada: {agendaOccupancyPct}%</p>
+            <p style={{ color: "#d1d5db", fontSize: "10px" }}>Pacientes aguardando confirmacao: {capacityGate.pendingConfirmations}</p>
+            <p style={{ color: "#d1d5db", fontSize: "10px" }}>Taxa de comparecimento atual: {showUpPct}%</p>
+            <p style={{ color: "#666", fontSize: "10px" }}>Tempo medio de resposta: sem integracao de dado</p>
+            <p style={{ color: "#666", fontSize: "10px" }}>Dentistas com disponibilidade: sem integracao de dado</p>
+            <p style={{ color: "#9ca3af", fontSize: "10px" }} className="mt-1">Conclusao: {capacityGate.reason}</p>
+          </div>
+        </div>
+
+        <div style={{ background: "#202020", border: `0.5px solid ${decisionOfDay.statusColor}` }} className="rounded-lg p-4 mb-4">
+          <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase tracking-wider mb-1">Decisao do dia</p>
+          <p style={{ color: decisionOfDay.statusColor, fontSize: "18px" }} className="font-bold">{decisionOfDay.statusEmoji} {decisionOfDay.title}</p>
+          <p style={{ color: "#fff", fontSize: "12px" }} className="mt-1">{decisionOfDay.campaignName}</p>
+          <p style={{ color: "#d1d5db", fontSize: "11px" }} className="mt-1">{decisionOfDay.recommendation}</p>
+          <div className="mt-2 space-y-0.5">
+            {decisionOfDay.reason.map((r, idx) => (
+              <p key={idx} style={{ color: "#9ca3af", fontSize: "10px" }}>✓ {r}</p>
+            ))}
+          </div>
+          <p style={{ color: "#10b981", fontSize: "10px" }} className="mt-2">{decisionOfDay.impact}</p>
         </div>
 
         <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4 mb-4">
-          <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold uppercase tracking-wider mb-2">Plano do dia</p>
+          <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold uppercase tracking-wider mb-2">O que EXECUTAR</p>
           <div className="space-y-2">
-            {visibleActions.length > 0 ? visibleActions.map((action, idx) => (
+            {executeActions.length > 0 ? executeActions.map((action, idx) => (
               <div key={`${idx}-${action.id}`} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-3">
                 <p style={{ color: "#fff", fontSize: "12px" }} className="font-semibold">Prioridade {idx + 1}: {action.title}</p>
                 <p style={{ color: "#9ca3af", fontSize: "10px" }}>Prazo: {action.due || "Hoje"}</p>
@@ -738,9 +840,24 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
                 </button>
               </div>
             )) : (
-              <p style={{ color: "#777", fontSize: "11px" }}>Sem ações pendentes agora.</p>
+              <p style={{ color: "#10b981", fontSize: "11px" }}>Nenhuma acao operacional pendente. O restante das campanhas esta dentro do comportamento esperado.</p>
             )}
           </div>
+
+          <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold uppercase tracking-wider mt-4 mb-2">O que MONITORAR</p>
+          <div className="space-y-2">
+            {monitorActions.length > 0 ? monitorActions.map((action, idx) => (
+              <div key={`${idx}-${action.id}`} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-3">
+                <p style={{ color: "#d1d5db", fontSize: "12px" }} className="font-semibold">⏳ {action.title}</p>
+                <p style={{ color: "#9ca3af", fontSize: "10px" }}>Status: Em observacao</p>
+                <p style={{ color: "#9ca3af", fontSize: "10px" }}>{action.reason}</p>
+                <p style={{ color: "#9ca3af", fontSize: "10px" }}>Proxima leitura: {action.due || "janela de dados (72h ou +R$50)"}</p>
+              </div>
+            )) : (
+              <p style={{ color: "#777", fontSize: "11px" }}>Sem itens de monitoramento no momento.</p>
+            )}
+          </div>
+
           <p style={{ color: executedPct === 100 ? "#10b981" : "#999", fontSize: "11px" }} className="mt-3">Plano do dia: {executedPct}%</p>
         </div>
       </>
@@ -782,7 +899,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
           <p style={{ color: "#777", fontSize: "10px" }} className="uppercase tracking-wider mb-2">Meta do mes</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
             <div>
-              <p style={{ color: "#fff", fontSize: "18px" }} className="font-bold">Meta Julho: {monthlyProjection.targetCompleted} comparecimentos</p>
+              <p style={{ color: "#fff", fontSize: "18px" }} className="font-bold">Meta {currentMonthLabel}: {monthlyProjection.targetCompleted} comparecimentos</p>
               <div className="h-2 rounded-full bg-[#303030] overflow-hidden mt-2">
                 <div
                   className="h-full rounded-full"

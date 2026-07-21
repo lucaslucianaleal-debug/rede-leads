@@ -112,6 +112,9 @@ export interface Campaign {
   leads: number;
   scheduled: number;
   completed: number;
+  monthLeads?: number;
+  monthScheduled?: number;
+  monthCompleted?: number;
 
   // Derivados:
   roas: number;          // (completed * ticketMedio) / totalSpend

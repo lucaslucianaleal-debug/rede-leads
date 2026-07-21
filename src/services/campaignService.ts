@@ -197,6 +197,9 @@ function buildCampaignFromSnapshot(
   leadsCount: number,
   scheduledCount: number,
   completedCount: number,
+  monthLeadsCount: number,
+  monthScheduledCount: number,
+  monthCompletedCount: number,
   totals: { totalSpend: number; totalImpressions: number; totalClicks: number; totalReach: number }
 ): Campaign {
   const color = data.color || CAMPAIGN_COLORS[idx % CAMPAIGN_COLORS.length];
@@ -238,6 +241,9 @@ function buildCampaignFromSnapshot(
     leads: leadsCount,
     scheduled: scheduledCount,
     completed: completedCount,
+    monthLeads: monthLeadsCount,
+    monthScheduled: monthScheduledCount,
+    monthCompleted: monthCompletedCount,
     roas,
     predictability,
     cacLead,
@@ -341,6 +347,13 @@ function inRange(date: Date, start: Date, end: Date) {
   return date.getTime() >= start.getTime() && date.getTime() <= end.getTime();
 }
 
+function getCurrentMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  return { start, end };
+}
+
 function resolveLeadDate(lead: any) {
   return parseFlexibleDate(lead?.dataCriacao)
     || parseFlexibleDate(lead?.createdAt)
@@ -355,6 +368,7 @@ function resolveLeadDate(lead: any) {
 export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, period: PeriodType = 'operacao'): Promise<Campaign[]> {
   try {
     const { start, end } = getPeriodRange(period);
+    const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
     const colRef = collection(db, "clinics", clinicId, "campaigns");
     const snapshot = await getDocs(colRef);
     const sharedSnap = await getDoc(getSharedCampaignDoc(clinicId));
@@ -385,11 +399,19 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
               const dt = resolveLeadDate(l);
               return dt ? inRange(dt, start, end) : false;
             });
+            const campaignMonthLeads = leads.filter(l => {
+              if (l.metaCampanhaId !== campaign.id) return false;
+              const dt = resolveLeadDate(l);
+              return dt ? inRange(dt, monthStart, monthEnd) : false;
+            });
           const leadsCount = campaignLeads.length;
           const scheduledCount = campaignLeads.filter(l => l.dataAgendamento?.trim()).length;
           const completedCount = campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length;
+          const monthLeadsCount = campaignMonthLeads.length;
+          const monthScheduledCount = campaignMonthLeads.filter(l => l.dataAgendamento?.trim()).length;
+          const monthCompletedCount = campaignMonthLeads.filter(l => l.comparecimento === "COMPARECEU").length;
             const totals = calcCampaignTotals(filteredMetrics);
-            return buildCampaignFromSnapshot(campaign.id, clinicId, { ...data, dailyMetrics: filteredMetrics, allDailyMetrics: data.dailyMetrics || [] }, idx, ticketMedio, leadsCount, scheduledCount, completedCount, totals);
+            return buildCampaignFromSnapshot(campaign.id, clinicId, { ...data, dailyMetrics: filteredMetrics, allDailyMetrics: data.dailyMetrics || [] }, idx, ticketMedio, leadsCount, scheduledCount, completedCount, monthLeadsCount, monthScheduledCount, monthCompletedCount, totals);
         });
 
         await persistCampaignBackup(clinicId, backupCampaigns);
@@ -417,6 +439,11 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
           const dt = resolveLeadDate(l);
           return dt ? inRange(dt, start, end) : false;
         });
+        const campaignMonthLeads = leads.filter(l => {
+          if (l.metaCampanhaId !== docSnap.id) return false;
+          const dt = resolveLeadDate(l);
+          return dt ? inRange(dt, monthStart, monthEnd) : false;
+        });
 
         return buildCampaignFromSnapshot(
           docSnap.id,
@@ -427,6 +454,9 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
           campaignLeads.length,
           campaignLeads.filter(l => l.dataAgendamento?.trim()).length,
           campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length,
+          campaignMonthLeads.length,
+          campaignMonthLeads.filter(l => l.dataAgendamento?.trim()).length,
+          campaignMonthLeads.filter(l => l.comparecimento === "COMPARECEU").length,
           totals
         );
       });
