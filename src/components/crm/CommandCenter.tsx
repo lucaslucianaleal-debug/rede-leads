@@ -77,7 +77,7 @@ export default function CommandCenter() {
           {layer === "meta" && (
             <div className="space-y-6">
               {/* Diagnósticos Meta */}
-              {metaDiagnostics.length > 0 && (
+              {period !== "operacao" && metaDiagnostics.length > 0 && (
                 <section>
                   <div className="flex items-center justify-between mb-3">
                     <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest">
@@ -94,12 +94,13 @@ export default function CommandCenter() {
               {/* Campanhas */}
               <section>
                 <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
-                  Campanhas
+                  {period === "operacao" ? "Execução" : period === "ciclo" ? "Ciclo Atual" : "Histórico"}
                 </h3>
                 <CampaignCard
                   campaigns={campaigns}
                   clinicId={clinicId}
                   ticketMedio={ticketMedio}
+                  period={period}
                   onAddCampaign={handleAddCampaign}
                   onSaveDailyMetric={handleSaveDailyMetric}
                   onDeleteDailyMetric={handleDeleteDailyMetric}

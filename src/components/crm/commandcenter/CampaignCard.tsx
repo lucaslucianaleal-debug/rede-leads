@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { Campaign, CampaignDailyMetric, CampaignDecisionCycle, CampaignOperationalEvent } from "@/types/commandCenter";
+import type { Campaign, CampaignDailyMetric, CampaignDecisionCycle, CampaignOperationalEvent, PeriodType } from "@/types/commandCenter";
 import CampaignDailyModal from "./CampaignDailyModal";
 import CampaignFinanceModal from "./CampaignFinanceModal";
 import CreateCampaignModal from "./CreateCampaignModal";
@@ -11,6 +11,7 @@ interface Props {
   campaigns: Campaign[];
   clinicId: string;
   ticketMedio: number;
+  period: PeriodType;
   onAddCampaign: (data: { name: string; dateStart: string; dateEnd: string; budget: number; dailyBudget?: number; fundsAdded?: number; taxCost?: number }) => Promise<void>;
   onSaveDailyMetric: (campaignId: string, metric: CampaignDailyMetric) => Promise<void>;
   onDeleteDailyMetric: (campaignId: string, date: string) => Promise<void>;
@@ -534,7 +535,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
   );
 }
 
-export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCampaign, onSaveDailyMetric, onDeleteDailyMetric, onToggleActive, onDeleteCampaign, onSaveCampaignFinance, onReload }: Props) {
+export default function CampaignCard({ campaigns, clinicId, ticketMedio, period, onAddCampaign, onSaveDailyMetric, onDeleteDailyMetric, onToggleActive, onDeleteCampaign, onSaveCampaignFinance, onReload }: Props) {
   const [dailyModal, setDailyModal] = useState<{ campaign: Campaign; metric?: CampaignDailyMetric } | null>(null);
   const [financeModal, setFinanceModal] = useState<Campaign | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -557,6 +558,17 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const mondayActions = buildMondayActions(active, ticketMedio);
   const visibleActions = mondayActions.filter((a) => !completedActions.includes(a.id));
   const executedPct = mondayActions.length > 0 ? Math.round(((mondayActions.length - visibleActions.length) / mondayActions.length) * 100) : 0;
+  const isOperacao = period === "operacao";
+  const isCiclo = period === "ciclo";
+  const isHistorico = period === "historico";
+  const actionableScaleCount = active.filter((c) => {
+    const d = buildCampaignDecision(c);
+    return d.action === "escalar_20" || d.action === "escalar_30";
+  }).length;
+  const pendingReviewCount = active.filter((c) => computeScaleCycleState(c).state === "pronto_reavaliar").length;
+  const videosPendingCount = visibleActions.filter((a) => /criativo|video|copy|publico/i.test(a.title)).length;
+  const pauseCandidates = active.filter((c) => buildCampaignDecision(c).action === "pausar").length;
+  const displayCampaigns = isHistorico ? campaigns : active;
   const masterStatus = buildMarketingMasterStatus(active, ticketMedio);
   const weeklyRisk = buildWeeklyRisk(active, ticketMedio);
   const monthlyProjection = buildMonthlyProjection(active, 50);
@@ -661,6 +673,69 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
 
     onReload();
   };
+
+  if (isOperacao) {
+    return (
+      <>
+        <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 style={{ color: "#fff", fontSize: "14px" }} className="font-semibold">Central Operacional</h4>
+            <span style={{ color: "#999", fontSize: "11px" }}>{visibleActions.length} ações pendentes</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Ações pendentes</p>
+              <p style={{ color: "#fff", fontSize: "16px" }} className="font-bold">{visibleActions.length}</p>
+            </div>
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Escalas para executar</p>
+              <p style={{ color: "#10b981", fontSize: "16px" }} className="font-bold">{actionableScaleCount}</p>
+            </div>
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Aguardando revisão</p>
+              <p style={{ color: "#f59e0b", fontSize: "16px" }} className="font-bold">{pendingReviewCount}</p>
+            </div>
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Pacientes pendentes</p>
+              <p style={{ color: "#ef4444", fontSize: "16px" }} className="font-bold">{capacityGate.pendingConfirmations}</p>
+            </div>
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Vídeos/creativos pendentes</p>
+              <p style={{ color: "#d1d5db", fontSize: "16px" }} className="font-bold">{videosPendingCount}</p>
+            </div>
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Campanhas candidatas à pausa</p>
+              <p style={{ color: "#f59e0b", fontSize: "16px" }} className="font-bold">{pauseCandidates}</p>
+            </div>
+          </div>
+          <p style={{ color: capacityGate.canScale ? "#10b981" : "#f59e0b", fontSize: "10px" }} className="mt-2">{capacityGate.reason}</p>
+        </div>
+
+        <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4 mb-4">
+          <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold uppercase tracking-wider mb-2">Plano do dia</p>
+          <div className="space-y-2">
+            {visibleActions.length > 0 ? visibleActions.map((action, idx) => (
+              <div key={`${idx}-${action.id}`} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-3">
+                <p style={{ color: "#fff", fontSize: "12px" }} className="font-semibold">Prioridade {idx + 1}: {action.title}</p>
+                <p style={{ color: "#9ca3af", fontSize: "10px" }}>Prazo: {action.due || "Hoje"}</p>
+                <p style={{ color: "#9ca3af", fontSize: "10px" }}>Impacto: {action.impact}</p>
+                <button
+                  onClick={() => setCompletedActions((prev) => [...prev, action.id])}
+                  style={{ border: "0.5px solid #3a3a3a", color: "#d1d5db", fontSize: "10px" }}
+                  className="mt-2 px-2 py-1 rounded hover:bg-[#323232]"
+                >
+                  ☐ Executado
+                </button>
+              </div>
+            )) : (
+              <p style={{ color: "#777", fontSize: "11px" }}>Sem ações pendentes agora.</p>
+            )}
+          </div>
+          <p style={{ color: executedPct === 100 ? "#10b981" : "#999", fontSize: "11px" }} className="mt-3">Plano do dia: {executedPct}%</p>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -859,9 +934,9 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
         </div>
       )}
 
-      {active.length > 0 && (
+      {displayCampaigns.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3">
-          {active.map(c => (
+          {displayCampaigns.map(c => (
             <CampaignRow
               key={c.id}
               c={c}
@@ -881,7 +956,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
         </div>
       )}
 
-      {paused.length > 0 && (
+      {!isCiclo && paused.length > 0 && !isHistorico && (
         <div className="space-y-2">
           <p style={{ color: "#555", fontSize: "10px" }} className="uppercase tracking-wider mt-2">Pausadas</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
