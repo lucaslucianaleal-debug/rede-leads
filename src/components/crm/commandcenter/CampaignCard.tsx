@@ -182,7 +182,6 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
 }) {
   const [expanded, setExpanded] = useState(false);
   const [decisionExpanded, setDecisionExpanded] = useState(false);
-  const [showMiniChart, setShowMiniChart] = useState(false);
   const receita = c.completed * ticketMedio;
   const custoReal = c.totalSpend + c.taxCost;
   const decision = buildCampaignDecision(c);
@@ -375,10 +374,10 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
           <button
             type="button"
             onClick={() => setDecisionExpanded((v) => !v)}
-            style={{ border: "0.5px solid #3a3a3a", color: "#ddd", fontSize: "11px" }}
-            className="px-3 py-1.5 rounded hover:bg-[#323232]"
+            style={{ border: "0.5px solid #3a3a3a", color: "#bbb", fontSize: "10px" }}
+            className="px-2 py-1 rounded hover:bg-[#323232]"
           >
-            {decisionExpanded ? "▲ Ocultar justificativa MPC" : "▼ Por que o MPC tomou essa decisão?"}
+            {decisionExpanded ? "▲ Ocultar por que" : "▼ Ver por que"}
           </button>
 
           {decisionExpanded && (
@@ -398,16 +397,10 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
         {/* Linha 4: Grafico */}
         <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-2 mb-3">
           <div className="flex items-center justify-between mb-1.5">
-            <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider">Histórico de performance</p>
-            <button
-              onClick={() => setShowMiniChart((v) => !v)}
-              style={{ border: "0.5px solid #3a3a3a", color: "#999", fontSize: "9px" }}
-              className="px-2 py-1 rounded hover:bg-[#323232]"
-            >
-              {showMiniChart ? "Ocultar histórico" : "Ver histórico"}
-            </button>
+            <p style={{ color: "#666", fontSize: "9px" }} className="uppercase tracking-wider">Mini gráfico (7 dias)</p>
+            <p style={{ color: "#555", fontSize: "9px" }}>Cliques x CPC</p>
           </div>
-          {showMiniChart && miniChartData.length > 0 ? (
+          {miniChartData.length > 0 ? (
             <div className="h-[70px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={miniChartData} margin={{ top: 4, right: 8, left: -26, bottom: 0 }}>
@@ -561,13 +554,9 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
 
   const active = campaigns.filter(c => c.active);
   const paused = campaigns.filter(c => !c.active);
-  const isOperacao = period === "operacao";
-  const isCiclo = period === "ciclo";
-  const isHistorico = period === "historico";
-  const summaryBase = isHistorico ? campaigns : active;
-  const totalSpend = summaryBase.reduce((a, c) => a + c.totalSpend, 0);
-  const totalLeads = summaryBase.reduce((a, c) => a + c.leads, 0);
-  const totalCompleted = summaryBase.reduce((a, c) => a + c.completed, 0);
+  const totalSpend = campaigns.reduce((a, c) => a + c.totalSpend, 0);
+  const totalLeads = campaigns.reduce((a, c) => a + c.leads, 0);
+  const totalCompleted = campaigns.reduce((a, c) => a + c.completed, 0);
   const receita = totalCompleted * ticketMedio;
   const totalCompletedRate = totalLeads > 0 ? Math.round((totalCompleted / totalLeads) * 100) : 0;
   const strategicRanking = active
@@ -588,7 +577,9 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
   });
   const actionableTotal = executeActions.length + monitorActions.length;
   const executedPct = actionableTotal > 0 ? Math.round((completedActions.length / (completedActions.length + actionableTotal)) * 100) : 100;
-  const showHeavyDashboard = !(isCiclo || isHistorico);
+  const isOperacao = period === "operacao";
+  const isCiclo = period === "ciclo";
+  const isHistorico = period === "historico";
   const actionableScaleCount = active.filter((c) => {
     const d = buildCampaignDecision(c);
     return d.action === "escalar_20" || d.action === "escalar_30";
@@ -886,8 +877,8 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
         {campaigns.length > 0 ? (
           <div className="grid grid-cols-4 gap-3 text-center">
             {[
-              { label: "Spend total", value: fmt(totalSpend), sub: isHistorico ? `${campaigns.length} campanhas` : `${active.length} ativa${active.length !== 1 ? "s" : ""}` },
-              { label: "Leads captados", value: fmtN(totalLeads), sub: isHistorico ? "histórico total" : isCiclo ? "ciclo atual" : "operação atual" },
+              { label: "Spend total", value: fmt(totalSpend), sub: `${active.length} ativa${active.length !== 1 ? "s" : ""}` },
+              { label: "Leads captados", value: fmtN(totalLeads), sub: "todas campanhas" },
               { label: "Previsibilidade geral", value: totalCompletedRate > 0 ? `${totalCompletedRate}%` : "—", color: totalCompletedRate >= 40 ? "#10b981" : totalCompletedRate >= 20 ? "#f59e0b" : "#ef4444", sub: "lead → comparecimento" },
               { label: "Receita potencial", value: fmt(receita), color: "#10b981", sub: `${totalCompleted} comparecimentos` },
             ].map(k => (
@@ -903,7 +894,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
         )}
       </div>
 
-      {showHeavyDashboard && active.length > 0 && (
+      {active.length > 0 && (
         <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4 mb-4">
           <p style={{ color: "#777", fontSize: "10px" }} className="uppercase tracking-wider mb-2">Meta do mes</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
@@ -929,7 +920,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
         </div>
       )}
 
-      {showHeavyDashboard && active.length > 0 && (
+      {active.length > 0 && (
         <div style={{ background: "#202020", border: `0.5px solid ${masterStatus.color}` }} className="rounded-lg p-4 mb-4">
           <p style={{ color: "#777", fontSize: "10px" }} className="uppercase tracking-wider mb-1">Diagnostico MPC</p>
           <p style={{ color: masterStatus.color, fontSize: "22px" }} className="font-bold">{masterStatus.emoji} {masterStatus.label}</p>
@@ -958,7 +949,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
         </div>
       )}
 
-      {showHeavyDashboard && active.length > 0 && (
+      {active.length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 mb-4">
           <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
             <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider mb-2">Prioridade estrategica</p>
@@ -978,7 +969,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
 
           <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
             <div className="flex items-center justify-between mb-2 gap-2">
-              <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider">Estado operacional</p>
+              <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider">Escala recomendada</p>
             </div>
 
             <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2 mb-2">
@@ -993,8 +984,8 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, period,
                   <p style={{ color: "#d1d5db", fontSize: "10px" }}>Atual: R${row.currentDailyBudget.toFixed(0)}/dia</p>
                   <p style={{ color: row.deltaDailyBudget > 0 ? "#10b981" : "#d1d5db", fontSize: "10px" }}>Proximo: R${row.recommendedDailyBudget.toFixed(0)}/dia ({row.deltaDailyBudget >= 0 ? "+" : ""}R${row.deltaDailyBudget.toFixed(0)})</p>
                   <p style={{ color: "#aaa", fontSize: "10px" }}>Status: {row.statusLabel}</p>
-                  <p style={{ color: "#aaa", fontSize: "10px" }}>Expectativa: ≈ {Math.max(0, Math.round(row.expectedCompleted))} comparecimento(s)</p>
-                  <p style={{ color: "#10b981", fontSize: "10px" }}>Receita potencial: ≈ {fmt(Math.round(row.expectedRevenue / 100) * 100)}</p>
+                  <p style={{ color: "#aaa", fontSize: "10px" }}>Impacto: +{row.expectedLeads} leads | +{row.expectedCompleted} comp.</p>
+                  <p style={{ color: "#10b981", fontSize: "10px" }}>Receita esperada: {fmt(row.expectedRevenue)}</p>
                   <p style={{ color: "#9ca3af", fontSize: "10px" }}>{row.nextReviewText}</p>
                   <p style={{ color: "#777", fontSize: "10px" }}>{row.reason}</p>
                 </div>

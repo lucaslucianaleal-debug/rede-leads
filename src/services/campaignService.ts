@@ -317,7 +317,7 @@ function getPeriodRange(period: PeriodType) {
   const start = new Date(now);
   const end = new Date(now);
 
-  if (period === 'historico') {
+  if (period === 'historico' || period === 'ciclo') {
     start.setFullYear(2000, 0, 1);
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
@@ -368,6 +368,7 @@ function resolveLeadDate(lead: any) {
 export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, period: PeriodType = 'operacao'): Promise<Campaign[]> {
   try {
     const { start, end } = getPeriodRange(period);
+    const useFullHistory = period === 'ciclo' || period === 'historico';
     const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
     const colRef = collection(db, "clinics", clinicId, "campaigns");
     const snapshot = await getDocs(colRef);
@@ -390,17 +391,15 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         const leads = await fetchLeadsFromClinic(clinicId);
         const restored = backupCampaigns.map((campaign: any, idx: number) => {
           const data = toCampaignDataSnapshot(campaign, campaign.id, clinicId);
-            const activeCycle = (data.cycles || []).find((c: CampaignDecisionCycle) => c.id === data.activeCycleId);
-            const cycleStart = activeCycle?.startedAt ? parseFlexibleDate(activeCycle.startedAt) : null;
             const filteredMetrics = (data.dailyMetrics || []).filter((m: CampaignDailyMetric) => {
+              if (useFullHistory) return true;
               const dt = parseFlexibleDate(m.date);
-              if (period === 'ciclo' && cycleStart) return dt ? inRange(dt, cycleStart, end) : false;
               return dt ? inRange(dt, start, end) : false;
             });
             const campaignLeads = leads.filter(l => {
               if (l.metaCampanhaId !== campaign.id) return false;
+              if (useFullHistory) return true;
               const dt = resolveLeadDate(l);
-              if (period === 'ciclo' && cycleStart) return dt ? inRange(dt, cycleStart, end) : false;
               return dt ? inRange(dt, start, end) : false;
             });
             const campaignMonthLeads = leads.filter(l => {
@@ -431,21 +430,18 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
       .sort((a, b) => compareCampaignRecency(a.data(), b.data()))
       .map((docSnap, idx) => {
         const data = docSnap.data();
-        const normalized = normalizeCampaignStructure(data);
-        const activeCycle = normalized.cycles.find((c) => c.id === normalized.activeCycleId);
-        const cycleStart = activeCycle?.startedAt ? parseFlexibleDate(activeCycle.startedAt) : null;
         const dailyMetrics: CampaignDailyMetric[] = Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [];
 
         const filteredMetrics = dailyMetrics.filter((m) => {
+          if (useFullHistory) return true;
           const dt = parseFlexibleDate(m.date);
-          if (period === 'ciclo' && cycleStart) return dt ? inRange(dt, cycleStart, end) : false;
           return dt ? inRange(dt, start, end) : false;
         });
         const totals = calcCampaignTotals(filteredMetrics);
         const campaignLeads = leads.filter(l => {
           if (l.metaCampanhaId !== docSnap.id) return false;
+          if (useFullHistory) return true;
           const dt = resolveLeadDate(l);
-          if (period === 'ciclo' && cycleStart) return dt ? inRange(dt, cycleStart, end) : false;
           return dt ? inRange(dt, start, end) : false;
         });
         const campaignMonthLeads = leads.filter(l => {
