@@ -4,7 +4,8 @@ import CampaignDailyModal from "./CampaignDailyModal";
 import CampaignFinanceModal from "./CampaignFinanceModal";
 import CreateCampaignModal from "./CreateCampaignModal";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
-import { buildBudgetAllocationPlan, buildCampaignDecision, buildCampaignPerformance, buildConfidenceContext, buildMarketingMasterStatus, buildMondayActions, buildMonthlyProjection, buildMpcDiagnostic, buildStrategicContext, buildWeeklyRisk } from "@/lib/mpcDecisionEngine";
+import { buildCampaignDecision, buildCampaignPerformance, buildConfidenceContext, buildMarketingMasterStatus, buildMondayActions, buildMonthlyProjection, buildMpcDiagnostic, buildOperationalScalePlan, buildStrategicContext, buildWeeklyRisk, computeScaleCycleState } from "@/lib/mpcDecisionEngine";
+import type { CampaignScaleEvent } from "@/types/commandCenter";
 
 interface Props {
   campaigns: Campaign[];
@@ -15,7 +16,7 @@ interface Props {
   onDeleteDailyMetric: (campaignId: string, date: string) => Promise<void>;
   onToggleActive: (campaignId: string, active: boolean) => Promise<void>;
   onDeleteCampaign: (campaignId: string) => Promise<void>;
-  onSaveCampaignFinance: (campaignId: string, data: { fundsAdded: number; taxCost: number; dailyBudget?: number; lastBudgetChangeAt?: string; scaleHistory?: any[] }) => Promise<void>;
+  onSaveCampaignFinance: (campaignId: string, data: { fundsAdded: number; taxCost: number; dailyBudget?: number; lastBudgetChangeAt?: string; scaleHistory?: CampaignScaleEvent[]; scaleCycleState?: 'idle' | 'aguardando_dados' | 'pronto_reavaliar' }) => Promise<void>;
   onReload: () => void;
 }
 
@@ -169,19 +170,21 @@ function CampaignBusinessHealth({ campaign, ticketMedio }: { campaign: Campaign;
   );
 }
 
-function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDelete }: {
+function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDelete, onRegisterScale }: {
   c: Campaign;
   ticketMedio: number;
   onDailyMetric: (c: Campaign, metric?: CampaignDailyMetric) => void;
   onToggle: (c: Campaign) => void;
   onFinance: (c: Campaign) => void;
   onDelete: (c: Campaign) => void;
+  onRegisterScale: (c: Campaign, toDailyBudget: number) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [decisionExpanded, setDecisionExpanded] = useState(false);
   const receita = c.completed * ticketMedio;
   const custoReal = c.totalSpend + c.taxCost;
   const decision = buildCampaignDecision(c);
+  const cycle = computeScaleCycleState(c);
   const performance = buildCampaignPerformance(c, ticketMedio);
   const confidenceCtx = buildConfidenceContext(c);
   const funnelScore = Math.round((
@@ -271,6 +274,21 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
               <p style={{ color: "#9ca3af", fontSize: "10px" }}>Orcamento atual: R${decision.budgetCurrent.toFixed(0)}/dia</p>
               <p style={{ color: "#fff", fontSize: "10px" }}>Recomendado: R${decision.budgetRecommended.toFixed(0)}/dia</p>
               <p style={{ color: "#9ca3af", fontSize: "10px" }}>Revisar apos +R$50 investidos ou em 3 dias.</p>
+              <button
+                onClick={async () => onRegisterScale(c, decision.budgetRecommended)}
+                style={{ border: "0.5px solid #3a3a3a", color: "#d1d5db", fontSize: "10px" }}
+                className="mt-1 px-2 py-1 rounded hover:bg-[#323232]"
+              >
+                ✓ Escala realizada
+              </button>
+            </div>
+          )}
+
+          {decision.action === "aguardar_dados" && (
+            <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
+              <p style={{ color: "#f59e0b", fontSize: "10px" }} className="font-semibold">Aguardando dados da escala</p>
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Ja investido apos escala: R${cycle.additionalSpendSinceLastScale.toFixed(0)}</p>
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Faltam: R${cycle.spendRemainingToReview.toFixed(0)} ou {Math.ceil(cycle.hoursRemainingToReview)}h</p>
             </div>
           )}
 
@@ -281,6 +299,38 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
             <p style={{ color: "#d1d5db", fontSize: "10px" }}>Proxima revisao: apos +R$50 investidos</p>
             <p style={{ color: "#d1d5db", fontSize: "10px" }}>Escalas realizadas: {(c.scaleHistory || []).length}</p>
           </div>
+
+          <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
+            <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Checklist auditavel da decisao</p>
+            <div className="mt-1 space-y-0.5">
+              {decision.checklist.map((item, idx) => (
+                <p key={`${item.label}-${idx}`} style={{ color: item.ok ? "#10b981" : "#f59e0b", fontSize: "10px" }}>
+                  {item.ok ? "✓" : "○"} {item.label}
+                </p>
+              ))}
+            </div>
+          </div>
+
+          {(c.scaleHistory || []).length > 0 && (
+            <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Timeline de escala</p>
+              <div className="mt-1 space-y-1">
+                {[...(c.scaleHistory || [])].slice(-4).reverse().map((ev, idx) => (
+                  <div key={`${ev.date}-${idx}`} style={{ border: "0.5px solid #3a3a3a" }} className="rounded px-2 py-1">
+                    <p style={{ color: "#d1d5db", fontSize: "10px" }}>
+                      {ev.date}: R${ev.fromDailyBudget.toFixed(0)} -&gt; R${ev.toDailyBudget.toFixed(0)}/dia
+                    </p>
+                    <p style={{ color: "#9ca3af", fontSize: "10px" }}>
+                      Status: {ev.status === "aguardando" ? "Aguardando" : ev.status === "pronto_reavaliar" ? "Pronto para reavaliar" : "Concluido"}
+                    </p>
+                    <p style={{ color: ev.result === "saudavel" ? "#10b981" : ev.result === "prejudicou" ? "#ef4444" : "#f59e0b", fontSize: "10px" }}>
+                      Resultado: {ev.result === "saudavel" ? "Saudavel" : ev.result === "prejudicou" ? "Prejudicou" : "Neutro"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <button
             type="button"
@@ -460,7 +510,6 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const [dailyModal, setDailyModal] = useState<{ campaign: Campaign; metric?: CampaignDailyMetric } | null>(null);
   const [financeModal, setFinanceModal] = useState<Campaign | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [availableBudget, setAvailableBudget] = useState(300);
   const [completedActions, setCompletedActions] = useState<string[]>([]);
 
   const active = campaigns.filter(c => c.active);
@@ -473,7 +522,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const strategicRanking = active
     .map((c) => ({ campaign: c, ctx: buildStrategicContext(c, ticketMedio) }))
     .sort((a, b) => b.ctx.priorityScore - a.ctx.priorityScore);
-  const allocationPlan = buildBudgetAllocationPlan(active, ticketMedio, availableBudget);
+  const scalePlan = buildOperationalScalePlan(active, ticketMedio);
   const mondayActions = buildMondayActions(active, ticketMedio);
   const visibleActions = mondayActions.filter((a) => !completedActions.includes(a.id));
   const executedPct = mondayActions.length > 0 ? Math.round(((mondayActions.length - visibleActions.length) / mondayActions.length) * 100) : 0;
@@ -491,6 +540,33 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const marketingChip = statusChip(mpcDiagnostic.marketingStatus);
   const comercialChip = statusChip(mpcDiagnostic.comercialStatus);
   const operacaoChip = statusChip(mpcDiagnostic.operacaoStatus);
+
+  const handleRegisterScale = async (campaign: Campaign, toDailyBudget: number) => {
+    const from = campaign.dailyBudget || 15;
+    const event: CampaignScaleEvent = {
+      date: new Date().toLocaleDateString("pt-BR"),
+      fromDailyBudget: from,
+      toDailyBudget,
+      reason: "Escala +20% executada",
+      investedAtChange: campaign.totalSpend || 0,
+      reviewAfterSpend: 50,
+      reviewAfterHours: 72,
+      status: "aguardando",
+      result: "neutro",
+      note: "Escala registrada no fluxo operacional",
+    };
+
+    await onSaveCampaignFinance(campaign.id, {
+      fundsAdded: campaign.fundsAdded,
+      taxCost: campaign.taxCost,
+      dailyBudget: toDailyBudget,
+      lastBudgetChangeAt: event.date,
+      scaleHistory: [...(campaign.scaleHistory || []), event],
+      scaleCycleState: "aguardando_dados",
+    });
+
+    onReload();
+  };
 
   return (
     <>
@@ -590,38 +666,27 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
 
           <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
             <div className="flex items-center justify-between mb-2 gap-2">
-              <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider">Centro de alocacao de verba</p>
-              <div className="flex items-center gap-1">
-                <span style={{ color: "#999", fontSize: "10px" }}>R$</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={10}
-                  value={availableBudget}
-                  onChange={(e) => setAvailableBudget(Number(e.target.value || 0))}
-                  style={{ background: "#262626", border: "0.5px solid #3a3a3a", color: "#fff", fontSize: "11px", width: 90 }}
-                  className="rounded px-2 py-1"
-                />
-              </div>
+              <p style={{ color: "#fff", fontSize: "11px" } } className="font-semibold uppercase tracking-wider">Escala recomendada</p>
             </div>
 
             <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2 mb-2">
-              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Verba disponivel: {fmt(availableBudget)}</p>
-              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Distribuicao recomendada</p>
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Painel operacional diario por campanha</p>
+              <p style={{ color: "#9ca3af", fontSize: "10px" }}>Atual -&gt; Proximo, impacto e momento da revisao</p>
             </div>
 
             <div className="space-y-2">
-              {allocationPlan.items.slice(0, 3).map((item) => (
-                <div key={item.campaignId} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
-                  <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">{item.campaignName}</p>
-                  <p style={{ color: "#10b981", fontSize: "11px" }} className="font-bold">{fmt(item.allocated)} ({availableBudget > 0 ? Math.round((item.allocated / availableBudget) * 100) : 0}%)</p>
-                  <p style={{ color: "#aaa", fontSize: "10px" }}>Leads previstos: {item.expectedLeads}</p>
-                  <p style={{ color: "#aaa", fontSize: "10px" }}>Comparecimentos previstos: {item.expectedCompleted}</p>
-                  <p style={{ color: "#10b981", fontSize: "10px" }}>Retorno esperado: {fmt(item.expectedRevenue)}</p>
+              {scalePlan.slice(0, 4).map((row) => (
+                <div key={row.campaignId} style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
+                  <p style={{ color: "#fff", fontSize: "11px" }} className="font-semibold">{row.campaignName}</p>
+                  <p style={{ color: "#d1d5db", fontSize: "10px" }}>Atual: R${row.currentDailyBudget.toFixed(0)}/dia</p>
+                  <p style={{ color: row.deltaDailyBudget > 0 ? "#10b981" : "#d1d5db", fontSize: "10px" }}>Proximo: R${row.recommendedDailyBudget.toFixed(0)}/dia ({row.deltaDailyBudget >= 0 ? "+" : ""}R${row.deltaDailyBudget.toFixed(0)})</p>
+                  <p style={{ color: "#aaa", fontSize: "10px" }}>Status: {row.statusLabel}</p>
+                  <p style={{ color: "#aaa", fontSize: "10px" }}>Impacto: +{row.expectedLeads} leads | +{row.expectedCompleted} comp.</p>
+                  <p style={{ color: "#10b981", fontSize: "10px" }}>Receita esperada: {fmt(row.expectedRevenue)}</p>
+                  <p style={{ color: "#9ca3af", fontSize: "10px" }}>{row.nextReviewText}</p>
                 </div>
               ))}
             </div>
-            <p style={{ color: "#777", fontSize: "10px" }} className="mt-2">Reserva estrategica: {fmt(allocationPlan.reserve)} ({availableBudget > 0 ? Math.round((allocationPlan.reserve / availableBudget) * 100) : 0}%)</p>
           </div>
 
           <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-3">
@@ -669,6 +734,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
               onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })}
               onToggle={camp => onToggleActive(camp.id, !camp.active)}
               onFinance={camp => setFinanceModal(camp)}
+              onRegisterScale={handleRegisterScale}
               onDelete={async (camp) => {
                 const ok = window.confirm(`Excluir a campanha "${camp.name}"? Esta ação não pode ser desfeita.`);
                 if (!ok) return;
@@ -692,6 +758,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
                 onDailyMetric={(campaign, metric) => setDailyModal({ campaign, metric })}
                 onToggle={camp => onToggleActive(camp.id, !camp.active)}
                 onFinance={camp => setFinanceModal(camp)}
+                onRegisterScale={handleRegisterScale}
                 onDelete={async (camp) => {
                   const ok = window.confirm(`Excluir a campanha "${camp.name}"? Esta ação não pode ser desfeita.`);
                   if (!ok) return;

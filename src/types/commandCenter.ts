@@ -41,6 +41,13 @@ export interface CampaignScaleEvent {
   date: string; // DD/MM/YYYY
   fromDailyBudget: number;
   toDailyBudget: number;
+  reason?: string;
+  investedAtChange?: number;
+  reviewAfterSpend?: number;
+  reviewAfterHours?: number;
+  status?: 'aguardando' | 'pronto_reavaliar' | 'concluido';
+  result?: 'saudavel' | 'prejudicou' | 'neutro';
+  resultNote?: string;
   note?: string;
 }
 
@@ -56,6 +63,7 @@ export interface Campaign {
   dailyBudget: number; // budget diario configurado manualmente
   lastBudgetChangeAt?: string;
   scaleHistory?: CampaignScaleEvent[];
+  scaleCycleState?: 'idle' | 'aguardando_dados' | 'pronto_reavaliar';
   fundsAdded: number; // créditos/fundos adicionados na conta de anúncios
   taxCost: number;    // impostos/taxas cobrados pela plataforma
   dailyMetrics: CampaignDailyMetric[];

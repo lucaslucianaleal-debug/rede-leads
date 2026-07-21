@@ -29,6 +29,7 @@ export interface CampaignDecision {
   reviewDate: string;
   budgetCurrent: number;
   budgetRecommended: number;
+  checklist: { label: string; ok: boolean }[];
 }
 
 export interface CampaignPerformance {
@@ -126,6 +127,27 @@ export interface MonthlyProjection {
   probability: number;
 }
 
+export interface ScaleCycleState {
+  state: "idle" | "aguardando_dados" | "pronto_reavaliar";
+  additionalSpendSinceLastScale: number;
+  spendRemainingToReview: number;
+  hoursSinceLastScale: number;
+  hoursRemainingToReview: number;
+}
+
+export interface OperationalScaleRow {
+  campaignId: string;
+  campaignName: string;
+  currentDailyBudget: number;
+  recommendedDailyBudget: number;
+  deltaDailyBudget: number;
+  statusLabel: string;
+  expectedLeads: number;
+  expectedCompleted: number;
+  expectedRevenue: number;
+  nextReviewText: string;
+}
+
 const TARGETS = {
   cpl: 8,
   cacAgendamento: 20,
@@ -193,8 +215,7 @@ function round(value: number) {
 }
 
 function resolveBudgetBase(campaign: Campaign) {
-  const spend = (campaign.totalSpend || 0) + (campaign.taxCost || 0);
-  return campaign.budget > 0 ? campaign.budget : Math.max(spend, 10);
+  return campaign.dailyBudget > 0 ? campaign.dailyBudget : 15;
 }
 
 function controlledScaleBudget(baseBudget: number) {
@@ -203,6 +224,48 @@ function controlledScaleBudget(baseBudget: number) {
   return {
     current: round(baseBudget),
     recommended: round(baseBudget + safeIncrease),
+  };
+}
+
+function parseBrDate(value?: string) {
+  if (!value) return null;
+  const [dd, mm, yyyy] = value.split("/").map(Number);
+  if (!dd || !mm || !yyyy) return null;
+  const d = new Date(yyyy, mm - 1, dd);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function computeScaleCycleState(campaign: Campaign): ScaleCycleState {
+  const history = campaign.scaleHistory || [];
+  const last = history.length > 0 ? history[history.length - 1] : null;
+  if (!last) {
+    return {
+      state: "idle",
+      additionalSpendSinceLastScale: 0,
+      spendRemainingToReview: 0,
+      hoursSinceLastScale: 0,
+      hoursRemainingToReview: 0,
+    };
+  }
+
+  const investedAtChange = Number(last.investedAtChange || 0);
+  const additionalSpend = Math.max((campaign.totalSpend || 0) - investedAtChange, 0);
+  const spendGate = Number(last.reviewAfterSpend || 50);
+  const spendRemaining = Math.max(spendGate - additionalSpend, 0);
+
+  const dt = parseBrDate(last.date);
+  const hoursSince = dt ? (Date.now() - dt.getTime()) / (1000 * 60 * 60) : 999;
+  const hourGate = Number(last.reviewAfterHours || 72);
+  const hoursRemaining = Math.max(hourGate - hoursSince, 0);
+
+  const waiting = spendRemaining > 0 && hoursRemaining > 0;
+
+  return {
+    state: waiting ? "aguardando_dados" : "pronto_reavaliar",
+    additionalSpendSinceLastScale: round(additionalSpend),
+    spendRemainingToReview: round(spendRemaining),
+    hoursSinceLastScale: round(hoursSince),
+    hoursRemainingToReview: round(hoursRemaining),
   };
 }
 
@@ -240,6 +303,15 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
   const confidenceLevel = computeConfidence(campaign);
   const confidencePct = confidenceLevel === "alta" ? 82 : confidenceLevel === "media" ? 64 : 48;
   const reviewDate = formatPtDate(addDays(new Date(), confidenceLevel === "baixa" ? 3 : confidenceLevel === "media" ? 2 : 1));
+  const scaleCycle = computeScaleCycleState(campaign);
+
+  const checklistBase = [
+    { label: "Campanha saiu do aprendizado", ok: spend >= 50 },
+    { label: "CPL abaixo da meta", ok: campaign.cacLead > 0 && campaign.cacLead <= TARGETS.cpl },
+    { label: "Investimento minimo de R$50", ok: spend >= 50 },
+    { label: "Dados de pelo menos 6 dias", ok: new Set((campaign.allDailyMetrics || campaign.dailyMetrics || []).map((m) => m.date)).size >= 6 },
+    { label: "Comparecimentos positivos", ok: campaign.completed > 0 || campaign.showUpRate >= TARGETS.showUpRate },
+  ];
 
   const reasons: string[] = [];
 
@@ -260,6 +332,28 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
     reasons.push(`CPC atual esta ${cpcAboveHistoryPct}% acima do historico da propria campanha.`);
   }
 
+  if (scaleCycle.state === "aguardando_dados") {
+    return {
+      status: "validando",
+      action: "aguardar_dados",
+      title: "AGUARDANDO DADOS DA ESCALA",
+      emoji: "🟡",
+      color: "#f59e0b",
+      recommendation: `Escala realizada. Aguardar ${Math.ceil(scaleCycle.hoursRemainingToReview)}h ou mais R$${scaleCycle.spendRemainingToReview.toFixed(0)} investidos antes de nova alteracao.`,
+      reasons: [
+        `Ja investiu +R$${scaleCycle.additionalSpendSinceLastScale.toFixed(0)} desde a ultima escala.`,
+        "Evitar mudancas antes de completar a janela de aprendizado da nova escala.",
+      ],
+      nextReview: "Reavaliar automaticamente quando 72h ou +R$50 forem atendidos.",
+      confidence: confidenceLevel,
+      confidencePct,
+      reviewDate,
+      budgetCurrent: campaign.dailyBudget || budgetScale.current,
+      budgetRecommended: campaign.dailyBudget || budgetScale.current,
+      checklist: checklistBase,
+    };
+  }
+
   if (spend > 100 && campaign.completed === 0) {
     return {
       status: "pausar",
@@ -278,6 +372,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.recommended,
+      checklist: checklistBase,
     };
   }
 
@@ -296,6 +391,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.current,
+      checklist: checklistBase,
     };
   }
 
@@ -316,6 +412,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.current,
+      checklist: checklistBase,
     };
   }
 
@@ -334,6 +431,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.recommended,
+      checklist: checklistBase,
     };
   }
 
@@ -352,6 +450,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.recommended,
+      checklist: checklistBase,
     };
   }
 
@@ -373,6 +472,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.current,
+      checklist: checklistBase,
     };
   }
 
@@ -390,6 +490,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
     reviewDate,
     budgetCurrent: budgetScale.current,
     budgetRecommended: budgetScale.current,
+    checklist: checklistBase,
   };
 }
 
@@ -433,7 +534,7 @@ export function buildConfidenceContext(campaign: Campaign): ConfidenceContext {
 
 export function projectImpact(campaign: Campaign, ticketMedio: number, increasePct = 20): ImpactProjection {
   const spend = (campaign.totalSpend || 0) + (campaign.taxCost || 0);
-  const baseForIncrease = campaign.budget > 0 ? campaign.budget : Math.max(spend, 10);
+  const baseForIncrease = campaign.dailyBudget > 0 ? campaign.dailyBudget : 15;
   const extraSpend = baseForIncrease * (increasePct / 100);
 
   const leadPerReal = spend > 0 ? campaign.leads / spend : 0;
@@ -537,6 +638,31 @@ export function buildBudgetAllocationPlan(campaigns: Campaign[], ticketMedio: nu
   return { totalBudget, reserve, items };
 }
 
+export function buildOperationalScalePlan(campaigns: Campaign[], ticketMedio: number): OperationalScaleRow[] {
+  return campaigns
+    .filter((c) => c.active)
+    .map((campaign) => {
+      const decision = buildCampaignDecision(campaign);
+      const projection = projectImpact(campaign, ticketMedio, 20);
+      const cycle = computeScaleCycleState(campaign);
+      return {
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        currentDailyBudget: campaign.dailyBudget || decision.budgetCurrent,
+        recommendedDailyBudget: decision.budgetRecommended,
+        deltaDailyBudget: round(decision.budgetRecommended - (campaign.dailyBudget || decision.budgetCurrent)),
+        statusLabel: decision.action === "aguardar_dados" ? "Aguardando dados" : decision.action === "escalar_20" ? "Escala sugerida" : decision.action === "otimizar" ? "Otimizar" : decision.action === "pausar" ? "Pausar" : "Manter",
+        expectedLeads: projection.leads,
+        expectedCompleted: projection.completed,
+        expectedRevenue: projection.revenue,
+        nextReviewText: cycle.state === "aguardando_dados"
+          ? `Aguardar ${Math.ceil(cycle.hoursRemainingToReview)}h ou +R$${cycle.spendRemainingToReview.toFixed(0)}`
+          : "Pronto para nova revisao",
+      };
+    })
+    .sort((a, b) => b.expectedRevenue - a.expectedRevenue);
+}
+
 export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): MondayAction[] {
   const contexts = campaigns
     .filter((c) => c.active)
@@ -564,6 +690,17 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
         impact: `Impacto esperado: +${ctx.projection20.leads} leads, +${ctx.projection20.completed} comparecimentos, +R$${ctx.projection20.revenue.toFixed(0)}.`,
         reason: ctx.decision.recommendation,
         eta: "2 minutos",
+      });
+      return;
+    }
+
+    if (ctx.decision.action === "aguardar_dados") {
+      actions.push({
+        id: `${campaign.id}-aguardar-dados`,
+        title: `Aguardar dados da escala em ${campaign.name}`,
+        impact: "Evita intervencoes prematuras e reduz risco de falso positivo na decisao.",
+        reason: ctx.decision.recommendation,
+        eta: "Sem acao operacional hoje",
       });
       return;
     }

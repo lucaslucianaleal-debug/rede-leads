@@ -42,6 +42,7 @@ function toCampaignDataSnapshot(data: any, id: string, clinicId: string) {
     dailyBudget: data.dailyBudget || 15,
     lastBudgetChangeAt: data.lastBudgetChangeAt || "",
     scaleHistory: Array.isArray(data.scaleHistory) ? data.scaleHistory : [],
+    scaleCycleState: data.scaleCycleState || "idle",
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     dailyMetrics: Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [],
@@ -85,6 +86,7 @@ function buildCampaignFromSnapshot(
     dailyBudget: data.dailyBudget || 15,
     lastBudgetChangeAt: data.lastBudgetChangeAt || "",
     scaleHistory: Array.isArray(data.scaleHistory) ? data.scaleHistory : [],
+    scaleCycleState: data.scaleCycleState || "idle",
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     dailyMetrics,
@@ -318,6 +320,7 @@ export async function createCampaign(clinicId: string, data: {
     dailyBudget: data.dailyBudget || 15,
     lastBudgetChangeAt: data.dateStart || new Date().toISOString(),
     scaleHistory: [],
+    scaleCycleState: "idle",
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     active: true,
@@ -335,6 +338,7 @@ export async function createCampaign(clinicId: string, data: {
     dailyBudget: data.dailyBudget || 15,
     lastBudgetChangeAt: data.dateStart || new Date().toISOString(),
     scaleHistory: [],
+    scaleCycleState: "idle",
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     active: true,
@@ -406,7 +410,7 @@ export async function deleteDailyMetric(
 export async function updateCampaign(
   clinicId: string,
   campaignId: string,
-  fields: Partial<{ name: string; active: boolean; budget: number; dailyBudget: number; lastBudgetChangeAt: string; scaleHistory: CampaignScaleEvent[]; dateEnd: string; fundsAdded: number; taxCost: number }>
+  fields: Partial<{ name: string; active: boolean; budget: number; dailyBudget: number; lastBudgetChangeAt: string; scaleHistory: CampaignScaleEvent[]; scaleCycleState: 'idle' | 'aguardando_dados' | 'pronto_reavaliar'; dateEnd: string; fundsAdded: number; taxCost: number }>
 ): Promise<void> {
   const docRef = doc(db, "clinics", clinicId, "campaigns", campaignId);
   await updateDoc(docRef, fields);
