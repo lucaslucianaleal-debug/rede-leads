@@ -187,6 +187,22 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
   const decision = buildCampaignDecision(c);
   const cycle = computeScaleCycleState(c);
   const decisionTimeline = buildDecisionTimeline(c);
+  const orderedTimeline = [
+    ...decisionTimeline.map((step) => ({
+      id: `planned-${step.atIso}-${step.title}`,
+      atIso: step.atIso,
+      title: step.title,
+      note: step.status === "current" ? "Em execucao" : step.status === "next" ? "Proximo" : "Concluido",
+      color: step.status === "current" ? "#10b981" : "#9ca3af",
+    })),
+    ...(c.events || []).map((ev) => ({
+      id: ev.id,
+      atIso: ev.createdAt,
+      title: ev.title,
+      note: ev.note || "Evento operacional",
+      color: "#9ca3af",
+    })),
+  ].sort((a, b) => new Date(b.atIso).getTime() - new Date(a.atIso).getTime());
   const performance = buildCampaignPerformance(c, ticketMedio);
   const confidenceCtx = buildConfidenceContext(c);
   const funnelScore = Math.round((
@@ -337,24 +353,18 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
             </div>
           </div>
 
-          {((c.events || []).length > 0 || decisionTimeline.length > 0) && (
+          {orderedTimeline.length > 0 && (
             <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
               <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Timeline operacional</p>
               <div className="mt-1 space-y-1">
-                {decisionTimeline.map((step, idx) => (
-                  <div key={`${step.dateLabel}-${idx}`} style={{ border: "0.5px solid #3a3a3a" }} className="rounded px-2 py-1">
+                {orderedTimeline.map((item) => (
+                  <div key={item.id} style={{ border: "0.5px solid #3a3a3a" }} className="rounded px-2 py-1">
                     <p style={{ color: "#d1d5db", fontSize: "10px" }}>
-                      {step.dateLabel} • {step.title}
+                      {new Date(item.atIso).toLocaleString("pt-BR")} • {item.title}
                     </p>
-                    <p style={{ color: step.status === "current" ? "#10b981" : "#9ca3af", fontSize: "10px" }}>
-                      {step.status === "current" ? "Em execucao" : step.status === "next" ? "Proximo" : "Concluido"}
+                    <p style={{ color: item.color, fontSize: "10px" }}>
+                      {item.note}
                     </p>
-                  </div>
-                ))}
-                {[...(c.events || [])].slice(-3).reverse().map((ev) => (
-                  <div key={ev.id} style={{ border: "0.5px solid #3a3a3a" }} className="rounded px-2 py-1">
-                    <p style={{ color: "#d1d5db", fontSize: "10px" }}>{new Date(ev.createdAt).toLocaleString("pt-BR")} • {ev.title}</p>
-                    <p style={{ color: "#9ca3af", fontSize: "10px" }}>{ev.note || "Evento operacional"}</p>
                   </div>
                 ))}
               </div>

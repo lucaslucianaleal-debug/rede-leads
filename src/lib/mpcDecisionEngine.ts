@@ -176,6 +176,7 @@ export interface CapacityGate {
 }
 
 export interface DecisionTimelineStep {
+  atIso: string;
   dateLabel: string;
   title: string;
   status: "done" | "current" | "next";
@@ -851,15 +852,21 @@ export function buildPortfolioAllocationPlan(campaigns: Campaign[], ticketMedio:
 
 export function buildDecisionTimeline(campaign: Campaign): DecisionTimelineStep[] {
   const cycle = getActiveCycle(campaign);
-  const nowLabel = new Date().toLocaleDateString("pt-BR");
+  const now = new Date();
+  const nowLabel = now.toLocaleDateString("pt-BR");
   const state = computeScaleCycleState(campaign);
-  const reviewDate = new Date(Date.now() + state.hoursRemainingToReview * 60 * 60 * 1000).toLocaleDateString("pt-BR");
+  const reviewAt = new Date(Date.now() + state.hoursRemainingToReview * 60 * 60 * 1000);
+  const reviewDate = reviewAt.toLocaleDateString("pt-BR");
+  const nextScaleAt = addDays(new Date(), 6);
+  const closeCycleAt = addDays(new Date(), 10);
+  const startedAt = cycle?.startedAt ? new Date(cycle.startedAt) : addDays(new Date(), -3);
 
   return [
-    { dateLabel: nowLabel, title: cycle?.executedInMeta ? "Escala executada no Meta" : "Executar ajuste recomendado", status: "current" },
-    { dateLabel: reviewDate, title: "Reavaliar ciclo com dados suficientes", status: "next" },
-    { dateLabel: formatPtDate(addDays(new Date(), 6)), title: "Escalar novamente (se aprovado)", status: "next" },
-    { dateLabel: formatPtDate(addDays(new Date(), 10)), title: "Encerrar ciclo operacional", status: "next" },
+    { atIso: startedAt.toISOString(), dateLabel: startedAt.toLocaleDateString("pt-BR"), title: "Inicio do ciclo operacional", status: "done" },
+    { atIso: now.toISOString(), dateLabel: nowLabel, title: cycle?.executedInMeta ? "Escala executada no Meta" : "Executar ajuste recomendado", status: "current" },
+    { atIso: reviewAt.toISOString(), dateLabel: reviewDate, title: "Reavaliar ciclo com dados suficientes", status: "next" },
+    { atIso: nextScaleAt.toISOString(), dateLabel: formatPtDate(nextScaleAt), title: "Escalar novamente (se aprovado)", status: "next" },
+    { atIso: closeCycleAt.toISOString(), dateLabel: formatPtDate(closeCycleAt), title: "Encerrar ciclo operacional", status: "next" },
   ];
 }
 
