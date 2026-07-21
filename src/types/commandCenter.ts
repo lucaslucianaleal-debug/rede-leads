@@ -1,7 +1,7 @@
 // Command Center — tipos centrais
 
 export type LayerType = 'ops' | 'meta' | 'wa';
-export type PeriodType = 'hoje' | 'semana' | 'mes' | 'historico';
+export type PeriodType = 'operacao' | 'ciclo' | 'historico' | 'hoje' | 'semana' | 'mes';
 
 export interface KPI {
   label: string;
@@ -51,6 +51,36 @@ export interface CampaignScaleEvent {
   note?: string;
 }
 
+export interface CampaignDecisionCycle {
+  id: string;
+  startedAt: string; // ISO
+  endedAt?: string; // ISO
+  triggerType: 'campaign_created' | 'budget_change' | 'creative_change' | 'audience_change' | 'copy_change' | 'manual';
+  triggerNote?: string;
+  status: 'aberto' | 'aguardando_dados' | 'pronto_reavaliar' | 'encerrado';
+  recommendedDailyBudget: number;
+  appliedDailyBudget?: number;
+  executedInMeta?: boolean;
+  executedAt?: string; // ISO
+  adherenceStatus?: 'aderente' | 'acima_recomendado' | 'abaixo_recomendado' | 'nao_executado';
+  adherenceDiffPct?: number;
+  investedAtStart: number;
+  reviewAfterSpend: number;
+  reviewAfterHours: number;
+  result?: 'saudavel' | 'prejudicou' | 'neutro';
+  resultNote?: string;
+}
+
+export interface CampaignOperationalEvent {
+  id: string;
+  cycleId?: string;
+  type: 'campaign_created' | 'budget_scaled' | 'creative_changed' | 'audience_changed' | 'copy_changed' | 'cycle_closed' | 'cycle_reopened';
+  createdAt: string; // ISO
+  title: string;
+  note?: string;
+  payload?: Record<string, any>;
+}
+
 export interface Campaign {
   id: string;
   clinicId: string;
@@ -64,6 +94,9 @@ export interface Campaign {
   lastBudgetChangeAt?: string;
   scaleHistory?: CampaignScaleEvent[];
   scaleCycleState?: 'idle' | 'aguardando_dados' | 'pronto_reavaliar';
+  cycles?: CampaignDecisionCycle[];
+  events?: CampaignOperationalEvent[];
+  activeCycleId?: string;
   fundsAdded: number; // créditos/fundos adicionados na conta de anúncios
   taxCost: number;    // impostos/taxas cobrados pela plataforma
   dailyMetrics: CampaignDailyMetric[];

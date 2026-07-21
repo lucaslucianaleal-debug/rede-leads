@@ -1,4 +1,4 @@
-import type { Campaign, CampaignDailyMetric } from "@/types/commandCenter";
+import type { Campaign, CampaignDailyMetric, CampaignDecisionCycle } from "@/types/commandCenter";
 
 export type CampaignAction =
   | "escalar_20"
@@ -30,6 +30,9 @@ export interface CampaignDecision {
   budgetCurrent: number;
   budgetRecommended: number;
   checklist: { label: string; ok: boolean }[];
+  adherenceStatus?: "aderente" | "acima_recomendado" | "abaixo_recomendado" | "nao_executado";
+  adherenceDiffPct?: number;
+  learningInsight?: string;
 }
 
 export interface CampaignPerformance {
@@ -146,6 +149,36 @@ export interface OperationalScaleRow {
   expectedCompleted: number;
   expectedRevenue: number;
   nextReviewText: string;
+  reason: string;
+}
+
+export interface PortfolioAllocationItem {
+  campaignId: string;
+  campaignName: string;
+  allocatedBudget: number;
+  suggestedDailyBudget: number;
+  expectedLeads: number;
+  expectedRevenue: number;
+  reason: string;
+}
+
+export interface PortfolioAllocationPlan {
+  totalExtraBudget: number;
+  items: PortfolioAllocationItem[];
+  blockedCampaigns: { campaignId: string; campaignName: string; reason: string }[];
+}
+
+export interface CapacityGate {
+  canScale: boolean;
+  pendingConfirmations: number;
+  bookedPressure: "baixo" | "medio" | "alto";
+  reason: string;
+}
+
+export interface DecisionTimelineStep {
+  dateLabel: string;
+  title: string;
+  status: "done" | "current" | "next";
 }
 
 const TARGETS = {
@@ -235,7 +268,98 @@ function parseBrDate(value?: string) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function getActiveCycle(campaign: Campaign): CampaignDecisionCycle | null {
+  const cycles = campaign.cycles || [];
+  if (cycles.length === 0) return null;
+  if (campaign.activeCycleId) {
+    const found = cycles.find((c) => c.id === campaign.activeCycleId);
+    if (found) return found;
+  }
+  return cycles[cycles.length - 1] || null;
+}
+
+function buildLearningInsight(campaign: Campaign) {
+  const closed = (campaign.cycles || []).filter((c) => c.result && c.appliedDailyBudget);
+  if (closed.length < 3) return "Ainda sem historico suficiente de ciclos para definir limite de escala.";
+
+  const byBudget = closed
+    .map((c) => ({
+      budget: Number(c.appliedDailyBudget || c.recommendedDailyBudget || 0),
+      result: c.result,
+    }))
+    .sort((a, b) => a.budget - b.budget);
+
+  const negative = byBudget.find((x) => x.result === "prejudicou");
+  if (!negative) {
+    const best = byBudget.filter((x) => x.result === "saudavel").pop();
+    return best
+      ? `Campanha manteve eficiencia ate R$${best.budget.toFixed(0)}/dia nos ciclos anteriores.`
+      : "Sem degradacao registrada nos ciclos fechados.";
+  }
+
+  const lastHealthy = [...byBudget].reverse().find((x) => x.result === "saudavel" && x.budget <= negative.budget);
+  if (lastHealthy) {
+    return `Historico sugere teto operacional perto de R$${lastHealthy.budget.toFixed(0)}/dia; acima disso a eficiencia caiu.`;
+  }
+  return `Historico recente indica queda de eficiencia em R$${negative.budget.toFixed(0)}/dia.`;
+}
+
+export function buildOperationalCapacityGate(campaigns: Campaign[]): CapacityGate {
+  const active = campaigns.filter((c) => c.active);
+  const scheduled = active.reduce((sum, c) => sum + c.scheduled, 0);
+  const completed = active.reduce((sum, c) => sum + c.completed, 0);
+  const pendingConfirmations = Math.max(scheduled - completed, 0);
+
+  if (pendingConfirmations >= 12) {
+    return {
+      canScale: false,
+      pendingConfirmations,
+      bookedPressure: "alto",
+      reason: "Agenda e comercial sob pressao. Nao escalar hoje evita ampliar gargalo de confirmacao.",
+    };
+  }
+
+  if (pendingConfirmations >= 8) {
+    return {
+      canScale: false,
+      pendingConfirmations,
+      bookedPressure: "medio",
+      reason: "Fila de confirmacoes elevada. Priorizar destravar operacao antes de escalar.",
+    };
+  }
+
+  return {
+    canScale: true,
+    pendingConfirmations,
+    bookedPressure: pendingConfirmations >= 5 ? "medio" : "baixo",
+    reason: "Capacidade operacional adequada para absorver novos leads.",
+  };
+}
+
 export function computeScaleCycleState(campaign: Campaign): ScaleCycleState {
+  const activeCycle = getActiveCycle(campaign);
+  if (activeCycle) {
+    const investedAtStart = Number(activeCycle.investedAtStart || 0);
+    const additionalSpend = Math.max((campaign.totalSpend || 0) - investedAtStart, 0);
+    const spendGate = Number(activeCycle.reviewAfterSpend || 50);
+    const spendRemaining = Math.max(spendGate - additionalSpend, 0);
+
+    const startedAt = new Date(activeCycle.startedAt);
+    const hoursSince = Number.isNaN(startedAt.getTime()) ? 999 : (Date.now() - startedAt.getTime()) / (1000 * 60 * 60);
+    const hourGate = Number(activeCycle.reviewAfterHours || 72);
+    const hoursRemaining = Math.max(hourGate - hoursSince, 0);
+
+    const waiting = spendRemaining > 0 && hoursRemaining > 0 && activeCycle.status === "aguardando_dados";
+
+    return {
+      state: waiting ? "aguardando_dados" : "pronto_reavaliar",
+      additionalSpendSinceLastScale: round(additionalSpend),
+      spendRemainingToReview: round(spendRemaining),
+      hoursSinceLastScale: round(hoursSince),
+      hoursRemainingToReview: round(hoursRemaining),
+    };
+  }
+
   const history = campaign.scaleHistory || [];
   const last = history.length > 0 ? history[history.length - 1] : null;
   if (!last) {
@@ -304,6 +428,10 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
   const confidencePct = confidenceLevel === "alta" ? 82 : confidenceLevel === "media" ? 64 : 48;
   const reviewDate = formatPtDate(addDays(new Date(), confidenceLevel === "baixa" ? 3 : confidenceLevel === "media" ? 2 : 1));
   const scaleCycle = computeScaleCycleState(campaign);
+  const activeCycle = getActiveCycle(campaign);
+  const adherenceStatus = activeCycle?.adherenceStatus;
+  const adherenceDiffPct = activeCycle?.adherenceDiffPct;
+  const learningInsight = buildLearningInsight(campaign);
 
   const checklistBase = [
     { label: "Campanha saiu do aprendizado", ok: spend >= 50 },
@@ -332,8 +460,16 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
     reasons.push(`CPC atual esta ${cpcAboveHistoryPct}% acima do historico da propria campanha.`);
   }
 
+  const decorate = (input: Omit<CampaignDecision, "checklist" | "adherenceStatus" | "adherenceDiffPct" | "learningInsight">): CampaignDecision => ({
+    ...input,
+    checklist: checklistBase,
+    adherenceStatus,
+    adherenceDiffPct,
+    learningInsight,
+  });
+
   if (scaleCycle.state === "aguardando_dados") {
-    return {
+    return decorate({
       status: "validando",
       action: "aguardar_dados",
       title: "AGUARDANDO DADOS DA ESCALA",
@@ -350,12 +486,11 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: campaign.dailyBudget || budgetScale.current,
       budgetRecommended: campaign.dailyBudget || budgetScale.current,
-      checklist: checklistBase,
-    };
+    });
   }
 
   if (spend > 100 && campaign.completed === 0) {
-    return {
+    return decorate({
       status: "pausar",
       action: "pausar",
       title: "PAUSAR CAMPANHA",
@@ -372,12 +507,11 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.recommended,
-      checklist: checklistBase,
-    };
+    });
   }
 
   if (cpcRising3d && clicksFalling3d) {
-    return {
+    return decorate({
       status: "otimizacao",
       action: "otimizar",
       title: "REVISAR CRIATIVO/PUBLICO",
@@ -391,14 +525,13 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.current,
-      checklist: checklistBase,
-    };
+    });
   }
 
   const goodCost = campaign.cacLead > 0 && campaign.cacLead <= TARGETS.cpl && campaign.cacAgendamento > 0 && campaign.cacAgendamento <= TARGETS.cacAgendamento;
 
   if (goodCost && spend < 50) {
-    return {
+    return decorate({
       status,
       action: "aguardar_dados",
       title: "CONTINUAR COLETANDO DADOS",
@@ -412,12 +545,11 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.current,
-      checklist: checklistBase,
-    };
+    });
   }
 
   if (goodCost && spend >= 50 && campaign.showUpRate >= TARGETS.showUpRate) {
-    return {
+    return decorate({
       status: "escala",
       action: "escalar_20",
       title: "CAMPANHA VALIDADA",
@@ -431,12 +563,11 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.recommended,
-      checklist: checklistBase,
-    };
+    });
   }
 
   if (goodCost && spend >= 50) {
-    return {
+    return decorate({
       status: "validando",
       action: "escalar_20",
       title: "INICIAR ESCALA CONTROLADA",
@@ -450,12 +581,11 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.recommended,
-      checklist: checklistBase,
-    };
+    });
   }
 
   if (campaign.cacLead > TARGETS.cpl * 1.2 || campaign.cacAgendamento > TARGETS.cacAgendamento * 1.2) {
-    return {
+    return decorate({
       status: "otimizacao",
       action: "otimizar",
       title: "OTIMIZAR CAMPANHA",
@@ -472,11 +602,10 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       reviewDate,
       budgetCurrent: budgetScale.current,
       budgetRecommended: budgetScale.current,
-      checklist: checklistBase,
-    };
+    });
   }
 
-  return {
+  return decorate({
     status,
     action: "manter",
     title: `${label.label}`,
@@ -490,8 +619,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
     reviewDate,
     budgetCurrent: budgetScale.current,
     budgetRecommended: budgetScale.current,
-    checklist: checklistBase,
-  };
+  });
 }
 
 export function buildCampaignPerformance(campaign: Campaign, ticketMedio: number): CampaignPerformance {
@@ -639,31 +767,104 @@ export function buildBudgetAllocationPlan(campaigns: Campaign[], ticketMedio: nu
 }
 
 export function buildOperationalScalePlan(campaigns: Campaign[], ticketMedio: number): OperationalScaleRow[] {
+  const gate = buildOperationalCapacityGate(campaigns);
   return campaigns
     .filter((c) => c.active)
     .map((campaign) => {
       const decision = buildCampaignDecision(campaign);
       const projection = projectImpact(campaign, ticketMedio, 20);
       const cycle = computeScaleCycleState(campaign);
+      const blockedByCapacity = !gate.canScale && (decision.action === "escalar_20" || decision.action === "escalar_30");
       return {
         campaignId: campaign.id,
         campaignName: campaign.name,
         currentDailyBudget: campaign.dailyBudget || decision.budgetCurrent,
-        recommendedDailyBudget: decision.budgetRecommended,
-        deltaDailyBudget: round(decision.budgetRecommended - (campaign.dailyBudget || decision.budgetCurrent)),
-        statusLabel: decision.action === "aguardar_dados" ? "Aguardando dados" : decision.action === "escalar_20" ? "Escala sugerida" : decision.action === "otimizar" ? "Otimizar" : decision.action === "pausar" ? "Pausar" : "Manter",
+        recommendedDailyBudget: blockedByCapacity ? (campaign.dailyBudget || decision.budgetCurrent) : decision.budgetRecommended,
+        deltaDailyBudget: round((blockedByCapacity ? (campaign.dailyBudget || decision.budgetCurrent) : decision.budgetRecommended) - (campaign.dailyBudget || decision.budgetCurrent)),
+        statusLabel: blockedByCapacity ? "Aguardando capacidade" : decision.action === "aguardar_dados" ? "Aguardando dados" : decision.action === "escalar_20" ? "Escala sugerida" : decision.action === "otimizar" ? "Otimizar" : decision.action === "pausar" ? "Pausar" : "Manter",
         expectedLeads: projection.leads,
         expectedCompleted: projection.completed,
         expectedRevenue: projection.revenue,
         nextReviewText: cycle.state === "aguardando_dados"
           ? `Aguardar ${Math.ceil(cycle.hoursRemainingToReview)}h ou +R$${cycle.spendRemainingToReview.toFixed(0)}`
           : "Pronto para nova revisao",
+        reason: blockedByCapacity ? gate.reason : decision.recommendation,
       };
     })
     .sort((a, b) => b.expectedRevenue - a.expectedRevenue);
 }
 
+export function buildPortfolioAllocationPlan(campaigns: Campaign[], ticketMedio: number, totalExtraBudget: number): PortfolioAllocationPlan {
+  const gate = buildOperationalCapacityGate(campaigns);
+  const active = campaigns.filter((c) => c.active);
+  if (totalExtraBudget <= 0 || active.length === 0) {
+    return { totalExtraBudget, items: [], blockedCampaigns: [] };
+  }
+
+  const candidates = active
+    .map((campaign) => {
+      const decision = buildCampaignDecision(campaign);
+      const projection = projectImpact(campaign, ticketMedio, 20);
+      return { campaign, decision, projection, score: projection.revenue + campaign.completed * ticketMedio * 0.15 };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const blockedCampaigns: { campaignId: string; campaignName: string; reason: string }[] = [];
+  const items: PortfolioAllocationItem[] = [];
+  let remaining = totalExtraBudget;
+
+  for (const entry of candidates) {
+    const { campaign, decision, projection } = entry;
+    const hardBlocked = decision.action === "pausar" || decision.action === "aguardar_dados";
+    const blockedByCapacity = !gate.canScale;
+    if (hardBlocked || blockedByCapacity) {
+      blockedCampaigns.push({
+        campaignId: campaign.id,
+        campaignName: campaign.name,
+        reason: hardBlocked ? decision.recommendation : gate.reason,
+      });
+      continue;
+    }
+
+    const suggested = Math.min(remaining, Math.max(5, Math.round((campaign.dailyBudget || 15) * 0.4)));
+    if (suggested <= 0) continue;
+
+    items.push({
+      campaignId: campaign.id,
+      campaignName: campaign.name,
+      allocatedBudget: suggested,
+      suggestedDailyBudget: round((campaign.dailyBudget || 15) + suggested),
+      expectedLeads: projection.leads,
+      expectedRevenue: projection.revenue,
+      reason: decision.recommendation,
+    });
+    remaining -= suggested;
+    if (remaining <= 0) break;
+  }
+
+  return {
+    totalExtraBudget,
+    items,
+    blockedCampaigns,
+  };
+}
+
+export function buildDecisionTimeline(campaign: Campaign): DecisionTimelineStep[] {
+  const cycle = getActiveCycle(campaign);
+  const nowLabel = new Date().toLocaleDateString("pt-BR");
+  const state = computeScaleCycleState(campaign);
+  const reviewDate = new Date(Date.now() + state.hoursRemainingToReview * 60 * 60 * 1000).toLocaleDateString("pt-BR");
+
+  return [
+    { dateLabel: nowLabel, title: cycle?.executedInMeta ? "Escala executada no Meta" : "Executar ajuste recomendado", status: "current" },
+    { dateLabel: reviewDate, title: "Reavaliar ciclo com dados suficientes", status: "next" },
+    { dateLabel: formatPtDate(addDays(new Date(), 6)), title: "Escalar novamente (se aprovado)", status: "next" },
+    { dateLabel: formatPtDate(addDays(new Date(), 10)), title: "Encerrar ciclo operacional", status: "next" },
+  ];
+}
+
 export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): MondayAction[] {
+  const gate = buildOperationalCapacityGate(campaigns);
   const contexts = campaigns
     .filter((c) => c.active)
     .map((c) => ({ campaign: c, ctx: buildStrategicContext(c, ticketMedio) }))
@@ -684,6 +885,16 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
     }
 
     if (ctx.decision.action === "escalar_20" || ctx.decision.action === "escalar_30") {
+      if (!gate.canScale) {
+        actions.push({
+          id: `${campaign.id}-bloqueio-capacidade`,
+          title: `Nao escalar ${campaign.name} hoje`,
+          impact: "Evita sobrecarga comercial e perda de conversao por gargalo.",
+          reason: gate.reason,
+          eta: "Revisar capacidade em 24h",
+        });
+        return;
+      }
       actions.push({
         id: `${campaign.id}-escalar`,
         title: `Ajustar ${campaign.name}: R$${ctx.decision.budgetCurrent.toFixed(0)} -> R$${ctx.decision.budgetRecommended.toFixed(0)}/dia`,

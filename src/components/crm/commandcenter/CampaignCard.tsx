@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import type { Campaign, CampaignDailyMetric } from "@/types/commandCenter";
+import type { Campaign, CampaignDailyMetric, CampaignDecisionCycle, CampaignOperationalEvent } from "@/types/commandCenter";
 import CampaignDailyModal from "./CampaignDailyModal";
 import CampaignFinanceModal from "./CampaignFinanceModal";
 import CreateCampaignModal from "./CreateCampaignModal";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
-import { buildCampaignDecision, buildCampaignPerformance, buildConfidenceContext, buildMarketingMasterStatus, buildMondayActions, buildMonthlyProjection, buildMpcDiagnostic, buildOperationalScalePlan, buildStrategicContext, buildWeeklyRisk, computeScaleCycleState } from "@/lib/mpcDecisionEngine";
+import { buildCampaignDecision, buildCampaignPerformance, buildConfidenceContext, buildDecisionTimeline, buildMarketingMasterStatus, buildMondayActions, buildMonthlyProjection, buildMpcDiagnostic, buildOperationalCapacityGate, buildOperationalScalePlan, buildPortfolioAllocationPlan, buildStrategicContext, buildWeeklyRisk, computeScaleCycleState } from "@/lib/mpcDecisionEngine";
 import type { CampaignScaleEvent } from "@/types/commandCenter";
 
 interface Props {
@@ -16,7 +16,7 @@ interface Props {
   onDeleteDailyMetric: (campaignId: string, date: string) => Promise<void>;
   onToggleActive: (campaignId: string, active: boolean) => Promise<void>;
   onDeleteCampaign: (campaignId: string) => Promise<void>;
-  onSaveCampaignFinance: (campaignId: string, data: { fundsAdded: number; taxCost: number; dailyBudget?: number; lastBudgetChangeAt?: string; scaleHistory?: CampaignScaleEvent[]; scaleCycleState?: 'idle' | 'aguardando_dados' | 'pronto_reavaliar' }) => Promise<void>;
+  onSaveCampaignFinance: (campaignId: string, data: { fundsAdded: number; taxCost: number; dailyBudget?: number; lastBudgetChangeAt?: string; scaleHistory?: CampaignScaleEvent[]; scaleCycleState?: 'idle' | 'aguardando_dados' | 'pronto_reavaliar'; cycles?: CampaignDecisionCycle[]; events?: CampaignOperationalEvent[]; activeCycleId?: string }) => Promise<void>;
   onReload: () => void;
 }
 
@@ -185,6 +185,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
   const custoReal = c.totalSpend + c.taxCost;
   const decision = buildCampaignDecision(c);
   const cycle = computeScaleCycleState(c);
+  const decisionTimeline = buildDecisionTimeline(c);
   const performance = buildCampaignPerformance(c, ticketMedio);
   const confidenceCtx = buildConfidenceContext(c);
   const funnelScore = Math.round((
@@ -279,7 +280,7 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
                 style={{ border: "0.5px solid #3a3a3a", color: "#d1d5db", fontSize: "10px" }}
                 className="mt-1 px-2 py-1 rounded hover:bg-[#323232]"
               >
-                ✓ Escala realizada
+                ✓ Registrar execucao
               </button>
             </div>
           )}
@@ -297,8 +298,32 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
             <p style={{ color: "#d1d5db", fontSize: "10px" }}>Orcamento atual: R${(c.dailyBudget || decision.budgetCurrent).toFixed(0)}/dia</p>
             <p style={{ color: "#d1d5db", fontSize: "10px" }}>Ultima alteracao: {c.lastBudgetChangeAt || "—"}</p>
             <p style={{ color: "#d1d5db", fontSize: "10px" }}>Proxima revisao: apos +R$50 investidos</p>
-            <p style={{ color: "#d1d5db", fontSize: "10px" }}>Escalas realizadas: {(c.scaleHistory || []).length}</p>
+            <p style={{ color: "#d1d5db", fontSize: "10px" }}>Escalas realizadas: {(c.cycles || []).filter(x => x.triggerType === "budget_change").length}</p>
           </div>
+
+          {(decision.adherenceStatus || decision.adherenceDiffPct !== undefined) && (
+            <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Aderencia a recomendacao</p>
+              <p style={{ color: "#d1d5db", fontSize: "10px" }}>Recomendado: R${decision.budgetRecommended.toFixed(0)} | Aplicado: R${(c.dailyBudget || decision.budgetCurrent).toFixed(0)}</p>
+              <p style={{ color: decision.adherenceStatus === "acima_recomendado" || decision.adherenceStatus === "abaixo_recomendado" ? "#f59e0b" : "#10b981", fontSize: "10px" }}>
+                {decision.adherenceStatus === "acima_recomendado"
+                  ? "⚠ Escala acima da recomendada"
+                  : decision.adherenceStatus === "abaixo_recomendado"
+                    ? "⚠ Escala abaixo da recomendada"
+                    : decision.adherenceStatus === "nao_executado"
+                      ? "○ Recomendacao ainda nao executada"
+                      : "✓ Dentro da politica MPC"}
+                {typeof decision.adherenceDiffPct === "number" ? ` (${decision.adherenceDiffPct >= 0 ? "+" : ""}${decision.adherenceDiffPct.toFixed(1)}%)` : ""}
+              </p>
+            </div>
+          )}
+
+          {decision.learningInsight && (
+            <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
+              <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Aprendizado da campanha</p>
+              <p style={{ color: "#d1d5db", fontSize: "10px" }}>{decision.learningInsight}</p>
+            </div>
+          )}
 
           <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
             <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Checklist auditavel da decisao</p>
@@ -311,21 +336,24 @@ function CampaignRow({ c, ticketMedio, onDailyMetric, onToggle, onFinance, onDel
             </div>
           </div>
 
-          {(c.scaleHistory || []).length > 0 && (
+          {((c.events || []).length > 0 || decisionTimeline.length > 0) && (
             <div style={{ background: "#262626", border: "0.5px dashed #3a3a3a" }} className="rounded p-2 mb-2">
-              <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Timeline de escala</p>
+              <p style={{ color: "#9ca3af", fontSize: "10px" }} className="uppercase">Timeline operacional</p>
               <div className="mt-1 space-y-1">
-                {[...(c.scaleHistory || [])].slice(-4).reverse().map((ev, idx) => (
-                  <div key={`${ev.date}-${idx}`} style={{ border: "0.5px solid #3a3a3a" }} className="rounded px-2 py-1">
+                {decisionTimeline.map((step, idx) => (
+                  <div key={`${step.dateLabel}-${idx}`} style={{ border: "0.5px solid #3a3a3a" }} className="rounded px-2 py-1">
                     <p style={{ color: "#d1d5db", fontSize: "10px" }}>
-                      {ev.date}: R${ev.fromDailyBudget.toFixed(0)} -&gt; R${ev.toDailyBudget.toFixed(0)}/dia
+                      {step.dateLabel} • {step.title}
                     </p>
-                    <p style={{ color: "#9ca3af", fontSize: "10px" }}>
-                      Status: {ev.status === "aguardando" ? "Aguardando" : ev.status === "pronto_reavaliar" ? "Pronto para reavaliar" : "Concluido"}
+                    <p style={{ color: step.status === "current" ? "#10b981" : "#9ca3af", fontSize: "10px" }}>
+                      {step.status === "current" ? "Em execucao" : step.status === "next" ? "Proximo" : "Concluido"}
                     </p>
-                    <p style={{ color: ev.result === "saudavel" ? "#10b981" : ev.result === "prejudicou" ? "#ef4444" : "#f59e0b", fontSize: "10px" }}>
-                      Resultado: {ev.result === "saudavel" ? "Saudavel" : ev.result === "prejudicou" ? "Prejudicou" : "Neutro"}
-                    </p>
+                  </div>
+                ))}
+                {[...(c.events || [])].slice(-3).reverse().map((ev) => (
+                  <div key={ev.id} style={{ border: "0.5px solid #3a3a3a" }} className="rounded px-2 py-1">
+                    <p style={{ color: "#d1d5db", fontSize: "10px" }}>{new Date(ev.createdAt).toLocaleString("pt-BR")} • {ev.title}</p>
+                    <p style={{ color: "#9ca3af", fontSize: "10px" }}>{ev.note || "Evento operacional"}</p>
                   </div>
                 ))}
               </div>
@@ -511,6 +539,7 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const [financeModal, setFinanceModal] = useState<Campaign | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [completedActions, setCompletedActions] = useState<string[]>([]);
+  const [extraBudgetTomorrow, setExtraBudgetTomorrow] = useState(30);
 
   const active = campaigns.filter(c => c.active);
   const paused = campaigns.filter(c => !c.active);
@@ -523,6 +552,8 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
     .map((c) => ({ campaign: c, ctx: buildStrategicContext(c, ticketMedio) }))
     .sort((a, b) => b.ctx.priorityScore - a.ctx.priorityScore);
   const scalePlan = buildOperationalScalePlan(active, ticketMedio);
+  const portfolioPlan = buildPortfolioAllocationPlan(active, ticketMedio, extraBudgetTomorrow);
+  const capacityGate = buildOperationalCapacityGate(active);
   const mondayActions = buildMondayActions(active, ticketMedio);
   const visibleActions = mondayActions.filter((a) => !completedActions.includes(a.id));
   const executedPct = mondayActions.length > 0 ? Math.round(((mondayActions.length - visibleActions.length) / mondayActions.length) * 100) : 0;
@@ -541,28 +572,91 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
   const comercialChip = statusChip(mpcDiagnostic.comercialStatus);
   const operacaoChip = statusChip(mpcDiagnostic.operacaoStatus);
 
+  const makeId = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+
   const handleRegisterScale = async (campaign: Campaign, toDailyBudget: number) => {
+    const executedInMeta = window.confirm("A alteracao foi realmente executada no Meta Ads agora?");
+    const whenPrompt = window.prompt("Data/hora da execucao (deixe vazio para agora)", new Date().toLocaleString("pt-BR"));
+    const parsedWhen = whenPrompt && whenPrompt.trim() ? new Date(whenPrompt) : null;
+    const executedAt = parsedWhen && !Number.isNaN(parsedWhen.getTime()) ? parsedWhen.toISOString() : new Date().toISOString();
     const from = campaign.dailyBudget || 15;
+    const appliedInput = window.prompt("Valor aplicado no Meta (R$/dia)", toDailyBudget.toFixed(0));
+    const appliedDailyBudget = executedInMeta ? Math.max(1, Number(appliedInput || toDailyBudget)) : from;
+    const diffPct = toDailyBudget > 0 ? ((appliedDailyBudget - toDailyBudget) / toDailyBudget) * 100 : 0;
+    const adherenceStatus: CampaignDecisionCycle["adherenceStatus"] = !executedInMeta
+      ? "nao_executado"
+      : Math.abs(diffPct) <= 10
+        ? "aderente"
+        : diffPct > 10
+          ? "acima_recomendado"
+          : "abaixo_recomendado";
+
+    const cycles = [...(campaign.cycles || [])];
+    const events = [...(campaign.events || [])];
+    const activeCycleIndex = campaign.activeCycleId ? cycles.findIndex((x) => x.id === campaign.activeCycleId) : cycles.length - 1;
+
+    if (activeCycleIndex >= 0) {
+      const currentCycle = cycles[activeCycleIndex];
+      cycles[activeCycleIndex] = {
+        ...currentCycle,
+        status: executedInMeta ? "aguardando_dados" : currentCycle.status,
+        recommendedDailyBudget: toDailyBudget,
+        appliedDailyBudget,
+        executedInMeta,
+        executedAt,
+        adherenceStatus,
+        adherenceDiffPct: Math.round(diffPct * 10) / 10,
+        reviewAfterSpend: 50,
+        reviewAfterHours: 72,
+      };
+    }
+
     const event: CampaignScaleEvent = {
       date: new Date().toLocaleDateString("pt-BR"),
       fromDailyBudget: from,
-      toDailyBudget,
-      reason: "Escala +20% executada",
+      toDailyBudget: appliedDailyBudget,
+      reason: executedInMeta ? "Escala executada no Meta" : "Escala recomendada, ainda nao executada",
       investedAtChange: campaign.totalSpend || 0,
       reviewAfterSpend: 50,
       reviewAfterHours: 72,
-      status: "aguardando",
+      status: executedInMeta ? "aguardando" : "pronto_reavaliar",
       result: "neutro",
       note: "Escala registrada no fluxo operacional",
     };
 
+    events.push({
+      id: makeId("event"),
+      cycleId: campaign.activeCycleId,
+      type: "budget_scaled",
+      createdAt: executedAt,
+      title: executedInMeta
+        ? `Escala aplicada ${from.toFixed(0)} -> ${appliedDailyBudget.toFixed(0)}`
+        : `Escala recomendada ${from.toFixed(0)} -> ${toDailyBudget.toFixed(0)} (pendente)`,
+      note: adherenceStatus === "acima_recomendado"
+        ? "Fora da politica: acima da recomendacao"
+        : adherenceStatus === "abaixo_recomendado"
+          ? "Fora da politica: abaixo da recomendacao"
+          : adherenceStatus === "nao_executado"
+            ? "Recomendacao ainda nao executada"
+            : "Execucao dentro da politica MPC",
+      payload: {
+        recommendedDailyBudget: toDailyBudget,
+        appliedDailyBudget,
+        adherenceStatus,
+        adherenceDiffPct: Math.round(diffPct * 10) / 10,
+      },
+    });
+
     await onSaveCampaignFinance(campaign.id, {
       fundsAdded: campaign.fundsAdded,
       taxCost: campaign.taxCost,
-      dailyBudget: toDailyBudget,
+      dailyBudget: appliedDailyBudget,
       lastBudgetChangeAt: event.date,
       scaleHistory: [...(campaign.scaleHistory || []), event],
-      scaleCycleState: "aguardando_dados",
+      scaleCycleState: executedInMeta ? "aguardando_dados" : "pronto_reavaliar",
+      cycles,
+      events,
+      activeCycleId: campaign.activeCycleId,
     });
 
     onReload();
@@ -643,6 +737,13 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
               <p style={{ color: operacaoChip.color, fontSize: "12px" }} className="font-semibold">{mpcDiagnostic.operacao}/10 • {operacaoChip.label}</p>
             </div>
           </div>
+          <div style={{ background: "#262626", border: `0.5px solid ${capacityGate.canScale ? "#10b981" : "#f59e0b"}` }} className="rounded p-2 mt-2">
+            <p style={{ color: "#9ca3af", fontSize: "10px" }}>Gate de capacidade</p>
+            <p style={{ color: capacityGate.canScale ? "#10b981" : "#f59e0b", fontSize: "11px" }} className="font-semibold">
+              {capacityGate.canScale ? "Escala liberada" : "Escala bloqueada"} • Pendentes: {capacityGate.pendingConfirmations}
+            </p>
+            <p style={{ color: "#aaa", fontSize: "10px" }}>{capacityGate.reason}</p>
+          </div>
         </div>
       )}
 
@@ -684,8 +785,42 @@ export default function CampaignCard({ campaigns, clinicId, ticketMedio, onAddCa
                   <p style={{ color: "#aaa", fontSize: "10px" }}>Impacto: +{row.expectedLeads} leads | +{row.expectedCompleted} comp.</p>
                   <p style={{ color: "#10b981", fontSize: "10px" }}>Receita esperada: {fmt(row.expectedRevenue)}</p>
                   <p style={{ color: "#9ca3af", fontSize: "10px" }}>{row.nextReviewText}</p>
+                  <p style={{ color: "#777", fontSize: "10px" }}>{row.reason}</p>
                 </div>
               ))}
+            </div>
+
+            <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2 mt-2">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p style={{ color: "#fff", fontSize: "10px" }} className="font-semibold uppercase">Carteira amanha</p>
+                <div className="flex items-center gap-1">
+                  <span style={{ color: "#999", fontSize: "10px" }}>R$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={5}
+                    value={extraBudgetTomorrow}
+                    onChange={(e) => setExtraBudgetTomorrow(Number(e.target.value || 0))}
+                    style={{ background: "#1f1f1f", border: "0.5px solid #3a3a3a", color: "#fff", fontSize: "10px", width: 70 }}
+                    className="rounded px-2 py-1"
+                  />
+                </div>
+              </div>
+              {portfolioPlan.items.length > 0 ? (
+                <div className="space-y-1">
+                  {portfolioPlan.items.map((item) => (
+                    <div key={item.campaignId}>
+                        <p style={{ color: "#d1d5db", fontSize: "10px" }}>{fmt(item.allocatedBudget)} -&gt; {item.campaignName}</p>
+                      <p style={{ color: "#777", fontSize: "10px" }}>{item.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: "#777", fontSize: "10px" }}>Sem alocacao sugerida no momento.</p>
+              )}
+              {portfolioPlan.blockedCampaigns.length > 0 && (
+                <p style={{ color: "#f59e0b", fontSize: "10px" }} className="mt-1">Bloqueadas: {portfolioPlan.blockedCampaigns.map((b) => b.campaignName).join(", ")}</p>
+              )}
             </div>
           </div>
 

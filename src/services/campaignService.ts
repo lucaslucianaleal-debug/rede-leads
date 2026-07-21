@@ -1,11 +1,145 @@
 import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, arrayUnion } from "firebase/firestore";
-import type { Campaign, CampaignDailyMetric, CampaignScaleEvent } from "@/types/commandCenter";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import type { Campaign, CampaignDailyMetric, CampaignDecisionCycle, CampaignOperationalEvent, CampaignScaleEvent, PeriodType } from "@/types/commandCenter";
 import { fetchLeadsFromClinic } from "./firebaseQueries";
 import { parse, isValid } from "date-fns";
 
 const CAMPAIGN_COLORS = ["#D4537E", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"];
 const CAMPAIGN_BACKUP_FIELD = "metaAdsCampaigns";
+
+function makeId(prefix: string) {
+  return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function toIsoFromBrDate(value?: string) {
+  if (!value) return new Date().toISOString();
+  const [dd, mm, yyyy] = value.split("/").map(Number);
+  if (!dd || !mm || !yyyy) return new Date().toISOString();
+  return new Date(yyyy, mm - 1, dd).toISOString();
+}
+
+function mapLegacyScaleStateToCycleStatus(value?: string): CampaignDecisionCycle["status"] {
+  if (value === "aguardando_dados") return "aguardando_dados";
+  if (value === "pronto_reavaliar") return "pronto_reavaliar";
+  return "aberto";
+}
+
+function migrateFromScaleHistory(data: any): { cycles: CampaignDecisionCycle[]; events: CampaignOperationalEvent[]; activeCycleId: string } {
+  const createdAt = data.createdAt || new Date().toISOString();
+  const baseBudget = data.dailyBudget || 15;
+  const scaleHistory: CampaignScaleEvent[] = Array.isArray(data.scaleHistory) ? data.scaleHistory : [];
+
+  const baseCycleId = makeId("cycle");
+  const cycles: CampaignDecisionCycle[] = [
+    {
+      id: baseCycleId,
+      startedAt: createdAt,
+      triggerType: "campaign_created",
+      triggerNote: "Ciclo inicial da campanha",
+      status: "encerrado",
+      recommendedDailyBudget: baseBudget,
+      appliedDailyBudget: baseBudget,
+      executedInMeta: true,
+      executedAt: createdAt,
+      adherenceStatus: "aderente",
+      adherenceDiffPct: 0,
+      investedAtStart: 0,
+      reviewAfterSpend: 50,
+      reviewAfterHours: 72,
+    },
+  ];
+
+  const events: CampaignOperationalEvent[] = [
+    {
+      id: makeId("event"),
+      cycleId: baseCycleId,
+      type: "campaign_created",
+      createdAt,
+      title: "Campanha criada",
+      note: "Inicio da operacao",
+      payload: { dailyBudget: baseBudget },
+    },
+  ];
+
+  let activeCycleId = baseCycleId;
+
+  scaleHistory.forEach((ev) => {
+    const startedAt = toIsoFromBrDate(ev.date);
+    const cycleId = makeId("cycle");
+    const recommended = ev.toDailyBudget || baseBudget;
+    const applied = ev.toDailyBudget || recommended;
+    const diff = recommended > 0 ? ((applied - recommended) / recommended) * 100 : 0;
+    const adherenceStatus: CampaignDecisionCycle["adherenceStatus"] = Math.abs(diff) <= 10
+      ? "aderente"
+      : diff > 10
+        ? "acima_recomendado"
+        : "abaixo_recomendado";
+
+    cycles.push({
+      id: cycleId,
+      startedAt,
+      triggerType: "budget_change",
+      triggerNote: ev.reason || "Escala de budget",
+      status: ev.status === "concluido" ? "encerrado" : ev.status === "pronto_reavaliar" ? "pronto_reavaliar" : "aguardando_dados",
+      recommendedDailyBudget: recommended,
+      appliedDailyBudget: applied,
+      executedInMeta: true,
+      executedAt: startedAt,
+      adherenceStatus,
+      adherenceDiffPct: Math.round(diff * 10) / 10,
+      investedAtStart: ev.investedAtChange || 0,
+      reviewAfterSpend: ev.reviewAfterSpend || 50,
+      reviewAfterHours: ev.reviewAfterHours || 72,
+      result: ev.result || "neutro",
+      resultNote: ev.resultNote || ev.note,
+    });
+
+    events.push({
+      id: makeId("event"),
+      cycleId,
+      type: "budget_scaled",
+      createdAt: startedAt,
+      title: `Escala ${ev.fromDailyBudget || recommended} -> ${ev.toDailyBudget || recommended}`,
+      note: ev.reason || "Escala registrada",
+      payload: {
+        fromDailyBudget: ev.fromDailyBudget || recommended,
+        toDailyBudget: ev.toDailyBudget || recommended,
+      },
+    });
+
+    activeCycleId = cycleId;
+  });
+
+  if (cycles.length > 0) {
+    cycles.forEach((c, idx) => {
+      if (idx < cycles.length - 1 && !c.endedAt) {
+        c.endedAt = cycles[idx + 1].startedAt;
+      }
+    });
+  }
+
+  const activeCycle = cycles.find((c) => c.id === activeCycleId);
+  if (activeCycle && activeCycle.status === "encerrado") {
+    activeCycle.status = mapLegacyScaleStateToCycleStatus(data.scaleCycleState);
+  }
+
+  return { cycles, events, activeCycleId };
+}
+
+function normalizeCampaignStructure(data: any) {
+  const hasCycles = Array.isArray(data.cycles) && data.cycles.length > 0;
+  const hasEvents = Array.isArray(data.events);
+
+  if (hasCycles && hasEvents) {
+    return {
+      cycles: data.cycles as CampaignDecisionCycle[],
+      events: data.events as CampaignOperationalEvent[],
+      activeCycleId: data.activeCycleId || data.cycles[data.cycles.length - 1]?.id,
+    };
+  }
+
+  return migrateFromScaleHistory(data);
+}
 
 function parseCampaignDate(value?: string) {
   if (!value) return null;
@@ -30,6 +164,7 @@ function getSharedCampaignDoc(clinicId: string) {
 }
 
 function toCampaignDataSnapshot(data: any, id: string, clinicId: string) {
+  const normalized = normalizeCampaignStructure(data);
   return {
     id,
     clinicId,
@@ -43,6 +178,9 @@ function toCampaignDataSnapshot(data: any, id: string, clinicId: string) {
     lastBudgetChangeAt: data.lastBudgetChangeAt || "",
     scaleHistory: Array.isArray(data.scaleHistory) ? data.scaleHistory : [],
     scaleCycleState: data.scaleCycleState || "idle",
+    cycles: normalized.cycles,
+    events: normalized.events,
+    activeCycleId: normalized.activeCycleId,
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     dailyMetrics: Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [],
@@ -74,6 +212,8 @@ function buildCampaignFromSnapshot(
   const conversionRate = leadsCount > 0 ? Math.round((scheduledCount / leadsCount) * 100) : 0;
   const showUpRate = scheduledCount > 0 ? Math.round((completedCount / scheduledCount) * 100) : 0;
 
+  const normalized = normalizeCampaignStructure(data);
+
   return {
     id,
     clinicId,
@@ -87,6 +227,9 @@ function buildCampaignFromSnapshot(
     lastBudgetChangeAt: data.lastBudgetChangeAt || "",
     scaleHistory: Array.isArray(data.scaleHistory) ? data.scaleHistory : [],
     scaleCycleState: data.scaleCycleState || "idle",
+    cycles: normalized.cycles,
+    events: normalized.events,
+    activeCycleId: normalized.activeCycleId,
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     dailyMetrics,
@@ -163,7 +306,7 @@ function parseFlexibleDate(value?: string) {
   return isValid(parsed) ? parsed : null;
 }
 
-function getPeriodRange(period: 'hoje' | 'semana' | 'mes' | 'historico') {
+function getPeriodRange(period: PeriodType) {
   const now = new Date();
   const start = new Date(now);
   const end = new Date(now);
@@ -175,7 +318,7 @@ function getPeriodRange(period: 'hoje' | 'semana' | 'mes' | 'historico') {
     return { start, end };
   }
 
-  if (period === 'hoje') {
+  if (period === 'hoje' || period === 'operacao') {
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
     return { start, end };
@@ -209,7 +352,7 @@ function resolveLeadDate(lead: any) {
 /**
  * Busca todas as campanhas de uma clínica e enriquece com dados reais de leads
  */
-export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' | 'historico' = 'mes'): Promise<Campaign[]> {
+export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, period: PeriodType = 'operacao'): Promise<Campaign[]> {
   try {
     const { start, end } = getPeriodRange(period);
     const colRef = collection(db, "clinics", clinicId, "campaigns");
@@ -233,13 +376,17 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         const leads = await fetchLeadsFromClinic(clinicId);
         const restored = backupCampaigns.map((campaign: any, idx: number) => {
           const data = toCampaignDataSnapshot(campaign, campaign.id, clinicId);
+            const activeCycle = (data.cycles || []).find((c: CampaignDecisionCycle) => c.id === data.activeCycleId);
+            const cycleStart = activeCycle?.startedAt ? parseFlexibleDate(activeCycle.startedAt) : null;
             const filteredMetrics = (data.dailyMetrics || []).filter((m: CampaignDailyMetric) => {
               const dt = parseFlexibleDate(m.date);
+              if (period === 'ciclo' && cycleStart) return dt ? inRange(dt, cycleStart, end) : false;
               return dt ? inRange(dt, start, end) : false;
             });
             const campaignLeads = leads.filter(l => {
               if (l.metaCampanhaId !== campaign.id) return false;
               const dt = resolveLeadDate(l);
+              if (period === 'ciclo' && cycleStart) return dt ? inRange(dt, cycleStart, end) : false;
               return dt ? inRange(dt, start, end) : false;
             });
           const leadsCount = campaignLeads.length;
@@ -264,14 +411,20 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         const data = docSnap.data();
         const dailyMetrics: CampaignDailyMetric[] = Array.isArray(data.dailyMetrics) ? data.dailyMetrics : [];
 
+        const normalized = normalizeCampaignStructure(data);
+        const activeCycle = normalized.cycles.find((c) => c.id === normalized.activeCycleId);
+        const cycleStart = activeCycle?.startedAt ? parseFlexibleDate(activeCycle.startedAt) : null;
+
         const filteredMetrics = dailyMetrics.filter((m) => {
           const dt = parseFlexibleDate(m.date);
+          if (period === 'ciclo' && cycleStart) return dt ? inRange(dt, cycleStart, end) : false;
           return dt ? inRange(dt, start, end) : false;
         });
         const totals = calcCampaignTotals(filteredMetrics);
         const campaignLeads = leads.filter(l => {
           if (l.metaCampanhaId !== docSnap.id) return false;
           const dt = resolveLeadDate(l);
+          if (period === 'ciclo' && cycleStart) return dt ? inRange(dt, cycleStart, end) : false;
           return dt ? inRange(dt, start, end) : false;
         });
 
@@ -312,6 +465,29 @@ export async function createCampaign(clinicId: string, data: {
   const colRef = collection(db, "clinics", clinicId, "campaigns");
   const newRef = doc(colRef);
   const color = CAMPAIGN_COLORS[Math.floor(Math.random() * CAMPAIGN_COLORS.length)];
+  const now = new Date().toISOString();
+  const initialCycleId = makeId("cycle");
+  const initialCycle: CampaignDecisionCycle = {
+    id: initialCycleId,
+    startedAt: now,
+    triggerType: "campaign_created",
+    triggerNote: "Ciclo inicial da campanha",
+    status: "aberto",
+    recommendedDailyBudget: data.dailyBudget || 15,
+    investedAtStart: 0,
+    reviewAfterSpend: 50,
+    reviewAfterHours: 72,
+  };
+  const initialEvent: CampaignOperationalEvent = {
+    id: makeId("event"),
+    cycleId: initialCycleId,
+    type: "campaign_created",
+    createdAt: now,
+    title: "Campanha criada",
+    note: "Inicio da operacao",
+    payload: { dailyBudget: data.dailyBudget || 15 },
+  };
+
   await setDoc(newRef, {
     name: data.name,
     dateStart: data.dateStart,
@@ -321,13 +497,16 @@ export async function createCampaign(clinicId: string, data: {
     lastBudgetChangeAt: data.dateStart || new Date().toISOString(),
     scaleHistory: [],
     scaleCycleState: "idle",
+    cycles: [initialCycle],
+    events: [initialEvent],
+    activeCycleId: initialCycleId,
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     active: true,
     color,
     dailyMetrics: [],
     clinicId,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   });
   await persistCampaignBackup(clinicId, [{
     id: newRef.id,
@@ -339,13 +518,16 @@ export async function createCampaign(clinicId: string, data: {
     lastBudgetChangeAt: data.dateStart || new Date().toISOString(),
     scaleHistory: [],
     scaleCycleState: "idle",
+    cycles: [initialCycle],
+    events: [initialEvent],
+    activeCycleId: initialCycleId,
     fundsAdded: data.fundsAdded || 0,
     taxCost: data.taxCost || 0,
     active: true,
     color,
     dailyMetrics: [],
     clinicId,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   }]);
   return newRef.id;
 }
@@ -410,10 +592,77 @@ export async function deleteDailyMetric(
 export async function updateCampaign(
   clinicId: string,
   campaignId: string,
-  fields: Partial<{ name: string; active: boolean; budget: number; dailyBudget: number; lastBudgetChangeAt: string; scaleHistory: CampaignScaleEvent[]; scaleCycleState: 'idle' | 'aguardando_dados' | 'pronto_reavaliar'; dateEnd: string; fundsAdded: number; taxCost: number }>
+  fields: Partial<{ name: string; active: boolean; budget: number; dailyBudget: number; lastBudgetChangeAt: string; scaleHistory: CampaignScaleEvent[]; scaleCycleState: 'idle' | 'aguardando_dados' | 'pronto_reavaliar'; cycles: CampaignDecisionCycle[]; events: CampaignOperationalEvent[]; activeCycleId: string; dateEnd: string; fundsAdded: number; taxCost: number }>
 ): Promise<void> {
   const docRef = doc(db, "clinics", clinicId, "campaigns", campaignId);
-  await updateDoc(docRef, fields);
+  const before = await getDoc(docRef);
+  const current = before.exists() ? before.data() : null;
+
+  const preparedFields: any = { ...fields };
+  if (current && typeof fields.dailyBudget === "number" && fields.dailyBudget > 0 && fields.cycles === undefined) {
+    const normalized = normalizeCampaignStructure(current);
+    const prevBudget = Number(current.dailyBudget || 15);
+    const nextBudget = Number(fields.dailyBudget);
+
+    if (Math.abs(prevBudget - nextBudget) > 0.01) {
+      const now = new Date().toISOString();
+      const activeCycle = normalized.cycles.find((c) => c.id === normalized.activeCycleId);
+      const closedCycles = normalized.cycles.map((cycle) => {
+        if (cycle.id === normalized.activeCycleId) {
+          return { ...cycle, status: "encerrado" as const, endedAt: now };
+        }
+        return cycle;
+      });
+
+      const diffPct = prevBudget > 0 ? ((nextBudget - prevBudget) / prevBudget) * 100 : 0;
+      const adherenceStatus: CampaignDecisionCycle["adherenceStatus"] = Math.abs(diffPct) <= 10
+        ? "aderente"
+        : diffPct > 10
+          ? "acima_recomendado"
+          : "abaixo_recomendado";
+
+      const newCycleId = makeId("cycle");
+      const newCycle: CampaignDecisionCycle = {
+        id: newCycleId,
+        startedAt: now,
+        triggerType: "budget_change",
+        triggerNote: "Ajuste de budget aplicado",
+        status: "aguardando_dados",
+        recommendedDailyBudget: activeCycle?.recommendedDailyBudget || nextBudget,
+        appliedDailyBudget: nextBudget,
+        executedInMeta: true,
+        executedAt: now,
+        adherenceStatus,
+        adherenceDiffPct: Math.round(diffPct * 10) / 10,
+        investedAtStart: Number(current.totalSpend || 0),
+        reviewAfterSpend: 50,
+        reviewAfterHours: 72,
+      };
+
+      const newEvent: CampaignOperationalEvent = {
+        id: makeId("event"),
+        cycleId: newCycleId,
+        type: "budget_scaled",
+        createdAt: now,
+        title: `Escala ${prevBudget.toFixed(0)} -> ${nextBudget.toFixed(0)}`,
+        note: "Atualizacao registrada via Command Center",
+        payload: {
+          fromDailyBudget: prevBudget,
+          toDailyBudget: nextBudget,
+          recommendedDailyBudget: activeCycle?.recommendedDailyBudget || nextBudget,
+          adherenceStatus,
+        },
+      };
+
+      preparedFields.cycles = [...closedCycles, newCycle];
+      preparedFields.events = [...normalized.events, newEvent];
+      preparedFields.activeCycleId = newCycleId;
+      preparedFields.scaleCycleState = "aguardando_dados";
+      preparedFields.lastBudgetChangeAt = new Date().toLocaleDateString("pt-BR");
+    }
+  }
+
+  await updateDoc(docRef, preparedFields);
   const snapAfter = await getDoc(docRef);
   if (snapAfter.exists()) {
     await persistCampaignBackup(clinicId, [{ id: campaignId, ...snapAfter.data() }]);

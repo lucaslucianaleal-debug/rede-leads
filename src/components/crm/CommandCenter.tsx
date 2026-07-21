@@ -18,7 +18,7 @@ export default function CommandCenter() {
   const { currentClinic } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const [layer, setLayer] = useState<LayerType>("meta");
-  const [period, setPeriod] = useState<PeriodType>("mes");
+  const [period, setPeriod] = useState<PeriodType>("operacao");
   const [unit, setUnit] = useState("all");
   const [ticketMedio, setTicketMedio] = useState(() => {
     try {

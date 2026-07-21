@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Campaign, CampaignScaleEvent } from "@/types/commandCenter";
+import type { Campaign, CampaignDecisionCycle, CampaignOperationalEvent, CampaignScaleEvent, PeriodType } from "@/types/commandCenter";
 import type { Diagnostic } from "@/types/commandCenter";
 import { fetchCampaigns, createCampaign, upsertDailyMetric, updateCampaign, deleteDailyMetric, deleteCampaign } from "@/services/campaignService";
 import type { CampaignDailyMetric } from "@/types/commandCenter";
 
-export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", ticketMedio = 1800, period: 'hoje' | 'semana' | 'mes' | 'historico' = 'mes') {
+export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", ticketMedio = 1800, period: PeriodType = 'operacao') {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -44,7 +44,7 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
     await createCampaign(clinicId, data);
   };
 
-  const handleSaveCampaignFinance = async (campaignId: string, data: { fundsAdded: number; taxCost: number; dailyBudget?: number; lastBudgetChangeAt?: string; scaleHistory?: CampaignScaleEvent[] }) => {
+  const handleSaveCampaignFinance = async (campaignId: string, data: { fundsAdded: number; taxCost: number; dailyBudget?: number; lastBudgetChangeAt?: string; scaleHistory?: CampaignScaleEvent[]; scaleCycleState?: 'idle' | 'aguardando_dados' | 'pronto_reavaliar'; cycles?: CampaignDecisionCycle[]; events?: CampaignOperationalEvent[]; activeCycleId?: string }) => {
     await updateCampaign(clinicId, campaignId, data);
     await load();
   };

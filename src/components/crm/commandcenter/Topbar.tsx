@@ -19,9 +19,8 @@ const LAYERS: { id: LayerType; label: string; icon: string }[] = [
 ];
 
 const PERIODS: { id: PeriodType; label: string }[] = [
-  { id: "hoje", label: "Hoje" },
-  { id: "semana", label: "Semana" },
-  { id: "mes", label: "Mês" },
+  { id: "operacao", label: "Operação" },
+  { id: "ciclo", label: "Ciclo Atual" },
   { id: "historico", label: "Histórico" },
 ];
 
