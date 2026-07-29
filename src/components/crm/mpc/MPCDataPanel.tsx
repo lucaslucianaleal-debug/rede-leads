@@ -20,6 +20,12 @@ type MPCDataPanelProps = {
 
 type ActiveForm = null | "dentista" | "atendimento" | "satisfacao" | "ticket" | "importacao";
 
+type LastBulkAction = {
+  label: string;
+  snapshot: MPCStore;
+  createdAt: number;
+};
+
 function normalizeName(value: string) {
   return value
     .normalize("NFD")
@@ -86,6 +92,13 @@ function parseMoneyBRL(raw?: string) {
     .replace(/\s+/g, "");
   const n = Number(normalized);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function cloneStoreSnapshot(source: MPCStore): MPCStore {
+  if (typeof structuredClone === "function") {
+    return structuredClone(source);
+  }
+  return JSON.parse(JSON.stringify(source)) as MPCStore;
 }
 
 export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
@@ -167,6 +180,7 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
   const [budgetBulkText, setBudgetBulkText] = useState("");
   const [salesBulkDentistId, setSalesBulkDentistId] = useState("");
   const [salesBulkText, setSalesBulkText] = useState("");
+  const [lastBulkAction, setLastBulkAction] = useState<LastBulkAction | null>(null);
 
   const filteredApptLeads = useMemo(() => {
     if (!apptSearchQuery.trim()) return [];
@@ -335,6 +349,12 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
       return;
     }
 
+    setLastBulkAction({
+      label: "importação de atendimentos em massa",
+      snapshot: cloneStoreSnapshot(store),
+      createdAt: Date.now(),
+    });
+
     const nextStore = { ...store, appointments: [...store.appointments, ...imported] };
     setStore(nextStore);
     void saveNow(nextStore);
@@ -479,6 +499,12 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
       return;
     }
 
+    setLastBulkAction({
+      label: "importação de orçamentos em massa",
+      snapshot: cloneStoreSnapshot(store),
+      createdAt: Date.now(),
+    });
+
     const nextStore = { ...store, budgets: [...(store.budgets || []), ...imported] };
     setStore(nextStore);
     void saveNow(nextStore);
@@ -512,6 +538,12 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
     let updatedAttended = 0;
     let linkedCount = 0;
     let invalidCount = 0;
+
+    setLastBulkAction({
+      label: "reconciliação de vendas em massa",
+      snapshot: cloneStoreSnapshot(store),
+      createdAt: Date.now(),
+    });
 
     const nextStore = {
       ...store,
@@ -625,6 +657,15 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
       `Reconciliação de vendas concluída · +${createdBudgets} orçamento(s), +${createdAttended} atendimento(s), ${updatedAttended} atendimento(s) atualizado(s), ${linkedCount} vinculado(s) ao CRM, ${invalidCount} inválido(s)`
     );
     setSalesBulkText("");
+  };
+
+  const handleUndoLastBulkAction = async () => {
+    if (!lastBulkAction) return;
+    const snapshot = cloneStoreSnapshot(lastBulkAction.snapshot);
+    setStore(snapshot);
+    await saveNow(snapshot);
+    setLastBulkAction(null);
+    showSuccess(`Desfeito com sucesso: ${lastBulkAction.label}`);
   };
 
   const autoLinkUnmatchedByName = () => {
@@ -744,6 +785,21 @@ export default function MPCDataPanel({ store, mutations }: MPCDataPanelProps) {
       {successMsg && (
         <div className="flex items-center gap-2 px-5 py-2.5 bg-emerald-50 border-b border-emerald-200 text-emerald-800 text-sm">
           ✅ {successMsg}
+        </div>
+      )}
+
+      {lastBulkAction && (
+        <div className="flex items-center justify-between gap-2 px-5 py-2.5 bg-amber-50 border-b border-amber-200 text-amber-900 text-sm">
+          <span>
+            Último lançamento em massa: <strong>{lastBulkAction.label}</strong> ({new Date(lastBulkAction.createdAt).toLocaleTimeString("pt-BR")})
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleUndoLastBulkAction()}
+            className="px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-amber-900 text-xs font-medium hover:bg-amber-100"
+          >
+            Desfazer último lançamento
+          </button>
         </div>
       )}
 

@@ -287,6 +287,27 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
     setEditingLead(null);
   };
 
+  const deleteLeadRecord = async (lead: any) => {
+    if (!lead?.id || !lead?.sourceType) return;
+    const sourceLabel = lead.sourceType === "budget" ? "orçamento" : "atendimento";
+    const confirmed = window.confirm(`Apagar este ${sourceLabel} de \"${lead.name || "Sem nome"}\"?`);
+    if (!confirmed) return;
+
+    let nextStoreSnapshot: MPCStore | null = null;
+    mutations.setStore((prev) => {
+      if (lead.sourceType === "appointment") {
+        const appointments = (prev.appointments || []).filter((a: any) => a.id !== lead.id);
+        nextStoreSnapshot = { ...prev, appointments };
+        return nextStoreSnapshot;
+      }
+      const budgets = (prev.budgets || []).filter((b: any) => b.id !== lead.id);
+      nextStoreSnapshot = { ...prev, budgets };
+      return nextStoreSnapshot;
+    });
+
+    if (nextStoreSnapshot) await mutations.saveNow(nextStoreSnapshot);
+  };
+
   const startEditSchedule = (dentistId: string, workDays?: number[]) => {
     setScheduleEditingId(dentistId);
     setScheduleDraft(normalizeWorkDays(workDays));
@@ -595,13 +616,22 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                                 {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">SYNC</span>}
                               </div>
                               {(lead.id && lead.sourceType) && (
-                                <button
-                                  type="button"
-                                  onClick={() => openEditLead(d.id, lead)}
-                                  className="text-[11px] px-1.5 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-white"
-                                >
-                                  Editar
-                                </button>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditLead(d.id, lead)}
+                                    className="text-[11px] px-1.5 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-white"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteLeadRecord(lead)}
+                                    className="text-[11px] px-1.5 py-0.5 rounded border border-rose-300 text-rose-700 hover:bg-rose-50"
+                                  >
+                                    Apagar
+                                  </button>
+                                </div>
                               )}
                             </div>
                             <p>
@@ -649,13 +679,22 @@ export default function MPCDentistPerformance({ dentists, store, mutations }: Pr
                                 {identity.synced && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">SYNC</span>}
                               </div>
                               {lead.id && (
-                                <button
-                                  type="button"
-                                  onClick={() => openEditLead(d.id, { ...lead, sourceType: "budget", status: "budget" })}
-                                  className="text-[11px] px-1.5 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-white"
-                                >
-                                  Editar
-                                </button>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditLead(d.id, { ...lead, sourceType: "budget", status: "budget" })}
+                                    className="text-[11px] px-1.5 py-0.5 rounded border border-slate-300 text-slate-600 hover:bg-white"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteLeadRecord({ ...lead, sourceType: "budget" })}
+                                    className="text-[11px] px-1.5 py-0.5 rounded border border-rose-300 text-rose-700 hover:bg-rose-50"
+                                  >
+                                    Apagar
+                                  </button>
+                                </div>
                               )}
                             </div>
                             <p>{lead.date || "sem data"}{identity.phone ? ` · ${identity.phone}` : ""}</p>
