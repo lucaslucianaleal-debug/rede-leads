@@ -7,6 +7,7 @@ interface TopbarProps {
   period: PeriodType;
   unit: string;
   criticalCount: number;
+  brandName?: string;
   onLayerChange: (l: LayerType) => void;
   onPeriodChange: (p: PeriodType) => void;
   onUnitChange: (u: string) => void;
@@ -25,7 +26,7 @@ const PERIODS: { id: PeriodType; label: string }[] = [
 ];
 
 export default function Topbar({
-  layer, period, unit, criticalCount,
+  layer, period, unit, criticalCount, brandName,
   onLayerChange, onPeriodChange, onUnitChange, onExportPDF, exporting,
 }: TopbarProps) {
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -44,7 +45,7 @@ export default function Topbar({
             {/* Logo + Brand */}
             <div className="flex items-center gap-2 min-w-fit">
               <span className="w-2 h-2 rounded-full bg-[#D4537E]" />
-              <span className="text-base font-semibold text-white">OdontoCompany</span>
+              <span className="text-base font-semibold text-white">{brandName || "Rede Leads"}</span>
             </div>
 
             {/* Layer tabs */}

@@ -13,6 +13,7 @@ export interface CreateClinicInput {
   logoUrl?: string;
   module?: "clinica" | "corretor";
   customFields?: Record<string, any>;
+  customServices?: string[];
 }
 
 const normalizeClinicId = (value: string) =>
@@ -83,6 +84,9 @@ export function useClinics() {
         module: input.module || "clinica",
         ...(input.customFields && Object.keys(input.customFields).length > 0
           ? { customFields: input.customFields }
+          : {}),
+        ...(Array.isArray(input.customServices) && input.customServices.length > 0
+          ? { customServices: input.customServices }
           : {}),
         createdAt: new Date().toISOString(),
         createdBy: auth.currentUser?.uid || "system",

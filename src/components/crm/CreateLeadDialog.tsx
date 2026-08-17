@@ -17,6 +17,7 @@ import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchActiveCampaignList } from "@/services/campaignService";
+import { addCustomService, resolveServiceOptions } from "@/lib/serviceCatalog";
 
 interface CreateLeadDialogProps {
   open: boolean;
@@ -32,8 +33,6 @@ const ETAPAS: LeadStage[] = [
   "Follow-Up 9", "Follow-Up 10", "Follow-Up 11", "Follow-Up 12",
   "Avaliação agendada", "Fora da região", "Desistência", "Finalizado",
 ];
-
-const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento", "Limpeza"];
 
 const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Promotora", "Hotleads", "Outro"];
 
@@ -73,6 +72,8 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
 
   const { clinics } = useClinics();
   const [dynamicFields, setDynamicFields] = useState<Record<string, any> | null>(null);
+  const [customServiceInput, setCustomServiceInput] = useState("");
+  const [serviceOptions, setServiceOptions] = useState<string[]>([]);
   const currentClinicObj = clinics.find((c) => c.id === clinicId);
 
   useEffect(() => {
@@ -88,15 +89,17 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
       creci: { label: "CRECI", placeholder: "Número do CRECI" },
     };
 
+    const resolvedServices = resolveServiceOptions(clinic, clinic?.customServices || []);
+    setServiceOptions(resolvedServices);
+
     const fields = clinic ? (clinic.customFields || (clinic.module === "corretor" ? defaultCorretorFields : null)) : null;
     if (fields) {
       setDynamicFields(fields);
-      // initialize form customFields with empty values for each key
       setForm((f) => ({ ...f, customFields: { ...(f.customFields || {}), ...Object.keys(fields).reduce((acc, k) => ({ ...acc, [k]: "" }), {}) } }));
     } else {
       setDynamicFields(null);
     }
-  }, [clinicId, open]);
+  }, [clinicId, open, clinics]);
 
   const selectValue = (val: any) => (val === "" || val === undefined ? "none" : String(val));
   const fromSelect = (val: string) => (val === "none" ? "" : val);
@@ -109,6 +112,35 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
     if (!norm) { setDuplicateWarning(null); return; }
     const found = allLeads.find(l => normalizePhoneTo10Digits(l.telefone) === norm);
     setDuplicateWarning(found ? { nome: found.nome, etapa: found.etapaLead } : null);
+  };
+
+  const handleAddCustomService = async () => {
+    const value = customServiceInput.trim();
+    if (!value) return;
+
+    const updated = addCustomService(serviceOptions, value);
+    setServiceOptions(updated);
+    setForm((f) => ({ ...f, servicoProcurado: value }));
+    setCustomServiceInput("");
+
+    if (currentClinicObj?.module === "corretor") {
+      const nextServices = updated.filter((service) => service && service.trim());
+      try {
+        const clinicRef = clinics.find((clinic) => clinic.id === clinicId);
+        if (clinicRef) {
+          const nextClinic = { ...clinicRef, customServices: nextServices };
+          const { doc, updateDoc } = await import("firebase/firestore");
+          const { db } = await import("@/lib/firebase");
+          await updateDoc(doc(db, "clinics", clinicId), { customServices: nextServices });
+          // keep local clinic state in sync in memory
+          const updatedClinics = clinics.map((clinic) => clinic.id === clinicId ? nextClinic : clinic);
+          // no-op local state refresh since hooks data is managed in firestore population; the current form value remains valid
+          void updatedClinics;
+        }
+      } catch {
+        // no-op, the user can still use the service in the form
+      }
+    }
   };
 
   const handleSave = () => {
@@ -242,12 +274,28 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
           <div className="space-y-1">
             <Label>Serviço Procurado</Label>
             <Select value={selectValue(form.servicoProcurado)} onValueChange={(v) => set("servicoProcurado", fromSelect(v))}>
-              <SelectTrigger><SelectValue placeholder="Selecione um serviço" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={currentClinicObj?.module === "corretor" ? "Digite ou selecione um serviço" : "Selecione um serviço"} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">—</SelectItem>
-                {SERVICOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {serviceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            {currentClinicObj?.module === "corretor" && (
+              <div className="flex gap-2 mt-2">
+                <Input
+                  value={customServiceInput}
+                  onChange={(e) => setCustomServiceInput(e.target.value)}
+                  placeholder="Adicionar serviço personalizado"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddCustomService();
+                    }
+                  }}
+                />
+                <Button type="button" variant="outline" onClick={handleAddCustomService}>Adicionar</Button>
+              </div>
+            )}
           </div>
 
           {/* Captador */}

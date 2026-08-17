@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Lead, LeadStage, LeadStatus, LeadResposta, LeadComparecimento } from '@/types/crm';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { addCustomService, resolveServiceOptions } from '@/lib/serviceCatalog';
 
 const ETAPAS: LeadStage[] = [
   'Novo', 'Em contato',
@@ -19,8 +20,6 @@ const ETAPAS: LeadStage[] = [
   'Follow-Up 9', 'Follow-Up 10', 'Follow-Up 11', 'Follow-Up 12',
   'Avaliação agendada', 'Fora da região', 'Desistência', 'Finalizado',
 ];
-
-const SERVICOS = ['Implante', 'Prótese', 'Protocolo', 'Facetas', 'Ortodontia', 'Clínico geral', 'Harmonização facial', 'Clareamento', 'Limpeza'];
 
 const FONTES = ['Online', 'Google', 'Sorteio Radio', 'Site', 'Indicação', 'Promotora', 'Hotleads', 'Outro'];
 
@@ -73,10 +72,38 @@ export function NewLeadDialog({
     lembretes: { h24: false, today: false },
   });
   const [saving, setSaving] = useState(false);
+  const [customServiceInput, setCustomServiceInput] = useState('');
+  const [serviceOptions, setServiceOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const clinicMeta = JSON.parse(localStorage.getItem('crm_clinic_cache') || 'null');
+    const nextOptions = resolveServiceOptions(
+      clinicMeta && clinicMeta.id === clinicId ? clinicMeta : { module: 'corretor', services: [] },
+      []
+    );
+    setServiceOptions(nextOptions);
+  }, [clinicId]);
 
   const selectValue = (val: any) => (val === '' || val === undefined ? 'none' : String(val));
   const fromSelect = (val: string) => (val === 'none' ? '' : val);
   const set = (key: keyof typeof form, value: any) => setForm((f) => ({ ...f, [key]: value }));
+
+  const handleAddCustomService = async () => {
+    const value = customServiceInput.trim();
+    if (!value) return;
+    const updated = addCustomService(serviceOptions, value);
+    setServiceOptions(updated);
+    setForm((f) => ({ ...f, servicoProcurado: value }));
+    setCustomServiceInput('');
+
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('@/lib/firebase');
+      await updateDoc(doc(db, 'clinics', clinicId), { customServices: updated });
+    } catch {
+      // ignore
+    }
+  };
 
   const handleSave = async () => {
     if (!form.telefone.trim()) {
@@ -151,12 +178,26 @@ export function NewLeadDialog({
           <div className="space-y-1">
             <Label>Serviço Procurado</Label>
             <Select value={selectValue(form.servicoProcurado)} onValueChange={(v) => set('servicoProcurado', fromSelect(v))}>
-              <SelectTrigger><SelectValue placeholder="Selecione um serviço" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecione ou adicione um serviço" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">—</SelectItem>
-                {SERVICOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {serviceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            <div className="flex gap-2 mt-2">
+              <Input
+                value={customServiceInput}
+                onChange={(e) => setCustomServiceInput(e.target.value)}
+                placeholder="Adicionar serviço personalizado"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddCustomService();
+                  }
+                }}
+              />
+              <Button type="button" variant="outline" size="sm" onClick={handleAddCustomService}>Adicionar</Button>
+            </div>
           </div>
 
           {/* Captador */}

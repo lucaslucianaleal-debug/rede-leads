@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Lead, LeadStage, LeadStatus, LeadResposta, LeadComparecimento } from "@/types/crm";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -19,9 +19,9 @@ import { db } from "@/lib/firebase";
 import { maskPhone, isValidPhone } from "@/lib/phone";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { useLeads } from "@/hooks/useLeads";
-import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchActiveCampaignList } from "@/services/campaignService";
+import { addCustomService, resolveServiceOptions } from "@/lib/serviceCatalog";
 
 interface EditLeadDialogProps {
   lead: Lead | null;
@@ -39,7 +39,6 @@ const ETAPAS: LeadStage[] = [
 ];
 
 const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Promotora", "Hotleads", "Outro"];
-const SERVICOS = ["Implante", "Prótese", "Protocolo", "Facetas", "Ortodontia", "Clínico geral", "Harmonização facial", "Clareamento", "Limpeza"];
 
 export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogProps) {
   const { allLeads } = useLeads();
@@ -48,6 +47,8 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const [duplicateWarning, setDuplicateWarning] = useState<{ nome: string; etapa: string } | null>(null);
   const [form, setForm] = useState<Partial<Lead>>({});
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
+  const [customServiceInput, setCustomServiceInput] = useState("");
+  const [serviceOptions, setServiceOptions] = useState<string[]>([]);
   const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [previousPhone, setPreviousPhone] = useState<string | null>(null);
@@ -61,6 +62,16 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
     }
     fetchActiveCampaignList(clinicId).then(setCampaigns);
   }, [clinicId, open]);
+
+  useEffect(() => {
+    if (!clinicId || !lead) return;
+    const clinicMeta = JSON.parse(localStorage.getItem("crm_clinic_cache") || "null");
+    const serviceList = resolveServiceOptions(
+      clinicMeta && clinicMeta.id === clinicId ? clinicMeta : { module: clinicMeta?.module || "clinica", services: clinicMeta?.customServices || [] },
+      []
+    );
+    setServiceOptions(serviceList);
+  }, [clinicId, lead]);
 
   useEffect(() => {
     if (lead) {
@@ -97,6 +108,25 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
 
   const selectValue = (v: string | undefined) => v || NONE;
   const fromSelect = (v: string) => v === NONE ? "" : v;
+
+  const handleAddCustomService = async () => {
+    const value = customServiceInput.trim();
+    if (!value) return;
+    const updated = addCustomService(serviceOptions, value);
+    setServiceOptions(updated);
+    setForm((prev) => ({ ...prev, servicoProcurado: value }));
+    setCustomServiceInput("");
+
+    if (clinicId) {
+      try {
+        const { doc, updateDoc } = await import("firebase/firestore");
+        const { db } = await import("@/lib/firebase");
+        await updateDoc(doc(db, "clinics", clinicId), { customServices: updated });
+      } catch {
+        // ignore
+      }
+    }
+  };
 
   const handleSave = async () => {
 
@@ -234,12 +264,26 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
           <div className="space-y-1">
             <Label>Serviço Procurado</Label>
             <Select value={selectValue(form.servicoProcurado)} onValueChange={(v) => set("servicoProcurado", fromSelect(v))}>
-              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecione ou adicione um serviço" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={"__none__"}>—</SelectItem>
-                {SERVICOS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {serviceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            <div className="flex gap-2 mt-2">
+              <Input
+                value={customServiceInput}
+                onChange={(e) => setCustomServiceInput(e.target.value)}
+                placeholder="Adicionar serviço personalizado"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddCustomService();
+                  }
+                }}
+              />
+              <Button type="button" variant="outline" onClick={handleAddCustomService}>Adicionar</Button>
+            </div>
           </div>
 
           {/* Captador */}

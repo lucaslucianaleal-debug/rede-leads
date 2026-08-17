@@ -11,6 +11,8 @@ export interface ClinicRecord {
   module?: "clinica" | "corretor";
   // Campos personalizados por módulo (p.ex. para corretor: CRECI, corretor, areas)
   customFields?: Record<string, any>;
+  // Catalogo de serviços criados pelo usuário/corretor
+  customServices?: string[];
   createdAt?: string;
   createdBy?: string;
 }

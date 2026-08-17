@@ -15,7 +15,7 @@ const unitToClinicId: Record<string, string> = {
   novohorizonte: "odontocompany-novohorizonte",
 };
 export default function CommandCenter() {
-  const { currentClinic } = useAuth();
+  const { currentClinic, clinicMeta } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const [layer, setLayer] = useState<LayerType>("meta");
   const [period, setPeriod] = useState<PeriodType>("operacao");
@@ -63,6 +63,7 @@ export default function CommandCenter() {
         period={period}
         unit={unit}
         criticalCount={criticalCount}
+        brandName={clinicMeta?.name || (currentClinic ? "Rede Leads" : "Rede Leads")}
         onLayerChange={setLayer}
         onPeriodChange={setPeriod}
         onUnitChange={setUnit}
