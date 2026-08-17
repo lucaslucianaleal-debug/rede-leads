@@ -78,7 +78,7 @@ export function NewLeadDialog({
   useEffect(() => {
     const clinicMeta = JSON.parse(localStorage.getItem('crm_clinic_cache') || 'null');
     const nextOptions = resolveServiceOptions(
-      clinicMeta && clinicMeta.id === clinicId ? clinicMeta : { module: 'corretor', services: [] },
+      clinicMeta && clinicMeta.id === clinicId ? clinicMeta : { module: 'corretor' },
       []
     );
     setServiceOptions(nextOptions);

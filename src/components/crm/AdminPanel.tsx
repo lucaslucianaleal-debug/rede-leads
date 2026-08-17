@@ -40,6 +40,7 @@ import {
 import { UserRole } from "@/types/auth";
 import { Settings, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { DEFAULT_CORRETOR_SERVICE_LIBRARY } from "@/lib/serviceCatalog";
 
 export function AdminPanel() {
   const { users, createUser, updateUserRole, deleteUser, loading, error } =
@@ -62,6 +63,7 @@ export function AdminPanel() {
   const [newClinicLogoUrl, setNewClinicLogoUrl] = useState("");
   const [newClinicModule, setNewClinicModule] = useState<"clinica" | "corretor">("clinica");
   const [newClinicCustomFields, setNewClinicCustomFields] = useState("{}");
+  const [newClinicServices, setNewClinicServices] = useState(DEFAULT_CORRETOR_SERVICE_LIBRARY.join(", "));
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const isCorretorModule = newClinicModule === "corretor";
 
@@ -81,6 +83,13 @@ export function AdminPanel() {
         toast.error("JSON inválido em Campos Personalizados");
         return;
       }
+      const parsedServices = isCorretorModule
+        ? newClinicServices
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined;
+
       const clinic = await createClinic({
         id: newClinicId,
         name: newClinicName,
@@ -89,6 +98,7 @@ export function AdminPanel() {
         logoUrl: newClinicLogoUrl,
         module: newClinicModule,
         customFields: parsedCustom,
+        customServices: parsedServices,
       });
       toast.success(`${isCorretorModule ? "Corretor" : "Clínica"} "${clinic.name}" criado(a) com sucesso!`);
       setClinicForUser(clinic.id);
@@ -99,6 +109,7 @@ export function AdminPanel() {
       setNewClinicLogoUrl("");
       setNewClinicModule("clinica");
       setNewClinicCustomFields("{}");
+      setNewClinicServices(DEFAULT_CORRETOR_SERVICE_LIBRARY.join(", "));
     } catch {
       toast.error(clinicsError || "Erro ao criar clínica");
     }
@@ -229,7 +240,13 @@ export function AdminPanel() {
                 <select
                   id="new-clinic-module"
                   value={newClinicModule}
-                  onChange={(e) => setNewClinicModule(e.target.value as "clinica" | "corretor")}
+                  onChange={(e) => {
+                    const value = e.target.value as "clinica" | "corretor";
+                    setNewClinicModule(value);
+                    if (value === "corretor" && !newClinicServices.trim()) {
+                      setNewClinicServices(DEFAULT_CORRETOR_SERVICE_LIBRARY.join(", "));
+                    }
+                  }}
                   className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
                 >
                   <option value="clinica">Clínica</option>
@@ -255,6 +272,23 @@ export function AdminPanel() {
                 onChange={(e) => setNewClinicLogoUrl(e.target.value)}
               />
             </div>
+            {isCorretorModule && (
+              <div className="space-y-2">
+                <Label htmlFor="new-clinic-services">
+                  Serviços oferecidos (separados por vírgula)
+                </Label>
+                <Input
+                  id="new-clinic-services"
+                  placeholder="Venda de imóveis, Locação/Aluguel, Avaliação imobiliária..."
+                  value={newClinicServices}
+                  onChange={(e) => setNewClinicServices(e.target.value)}
+                />
+                <p className="text-xs text-slate-400">
+                  Essa lista aparece na aba "Serviço Procurado" ao cadastrar um lead. O corretor
+                  também pode adicionar/remover serviços depois, direto pela tela de leads.
+                </p>
+              </div>
+            )}
             <Button type="submit" disabled={clinicsLoading} className="w-full">
               {clinicsLoading ? "Criando..." : isCorretorModule ? "Criar Corretor" : "Criar Clínica"}
             </Button>

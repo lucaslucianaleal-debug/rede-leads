@@ -67,7 +67,7 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
     if (!clinicId || !lead) return;
     const clinicMeta = JSON.parse(localStorage.getItem("crm_clinic_cache") || "null");
     const serviceList = resolveServiceOptions(
-      clinicMeta && clinicMeta.id === clinicId ? clinicMeta : { module: clinicMeta?.module || "clinica", services: clinicMeta?.customServices || [] },
+      clinicMeta && clinicMeta.id === clinicId ? clinicMeta : { module: clinicMeta?.module || "clinica" },
       []
     );
     setServiceOptions(serviceList);
