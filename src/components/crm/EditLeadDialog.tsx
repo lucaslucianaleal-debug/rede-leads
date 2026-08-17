@@ -21,7 +21,7 @@ import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { useLeads } from "@/hooks/useLeads";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchActiveCampaignList } from "@/services/campaignService";
-import { addCustomService, resolveServiceOptions } from "@/lib/serviceCatalog";
+import { addCustomService, removeCustomService, resolveServiceOptions } from "@/lib/serviceCatalog";
 
 interface EditLeadDialogProps {
   lead: Lead | null;
@@ -122,6 +122,24 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
         const { doc, updateDoc } = await import("firebase/firestore");
         const { db } = await import("@/lib/firebase");
         await updateDoc(doc(db, "clinics", clinicId), { customServices: updated });
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handleRemoveCustomService = async (service: string) => {
+    const next = removeCustomService(serviceOptions, service);
+    setServiceOptions(next);
+    if ((form.servicoProcurado || "") === service) {
+      setForm((prev) => ({ ...prev, servicoProcurado: "" }));
+    }
+
+    if (clinicId) {
+      try {
+        const { doc, updateDoc } = await import("firebase/firestore");
+        const { db } = await import("@/lib/firebase");
+        await updateDoc(doc(db, "clinics", clinicId), { customServices: next });
       } catch {
         // ignore
       }
@@ -270,19 +288,43 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
                 {serviceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <div className="flex gap-2 mt-2">
-              <Input
-                value={customServiceInput}
-                onChange={(e) => setCustomServiceInput(e.target.value)}
-                placeholder="Adicionar serviço personalizado"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddCustomService();
-                  }
-                }}
-              />
-              <Button type="button" variant="outline" onClick={handleAddCustomService}>Adicionar</Button>
+            <div className="space-y-2 mt-2 rounded-md border border-dashed border-slate-300 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-slate-600">Serviços do corretor</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {serviceOptions.length === 0 ? (
+                  <span className="text-xs text-slate-500">Nenhum serviço cadastrado ainda.</span>
+                ) : (
+                  serviceOptions.map((service) => (
+                    <span key={service} className="inline-flex items-center gap-1 rounded-full border bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                      {service}
+                      <button
+                        type="button"
+                        className="ml-1 text-red-500 hover:text-red-700"
+                        onClick={() => handleRemoveCustomService(service)}
+                        aria-label={`Excluir serviço ${service}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={customServiceInput}
+                  onChange={(e) => setCustomServiceInput(e.target.value)}
+                  placeholder="Adicionar serviço personalizado"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddCustomService();
+                    }
+                  }}
+                />
+                <Button type="button" variant="outline" onClick={handleAddCustomService}>Adicionar</Button>
+              </div>
             </div>
           </div>
 

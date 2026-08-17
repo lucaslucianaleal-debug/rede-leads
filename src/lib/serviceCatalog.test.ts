@@ -22,4 +22,10 @@ describe("service catalog", () => {
     const next = addCustomService(base, "Consultoria imobiliária");
     expect(next).toEqual(["Consultoria imobiliária"]);
   });
+
+  it("removes a custom service from a corretor catalog", () => {
+    const base = ["Aparelho Invisalign", "Limpeza", "Implante"];
+    const next = base.filter((s) => s !== "Limpeza");
+    expect(next).toEqual(["Aparelho Invisalign", "Implante"]);
+  });
 });

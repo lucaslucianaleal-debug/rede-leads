@@ -109,6 +109,7 @@ const CRMDashboard = () => {
   const isMpcToolOnly = role === "mpc_tool";
   const currentClinicRecord = clinics.find((c) => c.id === currentClinic);
   const isCorretorModule = clinicMeta?.module === "corretor" || currentClinicRecord?.module === "corretor";
+  const canShowAdminControls = !isCorretorModule && permissions?.canManageUsers && !!user;
 
   // ...chat logic removido...
 
@@ -340,22 +341,15 @@ const CRMDashboard = () => {
                           Limpar Base
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuSeparator />
-                      {user && (
-                        <DropdownMenuItem onClick={() => { /* Admin entry - no-op here */ }}>
-                          <Activity className="h-4 w-4 mr-2" />
-                          Admin
-                        </DropdownMenuItem>
-                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  {permissions?.canManageUsers && user && <AdminPanel />}
+                  {canShowAdminControls && <AdminPanel />}
                 </div>
 
                 {/* Mobile dropdown — hidden on desktop */}
                 <div className="flex md:hidden items-center gap-1">
-                  {permissions?.canManageUsers && user && <AdminPanel />}
+                  {canShowAdminControls && <AdminPanel />}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="icon" className="h-8 w-8">

@@ -50,3 +50,9 @@ export function addCustomService(existing: string[], value: string): string[] {
   const next = existing.filter((item) => item.trim().toLowerCase() !== normalized.toLowerCase());
   return [...next, normalized];
 }
+
+export function removeCustomService(existing: string[], value: string): string[] {
+  const normalized = value.trim();
+  if (!normalized) return existing;
+  return existing.filter((item) => item.trim().toLowerCase() !== normalized.toLowerCase());
+}
