@@ -13,6 +13,7 @@ import {
 import { attachLastWriter } from '../lib/crmGuard';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { CRMUser, UserRole } from "@/types/auth";
+import { filterVisibleUsersForProfile } from "@/lib/userAccess";
 
 export function useCRMUsers() {
   const [users, setUsers] = useState<CRMUser[]>([]);
@@ -26,7 +27,16 @@ export function useCRMUsers() {
       const usersRef = collection(db, "crm_users");
       const snapshot = await getDocs(usersRef);
       const usersList = snapshot.docs.map((doc) => doc.data() as CRMUser);
-      setUsers(usersList);
+
+      const currentUserProfile = auth.currentUser
+        ? (() => {
+            const profileDoc = usersList.find((user) => user.uid === auth.currentUser?.uid);
+            return profileDoc ?? null;
+          })()
+        : null;
+
+      const visibleUsers = filterVisibleUsersForProfile(currentUserProfile, usersList);
+      setUsers(visibleUsers);
     } catch (err: any) {
       setError(err.message || "Erro ao carregar usuários");
     } finally {
