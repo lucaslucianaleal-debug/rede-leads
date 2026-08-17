@@ -11,15 +11,26 @@ export const LEGACY_SERVICE_LIBRARY = [
 ];
 
 export type ServiceCatalogContext = {
+  id?: string;
+  name?: string;
   module?: "clinica" | "corretor";
   services?: string[];
 };
+
+export function isCorretorProfile(clinic: ServiceCatalogContext | null | undefined): boolean {
+  if (!clinic) return false;
+  if (clinic.module === "corretor") return true;
+  if (clinic.module === "clinica") return false;
+
+  const identifier = `${clinic.id ?? ""} ${clinic.name ?? ""}`.toLowerCase();
+  return identifier.includes("corretor") || identifier.includes("henrique");
+}
 
 export function resolveServiceOptions(
   clinic: ServiceCatalogContext | null | undefined,
   fallbackServices: string[] = LEGACY_SERVICE_LIBRARY,
 ): string[] {
-  const isCorretor = clinic?.module === "corretor";
+  const isCorretor = isCorretorProfile(clinic);
 
   if (isCorretor) {
     const custom = Array.isArray(clinic?.services) ? clinic.services : [];

@@ -14,4 +14,12 @@ describe("service catalog", () => {
     const next = addCustomService(base, "Aparelho Invisalign");
     expect(next).toEqual(["Aparelho Invisalign"]);
   });
+
+  it("treats legacy Henrique profiles without module as corretor", () => {
+    const base = resolveServiceOptions({ id: "henrique-pereira", name: "Henrique Pereira", services: [] }, []);
+    expect(base).toEqual([]);
+
+    const next = addCustomService(base, "Consultoria imobiliária");
+    expect(next).toEqual(["Consultoria imobiliária"]);
+  });
 });
