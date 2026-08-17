@@ -132,7 +132,7 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
               <Label htmlFor="clinic-name">{isCorretorModule ? "Nome do corretor *" : "Nome da clínica *"}</Label>
               <Input
                 id="clinic-name"
-                placeholder={isCorretorModule ? "ex: Henrique" : "ex: Odontocompany"}
+                placeholder={isCorretorModule ? "ex: Henrique" : "ex: Nome da clínica"}
                 value={newClinicName}
                 onChange={(e) => setNewClinicName(e.target.value)}
                 required

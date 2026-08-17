@@ -187,7 +187,7 @@ export function AdminPanel() {
                 <Label htmlFor="new-clinic-name">{isCorretorModule ? "Nome do corretor" : "Nome da clínica"}</Label>
                 <Input
                   id="new-clinic-name"
-                  placeholder={isCorretorModule ? "Henrique" : "Odontocompany Ribeirão"}
+                  placeholder={isCorretorModule ? "Henrique" : "Nome da clínica"}
                   value={newClinicName}
                   onChange={(e) => setNewClinicName(e.target.value)}
                   required
