@@ -48,6 +48,7 @@ export function AdminPanel() {
   const {
     clinics,
     createClinic,
+    updateClinic,
     loading: clinicsLoading,
     error: clinicsError,
   } = useClinics();
@@ -65,7 +66,38 @@ export function AdminPanel() {
   const [newClinicCustomFields, setNewClinicCustomFields] = useState("{}");
   const [newClinicServices, setNewClinicServices] = useState(DEFAULT_CORRETOR_SERVICE_LIBRARY.join(", "));
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [editingClinicId, setEditingClinicId] = useState<string | null>(null);
+  const [editClinicModule, setEditClinicModule] = useState<"clinica" | "corretor">("clinica");
+  const [editClinicServices, setEditClinicServices] = useState("");
   const isCorretorModule = newClinicModule === "corretor";
+
+  const startEditClinic = (clinic: (typeof clinics)[number]) => {
+    setEditingClinicId(clinic.id);
+    setEditClinicModule(clinic.module === "corretor" ? "corretor" : "clinica");
+    setEditClinicServices(
+      Array.isArray(clinic.customServices) && clinic.customServices.length > 0
+        ? clinic.customServices.join(", ")
+        : DEFAULT_CORRETOR_SERVICE_LIBRARY.join(", ")
+    );
+  };
+
+  const handleSaveClinicEdit = async () => {
+    if (!editingClinicId) return;
+    try {
+      const services =
+        editClinicModule === "corretor"
+          ? editClinicServices.split(",").map((s) => s.trim()).filter(Boolean)
+          : undefined;
+      await updateClinic(editingClinicId, {
+        module: editClinicModule,
+        ...(services ? { customServices: services } : {}),
+      });
+      toast.success("Cadastro atualizado com sucesso!");
+      setEditingClinicId(null);
+    } catch {
+      toast.error(clinicsError || "Erro ao atualizar cadastro");
+    }
+  };
 
   useEffect(() => {
     if (!clinicForUser && clinics.length > 0 && clinics[0]?.id) {
@@ -293,6 +325,87 @@ export function AdminPanel() {
               {clinicsLoading ? "Criando..." : isCorretorModule ? "Criar Corretor" : "Criar Clínica"}
             </Button>
           </form>
+        </div>
+
+        {/* Existing Clinics / Corretores List */}
+        <div className="space-y-3 border-b pb-4">
+          <h3 className="font-semibold">Clínicas e Corretores cadastrados</h3>
+          <p className="text-xs text-slate-400">
+            Se o tipo estiver errado (ex.: um corretor marcado como "Clínica"), a lista de
+            serviços mostrada no cadastro de lead também vai ficar errada. Corrija aqui.
+          </p>
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clinics.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground">
+                      Nenhuma clínica/corretor cadastrado
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  clinics.map((clinic) => (
+                    <TableRow key={clinic.id}>
+                      <TableCell className="font-medium">{clinic.name}</TableCell>
+                      <TableCell>
+                        {clinic.module === "corretor" ? "Corretor" : "Clínica"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => startEditClinic(clinic)}>
+                          Editar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {editingClinicId && (
+            <div className="space-y-3 border rounded-lg p-3 mt-2">
+              <p className="text-sm font-medium">
+                Editando: {clinics.find((c) => c.id === editingClinicId)?.name}
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="edit-clinic-module">Tipo</Label>
+                <select
+                  id="edit-clinic-module"
+                  value={editClinicModule}
+                  onChange={(e) => setEditClinicModule(e.target.value as "clinica" | "corretor")}
+                  className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
+                >
+                  <option value="clinica">Clínica</option>
+                  <option value="corretor">Corretor</option>
+                </select>
+              </div>
+              {editClinicModule === "corretor" && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-clinic-services">Serviços oferecidos (separados por vírgula)</Label>
+                  <Input
+                    id="edit-clinic-services"
+                    value={editClinicServices}
+                    onChange={(e) => setEditClinicServices(e.target.value)}
+                  />
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleSaveClinicEdit} disabled={clinicsLoading}>
+                  Salvar
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditingClinicId(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Create User Form */}

@@ -1,12 +1,23 @@
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, doc, getDocs, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, setDoc, updateDoc } from "firebase/firestore";
 import type { ClinicRecord } from "@/types/auth";
 import { CLINICAS } from "@/hooks/useCupons";
 
 export interface CreateClinicInput {
   id?: string;
   name: string;
+  address?: string;
+  phone?: string;
+  color?: string;
+  logoUrl?: string;
+  module?: "clinica" | "corretor";
+  customFields?: Record<string, any>;
+  customServices?: string[];
+}
+
+export interface UpdateClinicInput {
+  name?: string;
   address?: string;
   phone?: string;
   color?: string;
@@ -106,6 +117,36 @@ export function useClinics() {
     }
   };
 
+  const updateClinic = async (clinicId: string, updates: UpdateClinicInput) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const payload: Record<string, any> = {};
+      if (updates.name !== undefined) payload.name = updates.name.trim();
+      if (updates.address !== undefined) payload.address = updates.address.trim();
+      if (updates.phone !== undefined) payload.phone = updates.phone.trim();
+      if (updates.color !== undefined) payload.color = updates.color.trim();
+      if (updates.logoUrl !== undefined) payload.logoUrl = updates.logoUrl.trim();
+      if (updates.module !== undefined) payload.module = updates.module;
+      if (updates.customFields !== undefined) payload.customFields = updates.customFields;
+      if (updates.customServices !== undefined) payload.customServices = updates.customServices;
+
+      // updateDoc faz merge parcial: só altera os campos enviados, preserva o resto do documento.
+      await updateDoc(doc(db, "clinics", clinicId), payload);
+
+      setClinics((current) =>
+        current
+          .map((item) => (item.id === clinicId ? { ...item, ...payload } : item))
+          .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+      );
+    } catch (err: any) {
+      setError(err.message || "Erro ao atualizar clínica");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadClinics();
   }, []);
@@ -115,6 +156,7 @@ export function useClinics() {
     loading,
     error,
     createClinic,
+    updateClinic,
     refetch: loadClinics,
   };
 }
