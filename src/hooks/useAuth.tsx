@@ -8,20 +8,9 @@ import {
   User,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { normalizeUserClinicBindings } from "@/lib/userAccess";
 
-const normalizeProfileClinics = (profile: any) => {
-  const raw = [
-    ...(profile?.clinicId ? [profile.clinicId] : []),
-    ...(Array.isArray(profile?.clinicIds) ? profile.clinicIds : []),
-    ...(Array.isArray(profile?.clinics) ? profile.clinics : []),
-  ]
-    .filter(Boolean)
-    .map((v: any) => String(v).trim());
-
-  const hasWildcard = raw.includes("*");
-  const explicit = Array.from(new Set(raw.filter((v: string) => v !== "*")));
-  return { hasWildcard, explicit };
-};
+const normalizeProfileClinics = (profile: any) => normalizeUserClinicBindings(profile);
 
 type AuthContextType = {
   user: User | null;
@@ -93,6 +82,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         // Usuário mudou: limpa seleção anterior para não herdar clínica de outro login
         setSelectedClinic(null);
         persistClinic(null);
+        localStorage.removeItem('crm_selected_clinic');
+        localStorage.removeItem('crm_current_clinic');
       }
       lastUidRef.current = currentUser?.uid || null;
 
@@ -106,6 +97,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
             const normalized = normalizeProfileClinics(profile);
             const hasMultipleAccess = normalized.hasWildcard || normalized.explicit.length > 1;
             const singleClinic = hasMultipleAccess ? null : (normalized.explicit[0] || null);
+
+            if (normalized.explicit.length === 0) {
+              persistClinic(null);
+              console.log("[AuthProvider] fresh profile: no clinic bindings found, isolating selection");
+              return;
+            }
+
             if (profile.role === "admin" || profile.role === "cliente") {
               const val = singleClinic || null;
               persistClinic(val);
@@ -168,12 +166,16 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         ? (hasMultipleAccess ? null : (normalized.explicit[0] || null))
         : null;
       if (profile) {
-        if (profile.role === "admin" || profile.role === "cliente") {
+        if (normalized.explicit.length === 0) {
+          persistClinic(null);
+          localStorage.removeItem('crm_current_clinic');
+          localStorage.removeItem('crm_selected_clinic');
+          console.log("[AuthProvider][login] fresh user/corretor profile isolated from old clinic access");
+        } else if (profile.role === "admin" || profile.role === "cliente") {
           const val = clinic ?? singleClinic ?? null;
           persistClinic(val);
           console.log(`[AuthProvider][login] ${profile.role} set currentClinic ->`, val);
         } else {
-          // Outros roles têm restrição à clínica atribuída
           const effective = clinic ?? singleClinic ?? null;
           const allowed = profile.clinicId === effective || (Array.isArray(profile.clinicIds) && profile.clinicIds.includes(effective)) || (Array.isArray(profile.clinics) && profile.clinics.includes(effective));
           if (effective && allowed) {

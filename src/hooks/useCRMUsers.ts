@@ -55,12 +55,14 @@ export function useCRMUsers() {
       // Create Firebase Auth user
       const { user } = await createUserWithEmailAndPassword(auth, email, password);
 
+      const shouldKeepClinicLink = Boolean(clinicId && clinicId.trim());
+
       // Create CRM user record
       const crmUser: CRMUser = {
         uid: user.uid,
         username,
         role,
-        clinicId: clinicId || null,
+        clinicId: shouldKeepClinicLink ? clinicId : null,
         createdAt: new Date().toISOString(),
         createdBy: auth.currentUser?.uid || "system",
       };
@@ -70,8 +72,9 @@ export function useCRMUsers() {
         uid: user.uid,
         username,
         role,
-        clinicId: clinicId || null,
-        clinics: clinicId ? [clinicId] : [],
+        clinicId: shouldKeepClinicLink ? clinicId : null,
+        clinics: shouldKeepClinicLink && clinicId ? [clinicId] : [],
+        clinicIds: shouldKeepClinicLink && clinicId ? [clinicId] : [],
         createdAt: new Date().toISOString(),
         createdBy: auth.currentUser?.uid || "system",
         email,

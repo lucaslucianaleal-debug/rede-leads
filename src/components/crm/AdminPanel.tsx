@@ -66,8 +66,8 @@ export function AdminPanel() {
   const isCorretorModule = newClinicModule === "corretor";
 
   useEffect(() => {
-    if (!clinicForUser && clinics.length > 0) {
-      setClinicForUser(clinics[0].id);
+    if (!clinicForUser && clinics.length > 0 && clinics[0]?.id) {
+      setClinicForUser(null);
     }
   }, [clinicForUser, clinics]);
 
@@ -112,7 +112,7 @@ export function AdminPanel() {
       setUsername("");
       setPassword("");
       setRole("viewer");
-      setClinicForUser(clinics[0]?.id ?? null);
+      setClinicForUser(null);
       setOpen(false);
     } catch {
       toast.error(error || "Erro ao criar usuário");
@@ -317,7 +317,7 @@ export function AdminPanel() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="clinic-select">Clínica</Label>
+              <Label htmlFor="clinic-select">Clínica (opcional)</Label>
               <select
                 id="clinic-select"
                 value={clinicForUser || ''}
@@ -325,9 +325,8 @@ export function AdminPanel() {
                 className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
                 disabled={clinicsLoading || clinics.length === 0}
               >
-                {clinics.length === 0 ? (
-                  <option value="">Nenhuma clínica cadastrada</option>
-                ) : (
+                <option value="">Sem vínculo com clínica</option>
+                {clinics.length === 0 ? null : (
                   clinics.map((clinic) => (
                     <option key={clinic.id} value={clinic.id}>
                       {clinic.name}
