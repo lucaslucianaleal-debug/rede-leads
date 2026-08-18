@@ -51,6 +51,7 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
   const [customServiceInput, setCustomServiceInput] = useState("");
   const [serviceOptions, setServiceOptions] = useState<string[]>([]);
+  const [showServiceManager, setShowServiceManager] = useState(false);
   const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [previousPhone, setPreviousPhone] = useState<string | null>(null);
@@ -87,6 +88,10 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
     const serviceList = resolveServiceOptions(effectiveClinicContext, currentClinicObj?.customServices || []);
     setServiceOptions(serviceList);
   }, [clinicId, lead, clinics, clinicMeta, isCorretorContext]);
+
+  useEffect(() => {
+    if (!open) setShowServiceManager(false);
+  }, [open]);
 
   useEffect(() => {
     if (lead) {
@@ -306,7 +311,18 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
               </SelectContent>
             </Select>
             {isCorretorContext && (
-            <div className="space-y-2 mt-2 rounded-md border border-dashed border-slate-300 p-2">
+            <div className="mt-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1 text-xs text-slate-600 hover:text-slate-900"
+                onClick={() => setShowServiceManager((visible) => !visible)}
+              >
+                {showServiceManager ? "Fechar serviços" : "Gerenciar serviços"}
+              </Button>
+              {showServiceManager && (
+            <div className="space-y-2 mt-1 rounded-md border border-dashed border-slate-300 p-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-slate-600">Serviços do corretor</span>
               </div>
@@ -343,6 +359,8 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
                 />
                 <Button type="button" variant="outline" onClick={handleAddCustomService}>Adicionar</Button>
               </div>
+            </div>
+              )}
             </div>
             )}
           </div>

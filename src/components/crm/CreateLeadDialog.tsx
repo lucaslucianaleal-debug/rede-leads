@@ -74,6 +74,7 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
   const [dynamicFields, setDynamicFields] = useState<Record<string, any> | null>(null);
   const [customServiceInput, setCustomServiceInput] = useState("");
   const [serviceOptions, setServiceOptions] = useState<string[]>([]);
+  const [showServiceManager, setShowServiceManager] = useState(false);
   const currentClinicObj = clinics.find((c) => c.id === clinicId);
   const effectiveClinicContext = currentClinicObj
     ? {
@@ -117,6 +118,10 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
       setDynamicFields(null);
     }
   }, [clinicId, open, clinics, clinicMeta, isCorretorContext]);
+
+  useEffect(() => {
+    if (!open) setShowServiceManager(false);
+  }, [open]);
 
   const selectValue = (val: any) => (val === "" || val === undefined ? "none" : String(val));
   const fromSelect = (val: string) => (val === "none" ? "" : val);
@@ -311,7 +316,18 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
               </SelectContent>
             </Select>
             {isCorretorContext && (
-              <div className="space-y-2 mt-2 rounded-md border border-dashed border-slate-300 p-2">
+              <div className="mt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1 text-xs text-slate-600 hover:text-slate-900"
+                  onClick={() => setShowServiceManager((visible) => !visible)}
+                >
+                  {showServiceManager ? "Fechar serviços" : "Gerenciar serviços"}
+                </Button>
+                {showServiceManager && (
+              <div className="space-y-2 mt-1 rounded-md border border-dashed border-slate-300 p-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-slate-600">Serviços do corretor</span>
                 </div>
@@ -348,6 +364,8 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
                   />
                   <Button type="button" variant="outline" onClick={handleAddCustomService}>Adicionar</Button>
                 </div>
+              </div>
+                )}
               </div>
             )}
           </div>
