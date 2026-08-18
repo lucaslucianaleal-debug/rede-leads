@@ -1,13 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "./useAuth";
 import { useCRMUsers } from "./useCRMUsers";
-import { UserRole, rolePermissions, UserPermissions, CRMUser } from "@/types/auth";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { attachLastWriter } from '../lib/crmGuard';
+import { UserRole, rolePermissions, UserPermissions } from "@/types/auth";
 
 export function useUserPermissions() {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { getUserRole } = useCRMUsers();
   const [role, setRole] = useState<UserRole | null>(null);
   const [permissions, setPermissions] = useState<UserPermissions | null>(null);
@@ -16,31 +13,24 @@ export function useUserPermissions() {
   useEffect(() => {
     const loadPermissions = async () => {
       if (user) {
-        let userRole: UserRole = "admin"; // padrão para usuário logado
+        let userRole: UserRole;
         try {
           const fetchedRole = await getUserRole(user.uid);
           if (fetchedRole) {
+            // Fonte principal: registro de permissão (crm_users).
             userRole = fetchedRole;
+          } else if (userProfile?.role) {
+            // Sem crm_users, mas o perfil (users) já sabe qual era o papel dessa
+            // conta — usa isso em vez de assumir Admin. Não persiste nada sozinho:
+            // se a conta foi apagada, ela não deve "ressuscitar" com permissões.
+            userRole = userProfile.role as UserRole;
           } else {
-            // Tenta criar registro no Firestore, mas não bloqueia se falhar
-            try {
-              const crmUser: CRMUser = {
-                uid: user.uid,
-                username: user.email?.split("@")[0] || user.uid,
-                role: "admin",
-                createdAt: new Date().toISOString(),
-                createdBy: "system",
-              };
-              const sanitized = JSON.parse(JSON.stringify(crmUser));
-              await setDoc(doc(db, "crm_users", user.uid), attachLastWriter(sanitized, user.uid));
-            } catch {
-              // Silencia erro do Firestore, ainda usa admin como padrão
-            }
-            userRole = "admin";
+            // Nenhum registro encontrado em lugar nenhum. Sessão transitória com
+            // permissões mínimas — não grava nada no banco automaticamente.
+            userRole = "viewer";
           }
         } catch {
-          // Se Firestore inacessível, usuário logado = admin
-          userRole = "admin";
+          userRole = "viewer";
         }
         setRole(userRole);
         setPermissions(rolePermissions[userRole]);
@@ -53,7 +43,7 @@ export function useUserPermissions() {
     };
 
     loadPermissions();
-  }, [user]);
+  }, [user, userProfile]);
 
   return { role, permissions, loading, isAdmin: role === "admin", isReceptionist: role === "recepcao" };
 }

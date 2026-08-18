@@ -92,28 +92,47 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
         try {
           const ud = await getDoc(doc(db, "users", currentUser.uid));
           const profile = ud.exists() ? ud.data() : null;
+
+          if (!profile) {
+            // Conta de login existe (Firebase Authentication) mas o perfil foi
+            // apagado (ex.: excluído direto no Firestore/Console). Em vez de deixar
+            // o app "meio logado" usando dados velhos do localStorage, desloga e
+            // limpa tudo — assim não sobra usuário/clínica fantasma.
+            console.log("[AuthProvider] conta sem perfil (provavelmente excluída) — deslogando");
+            try { localStorage.removeItem('crm_selected_clinic'); } catch {}
+            try { localStorage.removeItem('crm_current_clinic'); } catch {}
+            setUserProfile(null);
+            setSelectedClinic(null);
+            persistClinic(null);
+            setClinicMeta(null);
+            setUser(null);
+            lastUidRef.current = null;
+            setError("Esta conta não existe mais ou foi removida. Faça login novamente.");
+            await signOut(auth);
+            setLoading(false);
+            return;
+          }
+
           setUserProfile(profile);
-          if (profile) {
-            const normalized = normalizeProfileClinics(profile);
-            const hasMultipleAccess = normalized.hasWildcard || normalized.explicit.length > 1;
-            const singleClinic = hasMultipleAccess ? null : (normalized.explicit[0] || null);
+          const normalized = normalizeProfileClinics(profile);
+          const hasMultipleAccess = normalized.hasWildcard || normalized.explicit.length > 1;
+          const singleClinic = hasMultipleAccess ? null : (normalized.explicit[0] || null);
 
-            if (normalized.explicit.length === 0) {
-              persistClinic(null);
-              console.log("[AuthProvider] fresh profile: no clinic bindings found, isolating selection");
-              setLoading(false);
-              return;
-            }
+          if (normalized.explicit.length === 0) {
+            persistClinic(null);
+            console.log("[AuthProvider] fresh profile: no clinic bindings found, isolating selection");
+            setLoading(false);
+            return;
+          }
 
-            if (profile.role === "admin" || profile.role === "cliente") {
-              const val = singleClinic || null;
-              persistClinic(val);
-              console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val);
-            } else {
-              const clinicFromProfile = singleClinic;
-              persistClinic(clinicFromProfile);
-              console.log("[AuthProvider] user currentClinic ->", clinicFromProfile);
-            }
+          if (profile.role === "admin" || profile.role === "cliente") {
+            const val = singleClinic || null;
+            persistClinic(val);
+            console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val);
+          } else {
+            const clinicFromProfile = singleClinic;
+            persistClinic(clinicFromProfile);
+            console.log("[AuthProvider] user currentClinic ->", clinicFromProfile);
           }
         } catch (e) {
           // ignore
@@ -160,31 +179,41 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       const uid = cred.user.uid;
       const ud = await getDoc(doc(db, "users", uid));
       const profile = ud.exists() ? ud.data() : null;
+
+      if (!profile) {
+        // Login de Authentication funcionou, mas não existe mais perfil no Firestore
+        // (conta apagada). Não deixa "entrar" com dados velhos — desloga na hora.
+        try { localStorage.removeItem('crm_selected_clinic'); } catch {}
+        try { localStorage.removeItem('crm_current_clinic'); } catch {}
+        setUserProfile(null);
+        persistClinic(null);
+        await signOut(auth);
+        setError("Esta conta não existe mais ou foi removida. Fale com o administrador.");
+        return;
+      }
+
       setUserProfile(profile);
       const normalized = normalizeProfileClinics(profile);
       const hasMultipleAccess = normalized.hasWildcard || normalized.explicit.length > 1;
-      const singleClinic = profile
-        ? (hasMultipleAccess ? null : (normalized.explicit[0] || null))
-        : null;
-      if (profile) {
-        if (normalized.explicit.length === 0) {
-          persistClinic(null);
-          localStorage.removeItem('crm_current_clinic');
-          localStorage.removeItem('crm_selected_clinic');
-          console.log("[AuthProvider][login] fresh user/corretor profile isolated from old clinic access");
-        } else if (profile.role === "admin" || profile.role === "cliente") {
-          const val = clinic ?? singleClinic ?? null;
-          persistClinic(val);
-          console.log(`[AuthProvider][login] ${profile.role} set currentClinic ->`, val);
-        } else {
-          const effective = clinic ?? singleClinic ?? null;
-          const allowed = profile.clinicId === effective || (Array.isArray(profile.clinicIds) && profile.clinicIds.includes(effective)) || (Array.isArray(profile.clinics) && profile.clinics.includes(effective));
-          if (effective && allowed) {
-            setSelectedClinic(effective);
-          }
-          persistClinic(effective);
-          console.log("[AuthProvider][login] user set currentClinic ->", effective, { allowed });
+      const singleClinic = hasMultipleAccess ? null : (normalized.explicit[0] || null);
+
+      if (normalized.explicit.length === 0) {
+        persistClinic(null);
+        localStorage.removeItem('crm_current_clinic');
+        localStorage.removeItem('crm_selected_clinic');
+        console.log("[AuthProvider][login] fresh user/corretor profile isolated from old clinic access");
+      } else if (profile.role === "admin" || profile.role === "cliente") {
+        const val = clinic ?? singleClinic ?? null;
+        persistClinic(val);
+        console.log(`[AuthProvider][login] ${profile.role} set currentClinic ->`, val);
+      } else {
+        const effective = clinic ?? singleClinic ?? null;
+        const allowed = profile.clinicId === effective || (Array.isArray(profile.clinicIds) && profile.clinicIds.includes(effective)) || (Array.isArray(profile.clinics) && profile.clinics.includes(effective));
+        if (effective && allowed) {
+          setSelectedClinic(effective);
         }
+        persistClinic(effective);
+        console.log("[AuthProvider][login] user set currentClinic ->", effective, { allowed });
       }
     } catch (err: any) {
       setError(err.message || "Erro ao fazer login");

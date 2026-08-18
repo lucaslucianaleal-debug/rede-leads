@@ -132,11 +132,19 @@ export function useCRMUsers() {
   };
 
   // Delete user
+  // Apaga em todos os lugares que o app controla no Firestore: crm_users (permissões)
+  // e users (perfil/vínculo de clínica usado no login). A conta de login em si
+  // (Firebase Authentication) não pode ser apagada pelo SDK do cliente por segurança —
+  // isso só é possível pelo Firebase Console (Authentication > usuário > Excluir) ou
+  // por uma função de backend com Admin SDK.
   const deleteUser = async (uid: string) => {
     setLoading(true);
     setError(null);
     try {
-      await deleteDoc(doc(db, "crm_users", uid));
+      await Promise.all([
+        deleteDoc(doc(db, "crm_users", uid)),
+        deleteDoc(doc(db, "users", uid)).catch(() => {}),
+      ]);
       setUsers(users.filter((u) => u.uid !== uid));
     } catch (err: any) {
       setError(err.message || "Erro ao deletar usuário");
