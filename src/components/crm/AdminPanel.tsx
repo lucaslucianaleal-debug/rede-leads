@@ -40,7 +40,7 @@ import {
 import { UserRole } from "@/types/auth";
 import { Settings, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { DEFAULT_CORRETOR_SERVICE_LIBRARY } from "@/lib/serviceCatalog";
+import { CORRETOR_SERVICE_LIBRARY } from "@/lib/serviceCatalog";
 import { filterVisibleClinicsForProfile, isGlobalAdminProfile } from "@/lib/userAccess";
 
 export function AdminPanel() {
@@ -75,7 +75,7 @@ export function AdminPanel() {
   const [newClinicLogoUrl, setNewClinicLogoUrl] = useState("");
   const [newClinicModule, setNewClinicModule] = useState<"clinica" | "corretor">("clinica");
   const [newClinicCustomFields, setNewClinicCustomFields] = useState("{}");
-  const [newClinicServices, setNewClinicServices] = useState(DEFAULT_CORRETOR_SERVICE_LIBRARY.join(", "));
+  const [newClinicServices, setNewClinicServices] = useState(CORRETOR_SERVICE_LIBRARY.join(", "));
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [editingClinicId, setEditingClinicId] = useState<string | null>(null);
   const [editClinicModule, setEditClinicModule] = useState<"clinica" | "corretor">("clinica");
@@ -88,7 +88,7 @@ export function AdminPanel() {
     setEditClinicServices(
       Array.isArray(clinic.customServices) && clinic.customServices.length > 0
         ? clinic.customServices.join(", ")
-        : DEFAULT_CORRETOR_SERVICE_LIBRARY.join(", ")
+        : CORRETOR_SERVICE_LIBRARY.join(", ")
     );
   };
 
@@ -152,7 +152,7 @@ export function AdminPanel() {
       setNewClinicLogoUrl("");
       setNewClinicModule("clinica");
       setNewClinicCustomFields("{}");
-      setNewClinicServices(DEFAULT_CORRETOR_SERVICE_LIBRARY.join(", "));
+      setNewClinicServices(CORRETOR_SERVICE_LIBRARY.join(", "));
     } catch {
       toast.error(clinicsError || "Erro ao criar clínica");
     }
@@ -288,7 +288,7 @@ export function AdminPanel() {
                     const value = e.target.value as "clinica" | "corretor";
                     setNewClinicModule(value);
                     if (value === "corretor" && !newClinicServices.trim()) {
-                      setNewClinicServices(DEFAULT_CORRETOR_SERVICE_LIBRARY.join(", "));
+                      setNewClinicServices(CORRETOR_SERVICE_LIBRARY.join(", "));
                     }
                   }}
                   className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
