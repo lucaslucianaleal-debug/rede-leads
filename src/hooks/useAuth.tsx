@@ -7,11 +7,13 @@ import {
   createUserWithEmailAndPassword,
   User,
 } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { normalizeUserClinicBindings } from "@/lib/userAccess";
+import { CORRETOR_SERVICE_LIBRARY } from "@/lib/serviceCatalog";
 
 const normalizeProfileClinics = (profile: any) => normalizeUserClinicBindings(profile);
 const LEGACY_CORRETOR_EMAILS = new Set(["henrique.2713@outlook.com"]);
+const HENRIQUE_CORRETOR_CLINIC_ID = "henrique-2713-corretor";
 
 type AuthContextType = {
   user: User | null;
@@ -92,31 +94,50 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
       if (currentUser) {
         try {
           const ud = await getDoc(doc(db, "users", currentUser.uid));
-          const profile = ud.exists() ? ud.data() : null;
-
-          if (!profile) {
-            // Conta de login existe (Firebase Authentication) mas o perfil foi
-            // apagado (ex.: excluído direto no Firestore/Console). Em vez de deixar
-            // o app "meio logado" usando dados velhos do localStorage, desloga e
-            // limpa tudo — assim não sobra usuário/clínica fantasma.
-            console.log("[AuthProvider] conta sem perfil (provavelmente excluída) — deslogando");
-            try { localStorage.removeItem('crm_selected_clinic'); } catch {}
-            try { localStorage.removeItem('crm_current_clinic'); } catch {}
-            setUserProfile(null);
-            setSelectedClinic(null);
-            persistClinic(null);
-            setClinicMeta(null);
-            setUser(null);
-            lastUidRef.current = null;
-            setError("Esta conta não existe mais ou foi removida. Faça login novamente.");
-            await signOut(auth);
-            setLoading(false);
-            return;
-          }
-
+          let profile = ud.exists() ? ud.data() : null;
           const isLegacyCorretor = currentUser.email
             ? LEGACY_CORRETOR_EMAILS.has(currentUser.email.toLowerCase())
             : false;
+
+          if (!profile) {
+            const crmUserSnapshot = await getDoc(doc(db, "crm_users", currentUser.uid));
+            const crmUser = crmUserSnapshot.exists() ? crmUserSnapshot.data() : {};
+            const recoveredClinicId = crmUser.clinicId || crmUser.clinicIds?.[0] || crmUser.clinics?.[0] || null;
+            const clinicId = isLegacyCorretor ? (recoveredClinicId || HENRIQUE_CORRETOR_CLINIC_ID) : recoveredClinicId;
+
+            profile = {
+              uid: currentUser.uid,
+              username: crmUser.username || currentUser.email?.split("@")[0] || currentUser.uid,
+              email: currentUser.email || "",
+              role: crmUser.role || "admin",
+              clinicId,
+              clinicIds: clinicId ? [clinicId] : [],
+              clinics: clinicId ? [clinicId] : [],
+              ...(isLegacyCorretor ? { accountModule: "corretor" } : {}),
+              createdAt: crmUser.createdAt || new Date().toISOString(),
+              createdBy: crmUser.createdBy || "profile-recovery",
+            };
+
+            const writes = [
+              setDoc(doc(db, "users", currentUser.uid), profile, { merge: true }),
+            ];
+            if (isLegacyCorretor && !recoveredClinicId) {
+              writes.push(setDoc(doc(db, "clinics", HENRIQUE_CORRETOR_CLINIC_ID), {
+                id: HENRIQUE_CORRETOR_CLINIC_ID,
+                name: "Henrique",
+                module: "corretor",
+                customServices: CORRETOR_SERVICE_LIBRARY,
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser.uid,
+              }, { merge: true }));
+            }
+            try {
+              await Promise.all(writes);
+            } catch {
+              // The recovered profile remains available in this authenticated session.
+            }
+          }
+
           const normalizedProfile = isLegacyCorretor
             ? { ...profile, accountModule: "corretor" }
             : profile;
