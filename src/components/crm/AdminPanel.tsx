@@ -161,7 +161,8 @@ export function AdminPanel() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createUser(username, password, role, clinicForUser);
+      const accountModule = allClinics.find((clinic) => clinic.id === clinicForUser)?.module;
+      await createUser(username, password, role, clinicForUser, accountModule);
       toast.success(`Usuário "${username}" criado com sucesso!`);
       setUsername("");
       setPassword("");

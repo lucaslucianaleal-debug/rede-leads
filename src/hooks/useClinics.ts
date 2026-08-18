@@ -3,6 +3,7 @@ import { auth, db } from "@/lib/firebase";
 import { collection, doc, getDocs, setDoc, updateDoc } from "firebase/firestore";
 import type { ClinicRecord } from "@/types/auth";
 import { CLINICAS } from "@/hooks/useCupons";
+import { CORRETOR_SERVICE_LIBRARY, resolveServiceOptions } from "@/lib/serviceCatalog";
 
 export interface CreateClinicInput {
   id?: string;
@@ -33,6 +34,10 @@ const normalizeClinicId = (value: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+
+const normalizeCorretorServices = (services?: string[]) => {
+  return resolveServiceOptions({ module: "corretor", customServices: services, services }, []);
+};
 
 export function useClinics() {
   const [clinics, setClinics] = useState<ClinicRecord[]>([]);
@@ -85,6 +90,7 @@ export function useClinics() {
         throw new Error("Informe um nome ou ID válido para a clínica");
       }
 
+      const module = input.module || "clinica";
       const clinic: ClinicRecord = {
         id: clinicId,
         name: input.name.trim(),
@@ -92,12 +98,12 @@ export function useClinics() {
         ...(input.phone?.trim() ? { phone: input.phone.trim() } : {}),
         ...(input.color?.trim() ? { color: input.color.trim() } : {}),
         ...(input.logoUrl?.trim() ? { logoUrl: input.logoUrl.trim() } : {}),
-        module: input.module || "clinica",
+        module,
         ...(input.customFields && Object.keys(input.customFields).length > 0
           ? { customFields: input.customFields }
           : {}),
-        ...(Array.isArray(input.customServices) && input.customServices.length > 0
-          ? { customServices: input.customServices }
+        ...(module === "corretor"
+          ? { customServices: normalizeCorretorServices(input.customServices) }
           : {}),
         createdAt: new Date().toISOString(),
         createdBy: auth.currentUser?.uid || "system",
@@ -129,7 +135,11 @@ export function useClinics() {
       if (updates.logoUrl !== undefined) payload.logoUrl = updates.logoUrl.trim();
       if (updates.module !== undefined) payload.module = updates.module;
       if (updates.customFields !== undefined) payload.customFields = updates.customFields;
-      if (updates.customServices !== undefined) payload.customServices = updates.customServices;
+      if (updates.module === "corretor") {
+        payload.customServices = normalizeCorretorServices(updates.customServices);
+      } else if (updates.customServices !== undefined) {
+        payload.customServices = updates.customServices;
+      }
 
       // updateDoc faz merge parcial: só altera os campos enviados, preserva o resto do documento.
       await updateDoc(doc(db, "clinics", clinicId), payload);

@@ -44,7 +44,7 @@ const COMPARECIMENTOS: LeadComparecimento[] = ["COMPARECEU", "NÃO COMPARECEU", 
 
 export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLeadDialogProps) {
   const { allLeads } = useLeads();
-  const { currentClinic, selectedClinic, clinicMeta } = useAuth();
+  const { currentClinic, selectedClinic, clinicMeta, userProfile } = useAuth();
   const clinicId = currentClinic || selectedClinic || "";
   const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
   const fetchedClinic = useRef("");
@@ -79,14 +79,14 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
     ? {
         id: currentClinicObj.id,
         name: currentClinicObj.name,
-        module: currentClinicObj.module ?? (clinicMeta as any)?.module,
+        module: userProfile?.accountModule ?? currentClinicObj.module ?? (clinicMeta as any)?.module,
         services: currentClinicObj.customServices || [],
         customFields: currentClinicObj.customFields,
       }
     : {
         id: clinicId,
         name: (clinicMeta as any)?.name,
-        module: (clinicMeta as any)?.module,
+        module: userProfile?.accountModule ?? (clinicMeta as any)?.module,
         services: Array.isArray((clinicMeta as any)?.customServices) ? (clinicMeta as any).customServices : [],
         customFields: (clinicMeta as any)?.customFields,
       };

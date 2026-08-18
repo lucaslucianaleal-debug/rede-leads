@@ -85,12 +85,12 @@ export function OnboardingModal({ open, onClose, onComplete }: OnboardingModalPr
         name: newClinicName,
         address: newClinicAddress,
         phone: newClinicPhone,
-          color: newClinicColor,
-          module: newClinicModule,
+        color: newClinicColor,
+        module: newClinicModule,
       });
 
       // Create user with the new clinic
-      await createUser(username, password, "admin", clinic.id);
+      await createUser(username, password, "admin", clinic.id, newClinicModule);
 
       toast.success(`${newClinicModule === "clinica" ? "Clínica" : "Corretor"} e usuário criados com sucesso!`);
       onComplete(clinic.id);

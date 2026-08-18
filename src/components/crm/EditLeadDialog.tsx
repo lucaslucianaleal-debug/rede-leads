@@ -43,7 +43,7 @@ const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Pro
 
 export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogProps) {
   const { allLeads } = useLeads();
-  const { currentClinic, selectedClinic, clinicMeta } = useAuth();
+  const { currentClinic, selectedClinic, clinicMeta, userProfile } = useAuth();
   const { clinics } = useClinics();
   const clinicId = currentClinic || selectedClinic || "";
   const [duplicateWarning, setDuplicateWarning] = useState<{ nome: string; etapa: string } | null>(null);
@@ -61,14 +61,14 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
     ? {
         id: currentClinicObj.id,
         name: currentClinicObj.name,
-        module: currentClinicObj.module ?? (clinicMeta as any)?.module,
+        module: userProfile?.accountModule ?? currentClinicObj.module ?? (clinicMeta as any)?.module,
         services: currentClinicObj.customServices || [],
         customFields: currentClinicObj.customFields,
       }
     : {
         id: clinicId,
         name: (clinicMeta as any)?.name,
-        module: (clinicMeta as any)?.module,
+        module: userProfile?.accountModule ?? (clinicMeta as any)?.module,
         services: Array.isArray((clinicMeta as any)?.customServices) ? (clinicMeta as any).customServices : [],
         customFields: (clinicMeta as any)?.customFields,
       };

@@ -51,7 +51,8 @@ export function useCRMUsers() {
     username: string,
     password: string,
     role: UserRole,
-    clinicId?: string | null
+    clinicId?: string | null,
+    accountModule?: "clinica" | "corretor",
   ) => {
     setLoading(true);
     setError(null);
@@ -85,6 +86,7 @@ export function useCRMUsers() {
         username,
         role,
         clinicId: shouldKeepClinicLink ? clinicId : null,
+        ...(accountModule ? { accountModule } : {}),
         clinics: shouldKeepClinicLink && clinicId ? [clinicId] : [],
         clinicIds: shouldKeepClinicLink && clinicId ? [clinicId] : [],
         createdAt: new Date().toISOString(),
