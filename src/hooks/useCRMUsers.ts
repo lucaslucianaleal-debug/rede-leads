@@ -17,6 +17,7 @@ import { filterVisibleUsersForProfile } from "@/lib/userAccess";
 
 export function useCRMUsers() {
   const [users, setUsers] = useState<CRMUser[]>([]);
+  const [currentUserProfile, setCurrentUserProfile] = useState<CRMUser | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,14 +29,15 @@ export function useCRMUsers() {
       const snapshot = await getDocs(usersRef);
       const usersList = snapshot.docs.map((doc) => doc.data() as CRMUser);
 
-      const currentUserProfile = auth.currentUser
+      const currentUserProfileDoc = auth.currentUser
         ? (() => {
             const profileDoc = usersList.find((user) => user.uid === auth.currentUser?.uid);
             return profileDoc ?? null;
           })()
         : null;
 
-      const visibleUsers = filterVisibleUsersForProfile(currentUserProfile, usersList);
+      setCurrentUserProfile(currentUserProfileDoc);
+      const visibleUsers = filterVisibleUsersForProfile(currentUserProfileDoc, usersList);
       setUsers(visibleUsers);
     } catch (err: any) {
       setError(err.message || "Erro ao carregar usuários");
@@ -162,6 +164,7 @@ export function useCRMUsers() {
 
   return {
     users,
+    currentUserProfile,
     loading,
     error,
     createUser,

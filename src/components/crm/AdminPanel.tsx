@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCRMUsers } from "@/hooks/useCRMUsers";
 import { useClinics } from "@/hooks/useClinics";
 import { Button } from "@/components/ui/button";
@@ -41,17 +41,28 @@ import { UserRole } from "@/types/auth";
 import { Settings, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_CORRETOR_SERVICE_LIBRARY } from "@/lib/serviceCatalog";
+import { filterVisibleClinicsForProfile, isGlobalAdminProfile } from "@/lib/userAccess";
 
 export function AdminPanel() {
-  const { users, createUser, updateUserRole, deleteUser, loading, error } =
+  const { users, currentUserProfile, createUser, updateUserRole, deleteUser, loading, error } =
     useCRMUsers();
   const {
-    clinics,
+    clinics: allClinics,
     createClinic,
     updateClinic,
     loading: clinicsLoading,
     error: clinicsError,
   } = useClinics();
+
+  // Um admin "de conta" (ex.: dono de uma conta de corretor vinculada a um clinicId
+  // especifico) so pode ver/gerenciar a propria conta - nao a lista inteira de
+  // clinicas/corretores de todos os clientes. So um admin global (sem vinculo, ou
+  // com clinicId "*") enxerga tudo.
+  const isGlobalAdmin = isGlobalAdminProfile(currentUserProfile);
+  const clinics = useMemo(
+    () => filterVisibleClinicsForProfile(currentUserProfile, allClinics),
+    [currentUserProfile, allClinics]
+  );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("viewer");
@@ -100,10 +111,10 @@ export function AdminPanel() {
   };
 
   useEffect(() => {
-    if (!clinicForUser && clinics.length > 0 && clinics[0]?.id) {
-      setClinicForUser(null);
+    if (!isGlobalAdmin && !clinicForUser && clinics.length > 0 && clinics[0]?.id) {
+      setClinicForUser(clinics[0].id);
     }
-  }, [clinicForUser, clinics]);
+  }, [clinicForUser, clinics, isGlobalAdmin]);
 
   const handleCreateClinic = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -221,7 +232,8 @@ export function AdminPanel() {
           </DialogDescription>
         </DialogHeader>
 
-        {/* Create Clinic Form */}
+        {/* Create Clinic Form — apenas admin global (dono da plataforma) cria novas contas */}
+        {isGlobalAdmin && (
         <div className="space-y-4 border-b pb-4">
           <h3 className="font-semibold">{isCorretorModule ? "Criar Novo Corretor" : "Criar Nova Clínica"}</h3>
           <form onSubmit={handleCreateClinic} className="space-y-3">
@@ -326,6 +338,7 @@ export function AdminPanel() {
             </Button>
           </form>
         </div>
+        )}
 
         {/* Existing Clinics / Corretores List */}
         <div className="space-y-3 border-b pb-4">
@@ -464,15 +477,17 @@ export function AdminPanel() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="clinic-select">Clínica (opcional)</Label>
+              <Label htmlFor="clinic-select">
+                {isGlobalAdmin ? "Clínica (opcional)" : "Conta"}
+              </Label>
               <select
                 id="clinic-select"
                 value={clinicForUser || ''}
                 onChange={(e) => setClinicForUser(e.target.value || null)}
                 className="w-full bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 p-2 rounded"
-                disabled={clinicsLoading || clinics.length === 0}
+                disabled={clinicsLoading || clinics.length === 0 || !isGlobalAdmin}
               >
-                <option value="">Sem vínculo com clínica</option>
+                {isGlobalAdmin && <option value="">Sem vínculo com clínica</option>}
                 {clinics.length === 0 ? null : (
                   clinics.map((clinic) => (
                     <option key={clinic.id} value={clinic.id}>
@@ -481,6 +496,11 @@ export function AdminPanel() {
                   ))
                 )}
               </select>
+              {!isGlobalAdmin && (
+                <p className="text-xs text-slate-400">
+                  Novos usuários ficam automaticamente vinculados à sua conta.
+                </p>
+              )}
             </div>
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? "Criando..." : "Criar Usuário"}

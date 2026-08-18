@@ -109,7 +109,7 @@ const CRMDashboard = () => {
   const isMpcToolOnly = role === "mpc_tool";
   const currentClinicRecord = clinics.find((c) => c.id === currentClinic);
   const isCorretorModule = clinicMeta?.module === "corretor" || currentClinicRecord?.module === "corretor";
-  const canShowAdminControls = !isCorretorModule && permissions?.canManageUsers && !!user;
+  const canShowAdminControls = permissions?.canManageUsers && !!user;
 
   // ...chat logic removido...
 
