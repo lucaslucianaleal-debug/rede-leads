@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   resolveServiceOptions,
   addCustomService,
-  DEFAULT_CORRETOR_SERVICE_LIBRARY,
+  CORRETOR_SERVICE_LIBRARY,
 } from "@/lib/serviceCatalog";
 
 describe("service catalog", () => {
@@ -11,35 +11,34 @@ describe("service catalog", () => {
     expect(options).toEqual(["Implante", "Prótese"]);
   });
 
-  it("uses the default real-estate library for a brand-new corretor account", () => {
-    const base = resolveServiceOptions({ module: "corretor" }, []);
-    expect(base).toEqual(DEFAULT_CORRETOR_SERVICE_LIBRARY);
-  });
-
-  it("uses the corretor's saved customServices from Firestore once it has any", () => {
-    const base = resolveServiceOptions(
-      { module: "corretor", customServices: ["Venda de imóveis", "Locação/Aluguel"] },
-      [],
-    );
-    expect(base).toEqual(["Venda de imóveis", "Locação/Aluguel"]);
+  it("uses the corretor real-estate catalog for all corretor profiles", () => {
+    const base = resolveServiceOptions({ module: "corretor", services: [] }, []);
+    expect(base).toEqual(CORRETOR_SERVICE_LIBRARY);
+    expect(base).not.toContain("Implante");
+    expect(base).not.toContain("Limpeza");
 
     const next = addCustomService(base, "Consultoria imobiliária");
-    expect(next).toEqual(["Venda de imóveis", "Locação/Aluguel", "Consultoria imobiliária"]);
+    expect(next).toContain("Consultoria imobiliária");
   });
 
-  it("respects an explicitly empty customServices list (user removed everything)", () => {
-    const base = resolveServiceOptions({ module: "corretor", customServices: [] }, []);
-    expect(base).toEqual([]);
+  it("treats legacy Henrique profiles without module as corretor and strips clinic services", () => {
+    const base = resolveServiceOptions({ id: "henrique-pereira", name: "Henrique Pereira", services: ["Implante", "Prótese", "Consultoria imobiliária"] }, []);
+    expect(base).toContain("Consultoria imobiliária");
+    expect(base).not.toContain("Implante");
+    expect(base).not.toContain("Prótese");
   });
 
-  it("treats legacy Henrique profiles without module as corretor", () => {
-    const base = resolveServiceOptions({ id: "henrique-pereira", name: "Henrique Pereira" }, []);
-    expect(base).toEqual(DEFAULT_CORRETOR_SERVICE_LIBRARY);
+  it("defaults non-odontocompany legacy IDs to corretor catalog", () => {
+    const base = resolveServiceOptions({ id: "corretor-lucas", name: "Lucas", services: ["Implante", "Limpeza"] }, []);
+    expect(base).toContain("Comprar imóvel");
+    expect(base).toContain("💰 Vender imóvel");
+    expect(base).not.toContain("Implante");
+    expect(base).not.toContain("Limpeza");
   });
 
   it("removes a custom service from a corretor catalog", () => {
-    const base = ["Aparelho Invisalign", "Limpeza", "Implante"];
+    const base = ["Comprar imóvel", "💰 Vender imóvel", "Limpeza"];
     const next = base.filter((s) => s !== "Limpeza");
-    expect(next).toEqual(["Aparelho Invisalign", "Implante"]);
+    expect(next).toEqual(["Comprar imóvel", "💰 Vender imóvel"]);
   });
 });

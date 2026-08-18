@@ -10,18 +10,36 @@ export const LEGACY_SERVICE_LIBRARY = [
   "Limpeza",
 ];
 
-// Catálogo padrão exibido para contas do módulo "corretor" (imobiliária)
-// que ainda não tenham uma lista de serviços própria salva.
-export const DEFAULT_CORRETOR_SERVICE_LIBRARY = [
-  "Venda de imóveis",
-  "Locação/Aluguel",
-  "Avaliação imobiliária",
-  "Consultoria imobiliária",
-  "Financiamento imobiliário",
-  "Permuta de imóveis",
-  "Imóveis comerciais",
-  "Lançamentos/Imóveis na planta",
-  "Terrenos/Lotes",
+export const CORRETOR_SERVICE_LIBRARY = [
+  "Comprar imóvel",
+  "💰 Vender imóvel",
+  "🔑 Alugar imóvel",
+  "📋 Anunciar imóvel para locação",
+  "🌳 Comprar terreno",
+  "📐 Vender terreno",
+  "🏢 Imóvel comercial",
+  "🏗️ Imóvel na planta / lançamento",
+  "💼 Investimento imobiliário",
+  "🔄 Permuta",
+  "💳 Financiamento imobiliário",
+  "📑 Avaliação de imóvel",
+  "📝 Assessoria imobiliária",
+  "❓ Outro",
+];
+
+const CLINIC_SERVICE_PATTERNS = [
+  "implante",
+  "prótese",
+  "protocolo",
+  "facetas",
+  "ortodontia",
+  "clínico geral",
+  "harmonização facial",
+  "clareamento",
+  "limpeza",
+  "consulta",
+  "dent",
+  "odonto",
 ];
 
 export type ServiceCatalogContext = {
@@ -32,6 +50,7 @@ export type ServiceCatalogContext = {
   customServices?: string[];
   // Mantido por compatibilidade com chamadas antigas/testes que usam "services".
   services?: string[];
+  customFields?: Record<string, any>;
 };
 
 export function isCorretorProfile(clinic: ServiceCatalogContext | null | undefined): boolean {
@@ -40,7 +59,19 @@ export function isCorretorProfile(clinic: ServiceCatalogContext | null | undefin
   if (clinic.module === "clinica") return false;
 
   const identifier = `${clinic.id ?? ""} ${clinic.name ?? ""}`.toLowerCase();
-  return identifier.includes("corretor") || identifier.includes("henrique");
+  if (identifier.includes("corretor") || identifier.includes("henrique") || identifier.includes("imobili")) return true;
+  if (identifier.includes("odontocompany")) return false;
+
+  const customFields = clinic.customFields || {};
+  if (customFields.creci || customFields.corretor || customFields.imovel) return true;
+
+  const services = Array.isArray(clinic.services) ? clinic.services : [];
+  const normalizedServices = services.map((service) => String(service || "").trim().toLowerCase()).filter(Boolean);
+  if (normalizedServices.some((service) => CORRETOR_SERVICE_LIBRARY.some((base) => base.toLowerCase() === service))) return true;
+
+  // Fallback para cadastros legados sem módulo explícito: evita classificar corretores
+  // como clínica quando o ID não pertence ao namespace odontocompany.
+  return Boolean(clinic.id) && !String(clinic.id).toLowerCase().includes("odontocompany");
 }
 
 export function resolveServiceOptions(
@@ -50,22 +81,19 @@ export function resolveServiceOptions(
   const isCorretor = isCorretorProfile(clinic);
 
   if (isCorretor) {
-    // Prioriza o campo real do Firestore (customServices); aceita "services"
-    // por compatibilidade; se nenhum estiver definido, usa o catálogo padrão
-    // de imobiliária em vez de deixar a lista vazia.
+    // Prioriza customServices (Firestore), aceita services por compatibilidade.
     const rawCustom = Array.isArray(clinic?.customServices)
       ? clinic.customServices
       : Array.isArray(clinic?.services)
         ? clinic.services
-        : null;
+        : [];
 
-    const custom = (rawCustom ?? [])
+    const cleanedCustom = rawCustom
       .map((service) => service?.trim())
-      .filter((service): service is string => Boolean(service));
+      .filter((service): service is string => Boolean(service))
+      .filter((service) => !CLINIC_SERVICE_PATTERNS.some((pattern) => service.toLowerCase().includes(pattern)));
 
-    if (custom.length > 0) return custom;
-    if (rawCustom !== null) return custom; // lista explicitamente vazia definida pelo usuário
-    return DEFAULT_CORRETOR_SERVICE_LIBRARY;
+    return Array.from(new Set([...CORRETOR_SERVICE_LIBRARY, ...cleanedCustom]));
   }
 
   return Array.isArray(fallbackServices) && fallbackServices.length > 0

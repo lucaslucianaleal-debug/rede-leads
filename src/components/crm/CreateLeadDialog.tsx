@@ -17,7 +17,7 @@ import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchActiveCampaignList } from "@/services/campaignService";
-import { addCustomService, removeCustomService, resolveServiceOptions } from '@/lib/serviceCatalog';
+import { addCustomService, CORRETOR_SERVICE_LIBRARY, isCorretorProfile, removeCustomService, resolveServiceOptions } from '@/lib/serviceCatalog';
 
 interface CreateLeadDialogProps {
   open: boolean;
@@ -44,7 +44,7 @@ const COMPARECIMENTOS: LeadComparecimento[] = ["COMPARECEU", "NÃO COMPARECEU", 
 
 export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLeadDialogProps) {
   const { allLeads } = useLeads();
-  const { currentClinic, selectedClinic } = useAuth();
+  const { currentClinic, selectedClinic, clinicMeta } = useAuth();
   const clinicId = currentClinic || selectedClinic || "";
   const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
   const fetchedClinic = useRef("");
@@ -75,6 +75,22 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
   const [customServiceInput, setCustomServiceInput] = useState("");
   const [serviceOptions, setServiceOptions] = useState<string[]>([]);
   const currentClinicObj = clinics.find((c) => c.id === clinicId);
+  const effectiveClinicContext = currentClinicObj
+    ? {
+        id: currentClinicObj.id,
+        name: currentClinicObj.name,
+        module: currentClinicObj.module ?? (clinicMeta as any)?.module,
+        services: currentClinicObj.customServices || [],
+        customFields: currentClinicObj.customFields,
+      }
+    : {
+        id: clinicId,
+        name: (clinicMeta as any)?.name,
+        module: (clinicMeta as any)?.module,
+        services: Array.isArray((clinicMeta as any)?.customServices) ? (clinicMeta as any).customServices : [],
+        customFields: (clinicMeta as any)?.customFields,
+      };
+  const isCorretorContext = isCorretorProfile(effectiveClinicContext);
 
   useEffect(() => {
     if (!open || !clinicId) return;
@@ -83,23 +99,24 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
     }
     fetchActiveCampaignList(clinicId).then(setCampaigns);
 
-    const clinic = clinics.find((c) => c.id === clinicId);
     const defaultCorretorFields: Record<string, any> = {
       endereco: { label: "Endereço", placeholder: "Rua, número, bairro, cidade" },
       creci: { label: "CRECI", placeholder: "Número do CRECI" },
     };
 
-    const resolvedServices = resolveServiceOptions(clinic, clinic?.customServices || []);
+    const resolvedServices = resolveServiceOptions(effectiveClinicContext, currentClinicObj?.customServices || []);
     setServiceOptions(resolvedServices);
 
-    const fields = clinic ? (clinic.customFields || (clinic.module === "corretor" ? defaultCorretorFields : null)) : null;
+    const fields = currentClinicObj
+      ? (currentClinicObj.customFields || (isCorretorContext ? defaultCorretorFields : null))
+      : (isCorretorContext ? defaultCorretorFields : null);
     if (fields) {
       setDynamicFields(fields);
       setForm((f) => ({ ...f, customFields: { ...(f.customFields || {}), ...Object.keys(fields).reduce((acc, k) => ({ ...acc, [k]: "" }), {}) } }));
     } else {
       setDynamicFields(null);
     }
-  }, [clinicId, open, clinics]);
+  }, [clinicId, open, clinics, clinicMeta, isCorretorContext]);
 
   const selectValue = (val: any) => (val === "" || val === undefined ? "none" : String(val));
   const fromSelect = (val: string) => (val === "none" ? "" : val);
@@ -123,8 +140,10 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
     setForm((f) => ({ ...f, servicoProcurado: value }));
     setCustomServiceInput("");
 
-    if (currentClinicObj?.module === "corretor") {
-      const nextServices = updated.filter((service) => service && service.trim());
+    if (isCorretorContext) {
+      const nextServices = updated
+        .filter((service) => service && service.trim())
+        .filter((service) => !CORRETOR_SERVICE_LIBRARY.includes(service));
       try {
         const { doc, updateDoc } = await import("firebase/firestore");
         const { db } = await import("@/lib/firebase");
@@ -142,11 +161,12 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
       setForm((f) => ({ ...f, servicoProcurado: "" }));
     }
 
-    if (currentClinicObj?.module === "corretor") {
+    if (isCorretorContext) {
+      const nextServices = next.filter((service) => !CORRETOR_SERVICE_LIBRARY.includes(service));
       try {
         const { doc, updateDoc } = await import("firebase/firestore");
         const { db } = await import("@/lib/firebase");
-        await updateDoc(doc(db, "clinics", clinicId), { customServices: next });
+        await updateDoc(doc(db, "clinics", clinicId), { customServices: nextServices });
       } catch {
         // no-op
       }
@@ -204,7 +224,7 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
     }
   };
 
-  const dialogTitle = currentClinicObj && currentClinicObj.module === "corretor" ? "Criar Corretor" : "Criar Novo Lead";
+  const dialogTitle = isCorretorContext ? "Criar Corretor" : "Criar Novo Lead";
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -212,7 +232,7 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <div className="text-xs text-muted-foreground mt-1">
-            Preencha os campos abaixo para adicionar um novo {currentClinicObj && currentClinicObj.module === "corretor" ? "corretor" : "lead"}
+            Preencha os campos abaixo para adicionar um novo {isCorretorContext ? "corretor" : "lead"}
           </div>
         </DialogHeader>
 
@@ -284,13 +304,13 @@ export function CreateLeadDialog({ open, onClose, onSave, onOpenCall }: CreateLe
           <div className="space-y-1">
             <Label>Serviço Procurado</Label>
             <Select value={selectValue(form.servicoProcurado)} onValueChange={(v) => set("servicoProcurado", fromSelect(v))}>
-              <SelectTrigger><SelectValue placeholder={currentClinicObj?.module === "corretor" ? "Digite ou selecione um serviço" : "Selecione um serviço"} /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={isCorretorContext ? "Digite ou selecione um serviço" : "Selecione um serviço"} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">—</SelectItem>
                 {serviceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            {currentClinicObj?.module === "corretor" && (
+            {isCorretorContext && (
               <div className="space-y-2 mt-2 rounded-md border border-dashed border-slate-300 p-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-slate-600">Serviços do corretor</span>

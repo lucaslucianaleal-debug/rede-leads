@@ -20,8 +20,9 @@ import { maskPhone, isValidPhone } from "@/lib/phone";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import { useLeads } from "@/hooks/useLeads";
 import { useAuth } from "@/hooks/useAuth";
+import { useClinics } from "@/hooks/useClinics";
 import { fetchActiveCampaignList } from "@/services/campaignService";
-import { addCustomService, removeCustomService, resolveServiceOptions } from "@/lib/serviceCatalog";
+import { addCustomService, CORRETOR_SERVICE_LIBRARY, isCorretorProfile, removeCustomService, resolveServiceOptions } from "@/lib/serviceCatalog";
 
 interface EditLeadDialogProps {
   lead: Lead | null;
@@ -42,7 +43,8 @@ const FONTES = ["Online", "Google", "Sorteio Radio", "Site", "Indicação", "Pro
 
 export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogProps) {
   const { allLeads } = useLeads();
-  const { currentClinic, selectedClinic } = useAuth();
+  const { currentClinic, selectedClinic, clinicMeta } = useAuth();
+  const { clinics } = useClinics();
   const clinicId = currentClinic || selectedClinic || "";
   const [duplicateWarning, setDuplicateWarning] = useState<{ nome: string; etapa: string } | null>(null);
   const [form, setForm] = useState<Partial<Lead>>({});
@@ -54,6 +56,23 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
   const [previousPhone, setPreviousPhone] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
   const fetchedClinic = useRef("");
+  const currentClinicObj = clinics.find((c) => c.id === clinicId);
+  const effectiveClinicContext = currentClinicObj
+    ? {
+        id: currentClinicObj.id,
+        name: currentClinicObj.name,
+        module: currentClinicObj.module ?? (clinicMeta as any)?.module,
+        services: currentClinicObj.customServices || [],
+        customFields: currentClinicObj.customFields,
+      }
+    : {
+        id: clinicId,
+        name: (clinicMeta as any)?.name,
+        module: (clinicMeta as any)?.module,
+        services: Array.isArray((clinicMeta as any)?.customServices) ? (clinicMeta as any).customServices : [],
+        customFields: (clinicMeta as any)?.customFields,
+      };
+  const isCorretorContext = isCorretorProfile(effectiveClinicContext);
 
   useEffect(() => {
     if (!open || !clinicId) return;
@@ -65,13 +84,9 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
 
   useEffect(() => {
     if (!clinicId || !lead) return;
-    const clinicMeta = JSON.parse(localStorage.getItem("crm_clinic_cache") || "null");
-    const serviceList = resolveServiceOptions(
-      clinicMeta && clinicMeta.id === clinicId ? clinicMeta : { module: clinicMeta?.module || "clinica" },
-      []
-    );
+    const serviceList = resolveServiceOptions(effectiveClinicContext, currentClinicObj?.customServices || []);
     setServiceOptions(serviceList);
-  }, [clinicId, lead]);
+  }, [clinicId, lead, clinics, clinicMeta, isCorretorContext]);
 
   useEffect(() => {
     if (lead) {
@@ -117,11 +132,12 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
     setForm((prev) => ({ ...prev, servicoProcurado: value }));
     setCustomServiceInput("");
 
-    if (clinicId) {
+    if (clinicId && isCorretorContext) {
+      const nextServices = updated.filter((service) => !CORRETOR_SERVICE_LIBRARY.includes(service));
       try {
         const { doc, updateDoc } = await import("firebase/firestore");
         const { db } = await import("@/lib/firebase");
-        await updateDoc(doc(db, "clinics", clinicId), { customServices: updated });
+        await updateDoc(doc(db, "clinics", clinicId), { customServices: nextServices });
       } catch {
         // ignore
       }
@@ -135,11 +151,12 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
       setForm((prev) => ({ ...prev, servicoProcurado: "" }));
     }
 
-    if (clinicId) {
+    if (clinicId && isCorretorContext) {
+      const nextServices = next.filter((service) => !CORRETOR_SERVICE_LIBRARY.includes(service));
       try {
         const { doc, updateDoc } = await import("firebase/firestore");
         const { db } = await import("@/lib/firebase");
-        await updateDoc(doc(db, "clinics", clinicId), { customServices: next });
+        await updateDoc(doc(db, "clinics", clinicId), { customServices: nextServices });
       } catch {
         // ignore
       }
@@ -288,6 +305,7 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
                 {serviceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            {isCorretorContext && (
             <div className="space-y-2 mt-2 rounded-md border border-dashed border-slate-300 p-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-slate-600">Serviços do corretor</span>
@@ -326,6 +344,7 @@ export function EditLeadDialog({ lead, open, onClose, onSave }: EditLeadDialogPr
                 <Button type="button" variant="outline" onClick={handleAddCustomService}>Adicionar</Button>
               </div>
             </div>
+            )}
           </div>
 
           {/* Captador */}
