@@ -36,6 +36,11 @@ describe("service catalog", () => {
     expect(base).not.toContain("Limpeza");
   });
 
+  it("uses the corretor catalog when the profile module overrides legacy clinic data", () => {
+    const base = resolveServiceOptions({ id: "odontocompany-legacy", module: "corretor", services: ["Implante", "Limpeza"] }, []);
+    expect(base).toEqual(CORRETOR_SERVICE_LIBRARY);
+  });
+
   it("removes a custom service from a corretor catalog", () => {
     const base = ["Comprar imóvel", "💰 Vender imóvel", "Limpeza"];
     const next = base.filter((s) => s !== "Limpeza");

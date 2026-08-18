@@ -7,10 +7,11 @@ import {
   createUserWithEmailAndPassword,
   User,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { normalizeUserClinicBindings } from "@/lib/userAccess";
 
 const normalizeProfileClinics = (profile: any) => normalizeUserClinicBindings(profile);
+const LEGACY_CORRETOR_EMAILS = new Set(["henrique.2713@outlook.com"]);
 
 type AuthContextType = {
   user: User | null;
@@ -113,8 +114,23 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
             return;
           }
 
-          setUserProfile(profile);
-          const normalized = normalizeProfileClinics(profile);
+          const isLegacyCorretor = currentUser.email
+            ? LEGACY_CORRETOR_EMAILS.has(currentUser.email.toLowerCase())
+            : false;
+          const normalizedProfile = isLegacyCorretor
+            ? { ...profile, accountModule: "corretor" }
+            : profile;
+
+          if (isLegacyCorretor && profile.accountModule !== "corretor") {
+            try {
+              await updateDoc(doc(db, "users", currentUser.uid), { accountModule: "corretor" });
+            } catch {
+              // The in-memory profile still enables the corretor module for this login.
+            }
+          }
+
+          setUserProfile(normalizedProfile);
+          const normalized = normalizeProfileClinics(normalizedProfile);
           const hasMultipleAccess = normalized.hasWildcard || normalized.explicit.length > 1;
           const singleClinic = hasMultipleAccess ? null : (normalized.explicit[0] || null);
 
@@ -125,10 +141,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
             return;
           }
 
-          if (profile.role === "admin" || profile.role === "cliente") {
+          if (normalizedProfile.role === "admin" || normalizedProfile.role === "cliente") {
             const val = singleClinic || null;
             persistClinic(val);
-            console.log(`[AuthProvider] ${profile.role} currentClinic set ->`, val);
+            console.log(`[AuthProvider] ${normalizedProfile.role} currentClinic set ->`, val);
           } else {
             const clinicFromProfile = singleClinic;
             persistClinic(clinicFromProfile);

@@ -53,7 +53,7 @@ import { useMPCDashboardData } from "@/hooks/useMPCDashboardData";
 import { useMPCDataStore } from "@/hooks/useMPCDataStore";
 
 const CRMDashboard = () => {
-  const { user, currentClinic, setSelectedClinic, clinicMeta } = useAuth();
+  const { user, currentClinic, setSelectedClinic, clinicMeta, userProfile } = useAuth();
   const { clinics } = useClinics();
   const { permissions, isReceptionist, role } = useUserPermissions();
   const {
@@ -108,8 +108,10 @@ const CRMDashboard = () => {
   const [clientClinicIds, setClientClinicIds] = useState<string[]>([]);
   const isMpcToolOnly = role === "mpc_tool";
   const currentClinicRecord = clinics.find((c) => c.id === currentClinic);
-  const isCorretorModule = clinicMeta?.module === "corretor" || currentClinicRecord?.module === "corretor";
-  const canShowAdminControls = permissions?.canManageUsers && !!user;
+  const isCorretorModule = userProfile?.accountModule === "corretor"
+    || clinicMeta?.module === "corretor"
+    || currentClinicRecord?.module === "corretor";
+  const canShowAdminControls = !isCorretorModule && permissions?.canManageUsers && !!user;
 
   // ...chat logic removido...
 
