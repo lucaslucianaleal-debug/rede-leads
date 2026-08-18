@@ -101,6 +101,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
             if (normalized.explicit.length === 0) {
               persistClinic(null);
               console.log("[AuthProvider] fresh profile: no clinic bindings found, isolating selection");
+              setLoading(false);
               return;
             }
 
