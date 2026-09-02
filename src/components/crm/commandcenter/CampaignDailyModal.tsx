@@ -120,7 +120,7 @@ export default function CampaignDailyModal({ campaign, onSave, onDelete, onClose
             { label: "Spend (R$) *", value: spend, set: setSpend, placeholder: "0,00" },
             { label: "Alcance", value: reach, set: setReach, placeholder: "5.294" },
             { label: "Impressões", value: impressions, set: setImpressions, placeholder: "14.221" },
-            { label: "Cliques", value: clicks, set: setClicks, placeholder: "850" },
+            { label: "Conversas iniciadas", value: clicks, set: setClicks, placeholder: "10" },
           ].map(f => (
             <div key={f.label}>
               <label style={{ color: "#999", fontSize: "11px" }} className="block mb-1.5 uppercase tracking-wider">{f.label}</label>
