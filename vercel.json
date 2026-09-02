@@ -11,10 +11,19 @@
     }
   ],
   "functions": {
-    "api/**/*.js": {
+    "api/webhook/**/*.js": {
       "maxDuration": 10
+    },
+    "api/meta/**/*.js": {
+      "maxDuration": 30
     }
   },
+  "crons": [
+    {
+      "path": "/api/meta/cron",
+      "schedule": "0 10 * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/promotora", "destination": "/promotora.html" },
     { "source": "/visita-comercial", "destination": "/visita-comercial.html" },
