@@ -8,6 +8,7 @@ import {
 const COLORS = ["#D4537E", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4"];
 const LOOKBACK_DAYS = 7;
 const FIRST_SYNC_MAX_DAYS = 180;
+const META_METRIC_SCHEMA_VERSION = 2;
 
 function colorForId(id) {
   const seed = Number(String(id || "0").replace(/\D/g, "").slice(-4) || 0);
@@ -16,7 +17,11 @@ function colorForId(id) {
 
 function determineSinceDate(data, ad, timeZone) {
   const yesterday = addDays(getDateInTimeZone(timeZone), -1);
-  if (data?.metaLastSyncAt) return addDays(yesterday, -(LOOKBACK_DAYS - 1));
+  // v2 corrige o campo legado `clicks` para representar conversas iniciadas.
+  // Campanhas sincronizadas antes da v2 fazem uma única releitura completa para corrigir os dias Meta antigos.
+  if (data?.metaLastSyncAt && Number(data?.metaMetricSchemaVersion || 0) >= META_METRIC_SCHEMA_VERSION) {
+    return addDays(yesterday, -(LOOKBACK_DAYS - 1));
+  }
   const floor = addDays(yesterday, -FIRST_SYNC_MAX_DAYS + 1);
   const candidates = [earliestMetricDate(data?.dailyMetrics), String(ad?.created_time || "").slice(0, 10)]
     .filter(Boolean).sort();
@@ -74,6 +79,7 @@ async function createFromAd(db, clinicId, adAccountId, ad, metrics) {
     metaCampaignId: String(ad.campaign_id || ""), metaAdSetId: String(ad.adset_id || ""), metaAdName: ad.name || "",
     metaStatus: ad.status || "", metaEffectiveStatus: ad.effective_status || "", metaSyncEnabled: true,
     metaCreatedBySync: true, metaMatchStrategy: "auto_created", metaLastSyncAt: now,
+    metaMetricSchemaVersion: META_METRIC_SCHEMA_VERSION,
   });
   return ref.id;
 }
@@ -86,7 +92,7 @@ async function updateLinked(item, adAccountId, ad, metaMetrics, matchStrategy) {
     metaCampaignId: String(ad.campaign_id || ""), metaAdSetId: String(ad.adset_id || ""), metaAdName: ad.name || "",
     metaStatus: ad.status || "", metaEffectiveStatus: ad.effective_status || "",
     metaSyncEnabled: item.data.metaSyncEnabled !== false, metaMatchStrategy: item.data.metaMatchStrategy || matchStrategy,
-    metaLastSyncAt: now,
+    metaLastSyncAt: now, metaMetricSchemaVersion: META_METRIC_SCHEMA_VERSION,
   }, { merge: true });
   return merged;
 }
