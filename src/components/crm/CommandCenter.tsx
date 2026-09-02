@@ -41,7 +41,19 @@ export default function CommandCenter() {
     unit === "all"
       ? (currentClinic || "odontocompany-olimpia")
       : (unitToClinicId[unit] || currentClinic || "odontocompany-olimpia");
-  const { campaigns, diagnostics: metaDiagnostics, reload: reloadCampaigns, handleAddCampaign, handleSaveDailyMetric, handleDeleteDailyMetric, handleSaveCampaignFinance, handleToggleActive, handleDeleteCampaign } = useMetaAds(unit, clinicId, ticketMedio, period);
+  const {
+    campaigns,
+    diagnostics: metaDiagnostics,
+    reload: reloadCampaigns,
+    handleAddCampaign,
+    handleSaveDailyMetric,
+    handleDeleteDailyMetric,
+    handleSaveCampaignFinance,
+    handleToggleActive,
+    handleDeleteCampaign,
+    handleSyncMetaAds,
+    metaSyncing,
+  } = useMetaAds(unit, clinicId, ticketMedio, period);
   const { execute } = useActions(unit);
   const { exportPDF, exporting } = useExport();
 
@@ -94,9 +106,25 @@ export default function CommandCenter() {
 
               {/* Campanhas */}
               <section>
-                <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest mb-3">
-                  {period === "operacao" ? "Execução" : period === "ciclo" ? "Ciclo Atual" : "Histórico"}
-                </h3>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest">
+                    {period === "operacao" ? "Execução" : period === "ciclo" ? "Ciclo Atual" : "Histórico"}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleSyncMetaAds}
+                    disabled={metaSyncing}
+                    style={{
+                      background: metaSyncing ? "#333" : "#134D48",
+                      border: "0.5px solid #1FB6A6",
+                      color: metaSyncing ? "#888" : "#1FB6A6",
+                      fontSize: "11px",
+                    }}
+                    className="px-3 py-1.5 rounded font-medium hover:opacity-90 disabled:cursor-not-allowed"
+                  >
+                    {metaSyncing ? "Sincronizando Meta..." : "↻ Sincronizar Meta"}
+                  </button>
+                </div>
                 <CampaignCard
                   campaigns={campaigns}
                   clinicId={clinicId}
