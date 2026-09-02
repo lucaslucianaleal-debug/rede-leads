@@ -13,6 +13,8 @@ Configure somente no Vercel (nunca no GitHub):
 
 Durante a validação inicial, as variáveis da Meta podem ficar somente em `Preview`. Depois da aprovação, devem também ser configuradas em `Production`, pois o cron diário roda no deployment de produção.
 
+As credenciais do Firebase Admin também precisam existir em `Preview` para permitir o teste da sincronização sem alterar a produção.
+
 ## Regras de segurança de dados
 
 - Dados manuais existentes são preservados.
