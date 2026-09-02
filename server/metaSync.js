@@ -118,7 +118,7 @@ export async function syncMetaForClinic({ clinicId, adAccountId: requestedAdAcco
   const summary = {
     ok: true, clinicId, adAccountId, accountName: account?.name || "", timezone: timeZone,
     adsFound: ads.length, activeAds: ads.filter((ad) => ad.effective_status === "ACTIVE").length,
-    linkedExisting: 0, createdCampaigns: 0, skippedInactiveUnlinked: 0, ambiguousMatches: 0,
+    linkedExisting: 0, createdCampaigns: 0, skippedInactiveUnlinked: 0, skippedAmbiguous: 0, skippedDisabled: 0, ambiguousMatches: 0,
     metricsAdded: 0, metricsUpdated: 0, manualMetricsPreserved: 0, errors: [], syncedAt: new Date().toISOString(),
   };
 
@@ -126,14 +126,33 @@ export async function syncMetaForClinic({ clinicId, adAccountId: requestedAdAcco
     try {
       let matched = lookups.byMetaId.get(String(ad.id));
       let strategy = matched ? "meta_id" : "";
+      let ambiguous = false;
+
       if (!matched) {
         const key = normalizeName(ad.name);
         const e = (lookups.existingByName.get(key) || []).filter((item) => !used.has(item.id));
         const m = lookups.metaByName.get(key) || [];
-        if (key && e.length === 1 && m.length === 1) { matched = e[0]; strategy = "normalized_name"; }
-        else if (e.length > 0 && m.length > 0) summary.ambiguousMatches += 1;
+        if (key && e.length === 1 && m.length === 1) {
+          matched = e[0];
+          strategy = "normalized_name";
+        } else if (e.length > 0 && m.length > 0) {
+          ambiguous = true;
+          summary.ambiguousMatches += 1;
+        }
       }
-      if (!matched && ad.effective_status !== "ACTIVE") { summary.skippedInactiveUnlinked += 1; continue; }
+
+      if (ambiguous) {
+        summary.skippedAmbiguous += 1;
+        continue;
+      }
+      if (matched?.data?.metaSyncEnabled === false) {
+        summary.skippedDisabled += 1;
+        continue;
+      }
+      if (!matched && ad.effective_status !== "ACTIVE") {
+        summary.skippedInactiveUnlinked += 1;
+        continue;
+      }
 
       const since = determineSinceDate(matched?.data || {}, ad, timeZone);
       const metrics = await fetchDailyInsights(ad.id, since, yesterday, accessToken, resultActionType);
@@ -141,12 +160,14 @@ export async function syncMetaForClinic({ clinicId, adAccountId: requestedAdAcco
         used.add(matched.id);
         const merged = await updateLinked(matched, adAccountId, ad, metrics, strategy);
         summary.linkedExisting += 1;
-        summary.metricsAdded += merged.added; summary.metricsUpdated += merged.updated;
+        summary.metricsAdded += merged.added;
+        summary.metricsUpdated += merged.updated;
         summary.manualMetricsPreserved += merged.manualPreserved;
       } else {
         const usable = metrics.filter(coreMetricHasData);
         await createFromAd(db, clinicId, adAccountId, ad, usable);
-        summary.createdCampaigns += 1; summary.metricsAdded += usable.length;
+        summary.createdCampaigns += 1;
+        summary.metricsAdded += usable.length;
       }
     } catch (error) {
       summary.errors.push({ adId: String(ad?.id || ""), adName: ad?.name || "", code: error?.code || "SYNC_AD_ERROR", message: error?.message || String(error) });
