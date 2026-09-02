@@ -11,6 +11,8 @@ Configure somente no Vercel (nunca no GitHub):
 - `CRON_SECRET`: segredo usado pelo Vercel Cron.
 - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`: já utilizadas pelas funções atuais do projeto.
 
+Durante a validação inicial, as variáveis da Meta podem ficar somente em `Preview`. Depois da aprovação, devem também ser configuradas em `Production`, pois o cron diário roda no deployment de produção.
+
 ## Regras de segurança de dados
 
 - Dados manuais existentes são preservados.
