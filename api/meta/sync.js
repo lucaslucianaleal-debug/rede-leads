@@ -1,5 +1,5 @@
-import { getAdminAuth } from "../_lib/firebaseAdmin.js";
-import { syncMetaForClinic } from "../_lib/metaSync.js";
+import { getAdminAuth } from "../../server/firebaseAdmin.js";
+import { syncMetaForClinic } from "../../server/metaSync.js";
 
 function readBody(req) {
   if (!req.body) return {};
