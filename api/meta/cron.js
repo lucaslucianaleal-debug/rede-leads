@@ -1,4 +1,4 @@
-import { syncAllConfiguredMetaClinics } from "../_lib/metaSync.js";
+import { syncAllConfiguredMetaClinics } from "../../server/metaSync.js";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
