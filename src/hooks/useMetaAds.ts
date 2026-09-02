@@ -114,8 +114,12 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
       }
 
       const s = result.payload || {};
-      const errorSuffix = Array.isArray(s.errors) && s.errors.length > 0
-        ? `\n\nAtenção: ${s.errors.length} anúncio(s) tiveram erro e foram ignorados nesta rodada.`
+      const syncErrors = Array.isArray(s.errors) ? s.errors : [];
+      const errorSuffix = syncErrors.length > 0
+        ? `\n\nAtenção: ${syncErrors.length} anúncio(s) tiveram erro nesta rodada:\n` +
+          syncErrors.slice(0, 5).map((item: { adName?: string; adId?: string; message?: string }) =>
+            `• ${item.adName || item.adId || "Anúncio"}: ${item.message || "erro não informado"}`
+          ).join("\n")
         : "";
 
       window.alert(
