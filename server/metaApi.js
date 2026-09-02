@@ -135,15 +135,21 @@ export async function fetchDailyInsights(adId, since, until, accessToken, result
     time_range: JSON.stringify({ since, until }), time_increment: 1, limit: 500,
   }, accessToken);
   const syncedAt = new Date().toISOString();
-  return rows.map((row) => ({
-    date: toBrDate(row.date_start),
-    spend: Number(row.spend || 0) || 0,
-    impressions: Number(row.impressions || 0) || 0,
-    clicks: Number(row.clicks || 0) || 0,
-    reach: Number(row.reach || 0) || 0,
-    metaResults: actionValue(row.actions, resultActionType),
-    metaCostPerResult: actionValue(row.cost_per_action_type, resultActionType),
-    source: "meta",
-    syncedAt,
-  }));
+  return rows.map((row) => {
+    const conversationsStarted = actionValue(row.actions, resultActionType);
+    return {
+      date: toBrDate(row.date_start),
+      spend: Number(row.spend || 0) || 0,
+      impressions: Number(row.impressions || 0) || 0,
+      // Campo legado `clicks`: no Rede Leads ele representa CONVERSAS INICIADAS.
+      // Mantemos o nome técnico para não migrar todo o banco/interface existente.
+      clicks: conversationsStarted,
+      metaLinkClicks: Number(row.clicks || 0) || 0,
+      reach: Number(row.reach || 0) || 0,
+      metaResults: conversationsStarted,
+      metaCostPerResult: actionValue(row.cost_per_action_type, resultActionType),
+      source: "meta",
+      syncedAt,
+    };
+  });
 }
