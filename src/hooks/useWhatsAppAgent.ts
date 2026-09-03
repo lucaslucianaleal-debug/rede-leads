@@ -104,7 +104,7 @@ export function useWhatsAppAgent() {
   const fetchMessages = useCallback(async (chatId: string) => {
     if (!currentClinic || !chatId) return [];
     const headers = await authHeaders();
-    const res = await fetch(`/api/whatsapp/messages?clinicId=${encodeURIComponent(currentClinic)}&chatId=${encodeURIComponent(chatId)}`, { headers });
+    const res = await fetch(`/api/whatsapp/chats?clinicId=${encodeURIComponent(currentClinic)}&chatId=${encodeURIComponent(chatId)}`, { headers });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || "Erro ao carregar mensagens");
     return Array.isArray(data.items) ? data.items : [];
@@ -113,7 +113,7 @@ export function useWhatsAppAgent() {
   const markChatRead = useCallback(async (chatId: string) => {
     if (!currentClinic || !chatId) return;
     const headers = await authHeaders();
-    const res = await fetch("/api/whatsapp/read", {
+    const res = await fetch("/api/whatsapp/chats", {
       method: "POST",
       headers,
       body: JSON.stringify({ clinicId: currentClinic, chatId }),
