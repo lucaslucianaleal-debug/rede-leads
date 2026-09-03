@@ -1,5 +1,6 @@
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
 import { applySentQueueItem, markQueueFailure } from "../../../server/whatsappAgent.js";
+import { recordWhatsAppChatMessage } from "../../../server/whatsappChatStore.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -14,6 +15,16 @@ export default async function handler(req, res) {
 
     if (statusValue === "sent") {
       const result = await applySentQueueItem(clinicId, queueId, { messageId: body.messageId || "" });
+      const queue = result.queue || {};
+      await recordWhatsAppChatMessage(clinicId, {
+        phone: queue.phone,
+        name: queue.name,
+        leadId: queue.leadId,
+        direction: "out",
+        text: queue.message,
+        messageType: "text",
+        messageId: body.messageId || "",
+      });
       return res.status(200).json({ ok: true, leadUpdated: result.leadUpdated });
     }
 
