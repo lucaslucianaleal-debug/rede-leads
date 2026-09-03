@@ -14,7 +14,7 @@ const AGENT_SECRET = String(process.env.WHATSAPP_AGENT_SECRET || "").trim();
 const MIN_DELAY_SECONDS = Math.max(60, Number(process.env.MIN_DELAY_SECONDS || 150) || 150);
 const MAX_DELAY_SECONDS = Math.max(MIN_DELAY_SECONDS, Number(process.env.MAX_DELAY_SECONDS || 270) || 270);
 const IDLE_POLL_SECONDS = Math.max(5, Number(process.env.IDLE_POLL_SECONDS || 8) || 8);
-const AGENT_VERSION = "2.1.0";
+const AGENT_VERSION = "2.2.0";
 
 if (!CLINIC_ID || !AGENT_SECRET) {
   console.error("\n[agent] Configure CLINIC_ID e WHATSAPP_AGENT_SECRET no arquivo .env antes de iniciar.\n");
@@ -75,6 +75,12 @@ function candidatePhones(raw) {
   }
 
   return [...new Set(variants)];
+}
+
+function messageCreatedAt(msg) {
+  const timestamp = Number(msg?.timestamp || msg?._data?.t || 0);
+  if (timestamp > 0) return new Date(timestamp * 1000).toISOString();
+  return new Date().toISOString();
 }
 
 async function api(pathname, options = {}) {
@@ -287,6 +293,48 @@ async function resolveInboundIdentity(msg) {
   return { phone, name };
 }
 
+async function resolveOutboundIdentity(msg) {
+  let contact = null;
+  let chat = null;
+  const target = String(msg?.to || msg?._data?.to || "");
+
+  try {
+    if (target) contact = await client.getContactById(target);
+  } catch {
+    // pode ser LID; tentaremos dados do chat abaixo
+  }
+  try {
+    chat = await msg.getChat();
+  } catch {
+    // sem chat confiável
+  }
+
+  const candidates = [
+    contact?.number,
+    contact?.id?.user,
+    chat?.id?.user,
+    target,
+  ];
+  let phone = null;
+  for (const value of candidates) {
+    const digits = digitsOnly(value);
+    if (digits.length >= 12 && digits.length <= 13 && digits.startsWith("55")) {
+      phone = digits;
+      break;
+    }
+  }
+
+  const name = String(
+    contact?.name ||
+    contact?.pushname ||
+    contact?.shortName ||
+    chat?.name ||
+    ""
+  ).trim();
+
+  return { phone, name, target };
+}
+
 function referralFromMessage(msg) {
   const raw = msg?._data?.referral || msg?._data?.ctwaContext || msg?._data?.contextInfo?.externalAdReply || {};
   return {
@@ -341,6 +389,7 @@ client.on("disconnected", async (reason) => {
   await heartbeat({ connected: false, lastError: String(reason || "disconnected"), qrCode: null });
 });
 
+// Entrada: somente novas mensagens recebidas. Não fazemos leitura de histórico.
 client.on("message", async (msg) => {
   try {
     if (!msg || msg.fromMe) return;
@@ -361,6 +410,7 @@ client.on("message", async (msg) => {
       text: String(msg.body || ""),
       messageType,
       messageId: msg?.id?._serialized || msg?.id?.id || "",
+      createdAt: messageCreatedAt(msg),
       referral: referralFromMessage(msg),
     };
 
@@ -371,6 +421,40 @@ client.on("message", async (msg) => {
     console.log(`[entrada] ${identity.name || identity.phone}: ${messageType}${result?.matched ? " → lead existente" : " → triagem"}`);
   } catch (error) {
     console.warn("[entrada] erro:", error?.message || error);
+  }
+});
+
+// Saída: captura mensagens criadas em QUALQUER aparelho vinculado.
+// Assim, se Lucas responder pelo celular ou WhatsApp Desktop, a caixa do Rede Leads acompanha.
+client.on("message_create", async (msg) => {
+  try {
+    if (!msg || !msg.fromMe) return;
+    const to = String(msg.to || msg?._data?.to || "");
+    if (to.endsWith("@g.us") || to === "status@broadcast" || to.endsWith("@newsletter")) return;
+
+    const identity = await resolveOutboundIdentity(msg);
+    if (!identity.phone) {
+      console.warn("[saida] mensagem ignorada: não consegui resolver o telefone do destinatário.");
+      return;
+    }
+
+    const messageType = normalizeMessageType(msg.type);
+    await api("/api/whatsapp/agent/inbound", {
+      method: "POST",
+      body: JSON.stringify({
+        clinicId: CLINIC_ID,
+        direction: "out",
+        phone: identity.phone,
+        name: identity.name,
+        text: String(msg.body || ""),
+        messageType,
+        messageId: msg?.id?._serialized || msg?.id?.id || "",
+        createdAt: messageCreatedAt(msg),
+      }),
+    });
+    console.log(`[saida] ${identity.name || identity.phone}: ${messageType} → Rede Leads`);
+  } catch (error) {
+    console.warn("[saida] erro:", error?.message || error);
   }
 });
 
@@ -386,11 +470,12 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-console.log("\n=== Rede Leads • WhatsApp Agent v2.1 ===");
+console.log("\n=== Rede Leads • WhatsApp Agent v2.2 ===");
 console.log(`Clínica: ${CLINIC_ID}`);
 console.log(`Rede Leads: ${BASE_URL}`);
 console.log(`Follow-ups automáticos: intervalo ${MIN_DELAY_SECONDS}s a ${MAX_DELAY_SECONDS}s`);
 console.log(`Mensagens manuais: prioridade, checagem a cada ~${IDLE_POLL_SECONDS}s`);
+console.log("Sincronização: somente eventos novos de entrada/saída; sem varredura de histórico.");
 console.log("O agente NÃO baixa mídia e NÃO lê o Firebase diretamente.\n");
 
 client.initialize();
