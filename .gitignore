@@ -30,7 +30,13 @@ whatsapp-server/.wwebjs_cache/
 whatsapp-server/.wwebjs_auth/
 whatsapp-server/media/
 whatsapp-server/package-lock.json
+whatsapp-server/.env
 serviceAccountKey.json
 
+# Variáveis de ambiente e segredos
+.env
+.env.*
+!.env.example
+!whatsapp-server/.env.example
+
 .vercel
-.env*.local
