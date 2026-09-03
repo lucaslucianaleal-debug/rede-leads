@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { Lead, LeadStage, LeadStatus, LeadResposta, LeadComparecimento } from '@
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { addCustomService, resolveServiceOptions } from '@/lib/serviceCatalog';
+import { fetchActiveCampaignList } from '@/services/campaignService';
 
 const ETAPAS: LeadStage[] = [
   'Novo', 'Em contato',
@@ -40,13 +41,11 @@ export function NewLeadDialog({
 }) {
   const hoje = format(new Date(), 'dd/MM/yyyy');
 
-  // Extrair data do lead recebido: preferir createdAt (timestamp), depois dataRecebimento ("dd/MM/yyyy, HH:mm:ss")
   const dataLead = (() => {
     if (lead.createdAt) {
       return format(new Date(lead.createdAt), 'dd/MM/yyyy');
     }
     if (lead.dataRecebimento) {
-      // formato "31/03/2026, 23:32:31" → pegar só a data
       return lead.dataRecebimento.split(',')[0].trim();
     }
     return hoje;
@@ -59,7 +58,7 @@ export function NewLeadDialog({
     telefone: lead.telefone || lead.phone || '',
     servicoProcurado: '',
     captador: '',
-    fonteLead: 'Online',
+    fonteLead: lead.fonteLead || 'Online',
     etapaLead: 'Novo',
     status: '',
     respostaLead: 'RESPONDEU',
@@ -70,10 +69,13 @@ export function NewLeadDialog({
     observacao: lead.mensagem ? `Primeiro contato via WhatsApp: "${lead.mensagem}"` : '',
     followUpCount: 0,
     lembretes: { h24: false, today: false },
+    metaCampanhaId: lead.metaCampanhaId || '',
+    metaCampanhaNome: lead.metaCampanhaNome || '',
   });
   const [saving, setSaving] = useState(false);
   const [customServiceInput, setCustomServiceInput] = useState('');
   const [serviceOptions, setServiceOptions] = useState<string[]>([]);
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     const clinicMeta = JSON.parse(localStorage.getItem('crm_clinic_cache') || 'null');
@@ -82,6 +84,7 @@ export function NewLeadDialog({
       []
     );
     setServiceOptions(nextOptions);
+    fetchActiveCampaignList(clinicId).then(setCampaigns).catch(() => setCampaigns([]));
   }, [clinicId]);
 
   const selectValue = (val: any) => (val === '' || val === undefined ? 'none' : String(val));
@@ -132,19 +135,16 @@ export function NewLeadDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-4 py-2">
-          {/* Nome */}
           <div className="space-y-1">
             <Label>Nome *</Label>
             <Input value={form.nome || ''} onChange={(e) => set('nome', e.target.value)} placeholder="Nome do contato" />
           </div>
 
-          {/* Telefone */}
           <div className="space-y-1">
             <Label>Telefone *</Label>
             <Input value={form.telefone || ''} onChange={(e) => set('telefone', maskPhone(e.target.value))} placeholder="(17) 99999-9999" />
           </div>
 
-          {/* Data de Criação */}
           <div className="space-y-1">
             <Label>Data de Criação</Label>
             <Input
@@ -159,7 +159,6 @@ export function NewLeadDialog({
             />
           </div>
 
-          {/* Data de Contato */}
           <div className="space-y-1">
             <Label>Data de Contato</Label>
             <Input
@@ -174,7 +173,6 @@ export function NewLeadDialog({
             />
           </div>
 
-          {/* Serviço Procurado */}
           <div className="space-y-1">
             <Label>Serviço Procurado</Label>
             <Select value={selectValue(form.servicoProcurado)} onValueChange={(v) => set('servicoProcurado', fromSelect(v))}>
@@ -200,28 +198,49 @@ export function NewLeadDialog({
             </div>
           </div>
 
-          {/* Captador */}
           <div className="space-y-1">
             <Label>Captador</Label>
             <Input value={form.captador || ''} onChange={(e) => set('captador', e.target.value)} placeholder="Quem captou o lead" />
           </div>
 
-          {/* Fonte */}
           <div className="space-y-1">
             <Label>Fonte</Label>
             <Select value={selectValue(form.fonteLead)} onValueChange={(v) => set('fonteLead', fromSelect(v))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {FONTES.map((f) => (
-                  <SelectItem key={f} value={f}>
-                    {f}
-                  </SelectItem>
+                  <SelectItem key={f} value={f}>{f}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Etapa */}
+          <div className="space-y-1">
+            <Label>Campanha Meta Ads</Label>
+            <Select
+              value={selectValue(form.metaCampanhaId)}
+              onValueChange={(v) => {
+                if (v === 'none') {
+                  setForm((f) => ({ ...f, metaCampanhaId: '', metaCampanhaNome: '' }));
+                  return;
+                }
+                const campaign = campaigns.find((item) => item.id === v);
+                setForm((f) => ({ ...f, metaCampanhaId: v, metaCampanhaNome: campaign?.name || '' }));
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Não identificada" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Não identificada</SelectItem>
+                {campaigns.map((campaign) => (
+                  <SelectItem key={campaign.id} value={campaign.id}>{campaign.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.metaCampanhaNome && (
+              <p className="text-xs text-emerald-600">Identificada automaticamente: {form.metaCampanhaNome}</p>
+            )}
+          </div>
+
           <div className="space-y-1">
             <Label>Etapa</Label>
             <Select value={selectValue(form.etapaLead)} onValueChange={(v) => set('etapaLead', fromSelect(v) as LeadStage)}>
@@ -232,7 +251,6 @@ export function NewLeadDialog({
             </Select>
           </div>
 
-          {/* Status */}
           <div className="space-y-1">
             <Label>Status</Label>
             <Select value={selectValue(form.status)} onValueChange={(v) => set('status', fromSelect(v) as LeadStatus)}>
@@ -244,7 +262,6 @@ export function NewLeadDialog({
             </Select>
           </div>
 
-          {/* Resposta */}
           <div className="space-y-1">
             <Label>Resposta</Label>
             <Select value={selectValue(form.respostaLead)} onValueChange={(v) => set('respostaLead', fromSelect(v) as LeadResposta)}>
@@ -256,7 +273,6 @@ export function NewLeadDialog({
             </Select>
           </div>
 
-          {/* Comparecimento */}
           <div className="space-y-1">
             <Label>Comparecimento</Label>
             <Select value={selectValue(form.comparecimento)} onValueChange={(v) => set('comparecimento', fromSelect(v) as LeadComparecimento)}>
@@ -268,7 +284,6 @@ export function NewLeadDialog({
             </Select>
           </div>
 
-          {/* Observação */}
           <div className="space-y-1 col-span-2">
             <Label>Observação</Label>
             <Textarea
@@ -292,4 +307,3 @@ export function NewLeadDialog({
 }
 
 export default NewLeadDialog;
-
