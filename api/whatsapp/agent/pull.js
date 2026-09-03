@@ -5,10 +5,11 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    requireWhatsAppAgent(req);
+    await requireWhatsAppAgent(req);
     const clinicId = String(req.query.clinicId || "").trim();
     const limit = Math.max(1, Math.min(Number(req.query.limit || 10) || 10, 20));
     const recover = String(req.query.recover || "") === "1";
+    const requestedKind = ["manual", "followup"].includes(String(req.query.kind || "")) ? String(req.query.kind) : "";
     if (!clinicId) return res.status(400).json({ error: "clinicId obrigatório" });
 
     const db = getAdminDb();
@@ -33,13 +34,29 @@ export default async function handler(req, res) {
       }
     }
 
-    const snap = await col.where("status", "==", "pending").limit(limit).get();
+    const snap = await col.where("status", "==", "pending").limit(60).get();
     if (snap.empty) return res.status(200).json({ ok: true, items: [] });
+
+    let docs = [...snap.docs];
+    if (requestedKind) {
+      docs = docs.filter((doc) => String(doc.data()?.kind || "manual") === requestedKind);
+    } else {
+      docs.sort((a, b) => {
+        const aData = a.data() || {};
+        const bData = b.data() || {};
+        const aPriority = String(aData.kind || "manual") === "manual" ? 0 : 1;
+        const bPriority = String(bData.kind || "manual") === "manual" ? 0 : 1;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return String(aData.createdAt || "").localeCompare(String(bData.createdAt || ""));
+      });
+    }
+    docs = docs.slice(0, limit);
+    if (!docs.length) return res.status(200).json({ ok: true, items: [] });
 
     const leaseAt = new Date();
     const leaseExpiresAt = new Date(leaseAt.getTime() + 45 * 60 * 1000).toISOString();
     const batch = db.batch();
-    const items = snap.docs.map((doc) => {
+    const items = docs.map((doc) => {
       const data = doc.data() || {};
       batch.set(doc.ref, {
         status: "leased",

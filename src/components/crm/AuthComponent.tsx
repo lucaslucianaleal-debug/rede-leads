@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogOut, LogIn } from "lucide-react";
+import { LogOut, LogIn, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export function AuthComponent() {
@@ -64,6 +65,12 @@ export function AuthComponent() {
     return (
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground hidden sm:inline">@{displayName}</span>
+        <Button asChild variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">
+          <Link to="/whatsapp-agent" aria-label="Abrir WhatsApp Comercial">
+            <MessageCircle className="h-4 w-4 mr-1" />
+            WhatsApp
+          </Link>
+        </Button>
         <Button variant="ghost" size="sm" onClick={logout}>
           <LogOut className="h-4 w-4 mr-1" />
           Sair

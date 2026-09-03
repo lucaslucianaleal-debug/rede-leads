@@ -2,7 +2,8 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import qrcode from "qrcode-terminal";
+import qrcodeTerminal from "qrcode-terminal";
+import QRCode from "qrcode";
 import pkg from "whatsapp-web.js";
 
 const { Client, LocalAuth } = pkg;
@@ -12,9 +13,8 @@ const CLINIC_ID = String(process.env.CLINIC_ID || "odontocompany-olimpia").trim(
 const AGENT_SECRET = String(process.env.WHATSAPP_AGENT_SECRET || "").trim();
 const MIN_DELAY_SECONDS = Math.max(60, Number(process.env.MIN_DELAY_SECONDS || 150) || 150);
 const MAX_DELAY_SECONDS = Math.max(MIN_DELAY_SECONDS, Number(process.env.MAX_DELAY_SECONDS || 270) || 270);
-const BATCH_SIZE = Math.max(1, Math.min(Number(process.env.BATCH_SIZE || 10) || 10, 20));
-const IDLE_POLL_SECONDS = Math.max(30, Number(process.env.IDLE_POLL_SECONDS || 60) || 60);
-const AGENT_VERSION = "2.0.0";
+const IDLE_POLL_SECONDS = Math.max(5, Number(process.env.IDLE_POLL_SECONDS || 8) || 8);
+const AGENT_VERSION = "2.1.0";
 
 if (!CLINIC_ID || !AGENT_SECRET) {
   console.error("\n[agent] Configure CLINIC_ID e WHATSAPP_AGENT_SECRET no arquivo .env antes de iniciar.\n");
@@ -67,7 +67,6 @@ function candidatePhones(raw) {
     variants.push(`55${digits}`);
     variants.push(`55${digits.slice(0, 2)}${digits.slice(3)}`);
   } else if (digits.length === 10) {
-    // Para celular antigo/CRM sem o nono dígito, tenta primeiro a forma moderna.
     const subscriberFirst = Number(digits[2]);
     if (subscriberFirst >= 6) variants.push(`55${digits.slice(0, 2)}9${digits.slice(2)}`);
     variants.push(`55${digits}`);
@@ -88,24 +87,24 @@ async function api(pathname, options = {}) {
     },
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.error || `HTTP ${response.status}`);
-  }
+  if (!response.ok) throw new Error(data?.error || `HTTP ${response.status}`);
   return data;
 }
 
-async function heartbeat({ connected, connectedPhone = "", lastError = null }) {
+async function heartbeat({ connected, connectedPhone = "", lastError = null, qrCode = undefined }) {
   try {
+    const body = {
+      clinicId: CLINIC_ID,
+      connected,
+      connectedPhone,
+      lastError,
+      agentVersion: AGENT_VERSION,
+      hostname: os.hostname(),
+    };
+    if (qrCode !== undefined) body.qrCode = qrCode;
     await api("/api/whatsapp/agent/heartbeat", {
       method: "POST",
-      body: JSON.stringify({
-        clinicId: CLINIC_ID,
-        connected,
-        connectedPhone,
-        lastError,
-        agentVersion: AGENT_VERSION,
-        hostname: os.hostname(),
-      }),
+      body: JSON.stringify(body),
     });
   } catch (error) {
     console.warn("[agent] heartbeat falhou:", error?.message || error);
@@ -127,8 +126,8 @@ let connected = false;
 let connectedPhone = "";
 let queueRunning = false;
 let firstPull = true;
-let firstSendInSession = true;
 let queueTimer = null;
+let nextFollowupAt = 0;
 
 async function resolveWhatsAppId(phone) {
   for (const candidate of candidatePhones(phone)) {
@@ -154,9 +153,74 @@ async function canStillSend(queueId) {
   return api(`/api/whatsapp/agent/check?${query.toString()}`);
 }
 
+async function pullQueue(kind, limit = 1, recover = false) {
+  const query = new URLSearchParams({
+    clinicId: CLINIC_ID,
+    limit: String(limit),
+    kind,
+    recover: recover ? "1" : "0",
+  });
+  const result = await api(`/api/whatsapp/agent/pull?${query.toString()}`);
+  return Array.isArray(result?.items) ? result.items : [];
+}
+
 function scheduleQueuePoll(delayMs = IDLE_POLL_SECONDS * 1000) {
   if (queueTimer) clearTimeout(queueTimer);
   queueTimer = setTimeout(() => processQueue().catch(() => {}), delayMs);
+}
+
+async function sendQueueItem(item) {
+  const cached = sentCache[item.id];
+  if (cached?.messageId) {
+    console.log(`[fila] ${item.name || item.phone}: já enviado localmente; confirmando no Rede Leads.`);
+    await reportResult(item.id, "sent", { messageId: cached.messageId }).catch((error) => {
+      console.warn("[fila] não foi possível confirmar envio em cache:", error?.message || error);
+    });
+    return true;
+  }
+
+  let check;
+  try {
+    check = await canStillSend(item.id);
+  } catch (error) {
+    console.warn(`[fila] falha ao validar ${item.name || item.phone}; não vou enviar:`, error?.message || error);
+    return false;
+  }
+  if (!check?.allowed) {
+    console.log(`[fila] cancelado: ${item.name || item.phone} (${check?.reason || "bloqueado"}).`);
+    return false;
+  }
+
+  const target = await resolveWhatsAppId(item.phone);
+  if (!target) {
+    const error = "Número não encontrado no WhatsApp";
+    console.warn(`[fila] ${item.name || item.phone}: ${error}`);
+    await reportResult(item.id, "failed", { error }).catch(() => {});
+    return false;
+  }
+
+  try {
+    try {
+      const chat = await client.getChatById(target);
+      await chat.sendStateTyping();
+      await sleep(item.kind === "followup" ? randomBetween(1200, 3500) : randomBetween(500, 1400));
+      await chat.clearState();
+    } catch {
+      // presença é opcional
+    }
+
+    const sent = await client.sendMessage(target, item.message);
+    const messageId = sent?.id?._serialized || sent?.id?.id || "";
+    sentCache[item.id] = { messageId, sentAt: new Date().toISOString() };
+    persistSentCache();
+    await reportResult(item.id, "sent", { messageId });
+    console.log(`[enviado] ${item.kind === "followup" ? "FU" : "MSG"} • ${item.name || item.phone}`);
+    return true;
+  } catch (error) {
+    console.error(`[erro] ${item.name || item.phone}:`, error?.message || error);
+    await reportResult(item.id, "failed", { error: error?.message || String(error) }).catch(() => {});
+    return false;
+  }
 }
 
 async function processQueue() {
@@ -167,82 +231,24 @@ async function processQueue() {
 
   queueRunning = true;
   try {
-    while (connected) {
-      const query = new URLSearchParams({
-        clinicId: CLINIC_ID,
-        limit: String(BATCH_SIZE),
-        recover: firstPull ? "1" : "0",
-      });
-      firstPull = false;
-      const pulled = await api(`/api/whatsapp/agent/pull?${query.toString()}`);
-      const items = Array.isArray(pulled?.items) ? pulled.items : [];
-      if (!items.length) break;
+    // Mensagens manuais têm prioridade e não esperam a régua de follow-up.
+    const manualItems = await pullQueue("manual", 5, firstPull);
+    firstPull = false;
+    if (manualItems.length) {
+      for (let i = 0; i < manualItems.length && connected; i += 1) {
+        await sendQueueItem(manualItems[i]);
+        if (i < manualItems.length - 1) await sleep(randomBetween(900, 2200));
+      }
+    }
 
-      console.log(`[fila] ${items.length} mensagem(ns) recebida(s) do Rede Leads.`);
-
-      for (const item of items) {
-        if (!connected) break;
-
-        const cached = sentCache[item.id];
-        if (cached?.messageId) {
-          console.log(`[fila] ${item.name || item.phone}: já enviado localmente; confirmando no Rede Leads.`);
-          try {
-            await reportResult(item.id, "sent", { messageId: cached.messageId });
-          } catch (error) {
-            console.warn("[fila] não foi possível confirmar envio em cache:", error?.message || error);
-          }
-          continue;
-        }
-
-        if (!firstSendInSession) {
-          const waitSeconds = randomBetween(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS);
-          console.log(`[fila] aguardando ${waitSeconds}s antes do próximo envio...`);
-          await sleep(waitSeconds * 1000);
-        }
-        firstSendInSession = false;
-
-        let check;
-        try {
-          check = await canStillSend(item.id);
-        } catch (error) {
-          console.warn(`[fila] falha ao validar ${item.name || item.phone}; não vou enviar:`, error?.message || error);
-          continue;
-        }
-        if (!check?.allowed) {
-          console.log(`[fila] cancelado: ${item.name || item.phone} (${check?.reason || "bloqueado"}).`);
-          continue;
-        }
-
-        const target = await resolveWhatsAppId(item.phone);
-        if (!target) {
-          const error = "Número não encontrado no WhatsApp";
-          console.warn(`[fila] ${item.name || item.phone}: ${error}`);
-          await reportResult(item.id, "failed", { error }).catch(() => {});
-          continue;
-        }
-
-        try {
-          // Pequena presença de digitação; o espaçamento real é controlado pelo rate limiter acima.
-          try {
-            const chat = await client.getChatById(target);
-            await chat.sendStateTyping();
-            await sleep(randomBetween(1200, 3500));
-            await chat.clearState();
-          } catch {
-            // presença é opcional
-          }
-
-          const sent = await client.sendMessage(target, item.message);
-          const messageId = sent?.id?._serialized || sent?.id?.id || "";
-          sentCache[item.id] = { messageId, sentAt: new Date().toISOString() };
-          persistSentCache();
-
-          await reportResult(item.id, "sent", { messageId });
-          console.log(`[enviado] ${item.name || item.phone}`);
-        } catch (error) {
-          console.error(`[erro] ${item.name || item.phone}:`, error?.message || error);
-          await reportResult(item.id, "failed", { error: error?.message || String(error) }).catch(() => {});
-        }
+    // Follow-up automático: no máximo um por janela aleatória de 150–270s.
+    if (connected && Date.now() >= nextFollowupAt) {
+      const followupItems = await pullQueue("followup", 1, false);
+      if (followupItems.length) {
+        await sendQueueItem(followupItems[0]);
+        const waitSeconds = randomBetween(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS);
+        nextFollowupAt = Date.now() + waitSeconds * 1000;
+        console.log(`[fila] próximo follow-up automático liberado em ~${waitSeconds}s.`);
       }
     }
   } catch (error) {
@@ -261,16 +267,10 @@ async function resolveInboundIdentity(msg) {
     // sem contato confiável = não inventar telefone
   }
 
-  const candidates = [
-    contact?.number,
-    contact?.id?.user,
-    msg?.from,
-  ];
-
+  const candidates = [contact?.number, contact?.id?.user, msg?.from];
   let phone = null;
   for (const value of candidates) {
     const digits = digitsOnly(value);
-    // LID interno costuma ser muito maior que um telefone; nunca vira lead.
     if (digits.length >= 12 && digits.length <= 13 && digits.startsWith("55")) {
       phone = digits;
       break;
@@ -284,7 +284,6 @@ async function resolveInboundIdentity(msg) {
     msg?._data?.notifyName ||
     ""
   ).trim();
-
   return { phone, name };
 }
 
@@ -292,7 +291,7 @@ function referralFromMessage(msg) {
   const raw = msg?._data?.referral || msg?._data?.ctwaContext || msg?._data?.contextInfo?.externalAdReply || {};
   return {
     sourceId: raw?.sourceId || raw?.source_id || raw?.adId || raw?.ad_id || "",
-    sourceUrl: raw?.sourceUrl || raw?.source_url || raw?.sourceUrl || "",
+    sourceUrl: raw?.sourceUrl || raw?.source_url || "",
     headline: raw?.headline || raw?.title || "",
     body: raw?.body || "",
     ctwaClid: raw?.ctwaClid || raw?.ctwa_clid || "",
@@ -307,9 +306,15 @@ function normalizeMessageType(type) {
   return value || "text";
 }
 
-client.on("qr", (qr) => {
-  console.log("\n[WhatsApp] Leia o QR Code abaixo em Aparelhos conectados:\n");
-  qrcode.generate(qr, { small: true });
+client.on("qr", async (qr) => {
+  console.log("\n[WhatsApp] QR gerado. Ele também aparecerá no Rede Leads.\n");
+  qrcodeTerminal.generate(qr, { small: true });
+  try {
+    const qrCode = await QRCode.toDataURL(qr, { width: 360, margin: 1 });
+    await heartbeat({ connected: false, connectedPhone: "", qrCode });
+  } catch (error) {
+    console.warn("[WhatsApp] não foi possível publicar o QR no Rede Leads:", error?.message || error);
+  }
 });
 
 client.on("authenticated", () => {
@@ -320,20 +325,20 @@ client.on("ready", async () => {
   connected = true;
   connectedPhone = digitsOnly(client?.info?.wid?._serialized || client?.info?.wid?.user || "");
   console.log(`[WhatsApp] conectado${connectedPhone ? `: ${connectedPhone}` : ""}.`);
-  await heartbeat({ connected: true, connectedPhone });
+  await heartbeat({ connected: true, connectedPhone, qrCode: null });
   processQueue().catch(() => {});
 });
 
 client.on("auth_failure", async (message) => {
   connected = false;
   console.error("[WhatsApp] falha de autenticação:", message);
-  await heartbeat({ connected: false, lastError: String(message || "auth_failure") });
+  await heartbeat({ connected: false, lastError: String(message || "auth_failure"), qrCode: null });
 });
 
 client.on("disconnected", async (reason) => {
   connected = false;
   console.warn("[WhatsApp] desconectado:", reason);
-  await heartbeat({ connected: false, lastError: String(reason || "disconnected") });
+  await heartbeat({ connected: false, lastError: String(reason || "disconnected"), qrCode: null });
 });
 
 client.on("message", async (msg) => {
@@ -349,12 +354,11 @@ client.on("message", async (msg) => {
     }
 
     const messageType = normalizeMessageType(msg.type);
-    const text = messageType === "text" ? String(msg.body || "") : String(msg.body || "");
     const payload = {
       clinicId: CLINIC_ID,
       phone: identity.phone,
       name: identity.name,
-      text,
+      text: String(msg.body || ""),
       messageType,
       messageId: msg?.id?._serialized || msg?.id?.id || "",
       referral: referralFromMessage(msg),
@@ -364,7 +368,6 @@ client.on("message", async (msg) => {
       method: "POST",
       body: JSON.stringify(payload),
     });
-
     console.log(`[entrada] ${identity.name || identity.phone}: ${messageType}${result?.matched ? " → lead existente" : " → triagem"}`);
   } catch (error) {
     console.warn("[entrada] erro:", error?.message || error);
@@ -378,15 +381,16 @@ setInterval(() => {
 process.on("SIGINT", async () => {
   console.log("\n[agent] encerrando...");
   connected = false;
-  await heartbeat({ connected: false, connectedPhone }).catch(() => {});
+  await heartbeat({ connected: false, connectedPhone, qrCode: null }).catch(() => {});
   try { await client.destroy(); } catch {}
   process.exit(0);
 });
 
-console.log("\n=== Rede Leads • WhatsApp Agent v2 ===");
+console.log("\n=== Rede Leads • WhatsApp Agent v2.1 ===");
 console.log(`Clínica: ${CLINIC_ID}`);
 console.log(`Rede Leads: ${BASE_URL}`);
-console.log(`Intervalo entre envios: ${MIN_DELAY_SECONDS}s a ${MAX_DELAY_SECONDS}s`);
+console.log(`Follow-ups automáticos: intervalo ${MIN_DELAY_SECONDS}s a ${MAX_DELAY_SECONDS}s`);
+console.log(`Mensagens manuais: prioridade, checagem a cada ~${IDLE_POLL_SECONDS}s`);
 console.log("O agente NÃO baixa mídia e NÃO lê o Firebase diretamente.\n");
 
 client.initialize();

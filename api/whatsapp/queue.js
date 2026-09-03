@@ -56,7 +56,12 @@ export default async function handler(req, res) {
       if (!leadId || !phone || !phoneKey || !message) continue;
       if (message.length > 4000) continue;
 
-      const id = `${kind === "followup" ? "fu" : "msg"}_${dayKey}_${safeId(leadId)}`;
+      const requestId = safeId(raw?.clientRequestId || "");
+      const manualSuffix = requestId || safeId(`${Date.now()}_${Math.random().toString(36).slice(2, 10)}`);
+      const id = kind === "followup"
+        ? `fu_${dayKey}_${safeId(leadId)}`
+        : `msg_${dayKey}_${safeId(leadId)}_${manualSuffix}`;
+
       normalized.push({
         id,
         leadId,
@@ -65,6 +70,7 @@ export default async function handler(req, res) {
         name: String(raw?.name || "").trim().slice(0, 150),
         message,
         kind,
+        clientRequestId: requestId,
         nextStage: raw?.nextStage || nextFollowUpStage(raw?.stage),
         stageBefore: String(raw?.stage || ""),
       });
@@ -97,6 +103,7 @@ export default async function handler(req, res) {
         name: item.name,
         message: item.message,
         kind: item.kind,
+        clientRequestId: item.clientRequestId,
         stageBefore: item.stageBefore,
         nextStage: item.nextStage,
         status: "pending",

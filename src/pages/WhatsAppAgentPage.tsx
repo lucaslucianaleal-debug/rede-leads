@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, RefreshCw, Send, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Copy, KeyRound, MessageCircle, QrCode, RefreshCw, Send, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,8 @@ import { useLeads } from "@/hooks/useLeads";
 import { useWhatsAppAgent, WhatsAppQueueItem } from "@/hooks/useWhatsAppAgent";
 import { Lead, LeadStage } from "@/types/crm";
 import { formatFollowUpMessage, getFollowUpMessageForLead } from "@/data/followUpMessages";
+import { WhatsAppInbox } from "@/components/crm/WhatsAppInbox";
+import { WhatsAppQRModal } from "@/components/crm/WhatsAppQRModal";
 
 function todayBr() {
   const now = new Date();
@@ -40,7 +42,6 @@ function buildMessage(lead: Lead, clinicName: string) {
     hasAppointment,
     noShow,
   );
-
   if (!template) return "";
   return formatFollowUpMessage(
     template,
@@ -59,11 +60,19 @@ function buildMessage(lead: Lead, clinicName: string) {
 export default function WhatsAppAgentPage() {
   const { clinicMeta, currentClinic } = useAuth();
   const { allLeads } = useLeads();
-  const { status, loadingStatus, refreshStatus, queueMessages } = useWhatsAppAgent();
+  const { status, loadingStatus, refreshStatus, pairAgent, queueMessages } = useWhatsAppAgent();
+  const [view, setView] = useState<"inbox" | "followup">("inbox");
+  const [showQr, setShowQr] = useState(false);
+  const [pairing, setPairing] = useState(false);
+  const [pairSecret, setPairSecret] = useState("");
   const [search, setSearch] = useState("");
   const [onlyNoReply, setOnlyNoReply] = useState(true);
   const [selected, setSelected] = useState<string[]>([]);
   const [queuing, setQueuing] = useState(false);
+
+  useEffect(() => {
+    if (status.qrCode && !status.connected) setShowQr(true);
+  }, [status.qrCode, status.connected]);
 
   const today = todayBr();
   const clinicName = clinicMeta?.name || "Odontocompany";
@@ -91,28 +100,48 @@ export default function WhatsAppAgentPage() {
     return candidates.filter((item) => ids.has(item.lead.id));
   }, [candidates, selected]);
 
-  const selectFirst40 = () => {
-    setSelected(candidates.slice(0, 40).map((item) => item.lead.id));
+  const selectFirst40 = () => setSelected(candidates.slice(0, 40).map((item) => item.lead.id));
+  const toggle = (id: string) => setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id].slice(0, 40));
+
+  const prepareThisPc = async () => {
+    setPairing(true);
+    try {
+      const secret = await pairAgent();
+      setPairSecret(secret);
+      toast.success("Chave deste computador gerada. Ela aparece somente agora.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao preparar computador");
+    } finally {
+      setPairing(false);
+    }
   };
 
-  const toggle = (id: string) => {
-    setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id].slice(0, 40));
+  const copyAgentConfig = async () => {
+    if (!pairSecret || !currentClinic) return;
+    const text = [
+      "REDE_LEADS_URL=https://rede-leads.vercel.app",
+      `CLINIC_ID=${currentClinic}`,
+      `WHATSAPP_AGENT_SECRET=${pairSecret}`,
+      "MIN_DELAY_SECONDS=150",
+      "MAX_DELAY_SECONDS=270",
+      "IDLE_POLL_SECONDS=8",
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Configuração copiada. Cole no arquivo whatsapp-agent/.env do seu PC.");
+    } catch {
+      toast.error("Não consegui copiar automaticamente. Selecione o bloco e copie manualmente.");
+    }
   };
 
   const enqueue = async () => {
-    if (!currentClinic) {
-      toast.error("Selecione uma clínica antes de criar a fila.");
-      return;
-    }
-    if (!selectedItems.length) {
-      toast.error("Selecione pelo menos um lead.");
-      return;
-    }
+    if (!currentClinic) return toast.error("Selecione uma clínica antes de criar a fila.");
+    if (!selectedItems.length) return toast.error("Selecione pelo menos um lead.");
+    if (!status.connected) return toast.error("Conecte o WhatsApp antes de iniciar os follow-ups.");
 
     const ok = window.confirm(
       `Colocar ${selectedItems.length} follow-up(s) na fila automática?\n\n` +
-      "O agente local enviará uma mensagem por vez, com intervalo aleatório configurado no computador. " +
-      "Respostas e pedidos para parar cancelam os próximos envios daquele lead."
+      "O agente enviará um follow-up por vez, com intervalo aleatório. Mensagens manuais da caixa de entrada têm prioridade."
     );
     if (!ok) return;
 
@@ -140,83 +169,131 @@ export default function WhatsAppAgentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto space-y-4">
-        <div className="flex items-center gap-3">
-          <Button asChild variant="outline" size="sm" className="border-slate-700 bg-slate-900">
+    <div className="min-h-screen bg-background p-4 md:p-6">
+      <div className="max-w-[1400px] mx-auto space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button asChild variant="outline" size="sm">
             <Link to="/"><ArrowLeft className="h-4 w-4 mr-2" />Rede Leads</Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">WhatsApp • Follow-up automático</h1>
-            <p className="text-sm text-slate-400">Fila leve para o agente local — sem servidor Firebase no computador.</p>
+            <h1 className="text-2xl font-heading font-bold">WhatsApp Comercial</h1>
+            <p className="text-sm text-muted-foreground">Conversas e follow-ups usando o agente local deste computador.</p>
           </div>
         </div>
 
-        <Card className="border-slate-800 bg-slate-900 text-slate-100">
-          <CardContent className="pt-6 flex flex-wrap items-center gap-3">
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${status.connected ? "border-emerald-700 bg-emerald-950/40 text-emerald-300" : "border-slate-700 bg-slate-950 text-slate-400"}`}>
-              {status.connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-              <span className="font-medium">{status.connected ? "Agente conectado" : status.online ? "Agente online, WhatsApp desconectado" : "Agente offline"}</span>
-            </div>
-            {status.lastSeenAt && <span className="text-xs text-slate-500">Último sinal: {new Date(status.lastSeenAt).toLocaleString("pt-BR")}</span>}
-            <Button variant="outline" size="sm" onClick={refreshStatus} disabled={loadingStatus} className="border-slate-700 ml-auto">
-              <RefreshCw className={`h-4 w-4 mr-2 ${loadingStatus ? "animate-spin" : ""}`} />Atualizar status
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-800 bg-slate-900 text-slate-100">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Send className="h-5 w-5" />Preparar fila de hoje</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-3 items-center">
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar nome, telefone ou serviço..."
-                className="max-w-sm bg-slate-950 border-slate-700"
-              />
-              <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="checkbox" checked={onlyNoReply} onChange={(e) => setOnlyNoReply(e.target.checked)} />
-                Somente quem não respondeu
-              </label>
-              <Button variant="secondary" onClick={selectFirst40} disabled={!candidates.length}>Selecionar 40 mais urgentes</Button>
-              <Button onClick={enqueue} disabled={queuing || selectedItems.length === 0}>
-                {queuing ? "Criando fila..." : `Colocar ${selectedItems.length || ""} na fila`}
+        <Card>
+          <CardContent className="pt-6 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${status.connected ? "border-emerald-200 bg-emerald-50 text-emerald-700" : status.online ? "border-amber-200 bg-amber-50 text-amber-700" : "border-border bg-muted/40 text-muted-foreground"}`}>
+                {status.connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+                <span className="font-medium">
+                  {status.connected ? "WhatsApp conectado" : status.online ? "Agente ligado • aguardando WhatsApp" : "Agente local desligado"}
+                </span>
+              </div>
+              {status.connectedPhone && <span className="text-sm text-muted-foreground">Número: +{status.connectedPhone}</span>}
+              {status.qrCode && !status.connected && (
+                <Button variant="outline" size="sm" onClick={() => setShowQr(true)}>
+                  <QrCode className="h-4 w-4 mr-2" />Abrir QR Code
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={refreshStatus} disabled={loadingStatus} className="ml-auto">
+                <RefreshCw className={`h-4 w-4 mr-2 ${loadingStatus ? "animate-spin" : ""}`} />Atualizar
               </Button>
             </div>
 
-            <div className="rounded-lg border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
-              O padrão do agente é 150–270 segundos entre mensagens. Isso evita rajadas, mas nenhum intervalo garante que o WhatsApp não aplique restrições. Use contatos com relação comercial legítima e respeite pedidos para parar.
-            </div>
-
-            <div className="text-sm text-slate-400">{candidates.length} lead(s) elegíveis • {selectedItems.length}/40 selecionados</div>
-
-            <div className="border border-slate-800 rounded-lg overflow-hidden max-h-[58vh] overflow-y-auto">
-              {candidates.slice(0, 120).map(({ lead, message }) => {
-                const checked = selected.includes(lead.id);
-                return (
-                  <label key={lead.id} className={`flex gap-3 p-3 border-b border-slate-800 cursor-pointer ${checked ? "bg-emerald-950/20" : "hover:bg-slate-800/50"}`}>
-                    <input type="checkbox" checked={checked} onChange={() => toggle(lead.id)} disabled={!checked && selected.length >= 40} className="mt-1" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold">{lead.nome}</span>
-                        <span className="text-xs text-slate-500">{lead.telefone}</span>
-                        <span className="text-xs rounded bg-slate-800 px-2 py-0.5">{lead.etapaLead}</span>
-                        {checked && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
-                      </div>
-                      <div className="text-xs text-slate-400 mt-1">{lead.servicoProcurado || "Sem serviço"} • último follow-up: {lead.lastFollowUpDone || "—"}</div>
-                      <div className="text-xs text-slate-500 mt-1 truncate">{message.replace(/\n/g, " ")}</div>
-                    </div>
-                  </label>
-                );
-              })}
-              {!candidates.length && <div className="p-8 text-center text-slate-500">Nenhum lead elegível com os filtros atuais.</div>}
-            </div>
+            {!status.online && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-sm text-blue-900 space-y-2">
+                <div className="font-medium flex items-center gap-2"><KeyRound className="h-4 w-4" />Primeira conexão deste computador</div>
+                <p>O WhatsApp Desktop já aberto no Windows não é a sessão usada pelo agente. Vamos conectar o Rede Leads como <strong>mais um aparelho vinculado</strong>. Depois da primeira leitura, a sessão fica salva no PC e não precisa de QR a cada abertura.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={prepareThisPc} disabled={pairing}>
+                    <KeyRound className="h-4 w-4 mr-2" />{pairing ? "Gerando..." : status.paired ? "Gerar nova chave deste PC" : "Preparar este computador"}
+                  </Button>
+                  {pairSecret && (
+                    <Button size="sm" variant="outline" onClick={copyAgentConfig}>
+                      <Copy className="h-4 w-4 mr-2" />Copiar configuração
+                    </Button>
+                  )}
+                </div>
+                {pairSecret && currentClinic && (
+                  <div className="space-y-2 pt-1">
+                    <p className="text-xs">Cole esta configuração no arquivo <strong>whatsapp-agent/.env</strong> do seu PC. A chave é exibida apenas nesta sessão:</p>
+                    <pre className="overflow-x-auto rounded-md bg-slate-950 text-slate-100 p-3 text-xs whitespace-pre-wrap break-all">{`REDE_LEADS_URL=https://rede-leads.vercel.app\nCLINIC_ID=${currentClinic}\nWHATSAPP_AGENT_SECRET=${pairSecret}\nMIN_DELAY_SECONDS=150\nMAX_DELAY_SECONDS=270\nIDLE_POLL_SECONDS=8`}</pre>
+                    <p className="text-xs">Depois, no terminal dentro da pasta <strong>whatsapp-agent</strong>, execute <strong>npm install</strong> e <strong>npm start</strong>. O QR será enviado automaticamente para esta tela.</p>
+                  </div>
+                )}
+                {!pairSecret && status.paired && <p className="text-xs">Já existe uma chave pareada. Se você não tiver mais essa chave no arquivo .env do PC, clique em “Gerar nova chave deste PC”.</p>}
+              </div>
+            )}
+            {status.online && !status.connected && !status.qrCode && (
+              <div className="text-sm text-muted-foreground">Agente está rodando. Aguardando geração do QR ou restauração da sessão anterior.</div>
+            )}
+            {status.lastError && <div className="text-xs text-destructive">Último erro: {status.lastError}</div>}
           </CardContent>
         </Card>
+
+        <div className="flex gap-2 border-b pb-2">
+          <Button variant={view === "inbox" ? "default" : "ghost"} onClick={() => setView("inbox")}>
+            <MessageCircle className="h-4 w-4 mr-2" />Conversas
+          </Button>
+          <Button variant={view === "followup" ? "default" : "ghost"} onClick={() => setView("followup")}>
+            <Send className="h-4 w-4 mr-2" />Follow-ups
+          </Button>
+        </div>
+
+        {view === "inbox" ? (
+          <WhatsAppInbox />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Send className="h-5 w-5" />Preparar fila de hoje</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-3 items-center">
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar nome, telefone ou serviço..." className="max-w-sm" />
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input type="checkbox" checked={onlyNoReply} onChange={(e) => setOnlyNoReply(e.target.checked)} />
+                  Somente quem não respondeu
+                </label>
+                <Button variant="secondary" onClick={selectFirst40} disabled={!candidates.length}>Selecionar 40 mais urgentes</Button>
+                <Button onClick={enqueue} disabled={queuing || selectedItems.length === 0 || !status.connected}>
+                  {queuing ? "Criando fila..." : `Colocar ${selectedItems.length || ""} na fila`}
+                </Button>
+              </div>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Follow-ups automáticos: 150–270 segundos entre envios. Respostas do lead cancelam a automação. Mensagens que você escrever em Conversas têm prioridade e não esperam essa janela.
+              </div>
+
+              <div className="text-sm text-muted-foreground">{candidates.length} lead(s) elegíveis • {selectedItems.length}/40 selecionados</div>
+
+              <div className="border rounded-lg overflow-hidden max-h-[58vh] overflow-y-auto">
+                {candidates.slice(0, 120).map(({ lead, message }) => {
+                  const checked = selected.includes(lead.id);
+                  return (
+                    <label key={lead.id} className={`flex gap-3 p-3 border-b cursor-pointer ${checked ? "bg-primary/5" : "hover:bg-muted/40"}`}>
+                      <input type="checkbox" checked={checked} onChange={() => toggle(lead.id)} disabled={!checked && selected.length >= 40} className="mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold">{lead.nome}</span>
+                          <span className="text-xs text-muted-foreground">{lead.telefone}</span>
+                          <span className="text-xs rounded bg-muted px-2 py-0.5">{lead.etapaLead}</span>
+                          {checked && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">{lead.servicoProcurado || "Sem serviço"} • último follow-up: {lead.lastFollowUpDone || "—"}</div>
+                        <div className="text-xs text-muted-foreground mt-1 truncate">{message.replace(/\n/g, " ")}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+                {!candidates.length && <div className="p-8 text-center text-muted-foreground">Nenhum lead elegível com os filtros atuais.</div>}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {showQr && <WhatsAppQRModal qrCode={status.qrCode || null} onClose={() => setShowQr(false)} />}
     </div>
   );
 }
