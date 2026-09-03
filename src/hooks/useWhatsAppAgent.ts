@@ -14,6 +14,7 @@ export type WhatsAppQueueItem = {
 
 type AgentStatus = {
   configured: boolean;
+  paired: boolean;
   online: boolean;
   connected: boolean;
   lastSeenAt?: string | null;
@@ -26,7 +27,7 @@ type AgentStatus = {
 
 export function useWhatsAppAgent() {
   const { user, currentClinic } = useAuth();
-  const [status, setStatus] = useState<AgentStatus>({ configured: false, online: false, connected: false, qrCode: null });
+  const [status, setStatus] = useState<AgentStatus>({ configured: false, paired: false, online: false, connected: false, qrCode: null });
   const [loadingStatus, setLoadingStatus] = useState(false);
 
   const authHeaders = useCallback(async () => {
@@ -48,6 +49,7 @@ export function useWhatsAppAgent() {
       if (!res.ok) throw new Error(data?.error || "Erro ao consultar agente WhatsApp");
       setStatus({
         configured: data.configured === true,
+        paired: data.paired === true,
         online: data.online === true,
         connected: data.connected === true,
         lastSeenAt: data.lastSeenAt || null,
@@ -69,6 +71,21 @@ export function useWhatsAppAgent() {
     const timer = window.setInterval(refreshStatus, 8000);
     return () => window.clearInterval(timer);
   }, [refreshStatus]);
+
+  const pairAgent = useCallback(async () => {
+    if (!currentClinic) throw new Error("Clínica não selecionada");
+    const headers = await authHeaders();
+    const res = await fetch("/api/whatsapp/status", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ clinicId: currentClinic, action: "pair" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "Erro ao preparar o agente");
+    if (!data.agentSecret) throw new Error("Chave do agente não foi gerada");
+    setStatus((prev) => ({ ...prev, configured: true, paired: true, connected: false, online: false, qrCode: null }));
+    return String(data.agentSecret);
+  }, [currentClinic, authHeaders]);
 
   const queueMessages = useCallback(async (items: WhatsAppQueueItem[]) => {
     if (!currentClinic) throw new Error("Clínica não selecionada");
@@ -128,6 +145,7 @@ export function useWhatsAppAgent() {
     status,
     loadingStatus,
     refreshStatus,
+    pairAgent,
     queueMessages,
     fetchChats,
     fetchMessages,
