@@ -1,12 +1,14 @@
 import React, { useRef, useState, useEffect } from "react";
 import type { LayerType, PeriodType } from "@/types/commandCenter";
 import { useMetaAds } from "@/hooks/useMetaAds";
+import { useMetaFinance } from "@/hooks/useMetaFinance";
 import { useActions } from "@/hooks/useActions";
 import { useExport } from "@/hooks/useExport";
 import { useAuth } from "@/hooks/useAuth";
 import Topbar from "./commandcenter/Topbar";
 import DiagnosticCard from "./commandcenter/DiagnosticCard";
 import CampaignCard from "./commandcenter/CampaignCard";
+import MetaFinanceCard from "./commandcenter/MetaFinanceCard";
 
 // Mapear unit IDs para clinic IDs no Firestore
 const unitToClinicId: Record<string, string> = {
@@ -54,13 +56,23 @@ export default function CommandCenter() {
     handleSyncMetaAds,
     metaSyncing,
   } = useMetaAds(unit, clinicId, ticketMedio, period);
+  const { metaFinance, metaFinanceLoading, refreshMetaFinance } = useMetaFinance(clinicId);
   const { execute } = useActions(unit);
   const { exportPDF, exporting } = useExport();
 
-  const criticalCount = metaDiagnostics.filter(d => d.type === "crit").length;
+  const criticalCount = metaDiagnostics.filter(d => d.type === "crit").length
+    + (metaFinance?.financial?.alertLevel === "critical" ? 1 : 0);
 
   const handleExport = () => {
     exportPDF(containerRef as React.RefObject<HTMLElement>, period);
+  };
+
+  const handleSyncMetaAndFinance = async () => {
+    try {
+      await handleSyncMetaAds();
+    } finally {
+      await refreshMetaFinance();
+    }
   };
 
   return (
@@ -112,7 +124,7 @@ export default function CommandCenter() {
                   </h3>
                   <button
                     type="button"
-                    onClick={handleSyncMetaAds}
+                    onClick={handleSyncMetaAndFinance}
                     disabled={metaSyncing}
                     style={{
                       background: metaSyncing ? "#333" : "#134D48",
@@ -125,6 +137,7 @@ export default function CommandCenter() {
                     {metaSyncing ? "Sincronizando Meta..." : "↻ Sincronizar Meta"}
                   </button>
                 </div>
+                <MetaFinanceCard status={metaFinance} loading={metaFinanceLoading} />
                 <CampaignCard
                   campaigns={campaigns}
                   clinicId={clinicId}
