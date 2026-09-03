@@ -27,21 +27,26 @@ export default async function handler(req, res) {
       .get();
 
     if (!snap.exists) {
-      return res.status(200).json({ configured: false, online: false, connected: false });
+      return res.status(200).json({ configured: false, online: false, connected: false, qrCode: null });
     }
 
     const data = snap.data() || {};
     const lastSeenMs = Date.parse(String(data.lastSeenAt || ""));
     const online = Number.isFinite(lastSeenMs) && (Date.now() - lastSeenMs) < 10 * 60 * 1000;
+    const connected = online && data.connected === true;
+    const qrUpdatedMs = Date.parse(String(data.qrUpdatedAt || ""));
+    const qrFresh = !connected && Number.isFinite(qrUpdatedMs) && (Date.now() - qrUpdatedMs) < 2 * 60 * 1000;
 
     return res.status(200).json({
       configured: true,
       online,
-      connected: online && data.connected === true,
+      connected,
       lastSeenAt: data.lastSeenAt || null,
       connectedPhone: data.connectedPhone || "",
       lastError: data.lastError || null,
       agentVersion: data.agentVersion || null,
+      qrCode: qrFresh && typeof data.qrCode === "string" ? data.qrCode : null,
+      qrUpdatedAt: qrFresh ? data.qrUpdatedAt || null : null,
     });
   } catch (error) {
     const status = error?.statusCode || (String(error?.code || "").includes("auth/") ? 401 : 500);
