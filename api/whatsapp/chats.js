@@ -1,4 +1,5 @@
 import { getAdminAuth, getAdminDb } from "../../server/firebaseAdmin.js";
+import { isIgnoredWhatsAppMessageType } from "../../server/whatsappChatStore.js";
 
 async function requireFirebaseUser(req) {
   const header = String(req.headers.authorization || "");
@@ -52,29 +53,37 @@ export default async function handler(req, res) {
         .doc(chatId)
         .collection("messages")
         .orderBy("createdAt", "desc")
-        .limit(120)
+        .limit(140)
         .get();
-      return res.status(200).json({ ok: true, items: snap.docs.map(serializeMessage).reverse() });
+      const items = snap.docs
+        .filter((doc) => !isIgnoredWhatsAppMessageType(doc.data()?.messageType))
+        .slice(0, 120)
+        .map(serializeMessage)
+        .reverse();
+      return res.status(200).json({ ok: true, items });
     }
 
     const snap = await chats
       .orderBy("lastMessageAt", "desc")
-      .limit(60)
+      .limit(80)
       .get();
 
-    const items = snap.docs.map((doc) => {
-      const data = doc.data() || {};
-      return {
-        id: doc.id,
-        phone: data.phone || "",
-        name: data.name || "",
-        leadId: data.leadId || "",
-        lastMessage: data.lastMessage || "",
-        lastMessageAt: data.lastMessageAt || null,
-        lastDirection: data.lastDirection || "in",
-        unreadCount: Number(data.unreadCount || 0) || 0,
-      };
-    });
+    const items = snap.docs
+      .filter((doc) => !isIgnoredWhatsAppMessageType(doc.data()?.lastMessageType))
+      .slice(0, 60)
+      .map((doc) => {
+        const data = doc.data() || {};
+        return {
+          id: doc.id,
+          phone: data.phone || "",
+          name: data.name || "",
+          leadId: data.leadId || "",
+          lastMessage: data.lastMessage || "",
+          lastMessageAt: data.lastMessageAt || null,
+          lastDirection: data.lastDirection || "in",
+          unreadCount: Number(data.unreadCount || 0) || 0,
+        };
+      });
 
     return res.status(200).json({ ok: true, items });
   } catch (error) {
