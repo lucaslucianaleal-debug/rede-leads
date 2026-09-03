@@ -4,6 +4,7 @@ import type { MetaFinanceStatus } from "@/hooks/useMetaFinance";
 interface Props {
   status: MetaFinanceStatus | null;
   loading?: boolean;
+  errorMessage?: string | null;
 }
 
 function money(value: number | null | undefined, currency = "BRL") {
@@ -30,25 +31,49 @@ function dateTimeBr(iso: string | null | undefined) {
   return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString("pt-BR");
 }
 
-export default function MetaFinanceCard({ status, loading = false }: Props) {
+export default function MetaFinanceCard({ status, loading = false, errorMessage = null }: Props) {
   if (loading && !status) {
     return (
       <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4 mb-4">
-        <p style={{ color: "#9ca3af", fontSize: "11px" }}>Carregando financeiro da Meta...</p>
+        <p style={{ color: "#fff", fontSize: "12px" }} className="font-semibold">Financeiro e combustível das campanhas</p>
+        <p style={{ color: "#9ca3af", fontSize: "10px" }} className="mt-1">Carregando leitura financeira da Meta...</p>
       </div>
     );
   }
 
-  if (!status?.configured) return null;
+  if (errorMessage) {
+    return (
+      <div style={{ background: "#202020", border: "0.5px solid #ef4444" }} className="rounded-lg p-4 mb-4">
+        <p style={{ color: "#777", fontSize: "9px" }} className="uppercase tracking-wider">DADO • META</p>
+        <p style={{ color: "#fff", fontSize: "13px" }} className="font-semibold">Financeiro e combustível das campanhas</p>
+        <p style={{ color: "#ef4444", fontSize: "10px" }} className="mt-2">Não foi possível consultar o financeiro neste ambiente: {errorMessage}</p>
+        <p style={{ color: "#777", fontSize: "9px" }} className="mt-1">As métricas de campanhas continuam funcionando; este aviso existe para o financeiro nunca desaparecer silenciosamente.</p>
+      </div>
+    );
+  }
+
+  if (!status?.configured) {
+    return (
+      <div style={{ background: "#202020", border: "0.5px solid #f59e0b" }} className="rounded-lg p-4 mb-4">
+        <p style={{ color: "#777", fontSize: "9px" }} className="uppercase tracking-wider">DADO • META</p>
+        <p style={{ color: "#fff", fontSize: "13px" }} className="font-semibold">Financeiro e combustível das campanhas</p>
+        <p style={{ color: "#f59e0b", fontSize: "10px" }} className="mt-2">Conta Meta ainda não identificada para este ambiente/clinica. Use “Sincronizar Meta” para vincular e gerar a primeira leitura financeira.</p>
+      </div>
+    );
+  }
 
   const financial = status.financial;
   if (!financial) {
+    const financeError = status.financeLastError?.message;
     return (
-      <div style={{ background: "#202020", border: "0.5px solid #3a3a3a" }} className="rounded-lg p-4 mb-4">
-        <p style={{ color: "#fff", fontSize: "12px" }} className="font-semibold">Financeiro Meta</p>
-        <p style={{ color: "#9ca3af", fontSize: "10px" }} className="mt-1">
-          A conta já está vinculada. Saldo, consumo e autonomia serão preenchidos na próxima sincronização automática ou manual.
-        </p>
+      <div style={{ background: "#202020", border: `0.5px solid ${financeError ? "#ef4444" : "#f59e0b"}` }} className="rounded-lg p-4 mb-4">
+        <p style={{ color: "#777", fontSize: "9px" }} className="uppercase tracking-wider">DADO • META</p>
+        <p style={{ color: "#fff", fontSize: "13px" }} className="font-semibold">Financeiro e combustível das campanhas</p>
+        {financeError ? (
+          <p style={{ color: "#ef4444", fontSize: "10px" }} className="mt-2">A conta está vinculada, mas a leitura financeira falhou: {financeError}</p>
+        ) : (
+          <p style={{ color: "#f59e0b", fontSize: "10px" }} className="mt-2">Conta vinculada. Faça uma sincronização agora para gerar a primeira leitura de saldo, gasto e entrega.</p>
+        )}
       </div>
     );
   }
