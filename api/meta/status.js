@@ -26,7 +26,7 @@ export default async function handler(req, res) {
 
     const snap = await getAdminDb().collection("metaIntegrations").doc(clinicId).get();
     if (!snap.exists) {
-      return res.status(200).json({ ok: true, configured: false, clinicId, financial: null, financeHistory: [] });
+      return res.status(200).json({ ok: true, configured: false, clinicId, financial: null, financeHistory: [], financeLastError: null });
     }
 
     const data = snap.data() || {};
@@ -39,6 +39,7 @@ export default async function handler(req, res) {
       timezone: data.timezone || "",
       lastSyncAt: data.lastSyncAt || null,
       financial: data.financial || null,
+      financeLastError: data.financeLastError || null,
       financeHistory: Array.isArray(data.financeHistory) ? data.financeHistory.slice(-14) : [],
     });
   } catch (error) {
