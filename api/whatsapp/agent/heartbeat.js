@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    requireWhatsAppAgent(req);
+    await requireWhatsAppAgent(req);
     const body = req.body || {};
     const clinicId = String(body.clinicId || "").trim();
     if (!clinicId) return res.status(400).json({ error: "clinicId obrigatório" });
