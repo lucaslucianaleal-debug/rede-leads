@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Send, MessageSquareText, CheckSquare, Square, Wifi, WifiOff } from "lucide-react";
+import { Search, Send, MessageSquareText, CheckSquare, Square, Wifi, WifiOff, MessageCircle, Clock3, Check, Reply } from "lucide-react";
 import { followUpMessages, formatFollowUpMessage } from "@/data/followUpMessages";
 import { useWhatsAppAgent } from "@/hooks/useWhatsAppAgent";
+import { WhatsAppConversationPanel } from "./WhatsAppConversationPanel";
 import { toast } from "sonner";
 
 const STAGES: { stage: LeadStage; label: string }[] = [
@@ -81,6 +82,10 @@ function personalize(template: string, lead: Lead) {
   );
 }
 
+function needsAttention(lead: Lead) {
+  return Boolean((lead as any).whatsappNeedsAttention);
+}
+
 interface FollowUpOperationsPanelProps {
   leads: Lead[];
   allLeads?: Lead[];
@@ -98,10 +103,12 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
   const [source, setSource] = useState<SourceFilter>("todos");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [queuedLeadIds, setQueuedLeadIds] = useState<Set<string>>(new Set());
   const [variants, setVariants] = useState<string[]>([]);
   const [singleLead, setSingleLead] = useState<Lead | null>(null);
   const [singleMessage, setSingleMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [activeLeadId, setActiveLeadId] = useState<string>("");
 
   const services = useMemo(() => {
     const values = base
@@ -137,7 +144,10 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
       );
     }
 
-    return list.sort((a, b) => daysSince(b.lastFollowUpDone || b.dataFollowUp) - daysSince(a.lastFollowUpDone || a.dataFollowUp));
+    return list.sort((a, b) => {
+      if (needsAttention(a) !== needsAttention(b)) return needsAttention(a) ? -1 : 1;
+      return daysSince(b.lastFollowUpDone || b.dataFollowUp) - daysSince(a.lastFollowUpDone || a.dataFollowUp);
+    });
   }, [base, stage, source, service, attendance, view, search, today]);
 
   const stageCounts = useMemo(() => {
@@ -153,6 +163,21 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
     setVariants(templatesFor(stage, attendance === "nao_compareceu"));
   }, [stage, attendance]);
 
+  useEffect(() => {
+    setQueuedLeadIds((current) => {
+      const next = new Set(current);
+      base.forEach((lead) => {
+        if (lead.lastFollowUpDone === today || needsAttention(lead)) next.delete(lead.id);
+      });
+      return next;
+    });
+  }, [base, today]);
+
+  useEffect(() => {
+    if (filtered.length && !activeLeadId) setActiveLeadId(filtered[0].id);
+  }, [filtered, activeLeadId]);
+
+  const activeLead = useMemo(() => base.find((lead) => lead.id === activeLeadId) || null, [base, activeLeadId]);
   const selectedLeads = useMemo(() => filtered.filter((lead) => selected.has(lead.id)), [filtered, selected]);
   const previewLead = selectedLeads[0] || filtered[0] || null;
   const usableVariants = variants.map((v) => v.trim()).filter(Boolean);
@@ -181,6 +206,10 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
     if (!selectedLeads.length) return toast.error("Selecione pelo menos um lead.");
     if (selectedLeads.length > 40) return toast.error("O limite por lote é 40 leads.");
     if (!usableVariants.length) return toast.error("Escreva pelo menos uma mensagem.");
+    if (!status.connected) return toast.error("WhatsApp está desconectado.");
+
+    const ok = window.confirm(`Colocar ${selectedLeads.length} follow-up(s) na fila?\n\nO agente enviará um por vez, com intervalo aleatório de segurança.`);
+    if (!ok) return;
 
     setSending(true);
     try {
@@ -194,6 +223,7 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
         nextStage: nextStage(lead.etapaLead as LeadStage),
       }));
       const result = await queueMessages(items);
+      setQueuedLeadIds((current) => new Set([...current, ...result.queuedIds]));
       toast.success(`${result.queued} follow-up(s) colocado(s) na fila. O agente enviará espaçado.`);
       if (result.skipped) toast.info(`${result.skipped} item(ns) foram ignorados por trava de duplicidade/estado.`);
       setSelected(new Set());
@@ -212,6 +242,7 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
 
   const queueSingle = async () => {
     if (!singleLead || !singleMessage.trim()) return;
+    if (!status.connected) return toast.error("WhatsApp está desconectado.");
     setSending(true);
     try {
       const result = await queueMessages([{
@@ -223,8 +254,13 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
         stage: singleLead.etapaLead,
         nextStage: nextStage(singleLead.etapaLead as LeadStage),
       }]);
-      if (result.queued) toast.success("Follow-up colocado na fila do WhatsApp.");
-      else toast.info("Esse follow-up não entrou na fila porque já existe um envio pendente ou realizado.");
+      if (result.queued) {
+        setQueuedLeadIds((current) => new Set([...current, singleLead.id]));
+        setActiveLeadId(singleLead.id);
+        toast.success("Follow-up colocado na fila. A conversa fica aberta ao lado.");
+      } else {
+        toast.info("Esse follow-up já tem envio pendente ou realizado hoje.");
+      }
       setSingleLead(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao criar follow-up");
@@ -241,7 +277,7 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
             <MessageSquareText className="h-5 w-5 text-primary" />
             Rotina de Contatos • WhatsApp
           </h3>
-          <p className="text-xs text-muted-foreground mt-1">Filtre, edite as mensagens e coloque até 40 follow-ups por lote. Só conta como feito quando o WhatsApp confirmar o envio.</p>
+          <p className="text-xs text-muted-foreground mt-1">Aqui é a operação: filtre a carteira, envie follow-ups e responda a conversa sem sair da rotina.</p>
         </div>
         <div className={`text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 ${status.connected ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
           {status.connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
@@ -250,12 +286,12 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Etapa</p>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Etapa para trabalhar</p>
         <div className="flex flex-wrap gap-1.5">
           {STAGES.map((item) => (
             <button
               key={item.stage}
-              onClick={() => setStage(item.stage)}
+              onClick={() => { setStage(item.stage); setView("vencidos"); setActiveLeadId(""); }}
               className={`px-2.5 py-1 rounded-full border text-xs font-semibold transition ${stage === item.stage ? "border-primary bg-primary/10 text-primary ring-1 ring-primary" : "bg-muted/50 text-muted-foreground border-muted hover:bg-muted"}`}
             >
               {item.label}{stageCounts[item.stage] ? <span className="ml-1 opacity-70">{stageCounts[item.stage]}</span> : null}
@@ -265,14 +301,14 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-        <Select value={service} onValueChange={setService}>
+        <Select value={service} onValueChange={(value) => { setService(value); setActiveLeadId(""); }}>
           <SelectTrigger><SelectValue placeholder="Serviço" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos os serviços</SelectItem>
             {services.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={attendance} onValueChange={(value) => setAttendance(value as AttendanceFilter)}>
+        <Select value={attendance} onValueChange={(value) => { setAttendance(value as AttendanceFilter); setActiveLeadId(""); }}>
           <SelectTrigger><SelectValue placeholder="Comparecimento" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
@@ -281,7 +317,7 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
             <SelectItem value="sem_status">Sem comparecimento</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={source} onValueChange={(value) => setSource(value as SourceFilter)}>
+        <Select value={source} onValueChange={(value) => { setSource(value as SourceFilter); setActiveLeadId(""); }}>
           <SelectTrigger><SelectValue placeholder="Origem" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todas as origens</SelectItem>
@@ -298,72 +334,116 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
 
       <div className="flex flex-wrap gap-1 bg-muted/40 rounded-lg p-1 w-fit">
         {(["vencidos", "hoje", "todos"] as ViewFilter[]).map((item) => (
-          <button key={item} onClick={() => setView(item)} className={`px-3 py-1.5 rounded-md text-sm ${view === item ? "bg-background shadow font-medium" : "text-muted-foreground"}`}>
+          <button key={item} onClick={() => { setView(item); setActiveLeadId(""); }} className={`px-3 py-1.5 rounded-md text-sm ${view === item ? "bg-background shadow font-medium" : "text-muted-foreground"}`}>
             {item === "vencidos" ? "Vencidos" : item === "hoje" ? "Hoje" : "Todos"}
           </button>
         ))}
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between gap-3 p-2.5 bg-muted/30 border-b">
-          <button onClick={toggleAll} className="text-xs font-medium flex items-center gap-1.5 hover:text-primary">
-            {filtered.length > 0 && filtered.every((lead) => selected.has(lead.id)) ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-            Selecionar visíveis
-          </button>
-          <span className="text-xs text-muted-foreground">{filtered.length} lead(s) • {selectedLeads.length} selecionado(s)</span>
-        </div>
-        <div className="max-h-[340px] overflow-y-auto divide-y">
-          {!filtered.length && <div className="p-8 text-sm text-muted-foreground text-center">Nenhum lead encontrado com esses filtros.</div>}
-          {filtered.map((lead) => (
-            <div key={lead.id} className="p-3 flex items-center gap-3 hover:bg-muted/30">
-              <input type="checkbox" checked={selected.has(lead.id)} onChange={() => setSelected((current) => { const next = new Set(current); next.has(lead.id) ? next.delete(lead.id) : next.add(lead.id); return next; })} className="h-4 w-4" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm truncate">{lead.nome || "Sem nome"}</span>
-                  {lead.comparecimento === "NÃO COMPARECEU" && <span className="text-[10px] rounded-full bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5">Não compareceu</span>}
-                  {daysSince(lead.lastFollowUpDone || lead.dataFollowUp) > 0 && <span className="text-[10px] rounded-full bg-amber-50 text-amber-700 px-1.5 py-0.5">Há {daysSince(lead.lastFollowUpDone || lead.dataFollowUp)}d</span>}
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5">{lead.telefone} • {lead.servicoProcurado || "Serviço não informado"}</div>
-              </div>
-              <Button size="sm" variant="outline" onClick={() => openSingle(lead)}>Editar mensagem</Button>
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.05fr)_minmax(430px,0.95fr)] gap-4 items-start">
+        <div className="space-y-4 min-w-0">
+          <div className="border rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between gap-3 p-2.5 bg-muted/30 border-b">
+              <button onClick={toggleAll} className="text-xs font-medium flex items-center gap-1.5 hover:text-primary">
+                {filtered.length > 0 && filtered.every((lead) => selected.has(lead.id)) ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                Selecionar visíveis
+              </button>
+              <span className="text-xs text-muted-foreground">{filtered.length} lead(s) • {selectedLeads.length} selecionado(s)</span>
             </div>
-          ))}
+            <div className="max-h-[420px] overflow-y-auto divide-y">
+              {!filtered.length && <div className="p-8 text-sm text-muted-foreground text-center">Nenhum lead encontrado com esses filtros.</div>}
+              {filtered.map((lead) => {
+                const active = activeLeadId === lead.id;
+                const queued = queuedLeadIds.has(lead.id);
+                const sentToday = lead.lastFollowUpDone === today;
+                const replied = needsAttention(lead);
+                return (
+                  <div
+                    key={lead.id}
+                    onClick={() => setActiveLeadId(lead.id)}
+                    className={`p-3 flex items-center gap-3 cursor-pointer transition-colors ${active ? "bg-primary/10" : "hover:bg-muted/30"}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.has(lead.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => setSelected((current) => { const next = new Set(current); next.has(lead.id) ? next.delete(lead.id) : next.add(lead.id); return next; })}
+                      className="h-4 w-4 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm truncate">{lead.nome || "Sem nome"}</span>
+                        {replied && <span className="text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 inline-flex items-center gap-1"><Reply className="h-3 w-3" />Respondeu</span>}
+                        {queued && !sentToday && <span className="text-[10px] rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 inline-flex items-center gap-1"><Clock3 className="h-3 w-3" />Na fila</span>}
+                        {sentToday && <span className="text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 inline-flex items-center gap-1"><Check className="h-3 w-3" />Enviado hoje</span>}
+                        {lead.comparecimento === "NÃO COMPARECEU" && <span className="text-[10px] rounded-full bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5">Não compareceu</span>}
+                        {daysSince(lead.lastFollowUpDone || lead.dataFollowUp) > 0 && <span className="text-[10px] rounded-full bg-amber-50 text-amber-700 px-1.5 py-0.5">Há {daysSince(lead.lastFollowUpDone || lead.dataFollowUp)}d</span>}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5 truncate">{lead.telefone} • {lead.servicoProcurado || "Serviço não informado"}</div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button size="sm" variant={active ? "default" : "outline"} onClick={(e) => { e.stopPropagation(); setActiveLeadId(lead.id); }}>
+                        <MessageCircle className="h-3.5 w-3.5 mr-1" />Conversa
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openSingle(lead); }}>Editar FU</Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold">Mensagens do lote</p>
+                <p className="text-xs text-muted-foreground">Até 3 variações intercaladas automaticamente. Quebras de linha são preservadas.</p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setVariants(templatesFor(stage, attendance === "nao_compareceu"))}>Carregar sugeridas</Button>
+                {variants.length < 3 && <Button size="sm" variant="outline" onClick={addVariant}>+ Variação</Button>}
+              </div>
+            </div>
+
+            {variants.length === 0 && <Textarea rows={5} placeholder="Escreva a mensagem. Use [primeiro_nome] e [serviço] para personalizar." onChange={(e) => setVariants([e.target.value])} />}
+            {variants.map((variant, index) => (
+              <div key={index} className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Variação {index + 1}</label>
+                <Textarea value={variant} onChange={(e) => updateVariant(index, e.target.value)} rows={5} className="whitespace-pre-wrap" />
+              </div>
+            ))}
+
+            {previewLead && usableVariants[0] && (
+              <div className="rounded-md bg-background border p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview para {previewLead.nome?.split(" ")[0] || "lead"}</p>
+                <div className="text-sm whitespace-pre-wrap leading-relaxed">{personalize(usableVariants[0], previewLead)}</div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">Fila automática: um follow-up por vez, respeitando o intervalo configurado.</span>
+              <Button onClick={queueBatch} disabled={sending || !selectedLeads.length || !usableVariants.length || !status.connected}>
+                <Send className="h-4 w-4 mr-2" />
+                {sending ? "Colocando na fila..." : `Enviar ${selectedLeads.length || ""} follow-up${selectedLeads.length === 1 ? "" : "s"}`}
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-sm font-semibold">Mensagens do lote</p>
-            <p className="text-xs text-muted-foreground">As variações são intercaladas automaticamente. Quebras de linha são preservadas no WhatsApp.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => setVariants(templatesFor(stage, attendance === "nao_compareceu"))}>Carregar sugeridas</Button>
-            {variants.length < 3 && <Button size="sm" variant="outline" onClick={addVariant}>+ Variação</Button>}
-          </div>
-        </div>
-
-        {variants.length === 0 && <Textarea rows={5} placeholder="Escreva a mensagem. Use [primeiro_nome] e [serviço] para personalizar." onChange={(e) => setVariants([e.target.value])} />}
-        {variants.map((variant, index) => (
-          <div key={index} className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Variação {index + 1}</label>
-            <Textarea value={variant} onChange={(e) => updateVariant(index, e.target.value)} rows={5} className="whitespace-pre-wrap" />
-          </div>
-        ))}
-
-        {previewLead && usableVariants[0] && (
-          <div className="rounded-md bg-background border p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview para {previewLead.nome?.split(" ")[0] || "lead"}</p>
-            <div className="text-sm whitespace-pre-wrap leading-relaxed">{personalize(usableVariants[0], previewLead)}</div>
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground">O agente enviará um follow-up por vez, respeitando o intervalo configurado de segurança.</span>
-          <Button onClick={queueBatch} disabled={sending || !selectedLeads.length || !usableVariants.length || !status.connected}>
-            <Send className="h-4 w-4 mr-2" />
-            {sending ? "Colocando na fila..." : `Enviar ${selectedLeads.length || ""} follow-up${selectedLeads.length === 1 ? "" : "s"}`}
-          </Button>
+        <div className="min-w-0 xl:sticky xl:top-24">
+          <WhatsAppConversationPanel
+            target={activeLead ? {
+              phone: activeLead.telefone,
+              name: activeLead.nome,
+              leadId: activeLead.id,
+              metaCampanhaId: activeLead.metaCampanhaId,
+              metaCampanhaNome: activeLead.metaCampanhaNome,
+              fonteLead: activeLead.fonteLead,
+            } : null}
+            lead={activeLead}
+            height="650px"
+            showQuickRegistration={false}
+          />
         </div>
       </div>
 
