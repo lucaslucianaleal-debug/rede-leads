@@ -2,6 +2,8 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
+let firestoreDb = null;
+
 function ensureAdminApp() {
   if (getApps().length) return getApps()[0];
 
@@ -26,7 +28,14 @@ function ensureAdminApp() {
 
 export function getAdminDb() {
   ensureAdminApp();
-  return getFirestore();
+  if (!firestoreDb) {
+    firestoreDb = getFirestore();
+    // Dados opcionais do CRM/Meta podem existir como undefined em objetos JS.
+    // O Firestore não aceita undefined por padrão; ignorá-los evita que um campo
+    // opcional derrube toda a sincronização de uma campanha/anúncio.
+    firestoreDb.settings({ ignoreUndefinedProperties: true });
+  }
+  return firestoreDb;
 }
 
 export function getAdminAuth() {
