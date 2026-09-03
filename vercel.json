@@ -21,7 +21,7 @@
   "crons": [
     {
       "path": "/api/meta/cron",
-      "schedule": "0 10 * * *"
+      "schedule": "0 10,16,22 * * *"
     }
   ],
   "rewrites": [
