@@ -82,6 +82,21 @@ export function nextFollowUpStage(stage) {
   return `Follow-Up ${n}`;
 }
 
+function timelineActivityRef(db, clinicId, leadId) {
+  return db
+    .collection("clinics")
+    .doc(clinicId)
+    .collection("timelines")
+    .doc(String(leadId))
+    .collection("activities")
+    .doc();
+}
+
+function trimTimelineText(value, max = 2000) {
+  const text = String(value || "").trim();
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
 export async function resolveMetaReferral(clinicId, referral = {}) {
   const sourceId = String(
     referral?.sourceId ||
@@ -124,7 +139,8 @@ export async function applySentQueueItem(clinicId, queueId, result = {}) {
   if (!queueSnap.exists) throw new Error("Queue item not found");
 
   const queue = queueSnap.data() || {};
-  const nowIso = new Date().toISOString();
+  const sentAt = new Date();
+  const nowIso = sentAt.toISOString();
   await queueRef.set({
     status: "sent",
     sentAt: nowIso,
@@ -147,7 +163,7 @@ export async function applySentQueueItem(clinicId, queueId, result = {}) {
     if (index < 0) return;
 
     const lead = leads[index] || {};
-    const today = brDateDisplay();
+    const today = brDateDisplay(sentAt);
     const count = Number(lead.followUpCount || 0) || 0;
     const nextStage = queue.nextStage || nextFollowUpStage(lead.etapaLead);
 
@@ -166,6 +182,25 @@ export async function applySentQueueItem(clinicId, queueId, result = {}) {
       leads,
       lastUpdated: nowIso,
     }, { merge: true });
+
+    // O follow-up só entra no histórico depois da confirmação real de envio.
+    const activityRef = timelineActivityRef(db, clinicId, lead.id);
+    tx.set(activityRef, {
+      type: "FOLLOW_UP",
+      timestamp: sentAt,
+      createdBy: null,
+      createdByName: "WhatsApp Agent",
+      data: {
+        etapa: nextStage,
+        observacao: trimTimelineText(queue.message || "Follow-up enviado via WhatsApp"),
+        canal: "whatsapp",
+        origem: "local-agent",
+        queueId,
+        messageId: result.messageId || "",
+        etapaAnterior: lead.etapaLead || "",
+      },
+    });
+
     leadUpdated = true;
   });
 
@@ -273,7 +308,30 @@ export async function processInboundEvent(clinicId, payload = {}) {
     }
 
     leads[index] = nextLead;
-    await sharedRef.set({ leads, lastUpdated: nowIso }, { merge: true });
+
+    const batch = db.batch();
+    batch.set(sharedRef, { leads, lastUpdated: nowIso }, { merge: true });
+
+    // Respostas recebidas também passam a aparecer no histórico unificado.
+    const activityRef = timelineActivityRef(db, clinicId, lead.id);
+    batch.set(activityRef, {
+      type: "WHATSAPP_MESSAGE",
+      timestamp: now,
+      createdBy: null,
+      createdByName: null,
+      data: {
+        content: trimTimelineText(displayMessage),
+        from: "paciente",
+        deliveryStatus: "recebida",
+        messageType,
+        messageId: String(payload.messageId || ""),
+        origem: "local-agent",
+        metaCampanhaId: resolvedCampaign?.id || "",
+        metaCampanhaNome: resolvedCampaign?.name || "",
+      },
+    });
+    await batch.commit();
+
     const cancelled = await cancelPendingForLead(clinicId, lead.id);
     return { matched: true, leadId: lead.id, cancelled };
   }
