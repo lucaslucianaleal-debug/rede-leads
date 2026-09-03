@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, MessageCircle, QrCode, RefreshCw, Send, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Copy, KeyRound, MessageCircle, QrCode, RefreshCw, Send, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,9 +60,11 @@ function buildMessage(lead: Lead, clinicName: string) {
 export default function WhatsAppAgentPage() {
   const { clinicMeta, currentClinic } = useAuth();
   const { allLeads } = useLeads();
-  const { status, loadingStatus, refreshStatus, queueMessages } = useWhatsAppAgent();
+  const { status, loadingStatus, refreshStatus, pairAgent, queueMessages } = useWhatsAppAgent();
   const [view, setView] = useState<"inbox" | "followup">("inbox");
   const [showQr, setShowQr] = useState(false);
+  const [pairing, setPairing] = useState(false);
+  const [pairSecret, setPairSecret] = useState("");
   const [search, setSearch] = useState("");
   const [onlyNoReply, setOnlyNoReply] = useState(true);
   const [selected, setSelected] = useState<string[]>([]);
@@ -100,6 +102,37 @@ export default function WhatsAppAgentPage() {
 
   const selectFirst40 = () => setSelected(candidates.slice(0, 40).map((item) => item.lead.id));
   const toggle = (id: string) => setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id].slice(0, 40));
+
+  const prepareThisPc = async () => {
+    setPairing(true);
+    try {
+      const secret = await pairAgent();
+      setPairSecret(secret);
+      toast.success("Chave deste computador gerada. Ela aparece somente agora.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao preparar computador");
+    } finally {
+      setPairing(false);
+    }
+  };
+
+  const copyAgentConfig = async () => {
+    if (!pairSecret || !currentClinic) return;
+    const text = [
+      "REDE_LEADS_URL=https://rede-leads.vercel.app",
+      `CLINIC_ID=${currentClinic}`,
+      `WHATSAPP_AGENT_SECRET=${pairSecret}`,
+      "MIN_DELAY_SECONDS=150",
+      "MAX_DELAY_SECONDS=270",
+      "IDLE_POLL_SECONDS=8",
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Configuração copiada. Cole no arquivo whatsapp-agent/.env do seu PC.");
+    } catch {
+      toast.error("Não consegui copiar automaticamente. Selecione o bloco e copie manualmente.");
+    }
+  };
 
   const enqueue = async () => {
     if (!currentClinic) return toast.error("Selecione uma clínica antes de criar a fila.");
@@ -169,8 +202,27 @@ export default function WhatsAppAgentPage() {
             </div>
 
             {!status.online && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                O WhatsApp Desktop já estar aberto não conecta o agente. Precisamos rodar o <strong>WhatsApp Agent</strong> no seu PC uma vez. Quando ele iniciar, o QR aparecerá nesta tela e você vai em <strong>WhatsApp no celular → Aparelhos conectados → Conectar aparelho</strong>.
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-sm text-blue-900 space-y-2">
+                <div className="font-medium flex items-center gap-2"><KeyRound className="h-4 w-4" />Primeira conexão deste computador</div>
+                <p>O WhatsApp Desktop já aberto no Windows não é a sessão usada pelo agente. Vamos conectar o Rede Leads como <strong>mais um aparelho vinculado</strong>. Depois da primeira leitura, a sessão fica salva no PC e não precisa de QR a cada abertura.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={prepareThisPc} disabled={pairing}>
+                    <KeyRound className="h-4 w-4 mr-2" />{pairing ? "Gerando..." : status.paired ? "Gerar nova chave deste PC" : "Preparar este computador"}
+                  </Button>
+                  {pairSecret && (
+                    <Button size="sm" variant="outline" onClick={copyAgentConfig}>
+                      <Copy className="h-4 w-4 mr-2" />Copiar configuração
+                    </Button>
+                  )}
+                </div>
+                {pairSecret && currentClinic && (
+                  <div className="space-y-2 pt-1">
+                    <p className="text-xs">Cole esta configuração no arquivo <strong>whatsapp-agent/.env</strong> do seu PC. A chave é exibida apenas nesta sessão:</p>
+                    <pre className="overflow-x-auto rounded-md bg-slate-950 text-slate-100 p-3 text-xs whitespace-pre-wrap break-all">{`REDE_LEADS_URL=https://rede-leads.vercel.app\nCLINIC_ID=${currentClinic}\nWHATSAPP_AGENT_SECRET=${pairSecret}\nMIN_DELAY_SECONDS=150\nMAX_DELAY_SECONDS=270\nIDLE_POLL_SECONDS=8`}</pre>
+                    <p className="text-xs">Depois, no terminal dentro da pasta <strong>whatsapp-agent</strong>, execute <strong>npm install</strong> e <strong>npm start</strong>. O QR será enviado automaticamente para esta tela.</p>
+                  </div>
+                )}
+                {!pairSecret && status.paired && <p className="text-xs">Já existe uma chave pareada. Se você não tiver mais essa chave no arquivo .env do PC, clique em “Gerar nova chave deste PC”.</p>}
               </div>
             )}
             {status.online && !status.connected && !status.qrCode && (
