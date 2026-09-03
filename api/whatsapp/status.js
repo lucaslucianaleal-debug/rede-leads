@@ -1,4 +1,6 @@
+import crypto from "node:crypto";
 import { getAdminAuth, getAdminDb } from "../../server/firebaseAdmin.js";
+import { hashWhatsAppAgentSecret } from "../../server/whatsappAgentAuth.js";
 
 async function requireFirebaseUser(req) {
   const header = String(req.headers.authorization || "");
@@ -12,22 +14,59 @@ async function requireFirebaseUser(req) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+  if (!["GET", "POST"].includes(req.method)) return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    await requireFirebaseUser(req);
-    const clinicId = String(req.query.clinicId || "").trim();
+    const user = await requireFirebaseUser(req);
+    const clinicId = String(req.method === "POST" ? req.body?.clinicId : req.query.clinicId || "").trim();
     if (!clinicId) return res.status(400).json({ error: "clinicId obrigatório" });
 
-    const snap = await getAdminDb()
+    const ref = getAdminDb()
       .collection("clinics")
       .doc(clinicId)
       .collection("integrations")
-      .doc("whatsappAgent")
-      .get();
+      .doc("whatsappAgent");
 
+    if (req.method === "POST") {
+      const action = String(req.body?.action || "pair").trim();
+      if (action === "pair") {
+        const secret = crypto.randomBytes(32).toString("base64url");
+        const nowIso = new Date().toISOString();
+        await ref.set({
+          agentSecretHash: hashWhatsAppAgentSecret(secret),
+          pairedAt: nowIso,
+          pairedBy: user.uid,
+          connected: false,
+          connectedPhone: "",
+          qrCode: null,
+          qrUpdatedAt: null,
+          lastError: null,
+          updatedAt: nowIso,
+        }, { merge: true });
+        return res.status(200).json({ ok: true, agentSecret: secret });
+      }
+
+      if (action === "revoke") {
+        const nowIso = new Date().toISOString();
+        await ref.set({
+          agentSecretHash: null,
+          pairedAt: null,
+          pairedBy: null,
+          connected: false,
+          connectedPhone: "",
+          qrCode: null,
+          qrUpdatedAt: null,
+          updatedAt: nowIso,
+        }, { merge: true });
+        return res.status(200).json({ ok: true });
+      }
+
+      return res.status(400).json({ error: "Ação inválida" });
+    }
+
+    const snap = await ref.get();
     if (!snap.exists) {
-      return res.status(200).json({ configured: false, online: false, connected: false, qrCode: null });
+      return res.status(200).json({ configured: false, paired: false, online: false, connected: false, qrCode: null });
     }
 
     const data = snap.data() || {};
@@ -39,6 +78,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       configured: true,
+      paired: !!data.agentSecretHash || !!String(process.env.WHATSAPP_AGENT_SECRET || "").trim(),
       online,
       connected,
       lastSeenAt: data.lastSeenAt || null,
