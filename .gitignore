@@ -23,11 +23,16 @@ dist-ssr
 *.sln
 *.sw?
 
-# WhatsApp server - arquivos sensíveis/locais
-whatsapp-server/serviceAccountKey.json
+# Sessões WhatsApp / caches locais
+/auth_info/
+/.wwebjs_cache/
+/.wwebjs_auth/
 whatsapp-server/auth_info/
 whatsapp-server/.wwebjs_cache/
 whatsapp-server/.wwebjs_auth/
+
+# WhatsApp server - arquivos sensíveis/locais
+whatsapp-server/serviceAccountKey.json
 whatsapp-server/media/
 whatsapp-server/package-lock.json
 whatsapp-server/.env
