@@ -12,6 +12,20 @@ export type WhatsAppQueueItem = {
   clientRequestId?: string;
 };
 
+export type WhatsAppCreateLeadInput = {
+  chatId: string;
+  phone: string;
+  name?: string;
+  servicoProcurado?: string;
+  captador?: string;
+  fonteLead?: string;
+  etapaLead?: string;
+  status?: string;
+  observacao?: string;
+  metaCampanhaId?: string;
+  metaCampanhaNome?: string;
+};
+
 type AgentStatus = {
   configured: boolean;
   paired: boolean;
@@ -89,7 +103,7 @@ export function useWhatsAppAgent() {
 
   const queueMessages = useCallback(async (items: WhatsAppQueueItem[]) => {
     if (!currentClinic) throw new Error("Clínica não selecionada");
-    if (!items.length) return { queued: 0, skipped: 0, total: 0 };
+    if (!items.length) return { queued: 0, skipped: 0, total: 0, queuedIds: [] as string[], skippedIds: [] as string[] };
     const headers = await authHeaders();
     const prepared = items.map((item) => ({
       ...item,
@@ -106,6 +120,8 @@ export function useWhatsAppAgent() {
       queued: Number(data.queued || 0),
       skipped: Number(data.skipped || 0),
       total: Number(data.total || items.length),
+      queuedIds: Array.isArray(data.queuedIds) ? data.queuedIds.map(String) : [],
+      skippedIds: Array.isArray(data.skippedIds) ? data.skippedIds.map(String) : [],
     };
   }, [currentClinic, authHeaders]);
 
@@ -131,19 +147,33 @@ export function useWhatsAppAgent() {
     return Array.isArray(data.items) ? data.items : [];
   }, [currentClinic, authHeaders]);
 
-  const markChatRead = useCallback(async (chatId: string) => {
-    if (!currentClinic || !chatId) return;
+  const postChatAction = useCallback(async (body: Record<string, unknown>) => {
+    if (!currentClinic) throw new Error("Clínica não selecionada");
     const headers = await authHeaders();
     const res = await fetch("/api/whatsapp/chats", {
       method: "POST",
       headers,
-      body: JSON.stringify({ clinicId: currentClinic, chatId }),
+      body: JSON.stringify({ clinicId: currentClinic, ...body }),
     });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data?.error || "Erro ao marcar conversa como lida");
-    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "Erro ao atualizar conversa");
+    return data;
   }, [currentClinic, authHeaders]);
+
+  const markChatRead = useCallback(async (chatId: string) => {
+    if (!chatId) return;
+    await postChatAction({ chatId, action: "read" });
+  }, [postChatAction]);
+
+  const linkChatToLead = useCallback(async (chatId: string, leadId: string, name?: string) => {
+    if (!chatId || !leadId) return;
+    return postChatAction({ chatId, action: "linkLead", leadId, name: name || "" });
+  }, [postChatAction]);
+
+  const createLeadFromChat = useCallback(async (input: WhatsAppCreateLeadInput) => {
+    if (!input.chatId || !input.phone) throw new Error("Conversa/telefone inválido");
+    return postChatAction({ ...input, action: "createLead" });
+  }, [postChatAction]);
 
   return {
     status,
@@ -154,5 +184,7 @@ export function useWhatsAppAgent() {
     fetchChats,
     fetchMessages,
     markChatRead,
+    linkChatToLead,
+    createLeadFromChat,
   };
 }
