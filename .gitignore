@@ -30,12 +30,15 @@ dist-ssr
 whatsapp-server/auth_info/
 whatsapp-server/.wwebjs_cache/
 whatsapp-server/.wwebjs_auth/
+whatsapp-agent/.agent-state/
 
 # WhatsApp server - arquivos sensíveis/locais
 whatsapp-server/serviceAccountKey.json
 whatsapp-server/media/
 whatsapp-server/package-lock.json
 whatsapp-server/.env
+whatsapp-agent/.env
+whatsapp-agent/package-lock.json
 serviceAccountKey.json
 
 # Variáveis de ambiente e segredos
@@ -43,5 +46,6 @@ serviceAccountKey.json
 .env.*
 !.env.example
 !whatsapp-server/.env.example
+!whatsapp-agent/.env.example
 
 .vercel
