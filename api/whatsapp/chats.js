@@ -1,5 +1,13 @@
 import { getAdminAuth, getAdminDb } from "../../server/firebaseAdmin.js";
 
+const IGNORED_TYPES = new Set([
+  "notification_template",
+  "e2e_notification",
+  "protocol",
+  "ciphertext",
+  "revoked",
+]);
+
 async function requireFirebaseUser(req) {
   const header = String(req.headers.authorization || "");
   if (!header.startsWith("Bearer ")) {
@@ -9,6 +17,10 @@ async function requireFirebaseUser(req) {
   }
   const token = header.slice("Bearer ".length).trim();
   return getAdminAuth().verifyIdToken(token);
+}
+
+function isIgnored(data = {}) {
+  return IGNORED_TYPES.has(String(data.messageType || data.lastMessageType || "").toLowerCase());
 }
 
 function serializeMessage(doc) {
@@ -31,6 +43,7 @@ export default async function handler(req, res) {
     await requireFirebaseUser(req);
     const clinicId = String(req.method === "POST" ? req.body?.clinicId : req.query.clinicId || "").trim();
     const chatId = String(req.method === "POST" ? req.body?.chatId : req.query.chatId || "").trim();
+    const since = String(req.method === "GET" ? req.query.since || "" : "").trim();
     if (!clinicId) return res.status(400).json({ error: "clinicId obrigatório" });
 
     const db = getAdminDb();
@@ -48,35 +61,43 @@ export default async function handler(req, res) {
     if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
     if (chatId) {
-      const snap = await chats
-        .doc(chatId)
-        .collection("messages")
-        .orderBy("createdAt", "desc")
-        .limit(120)
-        .get();
-      return res.status(200).json({ ok: true, items: snap.docs.map(serializeMessage).reverse() });
+      let ref = chats.doc(chatId).collection("messages");
+      let snap;
+      if (since) {
+        snap = await ref.where("createdAt", ">", since).orderBy("createdAt", "asc").limit(80).get();
+      } else {
+        snap = await ref.orderBy("createdAt", "desc").limit(80).get();
+      }
+      const docs = snap.docs.filter((doc) => !isIgnored(doc.data() || {}));
+      const items = docs.map(serializeMessage);
+      return res.status(200).json({ ok: true, incremental: !!since, items: since ? items : items.reverse() });
     }
 
-    const snap = await chats
-      .orderBy("lastMessageAt", "desc")
-      .limit(60)
-      .get();
+    let snap;
+    if (since) {
+      snap = await chats.where("updatedAt", ">", since).orderBy("updatedAt", "asc").limit(60).get();
+    } else {
+      snap = await chats.orderBy("lastMessageAt", "desc").limit(60).get();
+    }
 
-    const items = snap.docs.map((doc) => {
-      const data = doc.data() || {};
-      return {
-        id: doc.id,
-        phone: data.phone || "",
-        name: data.name || "",
-        leadId: data.leadId || "",
-        lastMessage: data.lastMessage || "",
-        lastMessageAt: data.lastMessageAt || null,
-        lastDirection: data.lastDirection || "in",
-        unreadCount: Number(data.unreadCount || 0) || 0,
-      };
-    });
+    const items = snap.docs
+      .filter((doc) => !isIgnored(doc.data() || {}))
+      .map((doc) => {
+        const data = doc.data() || {};
+        return {
+          id: doc.id,
+          phone: data.phone || "",
+          name: data.name || "",
+          leadId: data.leadId || "",
+          lastMessage: data.lastMessage || "",
+          lastMessageAt: data.lastMessageAt || null,
+          updatedAt: data.updatedAt || data.lastMessageAt || null,
+          lastDirection: data.lastDirection || "in",
+          unreadCount: Number(data.unreadCount || 0) || 0,
+        };
+      });
 
-    return res.status(200).json({ ok: true, items });
+    return res.status(200).json({ ok: true, incremental: !!since, items });
   } catch (error) {
     const status = error?.statusCode || (String(error?.code || "").includes("auth/") ? 401 : 500);
     console.error("[whatsapp-chats]", error?.message || error);
