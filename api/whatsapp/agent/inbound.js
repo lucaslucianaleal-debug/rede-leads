@@ -1,7 +1,7 @@
 import { getAdminDb } from "../../../server/firebaseAdmin.js";
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
 import { canonicalPhoneKey, cancelPendingForLead, findLeadIndex, processInboundEvent } from "../../../server/whatsappAgent.js";
-import { recordWhatsAppChatMessage } from "../../../server/whatsappChatStore.js";
+import { recordWhatsAppChatMessage, updateWhatsAppMessageStatus } from "../../../server/whatsappChatStore.js";
 
 const IGNORED_TYPES = new Set([
   "notification_template",
@@ -43,6 +43,15 @@ export default async function handler(req, res) {
     const phoneKey = canonicalPhoneKey(body.phone);
     if (!phoneKey) return res.status(200).json({ ok: true, skipped: true, reason: "unresolved_phone" });
 
+    if (String(body.direction || "").toLowerCase() === "ack") {
+      const result = await updateWhatsAppMessageStatus(clinicId, {
+        phone: body.phone,
+        messageId: body.messageId,
+        ack: body.ack,
+      });
+      return res.status(200).json({ ok: true, direction: "ack", ...result });
+    }
+
     const db = getAdminDb();
     const contactRef = db.collection("clinics").doc(clinicId).collection("whatsappContacts").doc(phoneKey);
     const messageId = String(body.messageId || "").trim();
@@ -70,6 +79,7 @@ export default async function handler(req, res) {
         phoneKey,
         phone: body.phone,
         name: leadName,
+        leadId: leadId || null,
         lastOutboundAt: nowIso,
         lastOutboundMessageId: messageId,
         updatedAt: nowIso,
@@ -95,6 +105,8 @@ export default async function handler(req, res) {
     }
 
     const result = await processInboundEvent(clinicId, body);
+    const contactAfterSnap = await contactRef.get();
+    const contactAfter = contactAfterSnap.exists ? (contactAfterSnap.data() || {}) : {};
 
     await recordWhatsAppChatMessage(clinicId, {
       phone: body.phone,
@@ -102,9 +114,12 @@ export default async function handler(req, res) {
       leadId: result?.leadId || "",
       direction: "in",
       text: body.text,
-      messageType,
+      messageType: body.messageType || "text",
       messageId: body.messageId || "",
       createdAt: body.createdAt || undefined,
+      fonteLead: "Online",
+      metaCampanhaId: contactAfter.metaCampanhaId || "",
+      metaCampanhaNome: contactAfter.metaCampanhaNome || "",
     });
 
     if (isOptOutText(body.text)) {

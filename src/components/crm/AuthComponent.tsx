@@ -22,16 +22,12 @@ export function AuthComponent() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [open, setOpen] = useState(false);
 
-  // Se o input já é um email real (contém @ com domínio), usa direto.
-  // Caso contrário, trata como username e adiciona @redeleads.app
   const resolveEmail = (input: string): string => {
     const trimmed = input.trim().toLowerCase();
     const atIndex = trimmed.indexOf("@");
     if (atIndex > 0 && trimmed.indexOf(".", atIndex) > atIndex) {
-      // É um email real (ex: fulano@gmail.com)
       return trimmed;
     }
-    // É um username simples — remove caracteres inválidos e adiciona domínio
     const clean = trimmed.replace(/[^a-z0-9_\-]/g, "");
     return `${clean}@redeleads.app`;
   };
@@ -66,9 +62,9 @@ export function AuthComponent() {
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground hidden sm:inline">@{displayName}</span>
         <Button asChild variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">
-          <Link to="/whatsapp-agent" aria-label="Abrir WhatsApp Comercial">
+          <Link to="/whatsapp-agent" aria-label="Abrir Caixa de Entrada">
             <MessageCircle className="h-4 w-4 mr-1" />
-            WhatsApp
+            Caixa de Entrada
           </Link>
         </Button>
         <Button variant="ghost" size="sm" onClick={logout}>
