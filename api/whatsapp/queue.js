@@ -86,12 +86,15 @@ export default async function handler(req, res) {
     const nowIso = new Date().toISOString();
     let queued = 0;
     let skipped = 0;
+    const queuedIds = [];
+    const skippedIds = [];
 
     normalized.forEach((item, index) => {
       const existing = existingSnaps[index];
       const currentStatus = existing.exists ? String(existing.data()?.status || "") : "";
       if (["pending", "leased", "sent"].includes(currentStatus)) {
         skipped += 1;
+        skippedIds.push(item.leadId);
         return;
       }
 
@@ -114,11 +117,12 @@ export default async function handler(req, res) {
         dayKey,
       }, { merge: true });
       queued += 1;
+      queuedIds.push(item.leadId);
     });
 
     if (queued > 0) await batch.commit();
 
-    return res.status(200).json({ ok: true, queued, skipped, total: normalized.length });
+    return res.status(200).json({ ok: true, queued, skipped, total: normalized.length, queuedIds, skippedIds });
   } catch (error) {
     const status = error?.statusCode || (String(error?.code || "").includes("auth/") ? 401 : 500);
     console.error("[whatsapp-queue]", error?.message || error);
