@@ -109,19 +109,23 @@ export function useWhatsAppAgent() {
     };
   }, [currentClinic, authHeaders]);
 
-  const fetchChats = useCallback(async () => {
+  const fetchChats = useCallback(async (since = "") => {
     if (!currentClinic) return [];
     const headers = await authHeaders();
-    const res = await fetch(`/api/whatsapp/chats?clinicId=${encodeURIComponent(currentClinic)}`, { headers });
+    const params = new URLSearchParams({ clinicId: currentClinic });
+    if (since) params.set("since", since);
+    const res = await fetch(`/api/whatsapp/chats?${params.toString()}`, { headers });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || "Erro ao carregar conversas");
     return Array.isArray(data.items) ? data.items : [];
   }, [currentClinic, authHeaders]);
 
-  const fetchMessages = useCallback(async (chatId: string) => {
+  const fetchMessages = useCallback(async (chatId: string, since = "") => {
     if (!currentClinic || !chatId) return [];
     const headers = await authHeaders();
-    const res = await fetch(`/api/whatsapp/chats?clinicId=${encodeURIComponent(currentClinic)}&chatId=${encodeURIComponent(chatId)}`, { headers });
+    const params = new URLSearchParams({ clinicId: currentClinic, chatId });
+    if (since) params.set("since", since);
+    const res = await fetch(`/api/whatsapp/chats?${params.toString()}`, { headers });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || "Erro ao carregar mensagens");
     return Array.isArray(data.items) ? data.items : [];
