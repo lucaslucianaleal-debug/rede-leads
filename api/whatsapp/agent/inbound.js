@@ -3,6 +3,14 @@ import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
 import { canonicalPhoneKey, cancelPendingForLead, findLeadIndex, processInboundEvent } from "../../../server/whatsappAgent.js";
 import { recordWhatsAppChatMessage } from "../../../server/whatsappChatStore.js";
 
+const IGNORED_TYPES = new Set([
+  "notification_template",
+  "e2e_notification",
+  "protocol",
+  "ciphertext",
+  "revoked",
+]);
+
 function normalizeText(value) {
   return String(value || "")
     .normalize("NFD")
@@ -26,6 +34,11 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const clinicId = String(body.clinicId || "").trim();
     if (!clinicId) return res.status(400).json({ error: "clinicId obrigatório" });
+
+    const messageType = String(body.messageType || "text").toLowerCase();
+    if (IGNORED_TYPES.has(messageType)) {
+      return res.status(200).json({ ok: true, skipped: true, reason: "technical_event" });
+    }
 
     const phoneKey = canonicalPhoneKey(body.phone);
     if (!phoneKey) return res.status(200).json({ ok: true, skipped: true, reason: "unresolved_phone" });
@@ -68,7 +81,7 @@ export default async function handler(req, res) {
         leadId,
         direction: "out",
         text: body.text,
-        messageType: body.messageType || "text",
+        messageType,
         messageId,
         createdAt: body.createdAt || undefined,
       });
@@ -89,7 +102,7 @@ export default async function handler(req, res) {
       leadId: result?.leadId || "",
       direction: "in",
       text: body.text,
-      messageType: body.messageType || "text",
+      messageType,
       messageId: body.messageId || "",
       createdAt: body.createdAt || undefined,
     });
