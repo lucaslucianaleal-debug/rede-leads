@@ -1,6 +1,7 @@
 import { getAdminDb } from "../../../server/firebaseAdmin.js";
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
 import { canonicalPhoneKey, cancelPendingForLead, processInboundEvent } from "../../../server/whatsappAgent.js";
+import { recordWhatsAppChatMessage } from "../../../server/whatsappChatStore.js";
 
 function normalizeText(value) {
   return String(value || "")
@@ -38,6 +39,16 @@ export default async function handler(req, res) {
     }
 
     const result = await processInboundEvent(clinicId, body);
+
+    await recordWhatsAppChatMessage(clinicId, {
+      phone: body.phone,
+      name: body.name,
+      leadId: result?.leadId || "",
+      direction: "in",
+      text: body.text,
+      messageType: body.messageType || "text",
+      messageId: body.messageId || "",
+    });
 
     if (isOptOutText(body.text)) {
       const nowIso = new Date().toISOString();
