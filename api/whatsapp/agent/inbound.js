@@ -1,7 +1,7 @@
 import { getAdminDb } from "../../../server/firebaseAdmin.js";
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
 import { canonicalPhoneKey, cancelPendingForLead, processInboundEvent } from "../../../server/whatsappAgent.js";
-import { recordWhatsAppChatMessage } from "../../../server/whatsappChatStore.js";
+import { isIgnoredWhatsAppMessageType, recordWhatsAppChatMessage, recordWhatsAppHistoryBatch } from "../../../server/whatsappChatStore.js";
 
 function normalizeText(value) {
   return String(value || "")
@@ -18,14 +18,71 @@ function isOptOutText(value) {
     .some((term) => text === normalizeText(term) || text.includes(normalizeText(term)));
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+async function listKnownLeadPhones(clinicId) {
+  const db = getAdminDb();
+  const sharedSnap = await db.collection("clinics").doc(clinicId).collection("shared").doc("shared").get();
+  const leads = sharedSnap.exists && Array.isArray(sharedSnap.data()?.leads) ? sharedSnap.data().leads : [];
+  const byPhone = new Map();
 
+  for (const lead of leads) {
+    if (lead?._deleted) continue;
+    const phoneKey = canonicalPhoneKey(lead?.telefone);
+    if (!phoneKey || byPhone.has(phoneKey)) continue;
+    byPhone.set(phoneKey, {
+      phoneKey,
+      phone: String(lead?.telefone || ""),
+      leadId: String(lead?.id || ""),
+      name: String(lead?.nome || "").slice(0, 150),
+    });
+  }
+
+  return [...byPhone.values()];
+}
+
+export default async function handler(req, res) {
   try {
     await requireWhatsAppAgent(req);
-    const body = req.body || {};
-    const clinicId = String(body.clinicId || "").trim();
+    const clinicId = String(req.method === "GET" ? req.query?.clinicId : req.body?.clinicId || "").trim();
     if (!clinicId) return res.status(400).json({ error: "clinicId obrigatório" });
+
+    if (req.method === "GET") {
+      if (String(req.query?.mode || "") !== "known-phones") {
+        return res.status(400).json({ error: "mode inválido" });
+      }
+      const items = await listKnownLeadPhones(clinicId);
+      return res.status(200).json({ ok: true, items });
+    }
+
+    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+    const body = req.body || {};
+
+    if (body.event === "history-batch") {
+      const result = await recordWhatsAppHistoryBatch(clinicId, body.messages || []);
+      return res.status(200).json({ ok: true, ...result });
+    }
+
+    const messageType = String(body.messageType || "text").toLowerCase();
+    if (isIgnoredWhatsAppMessageType(messageType)) {
+      return res.status(200).json({ ok: true, skipped: true, reason: "system_message" });
+    }
+
+    if (body.event === "outbound") {
+      const known = await listKnownLeadPhones(clinicId);
+      const phoneKey = canonicalPhoneKey(body.phone);
+      const lead = known.find((item) => item.phoneKey === phoneKey);
+      await recordWhatsAppChatMessage(clinicId, {
+        phone: body.phone,
+        name: lead?.name || body.name,
+        leadId: lead?.leadId || "",
+        direction: "out",
+        text: body.text,
+        messageType,
+        messageId: body.messageId || "",
+        createdAt: body.createdAt,
+      });
+      return res.status(200).json({ ok: true, matched: !!lead, leadId: lead?.leadId || "" });
+    }
 
     const phoneKey = canonicalPhoneKey(body.phone);
     if (!phoneKey) return res.status(200).json({ ok: true, skipped: true, reason: "unresolved_phone" });
@@ -46,8 +103,9 @@ export default async function handler(req, res) {
       leadId: result?.leadId || "",
       direction: "in",
       text: body.text,
-      messageType: body.messageType || "text",
+      messageType,
       messageId: body.messageId || "",
+      createdAt: body.createdAt,
     });
 
     if (isOptOutText(body.text)) {
