@@ -1,13 +1,14 @@
 {
   "name": "rede-leads-whatsapp-agent",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.34.6"
   }
