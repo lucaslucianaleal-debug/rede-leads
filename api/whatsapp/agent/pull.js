@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    requireWhatsAppAgent(req);
+    await requireWhatsAppAgent(req);
     const clinicId = String(req.query.clinicId || "").trim();
     const limit = Math.max(1, Math.min(Number(req.query.limit || 10) || 10, 20));
     const recover = String(req.query.recover || "") === "1";
@@ -34,7 +34,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Busca uma janela pequena e filtra em memória para evitar índices compostos.
     const snap = await col.where("status", "==", "pending").limit(60).get();
     if (snap.empty) return res.status(200).json({ ok: true, items: [] });
 
