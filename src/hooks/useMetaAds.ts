@@ -24,7 +24,6 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
 
   useEffect(() => { load(); }, [load]);
 
-  // Derived diagnostics from real data
   const diagnostics: Diagnostic[] = [];
   const active = campaigns.filter(c => c.active);
   if (active.length > 0) {
@@ -122,6 +121,21 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
           ).join("\n")
         : "";
 
+      let financeSuffix = "";
+      if (s.financeError?.message) {
+        financeSuffix = `\n\nFinanceiro Meta: NÃO DISPONÍVEL\n${s.financeError.message}`;
+      } else if (s.finance) {
+        const f = s.finance;
+        const balance = f.isPrepayAccount && typeof f.balance === "number"
+          ? `R$ ${Number(f.balance).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          : "não aplicável (conta pós-paga ou campo não disponível)";
+        financeSuffix = `\n\nFinanceiro Meta:\n` +
+          `Saldo: ${balance}\n` +
+          `Gasto ontem: R$ ${Number(f.yesterdaySpend || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
+          `Último gasto: ${f.lastSpendDate || "sem dado"}\n` +
+          `Alerta: ${f.alertMessage || "sem alerta"}`;
+      }
+
       window.alert(
         `Meta Ads sincronizada.\n\n` +
         `Anúncios ativos encontrados: ${s.activeAds ?? 0}\n` +
@@ -130,6 +144,7 @@ export function useMetaAds(unitId?: string, clinicId = "odontocompany-olimpia", 
         `Dias novos adicionados: ${s.metricsAdded ?? 0}\n` +
         `Dias Meta atualizados: ${s.metricsUpdated ?? 0}\n` +
         `Dias manuais preservados: ${s.manualMetricsPreserved ?? 0}` +
+        financeSuffix +
         errorSuffix
       );
 

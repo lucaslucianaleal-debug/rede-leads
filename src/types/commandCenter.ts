@@ -33,8 +33,18 @@ export interface CampaignDailyMetric {
   date: string; // DD/MM/YYYY
   spend: number;
   impressions: number;
+  /** Campo legado. No painel MPC representa CONVERSAS INICIADAS, não cliques de link. */
   clicks: number;
   reach: number;
+  /** Cliques reais retornados pela Meta, mantidos apenas para auditoria. */
+  metaLinkClicks?: number;
+  /** Resultado Meta configurado para a integração (conversas iniciadas). */
+  metaResults?: number;
+  /** Custo por conversa retornado pela Meta. */
+  metaCostPerResult?: number;
+  source?: 'meta' | 'manual';
+  manualOverride?: boolean;
+  syncedAt?: string;
 }
 
 export interface CampaignScaleEvent {
@@ -90,7 +100,7 @@ export interface Campaign {
   dateStart: string; // DD/MM/YYYY
   dateEnd: string;   // DD/MM/YYYY
   budget: number;    // budget total planejado
-  dailyBudget: number; // budget diario configurado manualmente
+  dailyBudget: number; // budget diario cadastrado no Rede Leads; não assumir que veio da Meta
   lastBudgetChangeAt?: string;
   scaleHistory?: CampaignScaleEvent[];
   scaleCycleState?: 'idle' | 'aguardando_dados' | 'pronto_reavaliar';
@@ -105,6 +115,7 @@ export interface Campaign {
   // Calculados automaticamente (agregados de dailyMetrics):
   totalSpend: number;
   totalImpressions: number;
+  /** Total de conversas iniciadas. Nome legado preservado por compatibilidade. */
   totalClicks: number;
   totalReach: number;
 
@@ -112,18 +123,21 @@ export interface Campaign {
   leads: number;
   scheduled: number;
   completed: number;
+  weekLeads?: number;
+  weekScheduled?: number;
+  weekCompleted?: number;
   monthLeads?: number;
   monthScheduled?: number;
   monthCompleted?: number;
 
   // Derivados:
   roas: number;          // (completed * ticketMedio) / totalSpend
-  predictability: number; // lead -> comparecimento (%), usado como previsibilidade
+  predictability: number; // lead -> comparecimento (%)
   cacLead: number;       // totalSpend / leads
   cacAgendamento: number; // totalSpend / scheduled
   cacComparecimento: number; // totalSpend / completed
-  conversionRate: number; // scheduled / leads * 100
-  showUpRate: number;     // completed / scheduled * 100
+  conversionRate: number; // lead -> agendamento * 100
+  showUpRate: number;     // agendamento -> comparecimento * 100
 }
 
 export interface WhatsAppMessage {

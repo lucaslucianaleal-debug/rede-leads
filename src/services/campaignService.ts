@@ -39,10 +39,6 @@ function migrateFromScaleHistory(data: any): { cycles: CampaignDecisionCycle[]; 
       status: "encerrado",
       recommendedDailyBudget: baseBudget,
       appliedDailyBudget: baseBudget,
-      executedInMeta: true,
-      executedAt: createdAt,
-      adherenceStatus: "aderente",
-      adherenceDiffPct: 0,
       investedAtStart: 0,
       reviewAfterSpend: 50,
       reviewAfterHours: 72,
@@ -197,6 +193,9 @@ function buildCampaignFromSnapshot(
   leadsCount: number,
   scheduledCount: number,
   completedCount: number,
+  weekLeadsCount: number,
+  weekScheduledCount: number,
+  weekCompletedCount: number,
   monthLeadsCount: number,
   monthScheduledCount: number,
   monthCompletedCount: number,
@@ -241,6 +240,9 @@ function buildCampaignFromSnapshot(
     leads: leadsCount,
     scheduled: scheduledCount,
     completed: completedCount,
+    weekLeads: weekLeadsCount,
+    weekScheduled: weekScheduledCount,
+    weekCompleted: weekCompletedCount,
     monthLeads: monthLeadsCount,
     monthScheduled: monthScheduledCount,
     monthCompleted: monthCompletedCount,
@@ -347,6 +349,19 @@ function inRange(date: Date, start: Date, end: Date) {
   return date.getTime() >= start.getTime() && date.getTime() <= end.getTime();
 }
 
+function getCurrentWeekRange() {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const start = new Date(now);
+  start.setDate(now.getDate() + diffToMonday);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
 function getCurrentMonthRange() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
@@ -369,6 +384,7 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
   try {
     const { start, end } = getPeriodRange(period);
     const useFullHistory = period === 'ciclo' || period === 'historico';
+    const { start: weekStart, end: weekEnd } = getCurrentWeekRange();
     const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
     const colRef = collection(db, "clinics", clinicId, "campaigns");
     const snapshot = await getDocs(colRef);
@@ -391,30 +407,46 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
         const leads = await fetchLeadsFromClinic(clinicId);
         const restored = backupCampaigns.map((campaign: any, idx: number) => {
           const data = toCampaignDataSnapshot(campaign, campaign.id, clinicId);
-            const filteredMetrics = (data.dailyMetrics || []).filter((m: CampaignDailyMetric) => {
-              if (useFullHistory) return true;
-              const dt = parseFlexibleDate(m.date);
-              return dt ? inRange(dt, start, end) : false;
-            });
-            const campaignLeads = leads.filter(l => {
-              if (l.metaCampanhaId !== campaign.id) return false;
-              if (useFullHistory) return true;
-              const dt = resolveLeadDate(l);
-              return dt ? inRange(dt, start, end) : false;
-            });
-            const campaignMonthLeads = leads.filter(l => {
-              if (l.metaCampanhaId !== campaign.id) return false;
-              const dt = resolveLeadDate(l);
-              return dt ? inRange(dt, monthStart, monthEnd) : false;
-            });
-          const leadsCount = campaignLeads.length;
-          const scheduledCount = campaignLeads.filter(l => l.dataAgendamento?.trim()).length;
-          const completedCount = campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length;
-          const monthLeadsCount = campaignMonthLeads.length;
-          const monthScheduledCount = campaignMonthLeads.filter(l => l.dataAgendamento?.trim()).length;
-          const monthCompletedCount = campaignMonthLeads.filter(l => l.comparecimento === "COMPARECEU").length;
-            const totals = calcCampaignTotals(filteredMetrics);
-            return buildCampaignFromSnapshot(campaign.id, clinicId, { ...data, dailyMetrics: filteredMetrics, allDailyMetrics: data.dailyMetrics || [] }, idx, ticketMedio, leadsCount, scheduledCount, completedCount, monthLeadsCount, monthScheduledCount, monthCompletedCount, totals);
+          const filteredMetrics = (data.dailyMetrics || []).filter((m: CampaignDailyMetric) => {
+            if (useFullHistory) return true;
+            const dt = parseFlexibleDate(m.date);
+            return dt ? inRange(dt, start, end) : false;
+          });
+          const campaignLeads = leads.filter(l => {
+            if (l.metaCampanhaId !== campaign.id) return false;
+            if (useFullHistory) return true;
+            const dt = resolveLeadDate(l);
+            return dt ? inRange(dt, start, end) : false;
+          });
+          const campaignWeekLeads = leads.filter(l => {
+            if (l.metaCampanhaId !== campaign.id) return false;
+            const dt = resolveLeadDate(l);
+            return dt ? inRange(dt, weekStart, weekEnd) : false;
+          });
+          const campaignMonthLeads = leads.filter(l => {
+            if (l.metaCampanhaId !== campaign.id) return false;
+            const dt = resolveLeadDate(l);
+            return dt ? inRange(dt, monthStart, monthEnd) : false;
+          });
+
+          const totals = calcCampaignTotals(filteredMetrics);
+          return buildCampaignFromSnapshot(
+            campaign.id,
+            clinicId,
+            { ...data, dailyMetrics: filteredMetrics, allDailyMetrics: data.dailyMetrics || [] },
+            idx,
+            ticketMedio,
+            campaignLeads.length,
+            campaignLeads.filter(l => l.dataAgendamento?.trim()).length,
+            campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length,
+            campaignWeekLeads.length,
+            campaignWeekLeads.filter(l => l.dataAgendamento?.trim()).length,
+            campaignWeekLeads.filter(l => l.comparecimento === "COMPARECEU").length,
+            campaignMonthLeads.length,
+            campaignMonthLeads.filter(l => l.dataAgendamento?.trim()).length,
+            campaignMonthLeads.filter(l => l.comparecimento === "COMPARECEU").length,
+            totals
+          );
         });
 
         await persistCampaignBackup(clinicId, backupCampaigns);
@@ -444,6 +476,11 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
           const dt = resolveLeadDate(l);
           return dt ? inRange(dt, start, end) : false;
         });
+        const campaignWeekLeads = leads.filter(l => {
+          if (l.metaCampanhaId !== docSnap.id) return false;
+          const dt = resolveLeadDate(l);
+          return dt ? inRange(dt, weekStart, weekEnd) : false;
+        });
         const campaignMonthLeads = leads.filter(l => {
           if (l.metaCampanhaId !== docSnap.id) return false;
           const dt = resolveLeadDate(l);
@@ -459,6 +496,9 @@ export async function fetchCampaigns(clinicId: string, ticketMedio = 1800, perio
           campaignLeads.length,
           campaignLeads.filter(l => l.dataAgendamento?.trim()).length,
           campaignLeads.filter(l => l.comparecimento === "COMPARECEU").length,
+          campaignWeekLeads.length,
+          campaignWeekLeads.filter(l => l.dataAgendamento?.trim()).length,
+          campaignWeekLeads.filter(l => l.comparecimento === "COMPARECEU").length,
           campaignMonthLeads.length,
           campaignMonthLeads.filter(l => l.dataAgendamento?.trim()).length,
           campaignMonthLeads.filter(l => l.comparecimento === "COMPARECEU").length,
@@ -570,13 +610,18 @@ export async function upsertDailyMetric(
   if (!snap.exists()) throw new Error("Campaign not found");
 
   const current: CampaignDailyMetric[] = snap.data().dailyMetrics || [];
+  const normalizedMetric: CampaignDailyMetric = {
+    ...metric,
+    source: "manual",
+    manualOverride: true,
+  };
   const existing = current.findIndex(m => m.date === metric.date);
 
   let updated: CampaignDailyMetric[];
   if (existing >= 0) {
-    updated = current.map((m, i) => (i === existing ? metric : m));
+    updated = current.map((m, i) => (i === existing ? normalizedMetric : m));
   } else {
-    updated = [...current, metric].sort((a, b) => {
+    updated = [...current, normalizedMetric].sort((a, b) => {
       const [da, ma, ya] = a.date.split("/").map(Number);
       const [db2, mb, yb] = b.date.split("/").map(Number);
       return new Date(ya, ma - 1, da).getTime() - new Date(yb, mb - 1, db2).getTime();
@@ -647,19 +692,19 @@ export async function updateCampaign(
           : "abaixo_recomendado";
 
       const newCycleId = makeId("cycle");
+      const investedAtStart = calcCampaignTotals(Array.isArray(current.dailyMetrics) ? current.dailyMetrics : []).totalSpend;
       const newCycle: CampaignDecisionCycle = {
         id: newCycleId,
         startedAt: now,
         triggerType: "budget_change",
-        triggerNote: "Ajuste de budget aplicado",
-        status: "aguardando_dados",
+        triggerNote: "Budget cadastrado no Rede Leads",
+        status: "aberto",
         recommendedDailyBudget: activeCycle?.recommendedDailyBudget || nextBudget,
         appliedDailyBudget: nextBudget,
-        executedInMeta: true,
-        executedAt: now,
+        executedInMeta: false,
         adherenceStatus,
         adherenceDiffPct: Math.round(diffPct * 10) / 10,
-        investedAtStart: Number(current.totalSpend || 0),
+        investedAtStart,
         reviewAfterSpend: 50,
         reviewAfterHours: 72,
       };
@@ -669,20 +714,21 @@ export async function updateCampaign(
         cycleId: newCycleId,
         type: "budget_scaled",
         createdAt: now,
-        title: `Escala ${prevBudget.toFixed(0)} -> ${nextBudget.toFixed(0)}`,
-        note: "Atualizacao registrada via Command Center",
+        title: `Budget cadastrado ${prevBudget.toFixed(0)} -> ${nextBudget.toFixed(0)}`,
+        note: "Alteracao registrada no Rede Leads; execucao na Meta nao confirmada.",
         payload: {
           fromDailyBudget: prevBudget,
           toDailyBudget: nextBudget,
           recommendedDailyBudget: activeCycle?.recommendedDailyBudget || nextBudget,
           adherenceStatus,
+          executedInMeta: false,
         },
       };
 
       preparedFields.cycles = [...closedCycles, newCycle];
       preparedFields.events = [...normalized.events, newEvent];
       preparedFields.activeCycleId = newCycleId;
-      preparedFields.scaleCycleState = "aguardando_dados";
+      preparedFields.scaleCycleState = "idle";
       preparedFields.lastBudgetChangeAt = new Date().toLocaleDateString("pt-BR");
     }
   }

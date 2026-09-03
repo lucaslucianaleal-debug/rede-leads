@@ -1,12 +1,14 @@
 import React, { useRef, useState, useEffect } from "react";
 import type { LayerType, PeriodType } from "@/types/commandCenter";
 import { useMetaAds } from "@/hooks/useMetaAds";
+import { useMetaFinance } from "@/hooks/useMetaFinance";
 import { useActions } from "@/hooks/useActions";
 import { useExport } from "@/hooks/useExport";
 import { useAuth } from "@/hooks/useAuth";
 import Topbar from "./commandcenter/Topbar";
 import DiagnosticCard from "./commandcenter/DiagnosticCard";
 import CampaignCard from "./commandcenter/CampaignCard";
+import MetaFinanceCard from "./commandcenter/MetaFinanceCard";
 
 // Mapear unit IDs para clinic IDs no Firestore
 const unitToClinicId: Record<string, string> = {
@@ -28,7 +30,6 @@ export default function CommandCenter() {
       return 1800;
     }
   });
-  // Salvar ticket médio no localStorage
   useEffect(() => {
     try {
       localStorage.setItem("ticketMedio", ticketMedio.toString());
@@ -54,13 +55,23 @@ export default function CommandCenter() {
     handleSyncMetaAds,
     metaSyncing,
   } = useMetaAds(unit, clinicId, ticketMedio, period);
+  const { metaFinance, metaFinanceLoading, metaFinanceError, refreshMetaFinance } = useMetaFinance(clinicId);
   const { execute } = useActions(unit);
   const { exportPDF, exporting } = useExport();
 
-  const criticalCount = metaDiagnostics.filter(d => d.type === "crit").length;
+  const criticalCount = metaDiagnostics.filter(d => d.type === "crit").length
+    + (metaFinance?.financial?.alertLevel === "critical" ? 1 : 0);
 
   const handleExport = () => {
     exportPDF(containerRef as React.RefObject<HTMLElement>, period);
+  };
+
+  const handleSyncMetaAndFinance = async () => {
+    try {
+      await handleSyncMetaAds();
+    } finally {
+      await refreshMetaFinance();
+    }
   };
 
   return (
@@ -69,7 +80,6 @@ export default function CommandCenter() {
       style={{ background: "#1a1a1a", color: "#fff", minHeight: "100vh" }}
       className="pb-12"
     >
-      {/* Topbar */}
       <Topbar
         layer={layer}
         period={period}
@@ -83,13 +93,10 @@ export default function CommandCenter() {
         exporting={exporting}
       />
 
-      {/* Main content */}
       <div className="px-3 sm:px-4 md:px-6 py-4 md:py-6">
         <div className="w-full max-w-[1600px] mx-auto space-y-4 md:space-y-6">
-          {/* META ADS */}
           {layer === "meta" && (
             <div className="space-y-6">
-              {/* Diagnósticos Meta */}
               {period !== "operacao" && metaDiagnostics.length > 0 && (
                 <section>
                   <div className="flex items-center justify-between mb-3">
@@ -104,7 +111,6 @@ export default function CommandCenter() {
                 </section>
               )}
 
-              {/* Campanhas */}
               <section>
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <h3 style={{ color: "#999" }} className="text-xs font-semibold uppercase tracking-widest">
@@ -112,7 +118,7 @@ export default function CommandCenter() {
                   </h3>
                   <button
                     type="button"
-                    onClick={handleSyncMetaAds}
+                    onClick={handleSyncMetaAndFinance}
                     disabled={metaSyncing}
                     style={{
                       background: metaSyncing ? "#333" : "#134D48",
@@ -125,6 +131,7 @@ export default function CommandCenter() {
                     {metaSyncing ? "Sincronizando Meta..." : "↻ Sincronizar Meta"}
                   </button>
                 </div>
+                <MetaFinanceCard status={metaFinance} loading={metaFinanceLoading} errorMessage={metaFinanceError} />
                 <CampaignCard
                   campaigns={campaigns}
                   clinicId={clinicId}

@@ -210,12 +210,16 @@ function avg(values: number[]) {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
-function computeCpcSeries(metrics: CampaignDailyMetric[]) {
+/**
+ * `clicks` é um nome legado do banco. Desde a integração Meta v2 ele contém
+ * CONVERSAS INICIADAS. Toda decisão daqui para frente trata o campo assim.
+ */
+function computeConversationSeries(metrics: CampaignDailyMetric[]) {
   return metrics
     .filter((m) => (m.clicks || 0) > 0 || (m.spend || 0) > 0)
     .map((m) => ({
-      cpc: (m.clicks || 0) > 0 ? (m.spend || 0) / m.clicks : (m.spend || 0),
-      clicks: m.clicks || 0,
+      costPerConversation: (m.clicks || 0) > 0 ? (m.spend || 0) / m.clicks : (m.spend || 0),
+      conversations: m.clicks || 0,
     }));
 }
 
@@ -309,6 +313,7 @@ export function buildOperationalCapacityGate(campaigns: Campaign[]): CapacityGat
   const active = campaigns.filter((c) => c.active);
   const scheduled = active.reduce((sum, c) => sum + c.scheduled, 0);
   const completed = active.reduce((sum, c) => sum + c.completed, 0);
+  // Isto NÃO é ocupação de agenda. É somente um sinal conservador de agendamentos ainda sem comparecimento.
   const pendingConfirmations = Math.max(scheduled - completed, 0);
 
   if (pendingConfirmations >= 12) {
@@ -316,7 +321,7 @@ export function buildOperationalCapacityGate(campaigns: Campaign[]): CapacityGat
       canScale: false,
       pendingConfirmations,
       bookedPressure: "alto",
-      reason: "Agenda e comercial sob pressao. Nao escalar hoje evita ampliar gargalo de confirmacao.",
+      reason: "Sinal operacional alto: muitos agendamentos ainda sem comparecimento. Validar confirmacoes antes de escalar.",
     };
   }
 
@@ -325,7 +330,7 @@ export function buildOperationalCapacityGate(campaigns: Campaign[]): CapacityGat
       canScale: false,
       pendingConfirmations,
       bookedPressure: "medio",
-      reason: "Fila de confirmacoes elevada. Priorizar destravar operacao antes de escalar.",
+      reason: "Sinal operacional moderado: validar confirmacoes e comparecimentos antes de aumentar volume.",
     };
   }
 
@@ -333,7 +338,7 @@ export function buildOperationalCapacityGate(campaigns: Campaign[]): CapacityGat
     canScale: true,
     pendingConfirmations,
     bookedPressure: pendingConfirmations >= 5 ? "medio" : "baixo",
-    reason: "Capacidade operacional adequada para absorver novos leads.",
+    reason: "Nao ha gargalo evidente no funil agendamento -> comparecimento. Capacidade real da agenda ainda nao e medida.",
   };
 }
 
@@ -412,16 +417,22 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
 
   const recent = sortMetrics(campaign.dailyMetrics).slice(-7);
   const full = sortMetrics(campaign.allDailyMetrics || campaign.dailyMetrics);
-  const recentCpc = computeCpcSeries(recent);
-  const fullCpc = computeCpcSeries(full);
+  const recentConversations = computeConversationSeries(recent);
+  const fullConversations = computeConversationSeries(full);
 
-  const last3 = recentCpc.slice(-3);
-  const cpcRising3d = last3.length === 3 && last3[2].cpc > last3[1].cpc && last3[1].cpc > last3[0].cpc;
-  const clicksFalling3d = last3.length === 3 && last3[2].clicks < last3[1].clicks && last3[1].clicks < last3[0].clicks;
+  const last3 = recentConversations.slice(-3);
+  const costPerConversationRising3d = last3.length === 3
+    && last3[2].costPerConversation > last3[1].costPerConversation
+    && last3[1].costPerConversation > last3[0].costPerConversation;
+  const conversationsFalling3d = last3.length === 3
+    && last3[2].conversations < last3[1].conversations
+    && last3[1].conversations < last3[0].conversations;
 
-  const historicalCpc = avg(fullCpc.map((x) => x.cpc));
-  const currentCpc = avg(recentCpc.map((x) => x.cpc));
-  const cpcAboveHistoryPct = historicalCpc > 0 ? Math.round(((currentCpc - historicalCpc) / historicalCpc) * 100) : 0;
+  const historicalCostPerConversation = avg(fullConversations.map((x) => x.costPerConversation));
+  const currentCostPerConversation = avg(recentConversations.map((x) => x.costPerConversation));
+  const costAboveHistoryPct = historicalCostPerConversation > 0
+    ? Math.round(((currentCostPerConversation - historicalCostPerConversation) / historicalCostPerConversation) * 100)
+    : 0;
   const recentMetrics = recent.slice(-4);
   const reachDown4d = recentMetrics.length >= 4 && recentMetrics[3].reach < recentMetrics[2].reach && recentMetrics[2].reach < recentMetrics[1].reach;
   const impressionsUp4d = recentMetrics.length >= 4 && recentMetrics[3].impressions > recentMetrics[2].impressions && recentMetrics[2].impressions > recentMetrics[1].impressions;
@@ -449,16 +460,16 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
   if (campaign.conversionRate >= TARGETS.conversionRate) reasons.push(`Conversao lead -> agendamento acima da meta (${campaign.conversionRate}% >= ${TARGETS.conversionRate}%).`);
   if (campaign.showUpRate >= TARGETS.showUpRate) reasons.push(`Comparecimento acima da meta (${campaign.showUpRate}% >= ${TARGETS.showUpRate}%).`);
 
-  if (cpcRising3d && clicksFalling3d) {
-    reasons.push("Nos ultimos 3 dias, CPC subiu e cliques cairam: sinal de fadiga do criativo/publico.");
+  if (costPerConversationRising3d && conversationsFalling3d) {
+    reasons.push("Nos ultimos 3 dias, o custo por conversa subiu e as conversas iniciadas cairam: sinal de perda de eficiencia do criativo/publico.");
   }
 
   if (reachDown4d && impressionsUp4d) {
     reasons.push("Alcance caiu enquanto impressoes subiram: indicio de saturacao do publico.");
   }
 
-  if (cpcAboveHistoryPct >= 60) {
-    reasons.push(`CPC atual esta ${cpcAboveHistoryPct}% acima do historico da propria campanha.`);
+  if (costAboveHistoryPct >= 60) {
+    reasons.push(`Custo por conversa atual esta ${costAboveHistoryPct}% acima do historico da propria campanha.`);
   }
 
   const decorate = (input: Omit<CampaignDecision, "checklist" | "adherenceStatus" | "adherenceDiffPct" | "learningInsight">): CampaignDecision => ({
@@ -469,19 +480,19 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
     learningInsight,
   });
 
-  if (scaleCycle.state === "aguardando_dados") {
+  if (scaleCycle.state === "aguardando_dados" && activeCycle?.triggerType === "budget_change") {
     return decorate({
       status: "validando",
       action: "aguardar_dados",
       title: "AGUARDANDO DADOS DA ESCALA",
       emoji: "🟡",
       color: "#f59e0b",
-      recommendation: `Escala realizada. Aguardar ${Math.ceil(scaleCycle.hoursRemainingToReview)}h ou mais R$${scaleCycle.spendRemainingToReview.toFixed(0)} investidos antes de nova alteracao.`,
+      recommendation: `Escala registrada. Aguardar ${Math.ceil(scaleCycle.hoursRemainingToReview)}h ou mais R$${scaleCycle.spendRemainingToReview.toFixed(0)} investidos antes de nova alteracao.`,
       reasons: [
-        `Ja investiu +R$${scaleCycle.additionalSpendSinceLastScale.toFixed(0)} desde a ultima escala.`,
-        "Evitar mudancas antes de completar a janela de aprendizado da nova escala.",
+        `Ja investiu +R$${scaleCycle.additionalSpendSinceLastScale.toFixed(0)} desde a ultima escala registrada.`,
+        "Evitar mudancas antes de completar a janela de avaliacao da nova escala.",
       ],
-      nextReview: "Reavaliar automaticamente quando 72h ou +R$50 forem atendidos.",
+      nextReview: "Reavaliar quando 72h ou +R$50 forem atendidos.",
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
@@ -497,7 +508,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       title: "PAUSAR CAMPANHA",
       emoji: "🔴",
       color: "#ef4444",
-      recommendation: "Pausar imediatamente e reavaliar criativo, publico e abordagem comercial.",
+      recommendation: "Pausar e reavaliar criativo, publico e abordagem comercial antes de novo investimento.",
       reasons: [
         `Investimento acumulado alto (${spend.toFixed(0)}) sem comparecimentos.`,
         ...reasons,
@@ -507,20 +518,20 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       confidencePct,
       reviewDate,
       budgetCurrent: budgetScale.current,
-      budgetRecommended: budgetScale.recommended,
+      budgetRecommended: budgetScale.current,
     });
   }
 
-  if (cpcRising3d && clicksFalling3d) {
+  if (costPerConversationRising3d && conversationsFalling3d) {
     return decorate({
       status: "otimizacao",
       action: "otimizar",
       title: "REVISAR CRIATIVO/PUBLICO",
       emoji: "🟠",
       color: "#f59e0b",
-      recommendation: "Trocar criativo principal e ajustar publico antes de aumentar investimento.",
+      recommendation: "Revisar criativo principal e publico antes de aumentar investimento.",
       reasons,
-      nextReview: "Nova leitura apos 3 dias de veiculacao do novo criativo.",
+      nextReview: "Nova leitura apos 3 dias de veiculacao do ajuste.",
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
@@ -540,7 +551,7 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       color: "#f59e0b",
       recommendation: "Campanha promissora. Manter como esta ate atingir investimento minimo de R$50.",
       reasons,
-      nextReview: "Reavaliar apos consumir mais R$50 de investimento ou em 3 dias.",
+      nextReview: "Reavaliar apos mais R$50 de investimento ou em 3 dias.",
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
@@ -556,9 +567,9 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
       title: "CAMPANHA VALIDADA",
       emoji: "🟢",
       color: "#10b981",
-      recommendation: `Escalar gradualmente: ${budgetScale.current.toFixed(0)} -> ${budgetScale.recommended.toFixed(0)} por dia.`,
+      recommendation: `Escala sugerida sobre o budget cadastrado: ${budgetScale.current.toFixed(0)} -> ${budgetScale.recommended.toFixed(0)} por dia. Confirmar budget real na Meta antes de executar.`,
       reasons,
-      nextReview: "Revisar apos consumir mais R$50 de investimento ou em 3 dias.",
+      nextReview: "Revisar apos mais R$50 de investimento ou em 3 dias.",
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
@@ -571,12 +582,12 @@ export function buildCampaignDecision(campaign: Campaign): CampaignDecision {
     return decorate({
       status: "validando",
       action: "escalar_20",
-      title: "INICIAR ESCALA CONTROLADA",
+      title: "ESCALA PODE SER AVALIADA",
       emoji: "🟢",
       color: "#10b981",
-      recommendation: `Ajustar budget diario de ${budgetScale.current.toFixed(0)} para ${budgetScale.recommended.toFixed(0)}.`,
+      recommendation: `Budget cadastrado permite sugestao de ${budgetScale.current.toFixed(0)} para ${budgetScale.recommended.toFixed(0)}. Confirmar valor real na Meta e capacidade comercial antes de executar.`,
       reasons,
-      nextReview: "Revisar apos consumir mais R$50 de investimento ou em 3 dias.",
+      nextReview: "Revisar apos mais R$50 de investimento ou em 3 dias.",
       confidence: confidenceLevel,
       confidencePct,
       reviewDate,
@@ -661,6 +672,7 @@ export function buildConfidenceContext(campaign: Campaign): ConfidenceContext {
   return { label: "Baixa", color: "#ef4444", emoji: "🔴", checks };
 }
 
+/** Projeção linear simples. Não é previsão estatística; só deve ser exibida como estimativa. */
 export function projectImpact(campaign: Campaign, ticketMedio: number, increasePct = 20): ImpactProjection {
   const spend = (campaign.totalSpend || 0) + (campaign.taxCost || 0);
   const baseForIncrease = campaign.dailyBudget > 0 ? campaign.dailyBudget : 15;
@@ -707,7 +719,7 @@ export function buildStrategicContext(campaign: Campaign, ticketMedio: number): 
   const shortAction = decision.action === "escalar_30"
     ? "Escalar 30%"
     : decision.action === "escalar_20"
-      ? "Escalar 20%"
+      ? "Avaliar escala 20%"
       : decision.action === "pausar"
         ? "Pausar"
         : decision.action === "otimizar"
@@ -782,11 +794,11 @@ export function buildOperationalScalePlan(campaigns: Campaign[], ticketMedio: nu
         currentDailyBudget: campaign.dailyBudget || decision.budgetCurrent,
         recommendedDailyBudget: blockedByCapacity ? (campaign.dailyBudget || decision.budgetCurrent) : decision.budgetRecommended,
         deltaDailyBudget: round((blockedByCapacity ? (campaign.dailyBudget || decision.budgetCurrent) : decision.budgetRecommended) - (campaign.dailyBudget || decision.budgetCurrent)),
-        statusLabel: blockedByCapacity ? "Aguardando capacidade" : decision.action === "aguardar_dados" ? "Aguardando dados" : decision.action === "escalar_20" ? "Escala sugerida" : decision.action === "otimizar" ? "Otimizar" : decision.action === "pausar" ? "Pausar" : "Manter",
+        statusLabel: blockedByCapacity ? "Validar operacao" : decision.action === "aguardar_dados" ? "Aguardando dados" : decision.action === "escalar_20" ? "Escala sugerida" : decision.action === "otimizar" ? "Otimizar" : decision.action === "pausar" ? "Pausar" : "Manter",
         expectedLeads: projection.leads,
         expectedCompleted: projection.completed,
         expectedRevenue: projection.revenue,
-        nextReviewText: cycle.state === "aguardando_dados"
+        nextReviewText: cycle.state === "aguardando_dados" && getActiveCycle(campaign)?.triggerType === "budget_change"
           ? `Aguardar ${Math.ceil(cycle.hoursRemainingToReview)}h ou +R$${cycle.spendRemainingToReview.toFixed(0)}`
           : "Pronto para nova revisao",
         reason: blockedByCapacity ? gate.reason : decision.recommendation,
@@ -837,7 +849,7 @@ export function buildPortfolioAllocationPlan(campaigns: Campaign[], ticketMedio:
       suggestedDailyBudget: round((campaign.dailyBudget || 15) + suggested),
       expectedLeads: projection.leads,
       expectedRevenue: projection.revenue,
-      reason: decision.recommendation,
+      reason: `${decision.recommendation} Estimativa linear; confirmar budget real antes de executar.`,
     });
     remaining -= suggested;
     if (remaining <= 0) break;
@@ -853,21 +865,34 @@ export function buildPortfolioAllocationPlan(campaigns: Campaign[], ticketMedio:
 export function buildDecisionTimeline(campaign: Campaign): DecisionTimelineStep[] {
   const cycle = getActiveCycle(campaign);
   const now = new Date();
-  const nowLabel = now.toLocaleDateString("pt-BR");
   const state = computeScaleCycleState(campaign);
-  const reviewAt = new Date(Date.now() + state.hoursRemainingToReview * 60 * 60 * 1000);
-  const reviewDate = reviewAt.toLocaleDateString("pt-BR");
-  const nextScaleAt = addDays(new Date(), 6);
-  const closeCycleAt = addDays(new Date(), 10);
   const startedAt = cycle?.startedAt ? new Date(cycle.startedAt) : addDays(new Date(), -3);
-
-  return [
+  const steps: DecisionTimelineStep[] = [
     { atIso: startedAt.toISOString(), dateLabel: startedAt.toLocaleDateString("pt-BR"), title: "Inicio do ciclo operacional", status: "done" },
-    { atIso: now.toISOString(), dateLabel: nowLabel, title: cycle?.executedInMeta ? "Escala executada no Meta" : "Executar ajuste recomendado", status: "current" },
-    { atIso: reviewAt.toISOString(), dateLabel: reviewDate, title: "Reavaliar ciclo com dados suficientes", status: "next" },
-    { atIso: nextScaleAt.toISOString(), dateLabel: formatPtDate(nextScaleAt), title: "Escalar novamente (se aprovado)", status: "next" },
-    { atIso: closeCycleAt.toISOString(), dateLabel: formatPtDate(closeCycleAt), title: "Encerrar ciclo operacional", status: "next" },
   ];
+
+  const isRealBudgetChange = cycle?.triggerType === "budget_change";
+  if (isRealBudgetChange) {
+    steps.push({
+      atIso: cycle?.executedAt || now.toISOString(),
+      dateLabel: (cycle?.executedAt ? new Date(cycle.executedAt) : now).toLocaleDateString("pt-BR"),
+      title: cycle?.executedInMeta ? "Escala registrada como executada" : "Ajuste de budget pendente",
+      status: "current",
+    });
+
+    const reviewAt = new Date(Date.now() + state.hoursRemainingToReview * 60 * 60 * 1000);
+    steps.push({ atIso: reviewAt.toISOString(), dateLabel: reviewAt.toLocaleDateString("pt-BR"), title: "Reavaliar ciclo com dados suficientes", status: "next" });
+    steps.push({ atIso: addDays(reviewAt, 3).toISOString(), dateLabel: formatPtDate(addDays(reviewAt, 3)), title: "Nova escala somente se os dados aprovarem", status: "next" });
+  } else {
+    steps.push({
+      atIso: now.toISOString(),
+      dateLabel: now.toLocaleDateString("pt-BR"),
+      title: "Campanha em acompanhamento",
+      status: "current",
+    });
+  }
+
+  return steps;
 }
 
 export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): MondayAction[] {
@@ -895,19 +920,19 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
       if (!gate.canScale) {
         actions.push({
           id: `${campaign.id}-bloqueio-capacidade`,
-          title: `Nao escalar ${campaign.name} hoje`,
-          impact: "Evita sobrecarga comercial e perda de conversao por gargalo.",
+          title: `Nao escalar ${campaign.name} antes de validar operacao`,
+          impact: "Evita ampliar volume enquanto ha sinal de gargalo entre agendamento e comparecimento.",
           reason: gate.reason,
-          eta: "Revisar capacidade em 24h",
+          eta: "Revisar em 24h",
         });
         return;
       }
       actions.push({
         id: `${campaign.id}-escalar`,
-        title: `Ajustar ${campaign.name}: R$${ctx.decision.budgetCurrent.toFixed(0)} -> R$${ctx.decision.budgetRecommended.toFixed(0)}/dia`,
-        impact: `Impacto esperado: +${ctx.projection20.leads} leads, +${ctx.projection20.completed} comparecimentos, +R$${ctx.projection20.revenue.toFixed(0)}.`,
+        title: `Avaliar ajuste de ${campaign.name}: R$${ctx.decision.budgetCurrent.toFixed(0)} -> R$${ctx.decision.budgetRecommended.toFixed(0)}/dia`,
+        impact: `Estimativa linear: +${ctx.projection20.leads} leads, +${ctx.projection20.completed} comparecimentos, +R$${ctx.projection20.revenue.toFixed(0)} em receita potencial.`,
         reason: ctx.decision.recommendation,
-        eta: "2 minutos",
+        eta: "Validar antes de executar",
       });
       return;
     }
@@ -915,7 +940,7 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
     if (ctx.decision.action === "aguardar_dados") {
       actions.push({
         id: `${campaign.id}-aguardar-dados`,
-        title: `Aguardar dados da escala em ${campaign.name}`,
+        title: `Aguardar dados em ${campaign.name}`,
         impact: "Evita intervencoes prematuras e reduz risco de falso positivo na decisao.",
         reason: ctx.decision.recommendation,
         eta: "Sem acao operacional hoje",
@@ -926,11 +951,11 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
     if (ctx.decision.action === "otimizar") {
       actions.push({
         id: `${campaign.id}-otimizar`,
-        title: `Trocar criativo/publico em ${campaign.name}`,
-        impact: "Objetivo: recuperar tracao e reduzir custo por resultado.",
+        title: `Revisar criativo/publico em ${campaign.name}`,
+        impact: "Objetivo: recuperar conversas iniciadas e reduzir custo por conversa.",
         reason: ctx.decision.recommendation,
         eta: "25 minutos",
-        due: "Terca-feira",
+        due: "Proxima janela de otimizacao",
       });
       return;
     }
@@ -948,9 +973,9 @@ export function buildMondayActions(campaigns: Campaign[], ticketMedio: number): 
   if (lowShowUp) {
     actions.push({
       id: `comercial-${lowShowUp.id}`,
-      title: "Revisar tempo de resposta do comercial",
-      impact: "Potencial de ganho direto em comparecimento nas campanhas ativas.",
-      reason: `${lowShowUp.name} esta com comparecimento ${lowShowUp.showUpRate}% (meta ${TARGETS.showUpRate}%).`,
+      title: "Revisar confirmacao e comparecimento do comercial",
+      impact: "Atuar no trecho agendamento -> comparecimento, que esta abaixo da meta.",
+      reason: `${lowShowUp.name} esta com comparecimento ${lowShowUp.showUpRate}% (meta ${TARGETS.showUpRate}%). O sistema ainda nao mede tempo de resposta.`,
       eta: "10 minutos",
     });
   }
@@ -1016,7 +1041,7 @@ export function buildMarketingMasterStatus(campaigns: Campaign[], ticketMedio: n
       label: "CRITICO",
       color: "#ef4444",
       reason: pausedDecisionCount > 0
-        ? "Ha campanha com recomendacao de pausa imediata."
+        ? "Ha campanha com recomendacao de pausa."
         : "Volume de leads insuficiente para sustentar a meta.",
     };
   }
@@ -1044,9 +1069,26 @@ export function buildMarketingMasterStatus(campaigns: Campaign[], ticketMedio: n
 
 export function buildWeeklyRisk(campaigns: Campaign[], ticketMedio: number): WeeklyRisk {
   const active = campaigns.filter((c) => c.active);
-  const scheduled = active.reduce((a, c) => a + c.scheduled, 0);
-  const completed = active.reduce((a, c) => a + c.completed, 0);
-  const showUp = scheduled > 0 ? completed / scheduled : 0;
+  const hasWeekData = active.some((c) => typeof c.weekScheduled === "number" || typeof c.weekCompleted === "number");
+  const scheduled = hasWeekData
+    ? active.reduce((a, c) => a + (c.weekScheduled || 0), 0)
+    : active.reduce((a, c) => a + c.scheduled, 0);
+  const completed = hasWeekData
+    ? active.reduce((a, c) => a + (c.weekCompleted || 0), 0)
+    : active.reduce((a, c) => a + c.completed, 0);
+
+  if (scheduled < 3) {
+    return {
+      level: "baixo",
+      emoji: "⚪",
+      label: "SEM BASE",
+      color: "#9ca3af",
+      reason: "A semana ainda nao tem agendamentos suficientes para classificar risco com confianca.",
+      potentialRevenueLoss: 0,
+    };
+  }
+
+  const showUp = completed / scheduled;
   const expectedCompleted = Math.round(scheduled * (TARGETS.showUpRate / 100));
   const miss = Math.max(expectedCompleted - completed, 0);
   const potentialRevenueLoss = miss * ticketMedio;
@@ -1057,7 +1099,7 @@ export function buildWeeklyRisk(campaigns: Campaign[], ticketMedio: number): Wee
       emoji: "🔴",
       label: "ALTO",
       color: "#ef4444",
-      reason: "Comparecimentos muito abaixo da meta desta semana.",
+      reason: "Comparecimentos abaixo de 35% nos agendamentos desta semana.",
       potentialRevenueLoss,
     };
   }
@@ -1068,7 +1110,7 @@ export function buildWeeklyRisk(campaigns: Campaign[], ticketMedio: number): Wee
       emoji: "🟠",
       label: "MEDIO",
       color: "#f59e0b",
-      reason: "Comparecimentos abaixo do esperado, exigir acao comercial.",
+      reason: "Comparecimentos desta semana abaixo da meta de 50%.",
       potentialRevenueLoss,
     };
   }
@@ -1078,23 +1120,25 @@ export function buildWeeklyRisk(campaigns: Campaign[], ticketMedio: number): Wee
     emoji: "🟢",
     label: "BAIXO",
     color: "#10b981",
-    reason: "Ritmo de comparecimento dentro do esperado.",
+    reason: "Comparecimento da semana dentro ou acima da meta.",
     potentialRevenueLoss,
   };
 }
 
 export function buildMonthlyProjection(campaigns: Campaign[], targetCompleted = 50): MonthlyProjection {
   const active = campaigns.filter((c) => c.active);
-  const completed = active.reduce((a, c) => a + c.completed, 0);
+  const completed = active.reduce((a, c) => a + (c.monthCompleted ?? c.completed), 0);
   const missing = Math.max(targetCompleted - completed, 0);
-  const progress = targetCompleted > 0 ? completed / targetCompleted : 0;
-  const quality = active.length > 0
-    ? avg(active.map((c) => (buildCampaignDecision(c).action === "pausar" ? 0.3 : c.predictability > 0 ? c.predictability / 100 : 0.5)))
-    : 0;
-  const probability = Math.round(clamp((progress * 0.55 + quality * 0.45) * 100, 5, 95));
+  const today = new Date();
+  const elapsedDays = Math.max(today.getDate(), 1);
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const projectedCompleted = completed > 0 ? Math.round((completed / elapsedDays) * daysInMonth) : 0;
+  // Mantido por compatibilidade de interface: agora representa aderencia do ritmo projetado à meta,
+  // e não uma "probabilidade estatística".
+  const probability = targetCompleted > 0 ? Math.round(clamp((projectedCompleted / targetCompleted) * 100, 0, 100)) : 0;
 
   return {
-    projectedCompleted: completed,
+    projectedCompleted,
     targetCompleted,
     missing,
     probability,
