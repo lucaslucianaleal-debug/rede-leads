@@ -1,7 +1,28 @@
 import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "./firebaseAdmin.js";
-import { canonicalPhoneKey, whatsappPhone } from "./whatsappAgent.js";
+
+function digitsOnly(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function canonicalPhoneKey(value) {
+  let digits = digitsOnly(value);
+  if (!digits) return null;
+  if (digits.startsWith("55")) digits = digits.slice(2);
+  if (digits.length === 11 && digits[2] === "9") {
+    digits = `${digits.slice(0, 2)}${digits.slice(3)}`;
+  }
+  if (digits.length !== 10) return null;
+  return `55${digits}`;
+}
+
+function whatsappPhone(value) {
+  let digits = digitsOnly(value);
+  if (!digits) return null;
+  if (!digits.startsWith("55")) digits = `55${digits}`;
+  return digits.length >= 12 && digits.length <= 13 ? digits : null;
+}
 
 function messageDocId(messageId, direction) {
   const raw = String(messageId || "").trim();
