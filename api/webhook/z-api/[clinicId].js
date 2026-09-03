@@ -5,49 +5,31 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
-// Inicializa Firebase Admin (uma vez)
 if (!getApps().length) {
   try {
     const projectId = process.env.FIREBASE_PROJECT_ID;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
     let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-    
-    console.log("[Firebase] projectId exists:", !!projectId);
-    console.log("[Firebase] clientEmail exists:", !!clientEmail);
-    console.log("[Firebase] privateKey exists:", !!privateKey);
-    console.log("[Firebase] privateKey length:", privateKey?.length);
-    
+
     if (!projectId || !clientEmail || !privateKey) {
-      throw new Error(
-        `Missing credentials: projectId=${!!projectId}, clientEmail=${!!clientEmail}, privateKey=${!!privateKey}`
-      );
+      throw new Error("Firebase Admin credentials missing");
     }
-    
-    // Converter literal \n para newlines reais
+
     privateKey = privateKey.replace(/\\n/g, "\n");
-    
-    console.log("[Firebase] After replace, privateKey starts with:", privateKey.substring(0, 50));
-    
-    const credential = cert({
-      projectId,
-      clientEmail,
-      privateKey,
-    });
-    
+
     initializeApp({
-      credential,
+      credential: cert({ projectId, clientEmail, privateKey }),
     });
-    
-    console.log(`[Firebase] ✓ Inicializado: ${projectId}`);
+
+    console.log("[Firebase] Admin inicializado");
   } catch (err) {
-    console.error("[Firebase] ✗ Erro:", err.message);
+    console.error("[Firebase] Erro ao inicializar Admin:", err.message);
     throw err;
   }
 }
 
 const db = getFirestore();
 
-// Mapa de clinicId para nomes das clínicas
 const CLINIC_NAMES = {
   "olimpia": "Odontocompany Olímpia",
   "odontcompany-olimpia": "Odontocompany Olímpia",
@@ -55,45 +37,46 @@ const CLINIC_NAMES = {
   "novo-horizonte": "Novo Horizonte",
 };
 
-// Função para obter saudação baseada na hora
 function getGreeting() {
-  const now = new Date(new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }));
+  const now = new Date(new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }));
   const hour = now.getHours();
-  
   if (hour >= 5 && hour < 12) return "Bom dia";
   if (hour >= 12 && hour < 18) return "Boa tarde";
   return "Boa noite";
 }
 
-// Função para enviar mensagem com pausa
+function safePhone(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  return digits ? `***${digits.slice(-4)}` : "indisponível";
+}
+
 async function sendMessageWithDelay(phone, message, instance, token, delayMs = 0) {
   if (delayMs > 0) {
     await new Promise(resolve => setTimeout(resolve, delayMs));
   }
-  
+
   try {
     const zApiUrl = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
     const clientToken = (process.env.Z_API_CLIENT_TOKEN || "").trim();
-    const headers = { 'Content-Type': 'application/json' };
-    if (clientToken) headers['Client-Token'] = clientToken;
+    const headers = { "Content-Type": "application/json" };
+    if (clientToken) headers["Client-Token"] = clientToken;
+
     const response = await fetch(zApiUrl, {
-      method: 'POST',
+      method: "POST",
       headers,
-      body: JSON.stringify({
-        phone: phone,
-        message: message
-      })
+      body: JSON.stringify({ phone, message }),
     });
-    
+
     const data = await response.json().catch(() => ({}));
-    
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
+      throw new Error(`HTTP ${response.status}: ${data?.error || "erro Z-API"}`);
     }
-    
-    console.log(`[z-api] ✓ Msg enviada: ${phone}`, JSON.stringify(data));
+
+    console.log(`[z-api] Mensagem enviada para ${safePhone(phone)}`);
+    return data;
   } catch (err) {
-    console.error(`[z-api] ✗ Erro ao enviar msg para ${phone}:`, err.message);
+    console.error(`[z-api] Erro ao enviar para ${safePhone(phone)}:`, err.message);
+    return null;
   }
 }
 
@@ -103,22 +86,17 @@ export default async function handler(req, res) {
   }
 
   const { clinicId } = req.query;
-  const payload = req.body;
+  const payload = req.body || {};
 
   try {
-    console.log("[webhook] Recebido em:", clinicId);
-    console.log("[webhook] payload:", JSON.stringify(payload, null, 2));
-
-    // Extrair phone - tentar múltiplos caminhos
-    let phone =
+    const phone =
       payload?.data?.phone ||
       payload?.phone ||
       payload?.from ||
       payload?.sender ||
       "";
 
-    // Extrair message - tentar múltiplos caminhos
-    let message =
+    const message =
       payload?.data?.text?.message ||
       payload?.data?.message ||
       payload?.text?.message ||
@@ -126,48 +104,46 @@ export default async function handler(req, res) {
       payload?.body ||
       "";
 
-    // Extrair nome do contato (nome salvo no WhatsApp)
-    let nome =
+    const nome =
       payload?.data?.pushName ||
       payload?.data?.senderName ||
       payload?.pushName ||
       payload?.senderName ||
+      payload?.chatName ||
       "";
 
-    console.log("[webhook] phone:", phone, "| nome:", nome, "| message:", message);
+    const fromMe = Boolean(
+      payload?.data?.isFromMe ||
+      payload?.data?.fromMe ||
+      payload?.isFromMe ||
+      payload?.fromMe
+    );
+
+    console.log(`[webhook] ${clinicId} • ${payload?.type || payload?.event || "evento"} • ${safePhone(phone)} • fromMe=${fromMe}`);
+
+    if (fromMe) {
+      return res.status(200).json({ ok: true, skipped: true, reason: "from_me" });
+    }
 
     if (!phone || !message) {
-      console.log("[webhook] Phone ou message vazio - ignorando");
-      return res.status(200).json({ ok: true, skipped: true });
+      return res.status(200).json({ ok: true, skipped: true, reason: "missing_phone_or_text" });
     }
 
-    const fromMe = payload?.data?.isFromMe || payload?.isFromMe || false;
-    if (fromMe) {
-      console.log("[webhook] fromMe=true - ignorando");
-      return res.status(200).json({ ok: true, skipped: true });
-    }
-
-    const phoneNorm = phone.replace(/\D/g, "");
-
-    // Validar: telefone brasileiro deve ter 12 ou 13 dígitos (55 + DDD + número)
+    const phoneNorm = String(phone).replace(/\D/g, "");
     if (phoneNorm.length < 12 || phoneNorm.length > 13 || !phoneNorm.startsWith("55")) {
-      console.log(`[webhook] Telefone inválido ignorado: "${phoneNorm}" (${phoneNorm.length} dígitos)`);
-      return res.status(200).json({ ok: true, skipped: true });
+      console.log(`[webhook] Telefone fora do padrão BR ignorado: ${safePhone(phoneNorm)}`);
+      return res.status(200).json({ ok: true, skipped: true, reason: "invalid_phone" });
     }
+
     const ref = db.collection("clinics").doc(clinicId).collection("triagem").doc(phoneNorm);
     const existing = await ref.get();
 
-    // Se já foi convertido em lead → ignora completamente
     if (existing.exists && existing.data()?.convertido === true) {
-      console.log(`[triagem] Lead já cadastrado no CRM (convertido): ${phoneNorm} - ignorando`);
-      return res.status(200).json({ ok: true, skipped: true });
+      return res.status(200).json({ ok: true, skipped: true, reason: "already_converted" });
     }
 
-    const rawInstance = process.env.Z_API_INSTANCE || "";
-    const rawToken = process.env.Z_API_TOKEN || "";
-    const cleanInstance = rawInstance.trim();
-    const cleanToken = rawToken.trim();
-    console.log(`[z-api] instance(${cleanInstance.length}): "${cleanInstance.substring(0, 8)}..." token(${cleanToken.length}): "${cleanToken.substring(0, 8)}..."`);
+    const cleanInstance = (process.env.Z_API_INSTANCE || "").trim();
+    const cleanToken = (process.env.Z_API_TOKEN || "").trim();
 
     const msgLower = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const isInterestMessage =
@@ -181,11 +157,10 @@ export default async function handler(req, res) {
       msgLower.startsWith("ola,");
 
     if (!existing.exists) {
-      // Lead 100% novo → salva e envia auto-reply
       const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
       await ref.set({
         telefone: phoneNorm,
-        nome: nome,
+        nome,
         mensagem: message,
         dataRecebimento: agora,
         createdAt: Date.now(),
@@ -193,42 +168,31 @@ export default async function handler(req, res) {
         convertido: false,
         autoReplySent: false,
       });
-      console.log(`[triagem] ✓ Salvo: ${phoneNorm} → ${clinicId}`);
+      console.log(`[triagem] Novo contato salvo em ${clinicId}: ${safePhone(phoneNorm)}`);
     } else {
-      // Já está na triagem aguardando cadastro
       const autoReplySent = existing.data()?.autoReplySent === true;
       if (autoReplySent) {
-        console.log(`[triagem] Lead já na triagem + auto-reply já enviado: ${phoneNorm} - ignorando`);
-        return res.status(200).json({ ok: true, skipped: true });
+        return res.status(200).json({ ok: true, skipped: true, reason: "auto_reply_already_sent" });
       }
-      console.log(`[triagem] Lead na triagem sem auto-reply enviado: ${phoneNorm} - tentando reenviar`);
     }
 
-    // Enviar auto-reply se for mensagem de interesse
     if (!isInterestMessage) {
-      console.log(`[triagem] Mensagem não é de interesse, não envia auto-resposta: "${message.substring(0, 50)}"`);
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, skipped: true, reason: "not_interest_message" });
     }
 
     if (cleanInstance && cleanToken) {
       const greeting = getGreeting();
       const clinicName = CLINIC_NAMES[clinicId] || clinicId;
 
-      const msg1 = `${greeting}, como você está? 😊`;
-      const msg2 = `Meu nome é Lucas e sou da ${clinicName}`;
-      const msg3 = `Me conta um pouquinho mais... o que vem te incomodando no seu sorriso? 😁`;
+      await sendMessageWithDelay(phoneNorm, `${greeting}, como você está? 😊`, cleanInstance, cleanToken, 0);
+      await sendMessageWithDelay(phoneNorm, `Meu nome é Lucas e sou da ${clinicName}`, cleanInstance, cleanToken, 1000);
+      await sendMessageWithDelay(phoneNorm, "Me conta um pouquinho mais... o que vem te incomodando no seu sorriso? 😁", cleanInstance, cleanToken, 1000);
 
-      // Delays de 1s — total ~2s, seguro dentro do limite de 10s do Vercel
-      await sendMessageWithDelay(phoneNorm, msg1, cleanInstance, cleanToken, 0);
-      await sendMessageWithDelay(phoneNorm, msg2, cleanInstance, cleanToken, 1000);
-      await sendMessageWithDelay(phoneNorm, msg3, cleanInstance, cleanToken, 1000);
-
-      // Marca que o auto-reply foi enviado com sucesso
       await ref.set({ autoReplySent: true }, { merge: true });
-      console.log(`[triagem] ✓ Msgs automáticas enviadas: ${phoneNorm}`);
+      console.log(`[triagem] Auto-resposta concluída para ${safePhone(phoneNorm)}`);
     }
   } catch (err) {
-    console.error(`[triagem] ✗ Erro:`, err.message);
+    console.error("[triagem] Erro no webhook Z-API:", err.message);
   }
 
   return res.status(200).json({ ok: true });
