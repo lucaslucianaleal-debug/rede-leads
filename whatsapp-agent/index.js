@@ -14,7 +14,9 @@ const AGENT_SECRET = String(process.env.WHATSAPP_AGENT_SECRET || "").trim();
 const MIN_DELAY_SECONDS = Math.max(60, Number(process.env.MIN_DELAY_SECONDS || 150) || 150);
 const MAX_DELAY_SECONDS = Math.max(MIN_DELAY_SECONDS, Number(process.env.MAX_DELAY_SECONDS || 270) || 270);
 const IDLE_POLL_SECONDS = Math.max(5, Number(process.env.IDLE_POLL_SECONDS || 8) || 8);
-const AGENT_VERSION = "2.1.0";
+const HISTORY_CHAT_LIMIT = Math.max(5, Math.min(80, Number(process.env.HISTORY_CHAT_LIMIT || 40) || 40));
+const HISTORY_MESSAGES_PER_CHAT = Math.max(5, Math.min(40, Number(process.env.HISTORY_MESSAGES_PER_CHAT || 20) || 20));
+const AGENT_VERSION = "2.2.0";
 
 if (!CLINIC_ID || !AGENT_SECRET) {
   console.error("\n[agent] Configure CLINIC_ID e WHATSAPP_AGENT_SECRET no arquivo .env antes de iniciar.\n");
@@ -23,18 +25,19 @@ if (!CLINIC_ID || !AGENT_SECRET) {
 
 const STATE_DIR = path.join(process.cwd(), ".agent-state");
 const SENT_CACHE_FILE = path.join(STATE_DIR, "sent-cache.json");
+const HISTORY_STATE_FILE = path.join(STATE_DIR, "history-sync-v1.json");
 fs.mkdirSync(STATE_DIR, { recursive: true });
 
-function loadSentCache() {
+function loadJson(file, fallback = {}) {
   try {
-    const parsed = JSON.parse(fs.readFileSync(SENT_CACHE_FILE, "utf8"));
-    return parsed && typeof parsed === "object" ? parsed : {};
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : fallback;
   } catch {
-    return {};
+    return fallback;
   }
 }
 
-let sentCache = loadSentCache();
+let sentCache = loadJson(SENT_CACHE_FILE, {});
 function persistSentCache() {
   try {
     const entries = Object.entries(sentCache).slice(-500);
@@ -57,6 +60,15 @@ function digitsOnly(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+function canonicalPhoneKey(value) {
+  let digits = digitsOnly(value);
+  if (!digits) return null;
+  if (digits.startsWith("55")) digits = digits.slice(2);
+  if (digits.length === 11 && digits[2] === "9") digits = `${digits.slice(0, 2)}${digits.slice(3)}`;
+  if (digits.length !== 10) return null;
+  return `55${digits}`;
+}
+
 function candidatePhones(raw) {
   let digits = digitsOnly(raw);
   if (!digits) return [];
@@ -75,6 +87,45 @@ function candidatePhones(raw) {
   }
 
   return [...new Set(variants)];
+}
+
+const SYSTEM_MESSAGE_TYPES = new Set([
+  "notification_template",
+  "e2e_notification",
+  "protocol",
+  "gp2",
+  "ciphertext",
+  "revoked",
+  "call_log",
+]);
+
+function shouldIgnoreMessage(msg) {
+  if (!msg) return true;
+  const type = String(msg.type || "").toLowerCase();
+  if (SYSTEM_MESSAGE_TYPES.has(type)) return true;
+  const from = String(msg.from || "");
+  const to = String(msg.to || "");
+  return from.endsWith("@g.us") || to.endsWith("@g.us")
+    || from === "status@broadcast" || to === "status@broadcast"
+    || from.endsWith("@newsletter") || to.endsWith("@newsletter");
+}
+
+function normalizeMessageType(type) {
+  const value = String(type || "text").toLowerCase();
+  if (value === "chat") return "text";
+  if (value === "ptt" || value === "audio") return "audio";
+  if (["image", "video", "document", "sticker"].includes(value)) return value;
+  return value || "text";
+}
+
+function messageCreatedAt(msg) {
+  const seconds = Number(msg?.timestamp || msg?._data?.t || 0);
+  if (Number.isFinite(seconds) && seconds > 0) return new Date(seconds * 1000).toISOString();
+  return new Date().toISOString();
+}
+
+function messageIdOf(msg) {
+  return String(msg?.id?._serialized || msg?.id?.id || "");
 }
 
 async function api(pathname, options = {}) {
@@ -128,6 +179,7 @@ let queueRunning = false;
 let firstPull = true;
 let queueTimer = null;
 let nextFollowupAt = 0;
+let historySyncRunning = false;
 
 async function resolveWhatsAppId(phone) {
   for (const candidate of candidatePhones(phone)) {
@@ -210,7 +262,7 @@ async function sendQueueItem(item) {
     }
 
     const sent = await client.sendMessage(target, item.message);
-    const messageId = sent?.id?._serialized || sent?.id?.id || "";
+    const messageId = messageIdOf(sent);
     sentCache[item.id] = { messageId, sentAt: new Date().toISOString() };
     persistSentCache();
     await reportResult(item.id, "sent", { messageId });
@@ -231,7 +283,6 @@ async function processQueue() {
 
   queueRunning = true;
   try {
-    // Mensagens manuais têm prioridade e não esperam a régua de follow-up.
     const manualItems = await pullQueue("manual", 5, firstPull);
     firstPull = false;
     if (manualItems.length) {
@@ -241,7 +292,6 @@ async function processQueue() {
       }
     }
 
-    // Follow-up automático: no máximo um por janela aleatória de 150–270s.
     if (connected && Date.now() >= nextFollowupAt) {
       const followupItems = await pullQueue("followup", 1, false);
       if (followupItems.length) {
@@ -298,12 +348,105 @@ function referralFromMessage(msg) {
   };
 }
 
-function normalizeMessageType(type) {
-  const value = String(type || "text").toLowerCase();
-  if (value === "chat") return "text";
-  if (value === "ptt" || value === "audio") return "audio";
-  if (["image", "video", "document", "sticker"].includes(value)) return value;
-  return value || "text";
+async function knownLeadMap() {
+  const query = new URLSearchParams({ clinicId: CLINIC_ID, mode: "known-phones" });
+  const result = await api(`/api/whatsapp/agent/inbound?${query.toString()}`);
+  const map = new Map();
+  for (const item of Array.isArray(result?.items) ? result.items : []) {
+    if (item?.phoneKey) map.set(String(item.phoneKey), item);
+  }
+  return map;
+}
+
+async function contactForChat(chat) {
+  try {
+    return await chat.getContact();
+  } catch {
+    try {
+      return await client.getContactById(chat?.id?._serialized || "");
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function syncKnownLeadHistory() {
+  if (historySyncRunning) return;
+  const state = loadJson(HISTORY_STATE_FILE, {});
+  if (state?.completed === true) {
+    console.log(`[histórico] sincronização inicial já concluída em ${state.completedAt || "execução anterior"}.`);
+    return;
+  }
+
+  historySyncRunning = true;
+  try {
+    console.log("[histórico] buscando somente conversas de telefones já cadastrados no Rede Leads...");
+    const known = await knownLeadMap();
+    if (!known.size) {
+      console.log("[histórico] nenhum telefone de lead disponível para sincronização.");
+      return;
+    }
+
+    const chats = await client.getChats();
+    const matchedChats = [];
+
+    for (const chat of chats) {
+      if (matchedChats.length >= HISTORY_CHAT_LIMIT) break;
+      if (chat?.isGroup) continue;
+      const contact = await contactForChat(chat);
+      const phoneKey = canonicalPhoneKey(contact?.number || contact?.id?.user || chat?.id?.user || "");
+      if (!phoneKey || !known.has(phoneKey)) continue;
+      matchedChats.push({ chat, contact, lead: known.get(phoneKey) });
+    }
+
+    let imported = 0;
+    const pending = [];
+    for (const { chat, contact, lead } of matchedChats) {
+      let messages = [];
+      try {
+        messages = await chat.fetchMessages({ limit: HISTORY_MESSAGES_PER_CHAT });
+      } catch (error) {
+        console.warn(`[histórico] falha ao ler ${lead?.name || lead?.phoneKey}:`, error?.message || error);
+        continue;
+      }
+
+      for (const msg of messages) {
+        if (shouldIgnoreMessage(msg)) continue;
+        pending.push({
+          phone: lead.phone || contact?.number || chat?.id?.user || "",
+          name: lead.name || contact?.pushname || contact?.name || "",
+          leadId: lead.leadId || "",
+          direction: msg.fromMe ? "out" : "in",
+          text: String(msg.body || ""),
+          messageType: normalizeMessageType(msg.type),
+          messageId: messageIdOf(msg),
+          createdAt: messageCreatedAt(msg),
+        });
+      }
+    }
+
+    for (let i = 0; i < pending.length; i += 200) {
+      const chunk = pending.slice(i, i + 200);
+      const result = await api("/api/whatsapp/agent/inbound", {
+        method: "POST",
+        body: JSON.stringify({ clinicId: CLINIC_ID, event: "history-batch", messages: chunk }),
+      });
+      imported += Number(result?.imported || 0) || 0;
+    }
+
+    const completedAt = new Date().toISOString();
+    fs.writeFileSync(HISTORY_STATE_FILE, JSON.stringify({
+      completed: true,
+      completedAt,
+      matchedChats: matchedChats.length,
+      imported,
+    }, null, 2));
+    console.log(`[histórico] pronto: ${matchedChats.length} conversa(s), ${imported} mensagem(ns) úteis importadas.`);
+  } catch (error) {
+    console.warn("[histórico] não foi possível concluir agora:", error?.message || error);
+  } finally {
+    historySyncRunning = false;
+  }
 }
 
 client.on("qr", async (qr) => {
@@ -326,6 +469,7 @@ client.on("ready", async () => {
   connectedPhone = digitsOnly(client?.info?.wid?._serialized || client?.info?.wid?.user || "");
   console.log(`[WhatsApp] conectado${connectedPhone ? `: ${connectedPhone}` : ""}.`);
   await heartbeat({ connected: true, connectedPhone, qrCode: null });
+  syncKnownLeadHistory().catch(() => {});
   processQueue().catch(() => {});
 });
 
@@ -343,9 +487,7 @@ client.on("disconnected", async (reason) => {
 
 client.on("message", async (msg) => {
   try {
-    if (!msg || msg.fromMe) return;
-    const from = String(msg.from || "");
-    if (from.endsWith("@g.us") || from === "status@broadcast" || from.endsWith("@newsletter")) return;
+    if (!msg || msg.fromMe || shouldIgnoreMessage(msg)) return;
 
     const identity = await resolveInboundIdentity(msg);
     if (!identity.phone) {
@@ -360,7 +502,8 @@ client.on("message", async (msg) => {
       name: identity.name,
       text: String(msg.body || ""),
       messageType,
-      messageId: msg?.id?._serialized || msg?.id?.id || "",
+      messageId: messageIdOf(msg),
+      createdAt: messageCreatedAt(msg),
       referral: referralFromMessage(msg),
     };
 
@@ -371,6 +514,30 @@ client.on("message", async (msg) => {
     console.log(`[entrada] ${identity.name || identity.phone}: ${messageType}${result?.matched ? " → lead existente" : " → triagem"}`);
   } catch (error) {
     console.warn("[entrada] erro:", error?.message || error);
+  }
+});
+
+client.on("message_create", async (msg) => {
+  try {
+    if (!msg?.fromMe || shouldIgnoreMessage(msg)) return;
+    const rawTarget = String(msg.to || "");
+    const phone = digitsOnly(rawTarget);
+    if (!phone.startsWith("55") || phone.length < 12 || phone.length > 13) return;
+
+    await api("/api/whatsapp/agent/inbound", {
+      method: "POST",
+      body: JSON.stringify({
+        clinicId: CLINIC_ID,
+        event: "outbound",
+        phone,
+        text: String(msg.body || ""),
+        messageType: normalizeMessageType(msg.type),
+        messageId: messageIdOf(msg),
+        createdAt: messageCreatedAt(msg),
+      }),
+    });
+  } catch (error) {
+    console.warn("[saída] não foi possível registrar mensagem manual:", error?.message || error);
   }
 });
 
@@ -386,11 +553,12 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-console.log("\n=== Rede Leads • WhatsApp Agent v2.1 ===");
+console.log("\n=== Rede Leads • WhatsApp Agent v2.2 ===");
 console.log(`Clínica: ${CLINIC_ID}`);
 console.log(`Rede Leads: ${BASE_URL}`);
 console.log(`Follow-ups automáticos: intervalo ${MIN_DELAY_SECONDS}s a ${MAX_DELAY_SECONDS}s`);
 console.log(`Mensagens manuais: prioridade, checagem a cada ~${IDLE_POLL_SECONDS}s`);
+console.log(`Histórico inicial: até ${HISTORY_CHAT_LIMIT} conversas de leads × ${HISTORY_MESSAGES_PER_CHAT} mensagens.`);
 console.log("O agente NÃO baixa mídia e NÃO lê o Firebase diretamente.\n");
 
 client.initialize();
