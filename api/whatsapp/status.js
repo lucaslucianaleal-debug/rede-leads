@@ -1,6 +1,5 @@
-import crypto from "node:crypto";
 import { getAdminAuth, getAdminDb } from "../../server/firebaseAdmin.js";
-import { hashWhatsAppAgentSecret } from "../../server/whatsappAgentAuth.js";
+import { issueWhatsAppAgentToken } from "../../server/whatsappAgentAuth.js";
 
 async function requireFirebaseUser(req) {
   const header = String(req.headers.authorization || "");
@@ -30,12 +29,13 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       const action = String(req.body?.action || "pair").trim();
       if (action === "pair") {
-        const secret = crypto.randomBytes(32).toString("base64url");
+        const secret = issueWhatsAppAgentToken(clinicId);
         const nowIso = new Date().toISOString();
         await ref.set({
-          agentSecretHash: hashWhatsAppAgentSecret(secret),
+          agentSecretHash: null,
           pairedAt: nowIso,
           pairedBy: user.uid,
+          authMode: "signed-token-v1",
           connected: false,
           connectedPhone: "",
           qrCode: null,
@@ -52,6 +52,7 @@ export default async function handler(req, res) {
           agentSecretHash: null,
           pairedAt: null,
           pairedBy: null,
+          authMode: null,
           connected: false,
           connectedPhone: "",
           qrCode: null,
@@ -78,7 +79,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       configured: true,
-      paired: !!data.agentSecretHash || !!String(process.env.WHATSAPP_AGENT_SECRET || "").trim(),
+      paired: !!data.pairedAt || !!data.agentSecretHash || !!String(process.env.WHATSAPP_AGENT_SECRET || "").trim(),
       online,
       connected,
       lastSeenAt: data.lastSeenAt || null,
