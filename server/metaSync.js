@@ -49,8 +49,6 @@ function daysBetweenIso(fromIso, toIso) {
 
 function determineSinceDate(data, ad, timeZone) {
   const yesterday = addDays(getDateInTimeZone(timeZone), -1);
-  // v2 corrige o campo legado `clicks` para representar conversas iniciadas.
-  // Campanhas sincronizadas antes da v2 fazem uma única releitura completa para corrigir os dias Meta antigos.
   if (data?.metaLastSyncAt && Number(data?.metaMetricSchemaVersion || 0) >= META_METRIC_SCHEMA_VERSION) {
     return addDays(yesterday, -(LOOKBACK_DAYS - 1));
   }
@@ -302,8 +300,9 @@ export async function syncMetaForClinic({ clinicId, adAccountId: requestedAdAcco
   const adAccountId = normalizeAdAccountId(requestedAdAccountId || integration?.adAccountId);
   if (!adAccountId) throw makeMetaError("Conta de anúncios Meta ainda não vinculada", "META_ACCOUNT_NOT_CONFIGURED", 400);
 
+  // A leitura básica continua independente do módulo financeiro para nunca interromper o sync de campanhas.
   const account = await graphGet(adAccountId, {
-    fields: "id,name,timezone_name,timezone_offset_hours_utc,currency,account_status,disable_reason,amount_spent,balance,spend_cap,is_prepay_account",
+    fields: "id,name,timezone_name,timezone_offset_hours_utc,currency,account_status,disable_reason",
   }, accessToken);
   const timeZone = account?.timezone_name || "America/Sao_Paulo";
   const yesterday = addDays(getDateInTimeZone(timeZone), -1);
@@ -313,14 +312,28 @@ export async function syncMetaForClinic({ clinicId, adAccountId: requestedAdAcco
   }, accessToken);
   const activeAdsCount = ads.filter((ad) => ad.effective_status === "ACTIVE").length;
 
-  const financeState = await buildFinancialSnapshot({
-    account,
-    adAccountId,
-    accessToken,
-    timeZone,
-    activeAds: activeAdsCount,
-    integration,
-  });
+  let financeState = null;
+  let financeError = null;
+  try {
+    const financeAccount = await graphGet(adAccountId, {
+      fields: "currency,account_status,disable_reason,amount_spent,balance,spend_cap,is_prepay_account",
+    }, accessToken);
+    financeState = await buildFinancialSnapshot({
+      account: { ...account, ...financeAccount },
+      adAccountId,
+      accessToken,
+      timeZone,
+      activeAds: activeAdsCount,
+      integration,
+    });
+  } catch (error) {
+    financeError = {
+      code: error?.code || "META_FINANCE_UNAVAILABLE",
+      message: error?.message || String(error),
+      syncedAt: new Date().toISOString(),
+    };
+    console.error("Meta finance sync error:", financeError);
+  }
 
   const snap = await db.collection("clinics").doc(clinicId).collection("campaigns").get();
   const existing = snap.docs.map((doc) => ({ id: doc.id, ref: doc.ref, data: doc.data() }));
@@ -331,7 +344,8 @@ export async function syncMetaForClinic({ clinicId, adAccountId: requestedAdAcco
     adsFound: ads.length, activeAds: activeAdsCount,
     linkedExisting: 0, createdCampaigns: 0, skippedInactiveUnlinked: 0, skippedAmbiguous: 0, skippedDisabled: 0, ambiguousMatches: 0,
     metricsAdded: 0, metricsUpdated: 0, manualMetricsPreserved: 0, errors: [], syncedAt: new Date().toISOString(),
-    finance: financeState.financial,
+    finance: financeState?.financial || integration?.financial || null,
+    financeError,
   };
 
   for (const ad of ads) {
@@ -387,10 +401,13 @@ export async function syncMetaForClinic({ clinicId, adAccountId: requestedAdAcco
   }
 
   if (persistConfig) {
+    const financialUpdate = financeState
+      ? { financial: financeState.financial, financeHistory: financeState.financeHistory, financeLastError: null }
+      : { financeLastError: financeError };
     await integrationRef.set({
       clinicId, provider: "meta", adAccountId, accountName: account?.name || "", timezone: timeZone, enabled: true,
       resultActionType, graphVersion: process.env.META_GRAPH_VERSION || "v26.0", lastSyncAt: summary.syncedAt,
-      lastSyncSummary: summary, financial: financeState.financial, financeHistory: financeState.financeHistory,
+      lastSyncSummary: summary, ...financialUpdate,
       updatedAt: summary.syncedAt, createdAt: integration?.createdAt || summary.syncedAt,
     }, { merge: true });
   }
