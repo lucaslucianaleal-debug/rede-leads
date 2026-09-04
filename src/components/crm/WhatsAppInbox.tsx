@@ -233,6 +233,7 @@ export function WhatsAppInbox({
         <WhatsAppConversationPanel
           target={selectedChat}
           lead={selectedLead}
+          allLeads={leads}
           onUpdateLead={onUpdateLead}
           height="650px"
           className="border-0 rounded-none"

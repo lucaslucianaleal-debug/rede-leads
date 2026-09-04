@@ -49,6 +49,7 @@ type Props = {
   height?: string;
   showQuickRegistration?: boolean;
   onUpdateLead?: (leadId: string, updates: Partial<Lead>) => void;
+  allLeads?: Lead[];
 };
 
 function canonicalPhoneKey(value: string) {
@@ -149,6 +150,7 @@ export function WhatsAppConversationPanel({
   height = "620px",
   showQuickRegistration = true,
   onUpdateLead,
+  allLeads = [],
 }: Props) {
   const { status, fetchMessages, queueMessages, markChatRead, createLeadFromChat, deleteChatMessage } = useWhatsAppAgent();
   const [messages, setMessages] = useState<WhatsAppConversationMessage[]>([]);
@@ -491,6 +493,7 @@ export function WhatsAppConversationPanel({
         open={agendamentoOpen}
         onClose={() => setAgendamentoOpen(false)}
         onConfirm={confirmAppointment}
+        existingAppointments={allLeads}
       />
 
       <AlertDialog open={Boolean(messageToDelete)} onOpenChange={(open) => { if (!open && !deleting) setMessageToDelete(null); }}>

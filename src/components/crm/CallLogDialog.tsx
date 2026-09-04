@@ -421,6 +421,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
       onConfirm={handleConfirmAgendamento}
       initialDate={agendamentoInitialDate}
       initialTime={agendamentoInitialTime}
+      existingAppointments={leads}
     />
 
     </>
