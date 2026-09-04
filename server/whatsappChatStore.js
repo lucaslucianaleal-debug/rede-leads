@@ -85,9 +85,9 @@ export async function recordWhatsAppChatMessage(clinicId, payload = {}) {
     const duplicate = await msgRef.get();
     if (duplicate.exists) {
       // message_create pode registrar a saída antes do endpoint de resultado da fila.
-      // Se o resultado trouxer o tipo automático, enriquecemos o mesmo documento
-      // em vez de criar outra mensagem ou perder a etiqueta da automação.
-      if (messageType.startsWith("automation_")) {
+      // Se o resultado trouxer uma etiqueta de automação, enriquecemos o mesmo documento
+      // em vez de criar outra mensagem ou perder a identificação visual.
+      if (messageType !== "text") {
         const batch = db.batch();
         batch.set(msgRef, { messageType }, { merge: true });
         if (String(existingData.lastMessageId || "") === messageId) {
