@@ -2,14 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, CheckCheck, Clock3, RefreshCw, Send, UserPlus, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWhatsAppAgent } from "@/hooks/useWhatsAppAgent";
-import { useAuth } from "@/hooks/useAuth";
-import { resolveServiceOptions } from "@/lib/serviceCatalog";
-import { fetchActiveCampaignList } from "@/services/campaignService";
 import { Lead } from "@/types/crm";
+import { WhatsAppLeadRegistrationDialog } from "@/components/crm/WhatsAppLeadRegistrationDialog";
 
 export type WhatsAppConversationTarget = {
   id?: string;
@@ -22,6 +18,12 @@ export type WhatsAppConversationTarget = {
   lastMessage?: string;
   lastMessageAt?: string | null;
   lastMessageStatus?: string;
+  metaReferralHeadline?: string;
+  metaReferralBody?: string;
+  metaGreetingMessageBody?: string;
+  metaSourceApp?: string;
+  metaContainsAutoReply?: boolean;
+  metaAutomatedGreetingShown?: boolean;
 };
 
 export type WhatsAppConversationMessage = {
@@ -53,14 +55,14 @@ function canonicalPhoneKey(value: string) {
   return `55${digits}`;
 }
 
-function newerIso(values: Array<string | null | undefined>) {
-  return values.filter(Boolean).sort().at(-1) || "";
-}
-
 function messageTime(value?: string | null) {
   if (!value) return 0;
   const parsed = new Date(value).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function newerIso(values: Array<string | null | undefined>) {
+  return values.filter(Boolean).sort().at(-1) || "";
 }
 
 function shortTime(value?: string | null) {
@@ -83,6 +85,17 @@ function statusLabel(status?: string) {
   return { label: "Enviada", Icon: Check };
 }
 
+function normalizedText(value?: string) {
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function adSourceLabel(source?: string) {
+  const value = String(source || "").toLowerCase();
+  if (value.includes("instagram")) return "Anúncio do Instagram";
+  if (value.includes("facebook")) return "Anúncio do Facebook";
+  return "Anúncio Meta";
+}
+
 export function WhatsAppConversationPanel({
   target,
   lead,
@@ -91,36 +104,17 @@ export function WhatsAppConversationPanel({
   height = "620px",
   showQuickRegistration = true,
 }: Props) {
-  const { currentClinic, clinicMeta } = useAuth();
   const { status, fetchMessages, queueMessages, markChatRead, createLeadFromChat } = useWhatsAppAgent();
   const [messages, setMessages] = useState<WhatsAppConversationMessage[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [registering, setRegistering] = useState(false);
-  const [savingLead, setSavingLead] = useState(false);
-  const [name, setName] = useState("");
-  const [service, setService] = useState("");
-  const [campaignId, setCampaignId] = useState("");
-  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
   const messageSinceRef = useRef("");
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const chatId = useMemo(() => target?.id || canonicalPhoneKey(target?.phone || ""), [target?.id, target?.phone]);
-  const serviceOptions = useMemo(() => resolveServiceOptions(clinicMeta as any, []), [clinicMeta]);
   const linked = Boolean(lead?.id || target?.leadId);
-
-  useEffect(() => {
-    setName(lead?.nome || target?.name || "");
-    setService(lead?.servicoProcurado || "");
-    setCampaignId(lead?.metaCampanhaId || target?.metaCampanhaId || "");
-    setRegistering(false);
-  }, [chatId, lead?.id, lead?.nome, lead?.servicoProcurado, lead?.metaCampanhaId, target?.name, target?.metaCampanhaId]);
-
-  useEffect(() => {
-    if (!currentClinic || linked) return;
-    fetchActiveCampaignList(currentClinic).then(setCampaigns).catch(() => setCampaigns([]));
-  }, [currentClinic, linked]);
 
   const loadMessages = useCallback(async (forceFull = false) => {
     if (!chatId) {
@@ -155,18 +149,27 @@ export function WhatsAppConversationPanel({
   useEffect(() => {
     messageSinceRef.current = "";
     setMessages([]);
+    setRegistrationOpen(false);
     if (!chatId) return;
     loadMessages(true);
     const timer = window.setInterval(() => loadMessages(false), 4500);
     return () => window.clearInterval(timer);
   }, [chatId, loadMessages]);
 
+  const greetingText = normalizedText(target?.metaGreetingMessageBody);
+  const visibleMessages = useMemo(() => {
+    if (!greetingText) return messages;
+    return messages.filter((message) => {
+      return !(message.direction === "out" && normalizedText(message.text) === greetingText);
+    });
+  }, [messages, greetingText]);
+
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages.length, chatId]);
+  }, [visibleMessages.length, chatId]);
 
   const send = async () => {
     if (!target?.phone || !text.trim()) return;
@@ -192,35 +195,6 @@ export function WhatsAppConversationPanel({
     }
   };
 
-  const saveLead = async () => {
-    if (!target?.phone || !chatId) return;
-    if (!name.trim()) return toast.error("Informe o nome do lead.");
-    setSavingLead(true);
-    try {
-      const selectedCampaign = campaigns.find((item) => item.id === campaignId);
-      const firstInbound = messages.find((item) => item.direction === "in")?.text || target.lastMessage || "Primeiro contato recebido pelo WhatsApp";
-      const result = await createLeadFromChat({
-        chatId,
-        phone: target.phone,
-        name: name.trim(),
-        servicoProcurado: service,
-        fonteLead: target.fonteLead || "Online",
-        etapaLead: "Novo",
-        status: "MORNO",
-        observacao: `Primeiro contato via WhatsApp: "${firstInbound}"`,
-        metaCampanhaId: campaignId || target.metaCampanhaId || "",
-        metaCampanhaNome: selectedCampaign?.name || target.metaCampanhaNome || "",
-      });
-      if (result?.lead) onLeadLinked?.(result.lead as Lead);
-      setRegistering(false);
-      toast.success(result?.created ? "Lead cadastrado sem sair da conversa." : "Contato já existia e foi vinculado à conversa.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erro ao cadastrar lead");
-    } finally {
-      setSavingLead(false);
-    }
-  };
-
   if (!target) {
     return (
       <div className={`border rounded-xl bg-card flex items-center justify-center text-muted-foreground ${className}`} style={{ height }}>
@@ -229,117 +203,160 @@ export function WhatsAppConversationPanel({
     );
   }
 
+  const adContextVisible = Boolean(
+    target.metaReferralHeadline ||
+    target.metaReferralBody ||
+    target.metaGreetingMessageBody ||
+    target.metaCampanhaNome
+  );
+
   return (
-    <div className={`border rounded-xl bg-card overflow-hidden flex flex-col min-h-0 ${className}`} style={{ height }}>
-      <div className="shrink-0 border-b p-3 flex items-start justify-between gap-3 bg-card">
-        <div className="min-w-0">
-          <div className="font-semibold truncate">{lead?.nome || target.name || target.phone}</div>
-          <div className="text-xs text-muted-foreground truncate">{target.phone}</div>
-          {lead ? (
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{lead.etapaLead}</span>
-              {lead.servicoProcurado && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{lead.servicoProcurado}</span>}
-              {lead.comparecimento === "NÃO COMPARECEU" && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-700">Não compareceu</span>}
-            </div>
-          ) : target.metaCampanhaNome ? (
-            <div className="text-[11px] mt-1 text-emerald-700">Meta Ads • {target.metaCampanhaNome}</div>
-          ) : null}
+    <>
+      <div className={`border rounded-xl bg-card overflow-hidden flex flex-col min-h-0 ${className}`} style={{ height }}>
+        <div className="shrink-0 border-b p-3 flex items-start justify-between gap-3 bg-card">
+          <div className="min-w-0">
+            <div className="font-semibold truncate">{lead?.nome || target.name || target.phone}</div>
+            <div className="text-xs text-muted-foreground truncate">{target.phone}</div>
+            {lead ? (
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{lead.etapaLead}</span>
+                {lead.servicoProcurado && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{lead.servicoProcurado}</span>}
+                {lead.comparecimento === "NÃO COMPARECEU" && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-700">Não compareceu</span>}
+              </div>
+            ) : target.metaCampanhaNome ? (
+              <div className="text-[11px] mt-1 text-emerald-700">Meta Ads • {target.metaCampanhaNome}</div>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="ghost" size="icon" onClick={() => loadMessages(true)} disabled={loading} title="Atualizar conversa">
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+            <span className={`text-[11px] px-2 py-1 rounded-full border flex items-center gap-1 ${status.connected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+              {status.connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+              {status.connected ? "Conectado" : "Offline"}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="ghost" size="icon" onClick={() => loadMessages(true)} disabled={loading} title="Atualizar conversa">
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+
+        {!linked && showQuickRegistration && (
+          <div className="shrink-0 border-b bg-blue-50/70 p-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-blue-950">Novo contato ainda sem cadastro</p>
+              <p className="text-xs text-blue-800">Abra o cadastro completo sem sair da conversa. Nome, telefone e campanha já entram preenchidos.</p>
+            </div>
+            <Button size="sm" onClick={() => setRegistrationOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />Cadastrar lead
+            </Button>
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 overflow-y-auto bg-muted/10 p-4 flex flex-col gap-3">
+          {adContextVisible && (
+            <div className="mx-auto w-full max-w-[560px] rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-950">
+              <div className="font-semibold">{adSourceLabel(target.metaSourceApp)}</div>
+              {target.metaReferralHeadline && <div className="mt-1">{target.metaReferralHeadline}</div>}
+              {target.metaReferralBody && <div className="mt-1 text-emerald-800">{target.metaReferralBody}</div>}
+              {target.metaGreetingMessageBody && (
+                <div className="mt-2 rounded-md bg-white/70 border border-emerald-100 px-2 py-1.5">
+                  <span className="font-medium">Mensagem de saudação automática:</span> {target.metaGreetingMessageBody}
+                </div>
+              )}
+              {!target.metaReferralHeadline && !target.metaReferralBody && !target.metaGreetingMessageBody && target.metaCampanhaNome && (
+                <div className="mt-1 text-emerald-800">Campanha: {target.metaCampanhaNome}</div>
+              )}
+            </div>
+          )}
+
+          {visibleMessages.map((message) => {
+            const delivery = statusLabel(message.status);
+            const DeliveryIcon = delivery.Icon;
+            return (
+              <div key={message.id} className={`flex ${message.direction === "out" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[86%] rounded-xl px-3 py-2 text-sm shadow-sm ${message.direction === "out" ? "bg-primary text-primary-foreground" : "bg-card border"}`}>
+                  <div className="whitespace-pre-wrap break-words">{message.text}</div>
+                  <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${message.direction === "out" ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
+                    <span>{shortTime(message.createdAt)}</span>
+                    {message.messageType !== "text" && <span>• {message.messageType}</span>}
+                    {message.direction === "out" && (
+                      <span className="inline-flex items-center gap-0.5" title={delivery.label}>
+                        <DeliveryIcon className="h-3 w-3" />{delivery.label}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {loading && !visibleMessages.length && <div className="text-center text-xs text-muted-foreground py-8">Carregando conversa...</div>}
+          {!loading && !visibleMessages.length && <div className="text-center text-xs text-muted-foreground py-8">Sem histórico anterior. As novas mensagens aparecerão aqui.</div>}
+          <div ref={endRef} />
+        </div>
+
+        <div className="shrink-0 border-t bg-card p-3 flex gap-2 items-end">
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder="Digite aqui... Enter envia • Shift+Enter quebra linha"
+            disabled={!status.connected || sending}
+            rows={2}
+            className="min-h-[48px] max-h-28 resize-none"
+          />
+          <Button onClick={send} disabled={!status.connected || sending || !text.trim()} className="shrink-0">
+            <Send className="h-4 w-4 mr-2" />{sending ? "Enviando" : "Enviar"}
           </Button>
-          <span className={`text-[11px] px-2 py-1 rounded-full border flex items-center gap-1 ${status.connected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-            {status.connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-            {status.connected ? "Conectado" : "Offline"}
-          </span>
         </div>
       </div>
 
       {!linked && showQuickRegistration && (
-        <div className="shrink-0 border-b bg-blue-50/70 p-3">
-          {!registering ? (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold text-blue-950">Novo contato ainda sem cadastro</p>
-                <p className="text-xs text-blue-800">Cadastre aqui mesmo. Nome, telefone e campanha já entram preenchidos quando disponíveis.</p>
-              </div>
-              <Button size="sm" onClick={() => setRegistering(true)}>
-                <UserPlus className="h-4 w-4 mr-2" />Cadastrar lead
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome" />
-                <Select value={service || "none"} onValueChange={(value) => setService(value === "none" ? "" : value)}>
-                  <SelectTrigger><SelectValue placeholder="Serviço procurado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Serviço ainda não informado</SelectItem>
-                    {serviceOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Select value={campaignId || "none"} onValueChange={(value) => setCampaignId(value === "none" ? "" : value)}>
-                <SelectTrigger><SelectValue placeholder="Campanha Meta Ads" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Campanha não identificada</SelectItem>
-                  {target.metaCampanhaId && target.metaCampanhaNome && !campaigns.some((item) => item.id === target.metaCampanhaId) && (
-                    <SelectItem value={target.metaCampanhaId}>{target.metaCampanhaNome}</SelectItem>
-                  )}
-                  {campaigns.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <div className="flex justify-end gap-2">
-                <Button size="sm" variant="outline" onClick={() => setRegistering(false)}>Cancelar</Button>
-                <Button size="sm" onClick={saveLead} disabled={savingLead || !name.trim()}>{savingLead ? "Cadastrando..." : "Cadastrar e continuar no chat"}</Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex-1 min-h-0 overflow-y-auto bg-muted/10 p-4 flex flex-col gap-3">
-        {messages.map((message) => {
-          const delivery = statusLabel(message.status);
-          const DeliveryIcon = delivery.Icon;
-          return (
-            <div key={message.id} className={`flex ${message.direction === "out" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[86%] rounded-xl px-3 py-2 text-sm shadow-sm ${message.direction === "out" ? "bg-primary text-primary-foreground" : "bg-card border"}`}>
-                <div className="whitespace-pre-wrap break-words">{message.text}</div>
-                <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${message.direction === "out" ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
-                  <span>{shortTime(message.createdAt)}</span>
-                  {message.messageType !== "text" && <span>• {message.messageType}</span>}
-                  {message.direction === "out" && <span className="inline-flex items-center gap-0.5" title={delivery.label}><DeliveryIcon className="h-3 w-3" />{delivery.label}</span>}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        {loading && !messages.length && <div className="text-center text-xs text-muted-foreground py-8">Carregando conversa...</div>}
-        {!loading && !messages.length && <div className="text-center text-xs text-muted-foreground py-8">Sem histórico anterior. As novas mensagens aparecerão aqui.</div>}
-        <div ref={endRef} />
-      </div>
-
-      <div className="shrink-0 border-t bg-card p-3 flex gap-2 items-end">
-        <Textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
+        <WhatsAppLeadRegistrationDialog
+          open={registrationOpen}
+          onClose={() => setRegistrationOpen(false)}
+          initialName={target.name || ""}
+          initialPhone={target.phone}
+          initialCampaignId={target.metaCampanhaId || ""}
+          initialCampaignName={target.metaCampanhaNome || ""}
+          initialSource={target.fonteLead || "Online"}
+          contextText={`${target.metaReferralHeadline || ""} ${target.metaReferralBody || ""} ${target.metaGreetingMessageBody || ""}`}
+          onSave={async (form, campaignName) => {
+            try {
+              const result = await createLeadFromChat({
+                chatId,
+                phone: form.telefone,
+                name: form.nome,
+                dataCriacao: form.dataCriacao,
+                dataContato: form.dataContato,
+                servicoProcurado: form.servicoProcurado,
+                captador: form.captador,
+                fonteLead: form.fonteLead,
+                etapaLead: form.etapaLead,
+                status: form.status,
+                respostaLead: form.respostaLead,
+                comparecimento: form.comparecimento,
+                dataFollowUp: form.dataFollowUp,
+                dataAgendamento: form.dataAgendamento,
+                dataRetornoLigacao: form.dataRetornoLigacao,
+                observacao: form.observacao,
+                followUpCount: form.followUpCount,
+                lembretes: form.lembretes,
+                customFields: form.customFields,
+                metaCampanhaId: target.metaCampanhaId || "",
+                metaCampanhaNome: campaignName || target.metaCampanhaNome || "",
+              });
+              if (result?.lead) onLeadLinked?.(result.lead as Lead);
+              toast.success(result?.created ? "Lead cadastrado e conversa mantida aberta." : "Contato já existia e foi vinculado à conversa.");
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Erro ao cadastrar lead");
+              throw error;
             }
           }}
-          placeholder="Digite aqui... Enter envia • Shift+Enter quebra linha"
-          disabled={!status.connected || sending}
-          rows={2}
-          className="min-h-[48px] max-h-28 resize-none"
         />
-        <Button onClick={send} disabled={!status.connected || sending || !text.trim()} className="shrink-0">
-          <Send className="h-4 w-4 mr-2" />{sending ? "Enviando" : "Enviar"}
-        </Button>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
