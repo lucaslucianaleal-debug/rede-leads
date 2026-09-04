@@ -3,14 +3,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useClinics } from "@/hooks/useClinics";
 import { ClinicChip } from "@/components/ClinicChip";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
-import { useConversations } from "@/hooks/useConversations";
 import { Lead } from "@/types/crm";
 import { CLINICAS } from "@/hooks/useCupons";
 import { StatsCards } from "@/components/crm/StatsCards";
 import { FollowUpQueue } from "@/components/crm/FollowUpQueue";
 import { CallReturnQueue } from "@/components/crm/CallReturnQueue";
 import { AuthComponent } from "@/components/crm/AuthComponent";
-import { AdminPanel } from "@/components/crm/AdminPanel";
 import { ReminderQueue } from "@/components/crm/ReminderQueue";
 import { CalendarView } from "@/components/crm/CalendarView";
 import { AllLeadsView } from "@/components/crm/AllLeadsView";
@@ -25,8 +23,6 @@ import { FollowUpRuler } from "@/components/crm/FollowUpRuler";
 import { OperationsBell } from "@/components/crm/OperationsBell";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,12 +33,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, Ticket, BookOpen, Menu, TrendingUp } from "lucide-react";
+import { Download, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, Plus, Inbox, Ticket, BookOpen, Menu, TrendingUp } from "lucide-react";
 import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useRef, useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -86,8 +81,6 @@ const CRMDashboard = () => {
     clearDuplicates,
     allLeads,
   } = useLeads();
-
-  const { totalUnread, sendMessage, serverConnected } = useConversations();
 
   const { store: mpcStore, setStore: mpcSetStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, saveNow: mpcSaveNow } = useMPCDataStore(currentClinic);
   const { data: mpcData, isLoading: mpcLoading } = useMPCDashboardData(mpcStore);
@@ -274,124 +267,66 @@ const CRMDashboard = () => {
           </div>
           <div className="flex gap-2 items-center">
             {!isCorretorModule && <OperationsBell onOpenInbox={() => setActiveTab("novos-leads")} />}
-            <AuthComponent />
-            <button
-              onClick={() => setActiveTab('dashboard-executivo')}
-              className="ml-2 inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all bg-secondary/10 text-foreground hover:bg-secondary/20"
-              aria-label="Abrir Meta e Campanhas"
-            >
-              Meta & Campanhas
-            </button>
             {!isReceptionist && (
               <>
                 <input type="file" ref={fileRef} accept=".csv" onChange={handleImport} className="hidden" />
-
-                {/* Desktop: compact actions menu (hidden on mobile) */}
-                <div className="hidden md:flex gap-2 items-center">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <CalendarIcon className="h-4 w-4 mr-1" />
-                        {format(reportDate, "dd/MM/yyyy")}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={reportDate}
-                        onSelect={(date) => date && setReportDate(date)}
-                        locale={ptBR}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Abrir ferramentas">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <div className="px-2 py-2">
+                      <label htmlFor="header-report-date" className="mb-1.5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <CalendarIcon className="h-3.5 w-3.5" />
+                        Data dos relatórios
+                      </label>
+                      <input
+                        id="header-report-date"
+                        type="date"
+                        value={format(reportDate, "yyyy-MM-dd")}
+                        onChange={(event) => {
+                          const [year, month, day] = event.target.value.split("-").map(Number);
+                          if (year && month && day) setReportDate(new Date(year, month - 1, day));
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                       />
-                    </PopoverContent>
-                  </Popover>
-
-                  {/* date-range controls moved to 'Todos os Leads' view */}
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <MoreVertical className="h-4 w-4 mr-1" />
-                        Ações
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      {permissions?.canImport && (
-                        <DropdownMenuItem onClick={() => fileRef.current?.click()}>
-                          <Download className="h-4 w-4 mr-2" />
-                          Importar CSV
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem onClick={() => exportDailyReport(reportDate)}>
-                        <FileText className="h-4 w-4 mr-2" />
-                        Relatório Diário
+                    </div>
+                    <DropdownMenuSeparator />
+                    {permissions?.canImport && (
+                      <DropdownMenuItem onClick={() => fileRef.current?.click()}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Importar CSV
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => exportWeeklyReport(reportDate)}>
-                        <FileSpreadsheet className="h-4 w-4 mr-2" />
-                        Relatório Semanal
+                    )}
+                    <DropdownMenuItem onClick={() => exportDailyReport(reportDate)}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Relatório Diário
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => exportWeeklyReport(reportDate)}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Relatório Semanal
+                    </DropdownMenuItem>
+                    {(duplicatesInfo.has || permissions?.canDelete) && <DropdownMenuSeparator />}
+                    {duplicatesInfo.has && permissions?.canDelete && (
+                      <DropdownMenuItem onClick={() => setShowClearDuplicatesDialog(true)} className="text-amber-700">
+                        <Copy className="h-4 w-4 mr-2" />
+                        Limpar Duplicatas ({duplicatesInfo.count})
                       </DropdownMenuItem>
-                      {/* Range report moved to 'Todos os Leads' tab */}
-                      <DropdownMenuSeparator />
-                      {duplicatesInfo.has && permissions?.canDelete && (
-                        <DropdownMenuItem onClick={() => setShowClearDuplicatesDialog(true)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Limpar Duplicatas ({duplicatesInfo.count})
-                        </DropdownMenuItem>
-                      )}
-                      {permissions?.canDelete && (
-                        <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Limpar Base
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  {canShowAdminControls && <AdminPanel />}
-                </div>
-
-                {/* Mobile dropdown — hidden on desktop */}
-                <div className="flex md:hidden items-center gap-1">
-                  {canShowAdminControls && <AdminPanel />}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52">
-                      {permissions?.canImport && (
-                        <DropdownMenuItem onClick={() => fileRef.current?.click()}>
-                          <Download className="h-4 w-4 mr-2" />
-                          Importar CSV
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => exportDailyReport(reportDate)}>
-                        <FileText className="h-4 w-4 mr-2" />
-                        Relatório Diário
+                    )}
+                    {permissions?.canDelete && (
+                      <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Limpar Base
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => exportWeeklyReport(reportDate)}>
-                        <FileSpreadsheet className="h-4 w-4 mr-2" />
-                        Relatório Semanal
-                      </DropdownMenuItem>
-                      {(duplicatesInfo.has || permissions?.canDelete) && <DropdownMenuSeparator />}
-                      {duplicatesInfo.has && permissions?.canDelete && (
-                        <DropdownMenuItem onClick={() => setShowClearDuplicatesDialog(true)} className="text-amber-700">
-                          <Copy className="h-4 w-4 mr-2" />
-                          Limpar Duplicatas ({duplicatesInfo.count})
-                        </DropdownMenuItem>
-                      )}
-                      {permissions?.canDelete && (
-                        <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Limpar Base
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
+            <AuthComponent canShowAdminControls={canShowAdminControls} />
           </div>
         </div>
       </header>
