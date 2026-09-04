@@ -156,7 +156,10 @@ export function WhatsAppConversationPanel({
     return () => window.clearInterval(timer);
   }, [chatId, loadMessages]);
 
-  const greetingText = normalizedText(target?.metaGreetingMessageBody);
+  const greetingCandidate = target?.metaGreetingMessageBody || (
+    target?.metaCampanhaNome && target?.metaReferralBody ? target.metaReferralBody : ""
+  );
+  const greetingText = normalizedText(greetingCandidate);
   const visibleMessages = useMemo(() => {
     if (!greetingText) return messages;
     return messages.filter((message) => {
@@ -323,7 +326,7 @@ export function WhatsAppConversationPanel({
           initialCampaignName={target.metaCampanhaNome || ""}
           initialSource={target.fonteLead || "Online"}
           contextText={`${target.metaReferralHeadline || ""} ${target.metaReferralBody || ""} ${target.metaGreetingMessageBody || ""}`}
-          onSave={async (form, campaignName) => {
+          onSave={async (form, selectedCampaignId, campaignName) => {
             try {
               const result = await createLeadFromChat({
                 chatId,
@@ -345,7 +348,7 @@ export function WhatsAppConversationPanel({
                 followUpCount: form.followUpCount,
                 lembretes: form.lembretes,
                 customFields: form.customFields,
-                metaCampanhaId: target.metaCampanhaId || "",
+                metaCampanhaId: selectedCampaignId || target.metaCampanhaId || "",
                 metaCampanhaNome: campaignName || target.metaCampanhaNome || "",
               });
               if (result?.lead) onLeadLinked?.(result.lead as Lead);
