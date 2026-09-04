@@ -431,6 +431,7 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
               fonteLead: activeLead.fonteLead,
             } : null}
             lead={activeLead}
+            allLeads={base}
             onUpdateLead={onUpdateLead}
             height="650px"
             showQuickRegistration={false}

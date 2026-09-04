@@ -39,7 +39,7 @@ interface ChatWindowProps {
 }
 
 export function ChatWindow({ conversation, messages, onSend, onOpen, serverConnected, currentLead, onUpdateLead, onCreateLead, prefilledMessage, onPrefilledConsumed }: ChatWindowProps) {
-  const leads = useLeads();
+  const { leads } = useLeads();
   const { user } = useAuth();
 
   // Helper para buscar nome do lead
@@ -603,6 +603,7 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
         open={agendamentoDialogOpen}
         onClose={() => setAgendamentoDialogOpen(false)}
         onConfirm={handleConfirmAgendamento}
+        existingAppointments={leads}
       />
 
       {/* Desistência Dialog */}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Lead } from "@/types/crm";
 import {
   Dialog,
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { CalendarIcon } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, CalendarIcon, CheckCircle2 } from "lucide-react";
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { scheduleAppointmentWhatsAppAutomation } from "@/lib/appointmentWhatsAppAutomation";
 import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 import { Textarea } from "@/components/ui/textarea";
+import { appointmentConflicts, suggestAvailableTimes } from "@/lib/appointmentAvailability";
 
 interface AgendamentoDialogProps {
   lead: Lead | null;
@@ -29,9 +30,18 @@ interface AgendamentoDialogProps {
   onConfirm: (leadId: string, dataAgendamento: string) => void;
   initialDate?: Date;
   initialTime?: string;
+  existingAppointments?: Lead[];
 }
 
-export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate, initialTime }: AgendamentoDialogProps) {
+export function AgendamentoDialog({
+  lead,
+  open,
+  onClose,
+  onConfirm,
+  initialDate,
+  initialTime,
+  existingAppointments = [],
+}: AgendamentoDialogProps) {
   const { user, currentClinic, clinicMeta } = useAuth();
   const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(new Date());
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
@@ -39,12 +49,14 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<"appointment" | "message">("appointment");
   const [confirmationMessage, setConfirmationMessage] = useState("");
+  const [allowConflict, setAllowConflict] = useState(false);
 
   // Pré-preencher se já tem agendamento ou vaga sugerida
   useEffect(() => {
     if (!open) return;
     setStep("appointment");
     setConfirmationMessage("");
+    setAllowConflict(false);
 
     if (initialDate) {
       setAgendamentoDate(initialDate);
@@ -73,15 +85,23 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
     setAgendamentoTime("09:00");
   }, [lead?.dataAgendamento, open, initialDate, initialTime]);
 
+  const selectedDateValue = agendamentoDate ? format(agendamentoDate, "dd/MM/yyyy") : "";
+  const appointmentValue = selectedDateValue ? `${selectedDateValue} ${agendamentoTime}` : "";
+  const conflicts = useMemo(
+    () => appointmentConflicts(existingAppointments, appointmentValue, lead?.id),
+    [existingAppointments, appointmentValue, lead?.id],
+  );
+  const suggestedTimes = useMemo(
+    () => conflicts.length
+      ? suggestAvailableTimes(existingAppointments, selectedDateValue, agendamentoTime, lead?.id)
+      : [],
+    [conflicts.length, existingAppointments, selectedDateValue, agendamentoTime, lead?.id],
+  );
+
   if (!lead) return null;
 
-  const appointmentValue = () => {
-    if (!agendamentoDate) return "";
-    return `${format(agendamentoDate, "dd/MM/yyyy")} ${agendamentoTime}`;
-  };
-
   const handleContinue = () => {
-    const dataAgendamento = appointmentValue();
+    const dataAgendamento = appointmentValue;
     if (!dataAgendamento) {
       toast.error("Selecione uma data!");
       return;
@@ -89,6 +109,10 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
     const selectedDateTime = parse(dataAgendamento, "dd/MM/yyyy HH:mm", new Date());
     if (selectedDateTime.getTime() <= Date.now()) {
       toast.error("Escolha uma data e um horário futuros.");
+      return;
+    }
+    if (conflicts.length && !allowConflict) {
+      toast.warning("Esse horário já está ocupado. Escolha outro horário ou confirme que deseja manter o encaixe.");
       return;
     }
 
@@ -106,7 +130,7 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
   };
 
   const handleConfirm = async () => {
-    const dataAgendamento = appointmentValue();
+    const dataAgendamento = appointmentValue;
     if (!dataAgendamento) {
       toast.error("Selecione uma data!");
       return;
@@ -150,6 +174,7 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
       setAgendamentoTime("09:00");
       setStep("appointment");
       setConfirmationMessage("");
+      setAllowConflict(false);
       onClose();
     }
   };
@@ -199,6 +224,7 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
                     selected={agendamentoDate}
                     onSelect={(date) => {
                       setAgendamentoDate(date);
+                      setAllowConflict(false);
                       setCalendarOpen(false);
                     }}
                     locale={ptBR}
@@ -215,11 +241,65 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
                 id="time"
                 type="time"
                 value={agendamentoTime}
-                onChange={(e) => setAgendamentoTime(e.target.value)}
+                onChange={(e) => {
+                  setAgendamentoTime(e.target.value);
+                  setAllowConflict(false);
+                }}
                 className="mt-2"
                 disabled={saving}
               />
             </div>
+
+            {conflicts.length === 0 ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-emerald-800">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <CheckCircle2 className="h-4 w-4" /> Horário disponível
+                </div>
+                <p className="mt-0.5 text-xs text-emerald-700">Conferido com a agenda atual do Rede Leads.</p>
+              </div>
+            ) : (
+              <div className={`rounded-lg border px-3 py-3 ${allowConflict ? "border-amber-200 bg-amber-50" : "border-red-200 bg-red-50"}`}>
+                <div className={`flex items-center gap-2 text-sm font-semibold ${allowConflict ? "text-amber-900" : "text-red-800"}`}>
+                  <AlertTriangle className="h-4 w-4" />
+                  {conflicts.length === 1 ? "Este horário já está ocupado" : `${conflicts.length} agendamentos neste horário`}
+                </div>
+                <p className={`mt-1 text-xs ${allowConflict ? "text-amber-800" : "text-red-700"}`}>
+                  {conflicts.slice(0, 2).map((item) => item.nome || "Lead sem nome").join(" • ")}
+                  {conflicts.length > 2 ? ` • +${conflicts.length - 2}` : ""}
+                </p>
+
+                {suggestedTimes.length > 0 && !allowConflict && (
+                  <div className="mt-3">
+                    <div className="text-xs font-medium text-red-800">Próximos horários livres</div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {suggestedTimes.map((time) => (
+                        <Button
+                          key={time}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-red-200 bg-white text-red-800 hover:bg-red-100"
+                          onClick={() => {
+                            setAgendamentoTime(time);
+                            setAllowConflict(false);
+                          }}
+                        >
+                          {time}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className={`mt-3 text-xs font-semibold underline underline-offset-2 ${allowConflict ? "text-amber-900" : "text-red-800"}`}
+                  onClick={() => setAllowConflict((current) => !current)}
+                >
+                  {allowConflict ? "Cancelar encaixe neste horário" : "A clínica comporta: manter como encaixe"}
+                </button>
+              </div>
+            )}
 
             <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
               Na próxima etapa você poderá revisar a mensagem antes do envio.
@@ -228,8 +308,16 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
         ) : (
           <div className="space-y-3 py-4">
             <div className="rounded-lg border bg-muted/40 px-3 py-2">
-              <div className="text-xs text-muted-foreground">Data e horário</div>
-              <div className="font-semibold">{appointmentValue()}</div>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Data e horário</div>
+                  <div className="font-semibold">{appointmentValue}</div>
+                </div>
+                <CalendarCheck2 className="h-5 w-5 text-primary" />
+              </div>
+              {conflicts.length > 0 && allowConflict && (
+                <div className="mt-2 text-xs font-medium text-amber-700">Encaixe autorizado • {conflicts.length + 1} atendimentos no horário</div>
+              )}
             </div>
             <div>
               <Label htmlFor="appointment-confirmation">Mensagem de confirmação</Label>

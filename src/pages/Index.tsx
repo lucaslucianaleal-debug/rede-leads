@@ -22,6 +22,7 @@ import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { WhatsAppInbox } from "@/components/crm/WhatsAppInbox";
 import { ServicosExternos } from "@/components/crm/ServicosExternos";
 import { FollowUpRuler } from "@/components/crm/FollowUpRuler";
+import { OperationsBell } from "@/components/crm/OperationsBell";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
@@ -272,6 +273,7 @@ const CRMDashboard = () => {
             </div>
           </div>
           <div className="flex gap-2 items-center">
+            {!isCorretorModule && <OperationsBell onOpenInbox={() => setActiveTab("novos-leads")} />}
             <AuthComponent />
             <button
               onClick={() => setActiveTab('dashboard-executivo')}
