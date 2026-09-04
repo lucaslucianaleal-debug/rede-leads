@@ -15,7 +15,6 @@ import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { AgendamentoDialog } from "@/components/crm/AgendamentoDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Send, MessageCircle, CheckCheck, Wifi, WifiOff, UserPen, X, Save, Phone, Calendar, Reply, UserMinus } from "lucide-react";
@@ -163,9 +162,6 @@ export function ChatWindow({ conversation, messages, onSend, onOpen, serverConne
     }
     
     onUpdateLead(leadId, updates);
-    toast.success("Agendamento atualizado! Automação reativada.");
-    // Pré-preencher a barra de conversa com a confirmação completa para o lead
-    setText(generateAppointmentConfirmationText(dataAgendamento));
   };
 
   const handleDisableAutomation = () => {
