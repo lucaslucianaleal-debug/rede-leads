@@ -557,7 +557,7 @@ const CRMDashboard = () => {
               {permissions?.canEdit && (
                 <button
                   onClick={() => setShowCreateDialog(true)}
-                  className="ml-auto inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="ml-auto inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
                   aria-label="Novo Lead"
                 >
                   <Plus className="h-4 w-4 mr-2" />
