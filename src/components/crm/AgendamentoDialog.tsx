@@ -17,6 +17,8 @@ import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/phone";
+import { useAuth } from "@/hooks/useAuth";
+import { scheduleAppointmentWhatsAppAutomation } from "@/lib/appointmentWhatsAppAutomation";
 
 interface AgendamentoDialogProps {
   lead: Lead | null;
@@ -28,9 +30,11 @@ interface AgendamentoDialogProps {
 }
 
 export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate, initialTime }: AgendamentoDialogProps) {
+  const { user, currentClinic, clinicMeta } = useAuth();
   const [agendamentoDate, setAgendamentoDate] = useState<Date | undefined>(new Date());
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Pré-preencher se já tem agendamento ou vaga sugerida
   useEffect(() => {
@@ -61,21 +65,51 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
     // Reset quando modal abre sem agendamento
     setAgendamentoDate(new Date());
     setAgendamentoTime("09:00");
-  }, [lead?.dataAgendamento, open]);
+  }, [lead?.dataAgendamento, open, initialDate, initialTime]);
 
   if (!lead) return null;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!agendamentoDate) {
       toast.error("Selecione uma data!");
       return;
     }
+
     const dataAgendamento = `${format(agendamentoDate, "dd/MM/yyyy")} ${agendamentoTime}`;
-    onConfirm(lead.id, dataAgendamento);
-    toast.success(`Agendado para ${dataAgendamento}`);
-    setAgendamentoDate(new Date());
-    setAgendamentoTime("09:00");
-    onClose();
+    setSaving(true);
+
+    try {
+      // Primeiro salva o agendamento no fluxo já existente do CRM.
+      onConfirm(lead.id, dataAgendamento);
+      toast.success(`Agendado para ${dataAgendamento}`);
+
+      // Depois usa o mesmo agente do WhatsApp para confirmação imediata e lembretes futuros.
+      // A automação usa as mensagens já existentes no Rede Leads.
+      const result = await scheduleAppointmentWhatsAppAutomation({
+        user,
+        clinicId: currentClinic || "",
+        clinicMeta,
+        lead,
+        dataAgendamento,
+      });
+
+      if (result.confirmationQueued) {
+        toast.success("Confirmação colocada na fila do WhatsApp ✓");
+      }
+      if ((result.scheduled || []).length > 0) {
+        toast.success("Lembretes do agendamento programados ✓");
+      }
+    } catch (error) {
+      console.error("Falha ao programar WhatsApp do agendamento:", error);
+      toast.warning(
+        `Agendamento salvo, mas a automação do WhatsApp não foi programada: ${error instanceof Error ? error.message : "erro desconhecido"}`
+      );
+    } finally {
+      setSaving(false);
+      setAgendamentoDate(new Date());
+      setAgendamentoTime("09:00");
+      onClose();
+    }
   };
 
   return (
@@ -108,6 +142,7 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
                   variant="outline"
                   className="w-full mt-2 text-left font-normal"
                   onClick={() => setCalendarOpen(true)}
+                  disabled={saving}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {agendamentoDate ? format(agendamentoDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Selecionar data"}
@@ -137,16 +172,21 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
               value={agendamentoTime}
               onChange={(e) => setAgendamentoTime(e.target.value)}
               className="mt-2"
+              disabled={saving}
             />
+          </div>
+
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+            Ao confirmar, o Rede Leads envia a confirmação pelo agente conectado e programa os lembretes disponíveis para esse horário.
           </div>
         </div>
 
         <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirm}>
-            ✓ Agendar
+          <Button onClick={handleConfirm} disabled={saving}>
+            {saving ? "Programando..." : "✓ Agendar e confirmar"}
           </Button>
         </DialogFooter>
       </DialogContent>
