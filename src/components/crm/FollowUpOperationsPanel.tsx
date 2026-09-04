@@ -107,6 +107,8 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
   const [variants, setVariants] = useState<string[]>([]);
   const [singleLead, setSingleLead] = useState<Lead | null>(null);
   const [singleMessage, setSingleMessage] = useState("");
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [sending, setSending] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState<string>("");
 
@@ -161,6 +163,8 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
   useEffect(() => {
     setSelected(new Set());
     setVariants(templatesFor(stage, attendance === "nao_compareceu"));
+    setActiveVariantIndex(0);
+    setBatchOpen(false);
   }, [stage, attendance]);
 
   useEffect(() => {
@@ -199,7 +203,15 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
 
   const addVariant = () => {
     if (variants.length >= 3) return;
-    setVariants((current) => [...current, current[0] || ""]);
+    const next = [...variants, variants[0] || ""];
+    setVariants(next);
+    setActiveVariantIndex(next.length - 1);
+  };
+
+  const openBatch = () => {
+    if (!selectedLeads.length) return toast.info("Selecione os leads que deseja colocar na fila.");
+    setActiveVariantIndex(0);
+    setBatchOpen(true);
   };
 
   const queueBatch = async () => {
@@ -227,6 +239,7 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
       toast.success(`${result.queued} follow-up(s) colocado(s) na fila. O agente enviará espaçado.`);
       if (result.skipped) toast.info(`${result.skipped} item(ns) foram ignorados por trava de duplicidade/estado.`);
       setSelected(new Set());
+      setBatchOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao criar fila de follow-up");
     } finally {
@@ -341,16 +354,17 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.05fr)_minmax(430px,0.95fr)] gap-4 items-start">
-        <div className="space-y-4 min-w-0">
-          <div className="border rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between gap-3 p-2.5 bg-muted/30 border-b">
+        <div className="min-w-0">
+          <div className="border rounded-lg overflow-hidden flex flex-col xl:h-[650px]">
+            <div className="flex items-center justify-between gap-3 p-2.5 bg-muted/30 border-b shrink-0">
               <button onClick={toggleAll} className="text-xs font-medium flex items-center gap-1.5 hover:text-primary">
                 {filtered.length > 0 && filtered.every((lead) => selected.has(lead.id)) ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
                 Selecionar visíveis
               </button>
               <span className="text-xs text-muted-foreground">{filtered.length} lead(s) • {selectedLeads.length} selecionado(s)</span>
             </div>
-            <div className="max-h-[420px] overflow-y-auto divide-y">
+
+            <div className="max-h-[520px] xl:max-h-none xl:flex-1 min-h-0 overflow-y-auto divide-y">
               {!filtered.length && <div className="p-8 text-sm text-muted-foreground text-center">Nenhum lead encontrado com esses filtros.</div>}
               {filtered.map((lead) => {
                 const active = activeLeadId === lead.id;
@@ -391,40 +405,15 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
                 );
               })}
             </div>
-          </div>
 
-          <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold">Mensagens do lote</p>
-                <p className="text-xs text-muted-foreground">Até 3 variações intercaladas automaticamente. Quebras de linha são preservadas.</p>
+            <div className="border-t bg-background p-2.5 flex items-center justify-between gap-3 shrink-0">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold">{selectedLeads.length ? `${selectedLeads.length} lead(s) prontos para o lote` : "Selecione os leads do lote"}</p>
+                <p className="text-[11px] text-muted-foreground truncate">As mensagens e o envio abrem em uma janela, sem precisar descer a página.</p>
               </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => setVariants(templatesFor(stage, attendance === "nao_compareceu"))}>Carregar sugeridas</Button>
-                {variants.length < 3 && <Button size="sm" variant="outline" onClick={addVariant}>+ Variação</Button>}
-              </div>
-            </div>
-
-            {variants.length === 0 && <Textarea rows={5} placeholder="Escreva a mensagem. Use [primeiro_nome] e [serviço] para personalizar." onChange={(e) => setVariants([e.target.value])} />}
-            {variants.map((variant, index) => (
-              <div key={index} className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Variação {index + 1}</label>
-                <Textarea value={variant} onChange={(e) => updateVariant(index, e.target.value)} rows={5} className="whitespace-pre-wrap" />
-              </div>
-            ))}
-
-            {previewLead && usableVariants[0] && (
-              <div className="rounded-md bg-background border p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview para {previewLead.nome?.split(" ")[0] || "lead"}</p>
-                <div className="text-sm whitespace-pre-wrap leading-relaxed">{personalize(usableVariants[0], previewLead)}</div>
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground">Fila automática: um follow-up por vez, respeitando o intervalo configurado.</span>
-              <Button onClick={queueBatch} disabled={sending || !selectedLeads.length || !usableVariants.length || !status.connected}>
-                <Send className="h-4 w-4 mr-2" />
-                {sending ? "Colocando na fila..." : `Enviar ${selectedLeads.length || ""} follow-up${selectedLeads.length === 1 ? "" : "s"}`}
+              <Button size="sm" onClick={openBatch} disabled={!selectedLeads.length || !status.connected}>
+                <Send className="h-4 w-4 mr-1.5" />
+                Preparar envio{selectedLeads.length ? ` (${selectedLeads.length})` : ""}
               </Button>
             </div>
           </div>
@@ -446,6 +435,60 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
           />
         </div>
       </div>
+
+      <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Preparar lote • {stage.replace("Follow-Up ", "D")} • {selectedLeads.length} lead(s)</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold">Mensagens do lote</p>
+                <p className="text-xs text-muted-foreground">Até 3 variações intercaladas automaticamente. Quebras de linha são preservadas.</p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setVariants(templatesFor(stage, attendance === "nao_compareceu")); setActiveVariantIndex(0); }}>Carregar sugeridas</Button>
+                {variants.length < 3 && <Button size="sm" variant="outline" onClick={addVariant}>+ Variação</Button>}
+              </div>
+            </div>
+
+            {variants.length > 0 && (
+              <div className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit">
+                {variants.map((_, index) => (
+                  <button key={index} onClick={() => setActiveVariantIndex(index)} className={`px-3 py-1.5 rounded-md text-xs font-semibold ${activeVariantIndex === index ? "bg-background shadow text-foreground" : "text-muted-foreground"}`}>
+                    Variação {index + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {variants.length === 0 ? (
+              <Textarea rows={7} placeholder="Escreva a mensagem. Use [primeiro_nome] e [serviço] para personalizar." onChange={(e) => { setVariants([e.target.value]); setActiveVariantIndex(0); }} />
+            ) : (
+              <Textarea value={variants[activeVariantIndex] || ""} onChange={(e) => updateVariant(activeVariantIndex, e.target.value)} rows={8} className="whitespace-pre-wrap" />
+            )}
+
+            {previewLead && usableVariants[0] && (
+              <div className="rounded-md bg-muted/20 border p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview para {previewLead.nome?.split(" ")[0] || "lead"}</p>
+                <div className="text-sm whitespace-pre-wrap leading-relaxed">{personalize(usableVariants[0], previewLead)}</div>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground">Fila automática: um follow-up por vez, respeitando o intervalo configurado.</p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchOpen(false)}>Cancelar</Button>
+            <Button onClick={queueBatch} disabled={sending || !selectedLeads.length || !usableVariants.length || !status.connected}>
+              <Send className="h-4 w-4 mr-2" />
+              {sending ? "Colocando na fila..." : `Enviar ${selectedLeads.length} follow-up${selectedLeads.length === 1 ? "" : "s"}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!singleLead} onOpenChange={(open) => !open && setSingleLead(null)}>
         <DialogContent className="max-w-md">
