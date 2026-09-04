@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Copy, KeyRound, MessageCircle, QrCode, RefreshCw, Send, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
@@ -19,9 +19,20 @@ export default function WhatsAppAgentPage() {
   const [showQr, setShowQr] = useState(false);
   const [pairing, setPairing] = useState(false);
   const [pairSecret, setPairSecret] = useState("");
+  const qrWasAvailable = useRef(false);
 
   useEffect(() => {
-    if (status.qrCode && !status.connected) setShowQr(true);
+    if (status.connected) {
+      setShowQr(false);
+      qrWasAvailable.current = false;
+      return;
+    }
+
+    const available = Boolean(status.qrCode);
+    if (available && !qrWasAvailable.current) {
+      setShowQr(true);
+    }
+    qrWasAvailable.current = available;
   }, [status.qrCode, status.connected]);
 
   const prepareThisPc = async () => {
@@ -63,8 +74,8 @@ export default function WhatsAppAgentPage() {
             <Link to="/"><ArrowLeft className="h-4 w-4 mr-2" />Rede Leads</Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-heading font-bold">Caixa de Entrada & Follow-ups</h1>
-            <p className="text-sm text-muted-foreground">A mesma conversa acompanha o lead na caixa de entrada e na rotina diária.</p>
+            <h1 className="text-2xl font-heading font-bold">Agente WhatsApp</h1>
+            <p className="text-sm text-muted-foreground">Status da ponte local. A operação diária fica na Caixa de Entrada e na Rotina de Contatos do Rede Leads.</p>
           </div>
         </div>
 
@@ -131,7 +142,7 @@ export default function WhatsAppAgentPage() {
         )}
       </div>
 
-      <WhatsAppQRModal open={showQr} onClose={() => setShowQr(false)} qrCode={status.qrCode || ""} />
+      <WhatsAppQRModal open={showQr} onClose={() => setShowQr(false)} qrCode={status.qrCode || null} />
     </div>
   );
 }

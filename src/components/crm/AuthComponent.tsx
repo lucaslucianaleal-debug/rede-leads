@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogOut, LogIn, MessageCircle } from "lucide-react";
+import { LogOut, LogIn, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
 export function AuthComponent() {
@@ -62,9 +62,9 @@ export function AuthComponent() {
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground hidden sm:inline">@{displayName}</span>
         <Button asChild variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">
-          <Link to="/whatsapp-agent" aria-label="Abrir Caixa de Entrada">
-            <MessageCircle className="h-4 w-4 mr-1" />
-            Caixa de Entrada
+          <Link to="/whatsapp-agent" aria-label="Abrir configurações do agente WhatsApp">
+            <Settings2 className="h-4 w-4 mr-1" />
+            Agente
           </Link>
         </Button>
         <Button variant="ghost" size="sm" onClick={logout}>

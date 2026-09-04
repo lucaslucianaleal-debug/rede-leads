@@ -57,6 +57,12 @@ function newerIso(values: Array<string | null | undefined>) {
   return values.filter(Boolean).sort().at(-1) || "";
 }
 
+function messageTime(value?: string | null) {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function shortTime(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -129,7 +135,10 @@ export function WhatsAppConversationPanel({
         const map = new Map<string, WhatsAppConversationMessage>();
         if (since) current.forEach((item) => map.set(item.id, item));
         items.forEach((item: WhatsAppConversationMessage) => map.set(item.id, item));
-        return [...map.values()].sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+        return [...map.values()].sort((a, b) => {
+          const byTime = messageTime(a.createdAt) - messageTime(b.createdAt);
+          return byTime || a.id.localeCompare(b.id);
+        });
       });
       const maxCreated = newerIso(items.map((item: WhatsAppConversationMessage) => item.createdAt));
       if (maxCreated) messageSinceRef.current = maxCreated;
@@ -153,8 +162,11 @@ export function WhatsAppConversationPanel({
   }, [chatId, loadMessages]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length]);
+    const frame = window.requestAnimationFrame(() => {
+      endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages.length, chatId]);
 
   const send = async () => {
     if (!target?.phone || !text.trim()) return;
@@ -287,7 +299,7 @@ export function WhatsAppConversationPanel({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto bg-muted/10 p-4 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-muted/10 p-4 flex flex-col gap-3">
         {messages.map((message) => {
           const delivery = statusLabel(message.status);
           const DeliveryIcon = delivery.Icon;

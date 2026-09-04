@@ -19,7 +19,7 @@ import { ChatView } from "@/components/crm/ChatView";
 import { PerformanceChart } from "@/components/crm/PerformanceChart";
 import { ComparisonChart } from "@/components/crm/ComparisonChart";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
-import { NewLeadsTab } from "@/components/crm/NewLeadsTab";
+import { WhatsAppInbox } from "@/components/crm/WhatsAppInbox";
 import { ROIAnalysisView } from "@/components/crm/ROIAnalysisView";
 import { ServicosExternos } from "@/components/crm/ServicosExternos";
 import { FollowUpRuler } from "@/components/crm/FollowUpRuler";
@@ -241,7 +241,7 @@ const CRMDashboard = () => {
     ...(!isCorretorModule ? [{ value: "mpc", label: "Painel MPC" }] : []),
     { value: "agenda", label: "Agenda do Dia" },
     { value: "all-leads", label: "Todos os Leads" },
-    ...(!isCorretorModule ? [{ value: "novos-leads", label: "Novos Leads" }] : []),
+    ...(!isCorretorModule ? [{ value: "novos-leads", label: "Caixa de Entrada" }] : []),
     { value: "regua-followup", label: "Rotina de Contatos" },
     ...(!isCorretorModule ? [{ value: "roi-custos", label: "ROI/Custos" }] : []),
     { value: "externos", label: "Serviços Externos" },
@@ -532,7 +532,7 @@ const CRMDashboard = () => {
             {!isCorretorModule && (
               <TabsTrigger value="novos-leads" className="flex items-center gap-1.5">
                 <Inbox className="h-4 w-4 shrink-0" />
-                <span className="hidden sm:inline">Novos Leads</span>
+                <span className="hidden sm:inline">Caixa de Entrada</span>
                 {newLeadsCount > 0 && (
                   <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white leading-none">
                     {newLeadsCount}
@@ -640,7 +640,7 @@ const CRMDashboard = () => {
 
           {!isCorretorModule && (
             <TabsContent value="novos-leads" className="mt-6">
-              <NewLeadsTab onCreateLead={handleCreateLead} onCountChange={setNewLeadsCount} />
+              <WhatsAppInbox leads={allLeads || leads} onNewCountChange={setNewLeadsCount} />
             </TabsContent>
           )}
 
