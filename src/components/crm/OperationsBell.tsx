@@ -214,6 +214,23 @@ export function OperationsBell({ onOpenInbox }: { onOpenInbox?: () => void }) {
   const lastSeen = eventTime(agent.lastSeenAt);
   const agentOnline = Boolean(lastSeen && clock - lastSeen < 10 * 60 * 1000);
   const agentConnected = agentOnline && agent.connected === true;
+  const agentStatus = agentConnected
+    ? {
+        label: "Agente online",
+        className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        dotClassName: "bg-emerald-500",
+      }
+    : agentOnline
+      ? {
+          label: "Aguardando WhatsApp",
+          className: "border-amber-200 bg-amber-50 text-amber-700",
+          dotClassName: "bg-amber-500",
+        }
+      : {
+          label: "Agente offline",
+          className: "border-red-200 bg-red-50 text-red-700",
+          dotClassName: "bg-red-500",
+        };
 
   const events = useMemo(() => {
     const queueEvents = queueItems.map(queueEvent).filter(Boolean) as OperationEvent[];
@@ -258,7 +275,16 @@ export function OperationsBell({ onOpenInbox }: { onOpenInbox?: () => void }) {
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <div className="flex items-center gap-1">
+      <div
+        className={`flex h-9 items-center gap-2 rounded-full border px-2.5 text-sm font-medium ${agentStatus.className}`}
+        aria-label={agentStatus.label}
+        title={agentStatus.label}
+      >
+        <span className={`h-2 w-2 rounded-full ${agentStatus.dotClassName}`} />
+        <span className="hidden whitespace-nowrap lg:inline">{agentStatus.label}</span>
+      </div>
+      <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -374,6 +400,7 @@ export function OperationsBell({ onOpenInbox }: { onOpenInbox?: () => void }) {
           </div>
         )}
       </PopoverContent>
-    </Popover>
+      </Popover>
+    </div>
   );
 }

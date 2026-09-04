@@ -12,15 +12,25 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogOut, LogIn, Settings2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { AdminPanel } from "@/components/crm/AdminPanel";
+import { ChevronDown, LogOut, LogIn, Settings, Settings2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
-export function AuthComponent() {
+export function AuthComponent({ canShowAdminControls = false }: { canShowAdminControls?: boolean }) {
   const { user, login, logout, register, error, selectedClinic } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [open, setOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   const resolveEmail = (input: string): string => {
     const trimmed = input.trim().toLowerCase();
@@ -28,7 +38,7 @@ export function AuthComponent() {
     if (atIndex > 0 && trimmed.indexOf(".", atIndex) > atIndex) {
       return trimmed;
     }
-    const clean = trimmed.replace(/[^a-z0-9_\-]/g, "");
+    const clean = trimmed.replace(/[^a-z0-9_-]/g, "");
     return `${clean}@redeleads.app`;
   };
 
@@ -59,19 +69,46 @@ export function AuthComponent() {
   if (user) {
     const displayName = user.email?.split("@")[0] || user.email || "Usuário";
     return (
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground hidden sm:inline">@{displayName}</span>
-        <Button asChild variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50">
-          <Link to="/whatsapp-agent" aria-label="Abrir configurações do agente WhatsApp">
-            <Settings2 className="h-4 w-4 mr-1" />
-            Agente
-          </Link>
-        </Button>
-        <Button variant="ghost" size="sm" onClick={logout}>
-          <LogOut className="h-4 w-4 mr-1" />
-          Sair
-        </Button>
-      </div>
+      <>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-9 gap-2 px-2" aria-label="Abrir menu da conta">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <UserRound className="h-4 w-4" />
+              </span>
+              <span className="hidden lg:inline">Conta</span>
+              <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground sm:block" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuLabel className="font-normal">
+              <div className="text-sm font-medium text-foreground">Minha conta</div>
+              <div className="mt-0.5 truncate text-xs text-muted-foreground">@{displayName}</div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {canShowAdminControls && (
+              <DropdownMenuItem onSelect={() => setAdminOpen(true)}>
+                <Settings className="mr-2 h-4 w-4" />
+                Administração
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem asChild>
+              <Link to="/whatsapp-agent" aria-label="Abrir configurações do agente WhatsApp">
+                <Settings2 className="mr-2 h-4 w-4" />
+                Agente do WhatsApp
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => void logout()} className="text-destructive focus:text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {canShowAdminControls && (
+          <AdminPanel open={adminOpen} onOpenChange={setAdminOpen} hideTrigger />
+        )}
+      </>
     );
   }
 
