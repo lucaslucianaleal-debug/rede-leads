@@ -1,12 +1,19 @@
 ﻿import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Lead } from "@/types/crm";
 import React, { useMemo } from "react";
 import { format } from "date-fns";
-import { Bell, Clock, Phone, X } from "lucide-react";
+import { Bell, CheckCircle2, Clock3, MoreHorizontal, Phone, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
-import { generateAppointmentConfirmationText } from "@/lib/whatsapp";
 
 interface CalendarViewProps {
   leads: Lead[];
@@ -14,6 +21,22 @@ interface CalendarViewProps {
   onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
   onOpenChat?: (phone: string, message?: string) => void;
 }
+
+type ReminderType = "h24" | "today";
+type ReminderVisualState = "sent" | "scheduled" | "pending" | "not-applicable";
+
+type ReminderVisualStatus = {
+  state: ReminderVisualState;
+  title: string;
+  detail: string;
+};
+
+const reminderStatusStyles: Record<ReminderVisualState, string> = {
+  sent: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  scheduled: "border-blue-200 bg-blue-50 text-blue-700",
+  pending: "border-amber-200 bg-amber-50 text-amber-700",
+  "not-applicable": "border-border bg-muted/40 text-muted-foreground",
+};
 
 export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }: CalendarViewProps) {
   const now = new Date();
@@ -74,18 +97,76 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   };
 
   const [whatsLead, setWhatsLead] = React.useState<Lead | null>(null);
+  const [whatsReminderType, setWhatsReminderType] = React.useState<ReminderType | null>(null);
   const [showWhatsDialog, setShowWhatsDialog] = React.useState(false);
 
-  const handleSend24h = (lead: Lead) => {
-    // Open local popup to edit/send reminder (prefilled)
+  const handleManualReminder = (lead: Lead, type: ReminderType) => {
     setWhatsLead(lead);
+    setWhatsReminderType(type);
     setShowWhatsDialog(true);
-    // onMarkReminder will be called after send via onDone
   };
 
-  const handleSend1h = (lead: Lead) => {
-    setWhatsLead(lead);
-    setShowWhatsDialog(true);
+  const parseAppointment = (dateStr?: string): Date | null => {
+    const match = String(dateStr || "").match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+    if (!match) return null;
+    const [, day, month, year, hour, minute] = match;
+    const value = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+    return Number.isNaN(value.getTime()) ? null : value;
+  };
+
+  const getReminderStatus = (lead: Lead, type: ReminderType): ReminderVisualStatus => {
+    const sentAt = type === "h24"
+      ? lead.lembretes?.sent?.["24h"]
+      : lead.lembretes?.sent?.today;
+    const markedAsSent = type === "h24" ? lead.lembretes?.h24 : lead.lembretes?.today;
+
+    if (sentAt || markedAsSent) {
+      return {
+        state: "sent",
+        title: "Enviado",
+        detail: sentAt ? format(new Date(sentAt), "dd/MM 'às' HH:mm") : "Horário não registrado",
+      };
+    }
+
+    const appointment = parseAppointment(lead.dataAgendamento);
+    if (!appointment) {
+      return { state: "not-applicable", title: "Sem registro", detail: "Data inválida" };
+    }
+
+    const sendAt = type === "h24"
+      ? new Date(appointment.getTime() - 24 * 60 * 60 * 1000)
+      : new Date(appointment.getFullYear(), appointment.getMonth(), appointment.getDate(), 8, 0, 0, 0);
+
+    if (sendAt.getTime() >= appointment.getTime()) {
+      return { state: "not-applicable", title: "Não se aplica", detail: "Fora da janela" };
+    }
+
+    if (Date.now() < sendAt.getTime()) {
+      return {
+        state: "scheduled",
+        title: "Programado",
+        detail: format(sendAt, "dd/MM 'às' HH:mm"),
+      };
+    }
+
+    const appointmentDayStart = new Date(
+      appointment.getFullYear(),
+      appointment.getMonth(),
+      appointment.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+    const windowClosed = type === "h24"
+      ? Date.now() >= appointmentDayStart.getTime()
+      : Date.now() >= appointment.getTime();
+
+    if (windowClosed) {
+      return { state: "not-applicable", title: "Não enviado", detail: "Janela encerrada" };
+    }
+
+    return { state: "pending", title: "Aguardando", detail: "Envio automático" };
   };
 
   const handleMarkAbsent = (lead: Lead) => {
@@ -97,6 +178,26 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
     const hora = lead.dataAgendamento?.split(" ")[1] || "09:00";
     const [h, m] = hora.split(":");
     const dayLabel = isToday ? "HOJE" : "AMANHÃ";
+    const reminder24h = getReminderStatus(lead, "h24");
+    const reminderToday = getReminderStatus(lead, "today");
+
+    const renderReminderStatus = (label: string, status: ReminderVisualStatus) => {
+      const StatusIcon = status.state === "sent" ? CheckCircle2 : Clock3;
+
+      return (
+        <div
+          className={`min-w-[112px] rounded-lg border px-2.5 py-1.5 ${reminderStatusStyles[status.state]}`}
+          title={`${label}: ${status.title} — ${status.detail}`}
+        >
+          <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide opacity-80">
+            <StatusIcon className="h-3 w-3" />
+            {label}
+          </div>
+          <div className="mt-0.5 text-xs font-semibold leading-tight">{status.title}</div>
+          <div className="text-[10px] leading-tight opacity-80">{status.detail}</div>
+        </div>
+      );
+    };
 
     return (
       <div
@@ -132,26 +233,37 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
           </div>
         </div>
 
-        {/* Botões de ação */}
+        {/* Status dos lembretes */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <Button
-            size="sm"
-            onClick={() => handleSend24h(lead)}
-            className="h-8 px-2.5 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-semibold border border-green-300"
-            variant="outline"
-            title="Enviar lembrete Amanhã"
-          >
-            📱 Amanhã
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => handleSend1h(lead)}
-            className="h-8 px-2.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-semibold border border-blue-300"
-            variant="outline"
-            title="Enviar lembrete Hoje"
-          >
-            📱 Hoje
-          </Button>
+          {renderReminderStatus("24h antes", reminder24h)}
+          {renderReminderStatus("No dia", reminderToday)}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-muted-foreground"
+                title="Mais opções"
+                aria-label={`Mais opções para ${lead.nome}`}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Envio manual</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleManualReminder(lead, "h24")}>
+                <Send className="mr-2 h-4 w-4" />
+                Lembrete de 24h
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleManualReminder(lead, "today")}>
+                <Send className="mr-2 h-4 w-4" />
+                Lembrete do dia
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button
             size="sm"
             variant="ghost"
@@ -200,24 +312,26 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
         </div>
       )}
       </div>
-      {whatsLead && showWhatsDialog && (
+      {whatsLead && whatsReminderType && showWhatsDialog && (
         <WhatsAppMessageDialog
           lead={whatsLead}
           open={showWhatsDialog}
-          onClose={() => setShowWhatsDialog(false)}
-          suggestedMessage={(() => {
-            // choose template based on whether it's today or tomorrow
-            const tomorrow = whatsLead.dataAgendamento?.startsWith(tomorrowStr);
-            return tomorrow ? getReminder24h(whatsLead) : getReminder1h(whatsLead);
-          })()}
+          onClose={() => {
+            setShowWhatsDialog(false);
+            setWhatsReminderType(null);
+          }}
+          suggestedMessage={
+            whatsReminderType === "h24"
+              ? getReminder24h(whatsLead)
+              : getReminder1h(whatsLead)
+          }
           onDone={() => {
             if (whatsLead) {
-              // determine type
-              const isTomorrow = whatsLead.dataAgendamento?.startsWith(tomorrowStr);
-              onMarkReminder(whatsLead.id, isTomorrow ? "h24" : "today");
+              onMarkReminder(whatsLead.id, whatsReminderType);
               toast.success(`✓ ${whatsLead.nome} — Lembrete enviado!`);
             }
             setShowWhatsDialog(false);
+            setWhatsReminderType(null);
           }}
         />
       )}
