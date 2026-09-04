@@ -83,7 +83,20 @@ export async function recordWhatsAppChatMessage(clinicId, payload = {}) {
   if (stableId) {
     msgRef = chatRef.collection("messages").doc(stableId);
     const duplicate = await msgRef.get();
-    if (duplicate.exists) return { chatId: phoneKey, messageId: stableId, duplicate: true };
+    if (duplicate.exists) {
+      // message_create pode registrar a saída antes do endpoint de resultado da fila.
+      // Se o resultado trouxer uma etiqueta de automação, enriquecemos o mesmo documento
+      // em vez de criar outra mensagem ou perder a identificação visual.
+      if (messageType !== "text") {
+        const batch = db.batch();
+        batch.set(msgRef, { messageType }, { merge: true });
+        if (String(existingData.lastMessageId || "") === messageId) {
+          batch.set(chatRef, { lastMessageType: messageType, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+        await batch.commit();
+      }
+      return { chatId: phoneKey, messageId: stableId, duplicate: true };
+    }
   } else {
     msgRef = chatRef.collection("messages").doc();
   }
