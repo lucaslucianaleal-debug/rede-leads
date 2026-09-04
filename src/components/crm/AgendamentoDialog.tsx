@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/phone";
 import { useAuth } from "@/hooks/useAuth";
 import { scheduleAppointmentWhatsAppAutomation } from "@/lib/appointmentWhatsAppAutomation";
+import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
+import { Textarea } from "@/components/ui/textarea";
 
 interface AgendamentoDialogProps {
   lead: Lead | null;
@@ -35,10 +37,14 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
   const [agendamentoTime, setAgendamentoTime] = useState("09:00");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState<"appointment" | "message">("appointment");
+  const [confirmationMessage, setConfirmationMessage] = useState("");
 
   // Pré-preencher se já tem agendamento ou vaga sugerida
   useEffect(() => {
     if (!open) return;
+    setStep("appointment");
+    setConfirmationMessage("");
 
     if (initialDate) {
       setAgendamentoDate(initialDate);
@@ -69,19 +75,51 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
 
   if (!lead) return null;
 
-  const handleConfirm = async () => {
-    if (!agendamentoDate) {
+  const appointmentValue = () => {
+    if (!agendamentoDate) return "";
+    return `${format(agendamentoDate, "dd/MM/yyyy")} ${agendamentoTime}`;
+  };
+
+  const handleContinue = () => {
+    const dataAgendamento = appointmentValue();
+    if (!dataAgendamento) {
       toast.error("Selecione uma data!");
       return;
     }
+    const selectedDateTime = parse(dataAgendamento, "dd/MM/yyyy HH:mm", new Date());
+    if (selectedDateTime.getTime() <= Date.now()) {
+      toast.error("Escolha uma data e um horário futuros.");
+      return;
+    }
 
-    const dataAgendamento = `${format(agendamentoDate, "dd/MM/yyyy")} ${agendamentoTime}`;
+    const firstName = (lead.nome || "").trim().split(/\s+/)[0] || "";
+    const services = lead.servicoProcurado ? [lead.servicoProcurado] : [];
+    setConfirmationMessage(
+      generateAppointmentConfirmationTextForClinic(
+        clinicMeta,
+        dataAgendamento,
+        firstName,
+        services,
+      ),
+    );
+    setStep("message");
+  };
+
+  const handleConfirm = async () => {
+    const dataAgendamento = appointmentValue();
+    if (!dataAgendamento) {
+      toast.error("Selecione uma data!");
+      return;
+    }
+    if (!confirmationMessage.trim()) {
+      toast.error("A mensagem de confirmação não pode ficar vazia.");
+      return;
+    }
     setSaving(true);
 
     try {
       // Primeiro salva o agendamento no fluxo já existente do CRM.
       onConfirm(lead.id, dataAgendamento);
-      toast.success(`Agendado para ${dataAgendamento}`);
 
       // Depois usa o mesmo agente do WhatsApp para confirmação imediata e lembretes futuros.
       // A automação usa as mensagens já existentes no Rede Leads.
@@ -91,14 +129,16 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
         clinicMeta,
         lead,
         dataAgendamento,
+        confirmationMessage,
       });
 
-      if (result.confirmationQueued) {
-        toast.success("Confirmação colocada na fila do WhatsApp ✓");
-      }
-      if ((result.scheduled || []).length > 0) {
-        toast.success("Lembretes do agendamento programados ✓");
-      }
+      const confirmationStatus = result.confirmationQueued
+        ? "Confirmação enviada"
+        : "Confirmação já estava programada";
+      const reminderStatus = (result.scheduled || []).length > 0
+        ? "lembretes programados"
+        : "lembretes mantidos";
+      toast.success(`${confirmationStatus} e ${reminderStatus}.`);
     } catch (error) {
       console.error("Falha ao programar WhatsApp do agendamento:", error);
       toast.warning(
@@ -108,6 +148,8 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
       setSaving(false);
       setAgendamentoDate(new Date());
       setAgendamentoTime("09:00");
+      setStep("appointment");
+      setConfirmationMessage("");
       onClose();
     }
   };
@@ -116,7 +158,7 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Agendar Atendimento</DialogTitle>
+          <DialogTitle>{step === "appointment" ? "Agendar Atendimento" : "Revisar confirmação"}</DialogTitle>
           <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border">
             <div className="flex items-center justify-between mb-1">
               <div className="text-xs text-muted-foreground">{lead.nome}</div>
@@ -132,62 +174,100 @@ export function AgendamentoDialog({ lead, open, onClose, onConfirm, initialDate,
           </div>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Data */}
-          <div>
-            <Label>📅 Data do Agendamento</Label>
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full mt-2 text-left font-normal"
-                  onClick={() => setCalendarOpen(true)}
-                  disabled={saving}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {agendamentoDate ? format(agendamentoDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Selecionar data"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={agendamentoDate}
-                  onSelect={(date) => {
-                    setAgendamentoDate(date);
-                    setCalendarOpen(false);
-                  }}
-                  locale={ptBR}
-                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+        {step === "appointment" ? (
+          <div className="space-y-4 py-4">
+            {/* Data */}
+            <div>
+              <Label>📅 Data do Agendamento</Label>
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2 text-left font-normal"
+                    onClick={() => setCalendarOpen(true)}
+                    disabled={saving}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {agendamentoDate
+                      ? format(agendamentoDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                      : "Selecionar data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={agendamentoDate}
+                    onSelect={(date) => {
+                      setAgendamentoDate(date);
+                      setCalendarOpen(false);
+                    }}
+                    locale={ptBR}
+                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
 
-          {/* Hora */}
-          <div>
-            <Label htmlFor="time">🕐 Horário</Label>
-            <Input
-              id="time"
-              type="time"
-              value={agendamentoTime}
-              onChange={(e) => setAgendamentoTime(e.target.value)}
-              className="mt-2"
-              disabled={saving}
-            />
-          </div>
+            {/* Hora */}
+            <div>
+              <Label htmlFor="time">🕐 Horário</Label>
+              <Input
+                id="time"
+                type="time"
+                value={agendamentoTime}
+                onChange={(e) => setAgendamentoTime(e.target.value)}
+                className="mt-2"
+                disabled={saving}
+              />
+            </div>
 
-          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-            Ao confirmar, o Rede Leads envia a confirmação pelo agente conectado e programa os lembretes disponíveis para esse horário.
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+              Na próxima etapa você poderá revisar a mensagem antes do envio.
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-3 py-4">
+            <div className="rounded-lg border bg-muted/40 px-3 py-2">
+              <div className="text-xs text-muted-foreground">Data e horário</div>
+              <div className="font-semibold">{appointmentValue()}</div>
+            </div>
+            <div>
+              <Label htmlFor="appointment-confirmation">Mensagem de confirmação</Label>
+              <Textarea
+                id="appointment-confirmation"
+                value={confirmationMessage}
+                onChange={(event) => setConfirmationMessage(event.target.value)}
+                rows={10}
+                disabled={saving}
+                className="mt-2 resize-none"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Depois do envio, os lembretes serão programados automaticamente.
+            </p>
+          </div>
+        )}
 
         <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button onClick={handleConfirm} disabled={saving}>
-            {saving ? "Programando..." : "✓ Agendar e confirmar"}
-          </Button>
+          {step === "appointment" ? (
+            <>
+              <Button variant="outline" onClick={onClose} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button onClick={handleContinue} disabled={saving}>
+                Continuar
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setStep("appointment")} disabled={saving}>
+                Voltar
+              </Button>
+              <Button onClick={handleConfirm} disabled={saving || !confirmationMessage.trim()}>
+                {saving ? "Enviando..." : "Agendar e enviar confirmação"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

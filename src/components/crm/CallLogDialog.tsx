@@ -48,10 +48,7 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { formatPhoneNumber } from "@/lib/phone";
 import { AgendamentoDialog } from "./AgendamentoDialog";
-import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 import { AgendaDoDia } from "./AgendaDoDia";
-import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
-import { useAuth } from "@/hooks/useAuth";
 import { useLeads } from "@/hooks/useLeads";
 
 interface CallLogDialogProps {
@@ -89,7 +86,6 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
       };
     }, []);
   const { leads, updateLead } = useLeads();
-  const { clinicMeta } = useAuth();
   const [outcome, setOutcome] = useState("Caixa de mensagem");
   const [obs, setObs] = useState("");
   const [agendarRetorno, setAgendarRetorno] = useState(false);
@@ -97,8 +93,6 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
   const [returnTime, setReturnTime] = useState("17:00");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [agendamentoOpen, setAgendamentoOpen] = useState(false);
-  const [whatsOpen, setWhatsOpen] = useState(false);
-  const [suggestedMessage, setSuggestedMessage] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<string>(lead?.status || "MORNO");
   const [etapa, setEtapa] = useState<LeadStage>(lead?.etapaLead || "Novo");
   const [useAutoStage, setUseAutoStage] = useState(true);
@@ -207,11 +201,7 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
     }
     
     updateLead(leadId, updates);
-    toast.success("Agendamento atualizado! Automação reativada.");
-    const text = generateAppointmentConfirmationTextForClinic(clinicMeta, dataAgendamento);
-    setSuggestedMessage(text);
     setAgendamentoOpen(false);
-    setWhatsOpen(true);
   };
 
   return (
@@ -433,12 +423,6 @@ export function CallLogDialog({ lead, open, onClose, onConfirm }: CallLogDialogP
       initialTime={agendamentoInitialTime}
     />
 
-    <WhatsAppMessageDialog
-      lead={lead}
-      open={whatsOpen}
-      onClose={() => setWhatsOpen(false)}
-      suggestedMessage={suggestedMessage}
-    />
     </>
   );
 }

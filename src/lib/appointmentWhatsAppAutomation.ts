@@ -5,12 +5,19 @@ type FirebaseUserLike = {
   getIdToken: () => Promise<string>;
 };
 
+type ClinicMeta = {
+  id: string;
+  name?: string;
+  address?: string;
+};
+
 type ScheduleArgs = {
   user: FirebaseUserLike | null | undefined;
   clinicId: string;
-  clinicMeta?: any;
+  clinicMeta?: ClinicMeta | null;
   lead: Lead;
   dataAgendamento: string;
+  confirmationMessage?: string;
 };
 
 export type AppointmentAutomationResult = {
@@ -26,6 +33,7 @@ export async function scheduleAppointmentWhatsAppAutomation({
   clinicMeta,
   lead,
   dataAgendamento,
+  confirmationMessage,
 }: ScheduleArgs): Promise<AppointmentAutomationResult> {
   if (!user) throw new Error("Usuário não autenticado");
   if (!clinicId) throw new Error("Clínica não selecionada");
@@ -35,12 +43,14 @@ export async function scheduleAppointmentWhatsAppAutomation({
   const firstName = (lead.nome || "").trim().split(/\s+/)[0] || "";
   const services = lead.servicoProcurado ? [lead.servicoProcurado] : [];
   const messages = {
-    confirmation: generateAppointmentConfirmationTextForClinic(
-      clinicMeta,
-      dataAgendamento,
-      firstName,
-      services,
-    ),
+    confirmation:
+      confirmationMessage?.trim() ||
+      generateAppointmentConfirmationTextForClinic(
+        clinicMeta,
+        dataAgendamento,
+        firstName,
+        services,
+      ),
     h24: generateReminderText(dataAgendamento, "h24", firstName),
     today: generateReminderText(dataAgendamento, "today", firstName),
   };
