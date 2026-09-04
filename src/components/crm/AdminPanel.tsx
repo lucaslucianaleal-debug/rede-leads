@@ -43,7 +43,17 @@ import { toast } from "sonner";
 import { CORRETOR_SERVICE_LIBRARY } from "@/lib/serviceCatalog";
 import { filterVisibleClinicsForProfile, isGlobalAdminProfile } from "@/lib/userAccess";
 
-export function AdminPanel() {
+type AdminPanelProps = {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+};
+
+export function AdminPanel({
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+}: AdminPanelProps = {}) {
   const { users, currentUserProfile, createUser, updateUserRole, deleteUser, loading, error } =
     useCRMUsers();
   const {
@@ -66,7 +76,12 @@ export function AdminPanel() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("viewer");
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (nextOpen: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  };
   const [clinicForUser, setClinicForUser] = useState<string | null>(null);
   const [newClinicId, setNewClinicId] = useState("");
   const [newClinicName, setNewClinicName] = useState("");
@@ -219,12 +234,14 @@ export function AdminPanel() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Settings className="h-4 w-4 mr-1" />
-          Admin
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Settings className="h-4 w-4 mr-1" />
+            Admin
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Gerenciar Usuários</DialogTitle>
