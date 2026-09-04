@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Send, MessageSquareText, CheckSquare, Square, Wifi, WifiOff, MessageCircle, Clock3, Check, Reply } from "lucide-react";
+import { Search, Send, MessageSquareText, CheckSquare, Square, Wifi, WifiOff, MessageCircle, Clock3, Check, Reply, RotateCcw } from "lucide-react";
 import { followUpMessages, formatFollowUpMessage } from "@/data/followUpMessages";
 import { useWhatsAppAgent } from "@/hooks/useWhatsAppAgent";
+import { useAuth } from "@/hooks/useAuth";
 import { WhatsAppConversationPanel } from "./WhatsAppConversationPanel";
 import { toast } from "sonner";
 
@@ -21,6 +22,52 @@ const STAGES: { stage: LeadStage; label: string }[] = [
 type ViewFilter = "vencidos" | "hoje" | "todos";
 type AttendanceFilter = "todos" | "nao_compareceu" | "compareceu" | "sem_status";
 type SourceFilter = "todos" | "organico" | "promotora" | "indicacao";
+type OperationalLead = Lead & {
+  _deleted?: boolean;
+  whatsappNeedsAttention?: boolean;
+};
+
+type FollowUpFilters = {
+  stage: LeadStage;
+  view: ViewFilter;
+  service: string;
+  attendance: AttendanceFilter;
+  source: SourceFilter;
+  search: string;
+};
+
+const DEFAULT_FILTERS: FollowUpFilters = {
+  stage: "Follow-Up 2",
+  view: "vencidos",
+  service: "todos",
+  attendance: "todos",
+  source: "todos",
+  search: "",
+};
+
+const VIEW_FILTERS = new Set<ViewFilter>(["vencidos", "hoje", "todos"]);
+const ATTENDANCE_FILTERS = new Set<AttendanceFilter>(["todos", "nao_compareceu", "compareceu", "sem_status"]);
+const SOURCE_FILTERS = new Set<SourceFilter>(["todos", "organico", "promotora", "indicacao"]);
+
+function readStoredFilters(storageKey: string): FollowUpFilters {
+  if (!storageKey) return DEFAULT_FILTERS;
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || "{}") as Partial<FollowUpFilters>;
+    return {
+      stage: STAGES.some((item) => item.stage === parsed.stage) ? parsed.stage as LeadStage : DEFAULT_FILTERS.stage,
+      view: VIEW_FILTERS.has(parsed.view as ViewFilter) ? parsed.view as ViewFilter : DEFAULT_FILTERS.view,
+      service: typeof parsed.service === "string" && parsed.service ? parsed.service : DEFAULT_FILTERS.service,
+      attendance: ATTENDANCE_FILTERS.has(parsed.attendance as AttendanceFilter)
+        ? parsed.attendance as AttendanceFilter
+        : DEFAULT_FILTERS.attendance,
+      source: SOURCE_FILTERS.has(parsed.source as SourceFilter) ? parsed.source as SourceFilter : DEFAULT_FILTERS.source,
+      search: typeof parsed.search === "string" ? parsed.search.slice(0, 120) : DEFAULT_FILTERS.search,
+    };
+  } catch {
+    return DEFAULT_FILTERS;
+  }
+}
 
 function todayBR() {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date());
@@ -83,7 +130,11 @@ function personalize(template: string, lead: Lead) {
 }
 
 function needsAttention(lead: Lead) {
-  return Boolean((lead as any).whatsappNeedsAttention);
+  return Boolean((lead as OperationalLead).whatsappNeedsAttention);
+}
+
+function isDeleted(lead: Lead) {
+  return Boolean((lead as OperationalLead)._deleted);
 }
 
 interface FollowUpOperationsPanelProps {
@@ -93,16 +144,22 @@ interface FollowUpOperationsPanelProps {
 }
 
 export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: FollowUpOperationsPanelProps) {
+  const { user, currentClinic } = useAuth();
   const { status, queueMessages } = useWhatsAppAgent();
   const base = allLeads || leads;
   const today = todayBR();
+  const filtersStorageKey = user?.uid && currentClinic
+    ? `rede-leads:follow-up-filters:v1:${user.uid}:${currentClinic}`
+    : "";
+  const [initialFilters] = useState(() => readStoredFilters(filtersStorageKey));
 
-  const [stage, setStage] = useState<LeadStage>("Follow-Up 2");
-  const [view, setView] = useState<ViewFilter>("vencidos");
-  const [service, setService] = useState("todos");
-  const [attendance, setAttendance] = useState<AttendanceFilter>("todos");
-  const [source, setSource] = useState<SourceFilter>("todos");
-  const [search, setSearch] = useState("");
+  const [stage, setStage] = useState<LeadStage>(initialFilters.stage);
+  const [view, setView] = useState<ViewFilter>(initialFilters.view);
+  const [service, setService] = useState(initialFilters.service);
+  const [attendance, setAttendance] = useState<AttendanceFilter>(initialFilters.attendance);
+  const [source, setSource] = useState<SourceFilter>(initialFilters.source);
+  const [search, setSearch] = useState(initialFilters.search);
+  const [hydratedStorageKey, setHydratedStorageKey] = useState(filtersStorageKey);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [queuedLeadIds, setQueuedLeadIds] = useState<Set<string>>(new Set());
   const [variants, setVariants] = useState<string[]>([]);
@@ -113,16 +170,48 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
   const [sending, setSending] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState<string>("");
 
+  useEffect(() => {
+    if (filtersStorageKey === hydratedStorageKey) return;
+
+    const restored = readStoredFilters(filtersStorageKey);
+    setStage(restored.stage);
+    setView(restored.view);
+    setService(restored.service);
+    setAttendance(restored.attendance);
+    setSource(restored.source);
+    setSearch(restored.search);
+    setSelected(new Set());
+    setActiveLeadId("");
+    setHydratedStorageKey(filtersStorageKey);
+  }, [filtersStorageKey, hydratedStorageKey]);
+
+  useEffect(() => {
+    if (!filtersStorageKey || hydratedStorageKey !== filtersStorageKey) return;
+
+    try {
+      localStorage.setItem(filtersStorageKey, JSON.stringify({
+        stage,
+        view,
+        service,
+        attendance,
+        source,
+        search,
+      } satisfies FollowUpFilters));
+    } catch {
+      // A tela segue funcionando normalmente quando o navegador bloqueia o armazenamento local.
+    }
+  }, [filtersStorageKey, hydratedStorageKey, stage, view, service, attendance, source, search]);
+
   const services = useMemo(() => {
     const values = base
-      .filter((lead) => !(lead as any)._deleted)
+      .filter((lead) => !isDeleted(lead))
       .map((lead) => String(lead.servicoProcurado || "").trim())
       .filter(Boolean);
     return [...new Set(values)].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [base]);
 
   const filtered = useMemo(() => {
-    let list = base.filter((lead) => !(lead as any)._deleted && lead.etapaLead === stage);
+    let list = base.filter((lead) => !isDeleted(lead) && lead.etapaLead === stage);
 
     if (source === "promotora") list = list.filter(isPromotora);
     if (source === "indicacao") list = list.filter(isIndicacao);
@@ -156,7 +245,7 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     STAGES.forEach(({ stage: itemStage }) => {
-      counts[itemStage] = base.filter((lead) => !(lead as any)._deleted && lead.etapaLead === itemStage).length;
+      counts[itemStage] = base.filter((lead) => !isDeleted(lead) && lead.etapaLead === itemStage).length;
     });
     return counts;
   }, [base]);
@@ -186,6 +275,23 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
   const selectedLeads = useMemo(() => filtered.filter((lead) => selected.has(lead.id)), [filtered, selected]);
   const previewLead = selectedLeads[0] || filtered[0] || null;
   const usableVariants = variants.map((v) => v.trim()).filter(Boolean);
+  const activeFilterCount = [
+    view !== "todos",
+    service !== "todos",
+    attendance !== "todos",
+    source !== "todos",
+    Boolean(search.trim()),
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setView("todos");
+    setService("todos");
+    setAttendance("todos");
+    setSource("todos");
+    setSearch("");
+    setSelected(new Set());
+    setActiveLeadId("");
+  };
 
   const toggleAll = () => {
     if (filtered.length > 40) {
@@ -346,12 +452,23 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 bg-muted/40 rounded-lg p-1 w-fit">
-        {(["vencidos", "hoje", "todos"] as ViewFilter[]).map((item) => (
-          <button key={item} onClick={() => { setView(item); setActiveLeadId(""); }} className={`px-3 py-1.5 rounded-md text-sm ${view === item ? "bg-background shadow font-medium" : "text-muted-foreground"}`}>
-            {item === "vencidos" ? "Vencidos" : item === "hoje" ? "Hoje" : "Todos"}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1 bg-muted/40 rounded-lg p-1 w-fit">
+          {(["vencidos", "hoje", "todos"] as ViewFilter[]).map((item) => (
+            <button key={item} onClick={() => { setView(item); setActiveLeadId(""); }} className={`px-3 py-1.5 rounded-md text-sm ${view === item ? "bg-background shadow font-medium" : "text-muted-foreground"}`}>
+              {item === "vencidos" ? "Vencidos" : item === "hoje" ? "Hoje" : "Todos"}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{activeFilterCount ? `${activeFilterCount} filtro${activeFilterCount === 1 ? "" : "s"} ativo${activeFilterCount === 1 ? "" : "s"} • salvo${activeFilterCount === 1 ? "" : "s"} automaticamente` : "Filtros salvos automaticamente"}</span>
+          {activeFilterCount > 0 && (
+            <Button type="button" variant="ghost" size="sm" className="h-8 px-2" onClick={clearFilters}>
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              Limpar filtros
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.05fr)_minmax(430px,0.95fr)] gap-4 items-start">
@@ -382,7 +499,12 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
                       type="checkbox"
                       checked={selected.has(lead.id)}
                       onClick={(e) => e.stopPropagation()}
-                      onChange={() => setSelected((current) => { const next = new Set(current); next.has(lead.id) ? next.delete(lead.id) : next.add(lead.id); return next; })}
+                      onChange={() => setSelected((current) => {
+                        const next = new Set(current);
+                        if (next.has(lead.id)) next.delete(lead.id);
+                        else next.add(lead.id);
+                        return next;
+                      })}
                       className="h-4 w-4 shrink-0"
                     />
                     <div className="flex-1 min-w-0">
