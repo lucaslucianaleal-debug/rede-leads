@@ -189,7 +189,7 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
   const toggleAll = () => {
     if (filtered.length > 40) {
       const first40 = filtered.slice(0, 40);
-      setSelected(new Set(first40.map((lead) => lead.id));
+      setSelected(new Set(first40.map((lead) => lead.id)));
       toast.info("Selecionei os 40 primeiros. O limite por lote é 40.");
       return;
     }
