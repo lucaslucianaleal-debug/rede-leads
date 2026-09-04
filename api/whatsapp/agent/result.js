@@ -4,9 +4,9 @@ import { applySentQueueItem, findLeadIndex, markQueueFailure } from "../../../se
 import { recordWhatsAppChatMessage } from "../../../server/whatsappChatStore.js";
 
 function automationMessageType(automationType) {
-  if (automationType === "appointment_confirmation") return "automation_confirmation";
-  if (automationType === "appointment_reminder_24h") return "automation_reminder_24h";
-  if (automationType === "appointment_reminder_today") return "automation_reminder_today";
+  if (automationType === "appointment_confirmation") return "Confirmação de agendamento";
+  if (automationType === "appointment_reminder_24h") return "Lembrete • Amanhã";
+  if (automationType === "appointment_reminder_today") return "Lembrete • Hoje";
   return "text";
 }
 
