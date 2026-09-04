@@ -46,13 +46,14 @@ export async function scheduleAppointmentWhatsAppAutomation({
   };
 
   const token = await user.getIdToken();
-  const response = await fetch("/api/whatsapp/appointment-automation", {
+  const response = await fetch("/api/whatsapp/queue", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
+      action: "schedule_appointment",
       clinicId,
       leadId: lead.id,
       appointment: dataAgendamento,
