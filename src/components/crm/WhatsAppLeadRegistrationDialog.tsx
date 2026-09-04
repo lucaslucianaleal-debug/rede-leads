@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useClinics } from "@/hooks/useClinics";
 import { fetchActiveCampaignList } from "@/services/campaignService";
 import { CORRETOR_SERVICE_LIBRARY, isCorretorProfile, resolveServiceOptions } from "@/lib/serviceCatalog";
-import { maskPhone } from "@/lib/phone";
+import { formatPhoneNumber, maskPhone } from "@/lib/phone";
 
 const ETAPAS: LeadStage[] = [
   "Novo", "Em contato",
@@ -37,7 +37,7 @@ type Props = {
   initialCampaignName?: string;
   initialSource?: string;
   contextText?: string;
-  onSave: (lead: Draft, campaignName: string) => Promise<void> | void;
+  onSave: (lead: Draft, campaignId: string, campaignName: string) => Promise<void> | void;
 };
 
 function defaultDraft(): Draft {
@@ -78,17 +78,17 @@ function inputToDate(value: string) {
 
 function inferDentalService(text: string, options: string[]) {
   const normalized = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const rules = [
-    ["implante", ["implante"]],
-    ["ortodont", ["ortodont", "aparelho"]],
-    ["clareamento", ["clareamento"]],
-    ["protese", ["protese", "dentadura"]],
-    ["faceta", ["faceta", "lente"]],
-    ["canal", ["canal", "endodont"]],
-    ["infantil", ["infantil", "crianca", "odontopedi"]],
-  ] as const;
+  const keywordGroups = [
+    ["implante"],
+    ["ortodont", "aparelho"],
+    ["clareamento"],
+    ["protese", "dentadura"],
+    ["faceta", "lente"],
+    ["canal", "endodont"],
+    ["infantil", "crianca", "odontopedi"],
+  ];
 
-  for (const [, keywords] of rules) {
+  for (const keywords of keywordGroups) {
     if (!keywords.some((keyword) => normalized.includes(keyword))) continue;
     const match = options.find((option) => {
       const value = option.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -119,7 +119,7 @@ export function WhatsAppLeadRegistrationDialog({
   const [saving, setSaving] = useState(false);
 
   const currentClinicObj = clinics.find((clinic) => clinic.id === clinicId);
-  const effectiveClinicContext = currentClinicObj
+  const effectiveClinicContext = useMemo(() => currentClinicObj
     ? {
         id: currentClinicObj.id,
         name: currentClinicObj.name,
@@ -133,7 +133,7 @@ export function WhatsAppLeadRegistrationDialog({
         module: userProfile?.accountModule ?? (clinicMeta as any)?.module,
         services: Array.isArray((clinicMeta as any)?.customServices) ? (clinicMeta as any).customServices : [],
         customFields: (clinicMeta as any)?.customFields,
-      };
+      }, [currentClinicObj, userProfile?.accountModule, clinicMeta, clinicId]);
 
   const isCorretorContext = isCorretorProfile(effectiveClinicContext);
   const serviceOptions = useMemo(() => {
@@ -147,7 +147,7 @@ export function WhatsAppLeadRegistrationDialog({
     const next = defaultDraft();
     const suggestedService = inferDentalService(`${initialCampaignName} ${contextText}`, serviceOptions);
     next.nome = initialName;
-    next.telefone = maskPhone(initialPhone);
+    next.telefone = formatPhoneNumber(initialPhone);
     next.fonteLead = initialSource || "Online";
     next.servicoProcurado = suggestedService;
     next.observacao = "Primeiro contato recebido pelo WhatsApp";
@@ -170,7 +170,7 @@ export function WhatsAppLeadRegistrationDialog({
     setSaving(true);
     try {
       const campaignName = campaigns.find((item) => item.id === campaignId)?.name || initialCampaignName || "";
-      await onSave(form, campaignName);
+      await onSave(form, campaignId, campaignName);
       onClose();
     } finally {
       setSaving(false);
@@ -213,7 +213,7 @@ export function WhatsAppLeadRegistrationDialog({
                 {serviceOptions.map((service) => <SelectItem key={service} value={service}>{service}</SelectItem>)}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-muted-foreground">Lista vinculada à clínica atual.</p>
+            <p className="text-[11px] text-muted-foreground">Serviços da clínica selecionada — sem misturar o catálogo de corretor.</p>
           </div>
           <div className="space-y-1">
             <Label>Captador</Label>
@@ -286,8 +286,14 @@ export function WhatsAppLeadRegistrationDialog({
           </div>
           <div className="space-y-1">
             <Label>Data de Agendamento</Label>
-            <Input type="datetime-local" value={form.dataAgendamento || ""} onChange={(event) => set("dataAgendamento", event.target.value)} />
+            <Input type="date" value={dateToInput(form.dataAgendamento)} onChange={(event) => set("dataAgendamento", inputToDate(event.target.value))} />
           </div>
+
+          <div className="space-y-1">
+            <Label>Retorno de Ligação</Label>
+            <Input type="date" value={dateToInput(form.dataRetornoLigacao)} onChange={(event) => set("dataRetornoLigacao", inputToDate(event.target.value))} />
+          </div>
+          <div className="space-y-1" />
 
           <div className="space-y-1 sm:col-span-2">
             <Label>Observação</Label>
