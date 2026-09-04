@@ -31,6 +31,19 @@ function messageDocId(messageId, direction) {
   return `msg_${digest}`;
 }
 
+function operationDocId(operationId, direction) {
+  const raw = String(operationId || "").trim();
+  if (!raw) return null;
+  const digest = createHash("sha1").update(`${direction}:operation:${raw}`).digest("hex");
+  return `op_${digest}`;
+}
+
+function messageFingerprint(direction, text) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim().toLowerCase();
+  if (!normalized) return "";
+  return createHash("sha1").update(`${direction}:${normalized}`).digest("hex");
+}
+
 function ackToStatus(ack) {
   const value = Number(ack);
   if (value < 0) return "failed";
@@ -62,6 +75,7 @@ export async function recordWhatsAppChatMessage(clinicId, payload = {}) {
   const name = String(payload.name || "").trim().slice(0, 150);
   const leadId = String(payload.leadId || "").trim();
   const messageId = String(payload.messageId || "").trim();
+  const operationId = String(payload.operationId || "").trim();
   const metaCampanhaId = String(payload.metaCampanhaId || "").trim();
   const metaCampanhaNome = String(payload.metaCampanhaNome || "").trim().slice(0, 200);
   const fonteLead = String(payload.fonteLead || "").trim().slice(0, 80);
@@ -79,10 +93,19 @@ export async function recordWhatsAppChatMessage(clinicId, payload = {}) {
   const resolvedLeadId = leadId || String(existingData.leadId || "");
 
   let msgRef;
-  const stableId = messageDocId(messageId, direction);
+  // O ID do próprio WhatsApp permanece como chave principal para que os ACKs
+  // atualizem exatamente o mesmo documento. O ID da operação é só o fallback
+  // para eventos sem identificador nativo.
+  const stableId = messageDocId(messageId, direction) || operationDocId(operationId, direction);
   if (stableId) {
     msgRef = chatRef.collection("messages").doc(stableId);
-    const duplicate = await msgRef.get();
+    const [duplicate, deletion] = await Promise.all([
+      msgRef.get(),
+      chatRef.collection("messageDeletions").doc(stableId).get(),
+    ]);
+    if (deletion.exists) {
+      return { chatId: phoneKey, messageId: stableId, duplicate: true, deleted: true };
+    }
     if (duplicate.exists) {
       // message_create pode registrar a saída antes do endpoint de resultado da fila.
       // Se o resultado trouxer uma etiqueta de automação, enriquecemos o mesmo documento
@@ -101,6 +124,30 @@ export async function recordWhatsAppChatMessage(clinicId, payload = {}) {
     msgRef = chatRef.collection("messages").doc();
   }
 
+  const fingerprint = messageFingerprint(direction, text);
+  const lastFingerprint = String(existingData.lastMessageFingerprint || "") || messageFingerprint(existingData.lastDirection, existingData.lastMessage);
+  const previousAt = Date.parse(String(existingData.lastMessageAt || ""));
+  const currentAt = createdAt.getTime();
+  const isCloseDuplicate = Boolean(
+    fingerprint &&
+    fingerprint === lastFingerprint &&
+    Number.isFinite(previousAt) &&
+    Math.abs(currentAt - previousAt) <= 30000 &&
+    existingData.lastMessageDocId
+  );
+
+  if (isCloseDuplicate) {
+    const previousRef = chatRef.collection("messages").doc(String(existingData.lastMessageDocId));
+    const updates = {
+      status: direction === "out" ? "sent" : "received",
+      ...(messageType !== "text" ? { messageType } : {}),
+      ...(messageId ? { messageId } : {}),
+      ...(operationId ? { operationId } : {}),
+    };
+    await previousRef.set(updates, { merge: true });
+    return { chatId: phoneKey, messageId: previousRef.id, duplicate: true };
+  }
+
   const batch = db.batch();
   const initialStatus = direction === "out" ? "sent" : "received";
   const chatPayload = {
@@ -113,6 +160,8 @@ export async function recordWhatsAppChatMessage(clinicId, payload = {}) {
     lastDirection: direction,
     lastMessageType: messageType,
     lastMessageId: messageId,
+    lastMessageDocId: msgRef.id,
+    lastMessageFingerprint: fingerprint,
     lastMessageStatus: initialStatus,
     updatedAt: createdAtIso,
   };
@@ -138,6 +187,7 @@ export async function recordWhatsAppChatMessage(clinicId, payload = {}) {
     text,
     messageType,
     messageId,
+    operationId,
     status: initialStatus,
     createdAt: createdAtIso,
   }, { merge: true });

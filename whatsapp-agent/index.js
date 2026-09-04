@@ -14,7 +14,7 @@ const AGENT_SECRET = String(process.env.WHATSAPP_AGENT_SECRET || "").trim();
 const MIN_DELAY_SECONDS = Math.max(60, Number(process.env.MIN_DELAY_SECONDS || 150) || 150);
 const MAX_DELAY_SECONDS = Math.max(MIN_DELAY_SECONDS, Number(process.env.MAX_DELAY_SECONDS || 270) || 270);
 const IDLE_POLL_SECONDS = Math.max(5, Number(process.env.IDLE_POLL_SECONDS || 8) || 8);
-const AGENT_VERSION = "2.2.0";
+const AGENT_VERSION = "2.3.0";
 
 if (!CLINIC_ID || !AGENT_SECRET) {
   console.error("\n[agent] Configure CLINIC_ID e WHATSAPP_AGENT_SECRET no arquivo .env antes de iniciar.\n");
@@ -134,6 +134,7 @@ let queueRunning = false;
 let firstPull = true;
 let queueTimer = null;
 let nextFollowupAt = 0;
+let activeOutboundQueueItem = null;
 
 async function resolveWhatsAppId(phone) {
   for (const candidate of candidatePhones(phone)) {
@@ -215,6 +216,13 @@ async function sendQueueItem(item) {
       // presença é opcional
     }
 
+    activeOutboundQueueItem = {
+      id: item.id,
+      phone: item.phone,
+      message: item.message,
+      automationType: item.automationType || "",
+      automationLabel: item.automationLabel || "",
+    };
     const sent = await client.sendMessage(target, item.message);
     const messageId = sent?.id?._serialized || sent?.id?.id || "";
     sentCache[item.id] = { messageId, sentAt: new Date().toISOString() };
@@ -226,6 +234,8 @@ async function sendQueueItem(item) {
     console.error(`[erro] ${item.name || item.phone}:`, error?.message || error);
     await reportResult(item.id, "failed", { error: error?.message || String(error) }).catch(() => {});
     return false;
+  } finally {
+    activeOutboundQueueItem = null;
   }
 }
 
@@ -439,6 +449,12 @@ client.on("message_create", async (msg) => {
     }
 
     const messageType = normalizeMessageType(msg.type);
+    const activeItem = activeOutboundQueueItem;
+    const operationMatches = Boolean(
+      activeItem &&
+      String(activeItem.message || "").trim() === String(msg.body || "").trim() &&
+      candidatePhones(activeItem.phone).some((candidate) => candidate === identity.phone)
+    );
     await api("/api/whatsapp/agent/inbound", {
       method: "POST",
       body: JSON.stringify({
@@ -447,8 +463,11 @@ client.on("message_create", async (msg) => {
         phone: identity.phone,
         name: identity.name,
         text: String(msg.body || ""),
-        messageType,
+        messageType: operationMatches && activeItem.automationLabel
+          ? activeItem.automationLabel
+          : messageType,
         messageId: msg?.id?._serialized || msg?.id?.id || "",
+        operationId: operationMatches ? activeItem.id : "",
         createdAt: messageCreatedAt(msg),
       }),
     });

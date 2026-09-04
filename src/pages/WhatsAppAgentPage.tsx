@@ -13,7 +13,7 @@ import { WhatsAppQRModal } from "@/components/crm/WhatsAppQRModal";
 
 export default function WhatsAppAgentPage() {
   const { currentClinic } = useAuth();
-  const { leads, allLeads } = useLeads();
+  const { leads, allLeads, updateLead } = useLeads();
   const { status, loadingStatus, refreshStatus, pairAgent } = useWhatsAppAgent();
   const [view, setView] = useState<"inbox" | "followup">("inbox");
   const [showQr, setShowQr] = useState(false);
@@ -136,9 +136,9 @@ export default function WhatsAppAgentPage() {
         </div>
 
         {view === "inbox" ? (
-          <WhatsAppInbox leads={allLeads || leads} />
+          <WhatsAppInbox leads={allLeads || leads} onUpdateLead={updateLead} />
         ) : (
-          <FollowUpOperationsPanel leads={leads} allLeads={allLeads} />
+          <FollowUpOperationsPanel leads={leads} allLeads={allLeads} onUpdateLead={updateLead} />
         )}
       </div>
 

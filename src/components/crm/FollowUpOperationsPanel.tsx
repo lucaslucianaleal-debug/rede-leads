@@ -89,9 +89,10 @@ function needsAttention(lead: Lead) {
 interface FollowUpOperationsPanelProps {
   leads: Lead[];
   allLeads?: Lead[];
+  onUpdateLead?: (leadId: string, updates: Partial<Lead>) => void;
 }
 
-export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsPanelProps) {
+export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: FollowUpOperationsPanelProps) {
   const { status, queueMessages } = useWhatsAppAgent();
   const base = allLeads || leads;
   const today = todayBR();
@@ -430,6 +431,7 @@ export function FollowUpOperationsPanel({ leads, allLeads }: FollowUpOperationsP
               fonteLead: activeLead.fonteLead,
             } : null}
             lead={activeLead}
+            onUpdateLead={onUpdateLead}
             height="650px"
             showQuickRegistration={false}
           />

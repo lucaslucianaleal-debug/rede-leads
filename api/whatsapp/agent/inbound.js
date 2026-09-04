@@ -103,6 +103,7 @@ export default async function handler(req, res) {
         text: body.text,
         messageType,
         messageId,
+        operationId: body.operationId || "",
         createdAt: body.createdAt || undefined,
       });
 

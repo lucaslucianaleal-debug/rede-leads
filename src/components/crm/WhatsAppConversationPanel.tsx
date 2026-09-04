@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, CheckCheck, Clock3, RefreshCw, Send, UserPlus, Wifi, WifiOff } from "lucide-react";
+import { CalendarClock, Check, CheckCheck, Clock3, MoreVertical, RefreshCw, Send, Trash2, UserPlus, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useWhatsAppAgent } from "@/hooks/useWhatsAppAgent";
 import { Lead } from "@/types/crm";
 import { WhatsAppLeadRegistrationDialog } from "@/components/crm/WhatsAppLeadRegistrationDialog";
+import { AgendamentoDialog } from "@/components/crm/AgendamentoDialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export type WhatsAppConversationTarget = {
   id?: string;
@@ -45,6 +48,7 @@ type Props = {
   className?: string;
   height?: string;
   showQuickRegistration?: boolean;
+  onUpdateLead?: (leadId: string, updates: Partial<Lead>) => void;
 };
 
 function canonicalPhoneKey(value: string) {
@@ -98,7 +102,7 @@ function dedupeCloseTechnicalDuplicates(items: WhatsAppConversationMessage[]) {
       previous &&
       previous.direction === item.direction &&
       normalizedText(previous.text) === normalizedText(item.text) &&
-      Math.abs(messageTime(previous.createdAt) - messageTime(item.createdAt)) <= 5000
+      Math.abs(messageTime(previous.createdAt) - messageTime(item.createdAt)) <= 30000
     );
 
     if (!sameTechnicalMessage) {
@@ -144,13 +148,17 @@ export function WhatsAppConversationPanel({
   className = "",
   height = "620px",
   showQuickRegistration = true,
+  onUpdateLead,
 }: Props) {
-  const { status, fetchMessages, queueMessages, markChatRead, createLeadFromChat } = useWhatsAppAgent();
+  const { status, fetchMessages, queueMessages, markChatRead, createLeadFromChat, deleteChatMessage } = useWhatsAppAgent();
   const [messages, setMessages] = useState<WhatsAppConversationMessage[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [agendamentoOpen, setAgendamentoOpen] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<WhatsAppConversationMessage | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const messageSinceRef = useRef("");
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -257,6 +265,41 @@ export function WhatsAppConversationPanel({
     }
   };
 
+  const confirmDelete = async () => {
+    if (!messageToDelete || !chatId) return;
+    setDeleting(true);
+    try {
+      await deleteChatMessage(chatId, messageToDelete.id);
+      setMessages((current) => current.filter((item) => item.id !== messageToDelete.id));
+      messageSinceRef.current = "";
+      setMessageToDelete(null);
+      await loadMessages(true);
+      toast.success("Mensagem excluída do Rede Leads.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao excluir mensagem");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const confirmAppointment = (leadId: string, dataAgendamento: string) => {
+    if (!lead || !onUpdateLead) return;
+    const today = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const updates: Partial<Lead> = {
+      dataAgendamento,
+      etapaLead: "Avaliação agendada",
+      lembretes: {
+        h24: false,
+        today: false,
+        disabled: false,
+        sent: { "24h": null, "12h": null, "3h": null, "1h": null },
+      },
+    };
+    if (!lead.dataAgendamento) updates.dataAgendamentoCriado = today;
+    else if (lead.dataAgendamento !== dataAgendamento) updates.dataAgendamentoAlterado = today;
+    onUpdateLead(leadId, updates);
+  };
+
   if (!target) {
     return (
       <div className={`border rounded-xl bg-card flex items-center justify-center text-muted-foreground ${className}`} style={{ height }}>
@@ -291,6 +334,11 @@ export function WhatsAppConversationPanel({
             ) : null}
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {lead && onUpdateLead && (
+              <Button variant="outline" size="sm" onClick={() => setAgendamentoOpen(true)} title="Agendar ou reagendar atendimento">
+                <CalendarClock className="h-4 w-4 mr-1.5" />Agendar
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={() => loadMessages(true)} disabled={loading} title="Atualizar conversa">
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
@@ -335,7 +383,24 @@ export function WhatsAppConversationPanel({
             const DeliveryIcon = delivery.Icon;
             return (
               <div key={message.id} className={`flex ${message.direction === "out" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[86%] rounded-xl px-3 py-2 text-sm shadow-sm ${message.direction === "out" ? "bg-primary text-primary-foreground" : "bg-card border"}`}>
+                <div className={`group relative max-w-[86%] rounded-xl px-3 py-2 pr-8 text-sm shadow-sm ${message.direction === "out" ? "bg-primary text-primary-foreground" : "bg-card border"}`}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className={`absolute right-1 top-1 rounded p-0.5 opacity-70 hover:opacity-100 focus:opacity-100 ${message.direction === "out" ? "hover:bg-white/15" : "hover:bg-muted"}`}
+                        aria-label="Opções da mensagem"
+                        title="Opções da mensagem"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align={message.direction === "out" ? "end" : "start"}>
+                      <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setMessageToDelete(message)}>
+                        <Trash2 className="h-4 w-4 mr-2" />Excluir do Rede Leads
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <div className="whitespace-pre-wrap break-words">{message.text}</div>
                   <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${message.direction === "out" ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
                     <span>{shortTime(message.createdAt)}</span>
@@ -420,6 +485,30 @@ export function WhatsAppConversationPanel({
           }}
         />
       )}
+
+      <AgendamentoDialog
+        lead={lead || null}
+        open={agendamentoOpen}
+        onClose={() => setAgendamentoOpen(false)}
+        onConfirm={confirmAppointment}
+      />
+
+      <AlertDialog open={Boolean(messageToDelete)} onOpenChange={(open) => { if (!open && !deleting) setMessageToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir esta mensagem?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ela será removida somente do histórico do Rede Leads. Essa ação não altera a conversa no WhatsApp.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Excluindo..." : "Excluir mensagem"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

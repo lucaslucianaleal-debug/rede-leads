@@ -185,6 +185,11 @@ export function useWhatsAppAgent() {
     return postChatAction({ ...input, action: "createLead" });
   }, [postChatAction]);
 
+  const deleteChatMessage = useCallback(async (chatId: string, messageDocId: string) => {
+    if (!chatId || !messageDocId) throw new Error("Mensagem inválida");
+    return postChatAction({ chatId, action: "deleteMessage", messageDocId });
+  }, [postChatAction]);
+
   return {
     status,
     loadingStatus,
@@ -196,5 +201,6 @@ export function useWhatsAppAgent() {
     markChatRead,
     linkChatToLead,
     createLeadFromChat,
+    deleteChatMessage,
   };
 }

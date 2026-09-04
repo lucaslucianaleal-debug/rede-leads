@@ -643,7 +643,7 @@ const CRMDashboard = () => {
 
           {!isCorretorModule && (
             <TabsContent value="novos-leads" className="mt-6">
-              <WhatsAppInbox leads={allLeads || leads} onNewCountChange={setNewLeadsCount} />
+              <WhatsAppInbox leads={allLeads || leads} onNewCountChange={setNewLeadsCount} onUpdateLead={updateLead} />
             </TabsContent>
           )}
 

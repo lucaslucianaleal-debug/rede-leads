@@ -1,14 +1,6 @@
 import { getAdminDb } from "../../../server/firebaseAdmin.js";
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
 import { applySentQueueItem, findLeadIndex, markQueueFailure } from "../../../server/whatsappAgent.js";
-import { recordWhatsAppChatMessage } from "../../../server/whatsappChatStore.js";
-
-function automationMessageType(automationType) {
-  if (automationType === "appointment_confirmation") return "Confirmação de agendamento";
-  if (automationType === "appointment_reminder_24h") return "Lembrete • Amanhã";
-  if (automationType === "appointment_reminder_today") return "Lembrete • Hoje";
-  return "text";
-}
 
 async function markAppointmentAutomationSent(clinicId, queue, messageId) {
   const automationType = String(queue?.automationType || "");
@@ -86,22 +78,9 @@ export default async function handler(req, res) {
       const queue = result.queue || {};
       const appointmentLeadUpdated = await markAppointmentAutomationSent(clinicId, queue, body.messageId || "");
 
-      // Toda saída real já é capturada por `message_create` no agente local.
-      // Registrar novamente aqui cria um segundo balão quando o ID do evento do
-      // WhatsApp e o ID retornado pelo sendMessage não são exatamente iguais.
-      // Mantemos este segundo passo somente para automações de agendamento,
-      // porque ele enriquece o histórico com a etiqueta da automação.
-      if (queue.automationType) {
-        await recordWhatsAppChatMessage(clinicId, {
-          phone: queue.phone,
-          name: queue.name,
-          leadId: queue.leadId,
-          direction: "out",
-          text: queue.message,
-          messageType: automationMessageType(queue.automationType),
-          messageId: body.messageId || "",
-        });
-      }
+      // O histórico possui uma única fonte para mensagens enviadas: o evento
+      // `message_create` do agente. O endpoint de resultado apenas confirma a fila
+      // e atualiza o lead. Gravar aqui novamente criava dois balões para um envio.
 
       return res.status(200).json({ ok: true, leadUpdated: result.leadUpdated || appointmentLeadUpdated });
     }

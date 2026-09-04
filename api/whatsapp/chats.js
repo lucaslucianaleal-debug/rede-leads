@@ -112,6 +112,65 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, leadId });
       }
 
+      if (action === "deleteMessage") {
+        const messageDocId = String(req.body?.messageDocId || "").trim();
+        if (!messageDocId || messageDocId.includes("/")) {
+          return res.status(400).json({ error: "Mensagem inválida" });
+        }
+
+        const chatRef = chats.doc(chatId);
+        const messageRef = chatRef.collection("messages").doc(messageDocId);
+        const messageSnap = await messageRef.get();
+        if (!messageSnap.exists) {
+          return res.status(200).json({ ok: true, deleted: false });
+        }
+
+        const deletedMessage = messageSnap.data() || {};
+        const nowIso = new Date().toISOString();
+        const deletionRef = chatRef.collection("messageDeletions").doc(messageDocId);
+        const batch = db.batch();
+        batch.set(deletionRef, {
+          messageDocId,
+          messageId: String(deletedMessage.messageId || ""),
+          direction: deletedMessage.direction === "out" ? "out" : "in",
+          deletedAt: nowIso,
+          deletedBy: user.uid,
+        }, { merge: true });
+        batch.delete(messageRef);
+        await batch.commit();
+
+        const latestSnap = await chatRef.collection("messages").orderBy("createdAt", "desc").limit(10).get();
+        const latestDoc = latestSnap.docs.find((doc) => !isIgnored(doc.data() || {}));
+        if (latestDoc) {
+          const latest = latestDoc.data() || {};
+          await chatRef.set({
+            lastMessage: String(latest.text || "").slice(0, 300),
+            lastMessageAt: latest.createdAt || null,
+            lastDirection: latest.direction === "out" ? "out" : "in",
+            lastMessageType: latest.messageType || "text",
+            lastMessageId: latest.messageId || "",
+            lastMessageDocId: latestDoc.id,
+            lastMessageFingerprint: "",
+            lastMessageStatus: latest.status || "",
+            updatedAt: nowIso,
+          }, { merge: true });
+        } else {
+          await chatRef.set({
+            lastMessage: "",
+            lastMessageAt: null,
+            lastDirection: "in",
+            lastMessageType: "text",
+            lastMessageId: "",
+            lastMessageDocId: "",
+            lastMessageFingerprint: "",
+            lastMessageStatus: "",
+            updatedAt: nowIso,
+          }, { merge: true });
+        }
+
+        return res.status(200).json({ ok: true, deleted: true });
+      }
+
       if (action === "createLead") {
         const phone = String(req.body?.phone || "").trim();
         const phoneKey = canonicalPhoneKey(phone);
