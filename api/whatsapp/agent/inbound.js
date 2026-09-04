@@ -26,6 +26,18 @@ function isOptOutText(value) {
     .some((term) => text === normalizeText(term) || text.includes(normalizeText(term)));
 }
 
+function referralContext(body = {}) {
+  const referral = body?.referral && typeof body.referral === "object" ? body.referral : {};
+  return {
+    headline: String(referral.headline || referral.title || "").trim().slice(0, 300),
+    body: String(referral.body || referral.adBody || referral.ad_body || "").trim().slice(0, 1000),
+    greetingMessageBody: String(referral.greetingMessageBody || referral.greeting_message_body || "").trim().slice(0, 1000),
+    sourceApp: String(referral.sourceApp || referral.source_app || "").trim().slice(0, 40),
+    containsAutoReply: referral.containsAutoReply === true || referral.contains_auto_reply === true,
+    automatedGreetingShown: referral.automatedGreetingMessageShown === true || referral.automated_greeting_message_shown === true,
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -56,8 +68,6 @@ export default async function handler(req, res) {
     const contactRef = db.collection("clinics").doc(clinicId).collection("whatsappContacts").doc(phoneKey);
     const messageId = String(body.messageId || "").trim();
 
-    // Mensagens enviadas por qualquer aparelho vinculado (celular, Desktop ou Rede Leads)
-    // entram na mesma caixa comercial. É 100% orientado a evento: não varremos histórico.
     if (String(body.direction || "").toLowerCase() === "out") {
       let leadId = "";
       let leadName = String(body.name || "").trim();
@@ -107,6 +117,19 @@ export default async function handler(req, res) {
     const result = await processInboundEvent(clinicId, body);
     const contactAfterSnap = await contactRef.get();
     const contactAfter = contactAfterSnap.exists ? (contactAfterSnap.data() || {}) : {};
+    const referral = referralContext(body);
+
+    if (referral.headline || referral.body || referral.greetingMessageBody || referral.sourceApp || referral.containsAutoReply || referral.automatedGreetingShown) {
+      await contactRef.set({
+        ...(referral.headline ? { metaReferralHeadline: referral.headline } : {}),
+        ...(referral.body ? { metaReferralBody: referral.body } : {}),
+        ...(referral.greetingMessageBody ? { metaGreetingMessageBody: referral.greetingMessageBody } : {}),
+        ...(referral.sourceApp ? { metaSourceApp: referral.sourceApp } : {}),
+        ...(referral.containsAutoReply ? { metaContainsAutoReply: true } : {}),
+        ...(referral.automatedGreetingShown ? { metaAutomatedGreetingShown: true } : {}),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    }
 
     await recordWhatsAppChatMessage(clinicId, {
       phone: body.phone,
@@ -120,6 +143,12 @@ export default async function handler(req, res) {
       fonteLead: "Online",
       metaCampanhaId: contactAfter.metaCampanhaId || "",
       metaCampanhaNome: contactAfter.metaCampanhaNome || "",
+      metaReferralHeadline: referral.headline || contactAfter.metaReferralHeadline || "",
+      metaReferralBody: referral.body || contactAfter.metaReferralBody || "",
+      metaGreetingMessageBody: referral.greetingMessageBody || contactAfter.metaGreetingMessageBody || "",
+      metaSourceApp: referral.sourceApp || contactAfter.metaSourceApp || "",
+      metaContainsAutoReply: referral.containsAutoReply || contactAfter.metaContainsAutoReply === true,
+      metaAutomatedGreetingShown: referral.automatedGreetingShown || contactAfter.metaAutomatedGreetingShown === true,
     });
 
     if (isOptOutText(body.text)) {
