@@ -55,6 +55,12 @@ function serializeChat(doc) {
     fonteLead: data.fonteLead || "",
     metaCampanhaId: data.metaCampanhaId || "",
     metaCampanhaNome: data.metaCampanhaNome || "",
+    metaReferralHeadline: data.metaReferralHeadline || "",
+    metaReferralBody: data.metaReferralBody || "",
+    metaGreetingMessageBody: data.metaGreetingMessageBody || "",
+    metaSourceApp: data.metaSourceApp || "",
+    metaContainsAutoReply: data.metaContainsAutoReply === true,
+    metaAutomatedGreetingShown: data.metaAutomatedGreetingShown === true,
   };
 }
 
@@ -62,6 +68,11 @@ function findExistingLead(leads, phone) {
   const key = canonicalPhoneKey(phone);
   if (!key) return null;
   return (Array.isArray(leads) ? leads : []).find((lead) => canonicalPhoneKey(lead?.telefone) === key) || null;
+}
+
+function safeString(value, fallback = "", max = 2000) {
+  const text = String(value ?? fallback).trim();
+  return text.slice(0, max);
 }
 
 export default async function handler(req, res) {
@@ -122,27 +133,36 @@ export default async function handler(req, res) {
             createdLead = existing;
           } else {
             const leadId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const requestedReminders = req.body?.lembretes && typeof req.body.lembretes === "object" ? req.body.lembretes : {};
+            const customFields = req.body?.customFields && typeof req.body.customFields === "object" && !Array.isArray(req.body.customFields)
+              ? req.body.customFields
+              : {};
+
             createdLead = {
               id: leadId,
-              dataCriacao: today,
-              dataContato: today,
-              nome: String(req.body?.name || "").trim() || phone,
+              dataCriacao: safeString(req.body?.dataCriacao, today, 20) || today,
+              dataContato: safeString(req.body?.dataContato, today, 20) || today,
+              nome: safeString(req.body?.name, phone, 150) || phone,
               telefone: phone,
-              servicoProcurado: String(req.body?.servicoProcurado || "").trim(),
-              captador: String(req.body?.captador || "").trim(),
-              fonteLead: String(req.body?.fonteLead || "Online").trim() || "Online",
-              etapaLead: String(req.body?.etapaLead || "Novo").trim() || "Novo",
-              status: String(req.body?.status || "MORNO").trim(),
-              respostaLead: "RESPONDEU",
-              comparecimento: "",
-              dataFollowUp: today,
-              dataAgendamento: "",
-              dataRetornoLigacao: "",
-              observacao: String(req.body?.observacao || "Primeiro contato recebido pelo WhatsApp").trim().slice(0, 2000),
-              followUpCount: 0,
-              lembretes: { h24: false, today: false },
-              metaCampanhaId: String(req.body?.metaCampanhaId || "").trim(),
-              metaCampanhaNome: String(req.body?.metaCampanhaNome || "").trim(),
+              servicoProcurado: safeString(req.body?.servicoProcurado, "", 150),
+              captador: safeString(req.body?.captador, "", 150),
+              fonteLead: safeString(req.body?.fonteLead, "Online", 80) || "Online",
+              etapaLead: safeString(req.body?.etapaLead, "Novo", 80) || "Novo",
+              status: safeString(req.body?.status, "MORNO", 40),
+              respostaLead: safeString(req.body?.respostaLead, "RESPONDEU", 40) || "RESPONDEU",
+              comparecimento: safeString(req.body?.comparecimento, "", 40),
+              dataFollowUp: safeString(req.body?.dataFollowUp, today, 30) || today,
+              dataAgendamento: safeString(req.body?.dataAgendamento, "", 40),
+              dataRetornoLigacao: safeString(req.body?.dataRetornoLigacao, "", 40),
+              observacao: safeString(req.body?.observacao, "Primeiro contato recebido pelo WhatsApp", 2000),
+              followUpCount: Math.max(0, Number(req.body?.followUpCount || 0) || 0),
+              lembretes: {
+                h24: requestedReminders.h24 === true,
+                today: requestedReminders.today === true,
+              },
+              customFields,
+              metaCampanhaId: safeString(req.body?.metaCampanhaId, "", 200),
+              metaCampanhaNome: safeString(req.body?.metaCampanhaNome, "", 250),
               lastWhatsAppInboundAt: nowIso,
               whatsappNeedsAttention: true,
               whatsappAutomationPaused: true,
