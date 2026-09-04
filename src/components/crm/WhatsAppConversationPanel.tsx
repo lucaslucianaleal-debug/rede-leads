@@ -156,10 +156,28 @@ export function WhatsAppConversationPanel({
     return () => window.clearInterval(timer);
   }, [chatId, loadMessages]);
 
-  const greetingCandidate = target?.metaGreetingMessageBody || (
-    target?.metaCampanhaNome && target?.metaReferralBody ? target.metaReferralBody : ""
-  );
-  const greetingText = normalizedText(greetingCandidate);
+  const inferredGreeting = useMemo(() => {
+    if (target?.metaGreetingMessageBody) return target.metaGreetingMessageBody;
+    if (!target?.metaCampanhaNome || linked) return "";
+
+    const firstInbound = messages.find((message) => message.direction === "in");
+    const firstOutbound = messages.find((message) => message.direction === "out");
+    if (!firstInbound || !firstOutbound) return "";
+
+    const inboundAt = messageTime(firstInbound.createdAt);
+    const outboundAt = messageTime(firstOutbound.createdAt);
+    if (!inboundAt || !outboundAt) return "";
+
+    // A saudação automática do anúncio pode chegar no stream alguns segundos depois
+    // da primeira mensagem do paciente. Só tratamos como contexto Meta nessa janela curta.
+    if (outboundAt >= inboundAt - 30000 && outboundAt <= inboundAt + 5000) {
+      return firstOutbound.text || "";
+    }
+    return "";
+  }, [messages, target?.metaGreetingMessageBody, target?.metaCampanhaNome, linked]);
+
+  const greetingToShow = target?.metaGreetingMessageBody || inferredGreeting || "";
+  const greetingText = normalizedText(greetingToShow);
   const visibleMessages = useMemo(() => {
     if (!greetingText) return messages;
     return messages.filter((message) => {
@@ -206,10 +224,11 @@ export function WhatsAppConversationPanel({
     );
   }
 
+  const referralBodyIsGreeting = Boolean(greetingToShow && normalizedText(target.metaReferralBody) === normalizedText(greetingToShow));
   const adContextVisible = Boolean(
     target.metaReferralHeadline ||
     target.metaReferralBody ||
-    target.metaGreetingMessageBody ||
+    greetingToShow ||
     target.metaCampanhaNome
   );
 
@@ -258,13 +277,13 @@ export function WhatsAppConversationPanel({
             <div className="mx-auto w-full max-w-[560px] rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-950">
               <div className="font-semibold">{adSourceLabel(target.metaSourceApp)}</div>
               {target.metaReferralHeadline && <div className="mt-1">{target.metaReferralHeadline}</div>}
-              {target.metaReferralBody && <div className="mt-1 text-emerald-800">{target.metaReferralBody}</div>}
-              {target.metaGreetingMessageBody && (
+              {target.metaReferralBody && !referralBodyIsGreeting && <div className="mt-1 text-emerald-800">{target.metaReferralBody}</div>}
+              {greetingToShow && (
                 <div className="mt-2 rounded-md bg-white/70 border border-emerald-100 px-2 py-1.5">
-                  <span className="font-medium">Mensagem de saudação automática:</span> {target.metaGreetingMessageBody}
+                  <span className="font-medium">Mensagem de saudação automática:</span> {greetingToShow}
                 </div>
               )}
-              {!target.metaReferralHeadline && !target.metaReferralBody && !target.metaGreetingMessageBody && target.metaCampanhaNome && (
+              {!target.metaReferralHeadline && !target.metaReferralBody && !greetingToShow && target.metaCampanhaNome && (
                 <div className="mt-1 text-emerald-800">Campanha: {target.metaCampanhaNome}</div>
               )}
             </div>
@@ -325,7 +344,7 @@ export function WhatsAppConversationPanel({
           initialCampaignId={target.metaCampanhaId || ""}
           initialCampaignName={target.metaCampanhaNome || ""}
           initialSource={target.fonteLead || "Online"}
-          contextText={`${target.metaReferralHeadline || ""} ${target.metaReferralBody || ""} ${target.metaGreetingMessageBody || ""}`}
+          contextText={`${target.metaReferralHeadline || ""} ${target.metaReferralBody || ""} ${greetingToShow}`}
           onSave={async (form, selectedCampaignId, campaignName) => {
             try {
               const result = await createLeadFromChat({
