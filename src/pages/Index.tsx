@@ -20,7 +20,6 @@ import { PerformanceChart } from "@/components/crm/PerformanceChart";
 import { ComparisonChart } from "@/components/crm/ComparisonChart";
 import { CallLogDialog } from "@/components/crm/CallLogDialog";
 import { WhatsAppInbox } from "@/components/crm/WhatsAppInbox";
-import { ROIAnalysisView } from "@/components/crm/ROIAnalysisView";
 import { ServicosExternos } from "@/components/crm/ServicosExternos";
 import { FollowUpRuler } from "@/components/crm/FollowUpRuler";
 import { Button } from "@/components/ui/button";
@@ -37,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, DollarSign, Ticket, BookOpen, Menu, TrendingUp } from "lucide-react";
+import { Download, Activity, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, MessageCircle, Plus, Inbox, Ticket, BookOpen, Menu, TrendingUp } from "lucide-react";
 import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
@@ -130,7 +129,7 @@ const CRMDashboard = () => {
 
   useEffect(() => {
     if (!isCorretorModule) return;
-    if (["mpc", "novos-leads", "roi-custos"].includes(activeTab)) {
+    if (["mpc", "novos-leads"].includes(activeTab)) {
       setActiveTab("dashboard");
     }
   }, [activeTab, isCorretorModule]);
@@ -237,13 +236,12 @@ const CRMDashboard = () => {
 
   const tabsMenuItems = [
     { value: "dashboard", label: "Dashboard" },
-    { value: "dashboard-executivo", label: "Meta & Campanhas" },
-    ...(!isCorretorModule ? [{ value: "mpc", label: "Painel MPC" }] : []),
-    { value: "agenda", label: "Agenda do Dia" },
-    { value: "all-leads", label: "Todos os Leads" },
     ...(!isCorretorModule ? [{ value: "novos-leads", label: "Caixa de Entrada" }] : []),
     { value: "regua-followup", label: "Rotina de Contatos" },
-    ...(!isCorretorModule ? [{ value: "roi-custos", label: "ROI/Custos" }] : []),
+    { value: "agenda", label: "Agenda do Dia" },
+    { value: "all-leads", label: "Todos os Leads" },
+    { value: "dashboard-executivo", label: "Meta & Campanhas" },
+    ...(!isCorretorModule ? [{ value: "mpc", label: "Painel MPC" }] : []),
     { value: "externos", label: "Serviços Externos" },
   ];
 
@@ -506,65 +504,70 @@ const CRMDashboard = () => {
                 )}
               </div>
 
-              <TabsList className="hidden lg:flex w-full sm:max-w-[1100px] justify-start gap-2 flex-wrap h-auto p-2">
-            <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
-              <LayoutDashboard className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </TabsTrigger>
-            <TabsTrigger value="dashboard-executivo" className="flex items-center gap-1.5">
-              <LayoutDashboard className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Meta & Campanhas</span>
-            </TabsTrigger>
-            {!isCorretorModule && (
-              <TabsTrigger value="mpc" className="flex items-center gap-1.5">
-                <TrendingUp className="h-4 w-4 shrink-0" />
-                <span className="hidden sm:inline">Painel MPC</span>
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="agenda" className="flex items-center gap-1.5">
-              <CalendarCheck className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Agenda do Dia</span>
-            </TabsTrigger>
-            <TabsTrigger value="all-leads" className="flex items-center gap-1.5">
-              <Database className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Todos os Leads</span>
-            </TabsTrigger>
-            {!isCorretorModule && (
-              <TabsTrigger value="novos-leads" className="flex items-center gap-1.5">
-                <Inbox className="h-4 w-4 shrink-0" />
-                <span className="hidden sm:inline">Caixa de Entrada</span>
-                {newLeadsCount > 0 && (
-                  <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white leading-none">
-                    {newLeadsCount}
-                  </span>
-                )}
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="regua-followup" className="flex items-center gap-1.5">
-              <BookOpen className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Rotina de Contatos</span>
-            </TabsTrigger>
-            {!isCorretorModule && (
-              <TabsTrigger value="roi-custos" className="flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 shrink-0" />
-                <span className="hidden sm:inline">ROI/Custos</span>
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="externos" className="flex items-center gap-1.5">
-              <Ticket className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Serviços Externos</span>
-            </TabsTrigger>
-              {permissions?.canEdit && (
-                <button
-                  onClick={() => setShowCreateDialog(true)}
-                  className="ml-auto inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
-                  aria-label="Novo Lead"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Novo Lead</span>
-                </button>
-              )}
-              </TabsList>
+              <div className="hidden lg:flex w-full max-w-[1180px] flex-col gap-2 rounded-xl border border-border/70 bg-card/50 p-2.5 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-20 shrink-0 pl-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Operação</div>
+                  <TabsList className="flex flex-1 justify-start gap-2 flex-wrap h-auto p-1 bg-muted/40">
+                    <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
+                      <LayoutDashboard className="h-4 w-4 shrink-0" />
+                      <span className="hidden sm:inline">Dashboard</span>
+                    </TabsTrigger>
+                    {!isCorretorModule && (
+                      <TabsTrigger value="novos-leads" className="flex items-center gap-1.5">
+                        <Inbox className="h-4 w-4 shrink-0" />
+                        <span className="hidden sm:inline">Caixa de Entrada</span>
+                        {newLeadsCount > 0 && (
+                          <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white leading-none">
+                            {newLeadsCount}
+                          </span>
+                        )}
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="regua-followup" className="flex items-center gap-1.5">
+                      <BookOpen className="h-4 w-4 shrink-0" />
+                      <span className="hidden sm:inline">Rotina de Contatos</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="agenda" className="flex items-center gap-1.5">
+                      <CalendarCheck className="h-4 w-4 shrink-0" />
+                      <span className="hidden sm:inline">Agenda do Dia</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="all-leads" className="flex items-center gap-1.5">
+                      <Database className="h-4 w-4 shrink-0" />
+                      <span className="hidden sm:inline">Todos os Leads</span>
+                    </TabsTrigger>
+                    {permissions?.canEdit && (
+                      <button
+                        onClick={() => setShowCreateDialog(true)}
+                        className="ml-auto inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90"
+                        aria-label="Novo Lead"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Novo Lead</span>
+                      </button>
+                    )}
+                  </TabsList>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-20 shrink-0 pl-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Gestão</div>
+                  <TabsList className="flex flex-1 justify-start gap-2 flex-wrap h-auto p-1 bg-muted/20">
+                    <TabsTrigger value="dashboard-executivo" className="flex items-center gap-1.5">
+                      <LayoutDashboard className="h-4 w-4 shrink-0" />
+                      <span className="hidden sm:inline">Meta & Campanhas</span>
+                    </TabsTrigger>
+                    {!isCorretorModule && (
+                      <TabsTrigger value="mpc" className="flex items-center gap-1.5">
+                        <TrendingUp className="h-4 w-4 shrink-0" />
+                        <span className="hidden sm:inline">Painel MPC</span>
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="externos" className="flex items-center gap-1.5">
+                      <Ticket className="h-4 w-4 shrink-0" />
+                      <span className="hidden sm:inline">Serviços Externos</span>
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+              </div>
           </div>
 
           <TabsContent value="dashboard" className="space-y-6 mt-6">
@@ -654,12 +657,6 @@ const CRMDashboard = () => {
               onUpdateLead={(id, updates) => updateLead(id, updates)}
             />
           </TabsContent>
-
-          {!isCorretorModule && (
-            <TabsContent value="roi-custos" className="mt-6">
-              <ROIAnalysisView leads={leads} clinicId={currentClinic ?? user?.uid} />
-            </TabsContent>
-          )}
 
           <TabsContent value="externos" className="mt-6">
             <ServicosExternos onRegisterCall={handleRegisterCall} />
