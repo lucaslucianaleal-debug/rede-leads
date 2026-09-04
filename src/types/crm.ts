@@ -85,6 +85,7 @@ export interface ReminderStatus {
     "12h": string | null;
     "3h": string | null;
     "1h": string | null;
+    today?: string | null;
   };
 }
 
