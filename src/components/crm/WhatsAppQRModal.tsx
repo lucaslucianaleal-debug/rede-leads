@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,18 +10,14 @@ import { Smartphone } from "lucide-react";
 interface WhatsAppQRModalProps {
   qrCode: string | null;
   onClose: () => void;
+  open?: boolean;
 }
 
-export function WhatsAppQRModal({ qrCode, onClose }: WhatsAppQRModalProps) {
-  // Fecha automaticamente quando o QR some (autenticado)
-  useEffect(() => {
-    if (qrCode === null) {
-      onClose();
-    }
-  }, [qrCode, onClose]);
+export function WhatsAppQRModal({ qrCode, onClose, open }: WhatsAppQRModalProps) {
+  const isOpen = open ?? Boolean(qrCode);
 
   return (
-    <Dialog open={qrCode !== null} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -30,7 +25,7 @@ export function WhatsAppQRModal({ qrCode, onClose }: WhatsAppQRModalProps) {
             Conectar WhatsApp
           </DialogTitle>
           <DialogDescription>
-            Escaneie o QR Code com o WhatsApp para conectar o servidor.
+            Escaneie o QR Code com o WhatsApp para conectar o agente.
           </DialogDescription>
         </DialogHeader>
 
@@ -55,7 +50,7 @@ export function WhatsAppQRModal({ qrCode, onClose }: WhatsAppQRModalProps) {
           </ol>
 
           <p className="text-xs text-muted-foreground">
-            O código expira em ~20 segundos. Um novo será gerado automaticamente.
+            O código pode ser renovado automaticamente enquanto a conexão não for concluída.
           </p>
         </div>
       </DialogContent>
