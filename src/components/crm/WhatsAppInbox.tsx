@@ -55,9 +55,11 @@ function findLead(leads: Lead[], chat: WhatsAppChatSummary | null) {
 export function WhatsAppInbox({
   leads = [],
   onNewCountChange,
+  onUpdateLead,
 }: {
   leads?: Lead[];
   onNewCountChange?: (count: number) => void;
+  onUpdateLead?: (leadId: string, updates: Partial<Lead>) => void;
 }) {
   const { fetchChats } = useWhatsAppAgent();
   const [chats, setChats] = useState<WhatsAppChatSummary[]>([]);
@@ -231,6 +233,7 @@ export function WhatsAppInbox({
         <WhatsAppConversationPanel
           target={selectedChat}
           lead={selectedLead}
+          onUpdateLead={onUpdateLead}
           height="650px"
           className="border-0 rounded-none"
           onLeadLinked={(newLead) => {

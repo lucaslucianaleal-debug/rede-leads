@@ -159,6 +159,9 @@ export default async function handler(req, res) {
         name: data.name || "",
         message: data.message || "",
         kind: data.kind || "manual",
+        clientRequestId: data.clientRequestId || "",
+        automationType: data.automationType || "",
+        automationLabel: data.automationLabel || "",
       };
     });
 

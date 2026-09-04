@@ -40,7 +40,7 @@ export function FollowUpRuler(props: FollowUpRulerProps) {
         </Button>
       </div>
 
-      <FollowUpOperationsPanel leads={props.leads} allLeads={props.allLeads} />
+      <FollowUpOperationsPanel leads={props.leads} allLeads={props.allLeads} onUpdateLead={props.onUpdateLead} />
 
       <Dialog open={insightsOpen} onOpenChange={setInsightsOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
