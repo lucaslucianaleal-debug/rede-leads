@@ -89,6 +89,47 @@ function normalizedText(value?: string) {
   return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+function dedupeCloseTechnicalDuplicates(items: WhatsAppConversationMessage[]) {
+  const result: WhatsAppConversationMessage[] = [];
+
+  for (const item of items) {
+    const previous = result[result.length - 1];
+    const sameTechnicalMessage = Boolean(
+      previous &&
+      previous.direction === item.direction &&
+      normalizedText(previous.text) === normalizedText(item.text) &&
+      Math.abs(messageTime(previous.createdAt) - messageTime(item.createdAt)) <= 5000
+    );
+
+    if (!sameTechnicalMessage) {
+      result.push(item);
+      continue;
+    }
+
+    // Se o mesmo envio foi gravado pelos dois caminhos internos (message_create
+    // e confirmação da fila), mostramos um único balão. Preferimos a versão que
+    // contém a etiqueta automática e preservamos o melhor status disponível.
+    const previousHasLabel = previous.messageType && previous.messageType !== "text";
+    const currentHasLabel = item.messageType && item.messageType !== "text";
+    if (!previousHasLabel && currentHasLabel) {
+      result[result.length - 1] = {
+        ...previous,
+        ...item,
+        createdAt: previous.createdAt || item.createdAt,
+        status: item.status || previous.status,
+      };
+    } else {
+      result[result.length - 1] = {
+        ...previous,
+        status: item.status || previous.status,
+        messageId: previous.messageId || item.messageId,
+      };
+    }
+  }
+
+  return result;
+}
+
 function adSourceLabel(source?: string) {
   const value = String(source || "").toLowerCase();
   if (value.includes("instagram")) return "Anúncio do Instagram";
@@ -179,10 +220,10 @@ export function WhatsAppConversationPanel({
   const greetingToShow = target?.metaGreetingMessageBody || inferredGreeting || "";
   const greetingText = normalizedText(greetingToShow);
   const visibleMessages = useMemo(() => {
-    if (!greetingText) return messages;
-    return messages.filter((message) => {
-      return !(message.direction === "out" && normalizedText(message.text) === greetingText);
-    });
+    const withoutGreeting = greetingText
+      ? messages.filter((message) => !(message.direction === "out" && normalizedText(message.text) === greetingText))
+      : messages;
+    return dedupeCloseTechnicalDuplicates(withoutGreeting);
   }, [messages, greetingText]);
 
   useEffect(() => {

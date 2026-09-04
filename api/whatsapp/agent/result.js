@@ -85,15 +85,24 @@ export default async function handler(req, res) {
       const result = await applySentQueueItem(clinicId, queueId, { messageId: body.messageId || "" });
       const queue = result.queue || {};
       const appointmentLeadUpdated = await markAppointmentAutomationSent(clinicId, queue, body.messageId || "");
-      await recordWhatsAppChatMessage(clinicId, {
-        phone: queue.phone,
-        name: queue.name,
-        leadId: queue.leadId,
-        direction: "out",
-        text: queue.message,
-        messageType: automationMessageType(queue.automationType),
-        messageId: body.messageId || "",
-      });
+
+      // Toda saída real já é capturada por `message_create` no agente local.
+      // Registrar novamente aqui cria um segundo balão quando o ID do evento do
+      // WhatsApp e o ID retornado pelo sendMessage não são exatamente iguais.
+      // Mantemos este segundo passo somente para automações de agendamento,
+      // porque ele enriquece o histórico com a etiqueta da automação.
+      if (queue.automationType) {
+        await recordWhatsAppChatMessage(clinicId, {
+          phone: queue.phone,
+          name: queue.name,
+          leadId: queue.leadId,
+          direction: "out",
+          text: queue.message,
+          messageType: automationMessageType(queue.automationType),
+          messageId: body.messageId || "",
+        });
+      }
+
       return res.status(200).json({ ok: true, leadUpdated: result.leadUpdated || appointmentLeadUpdated });
     }
 
