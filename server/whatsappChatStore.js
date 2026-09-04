@@ -65,6 +65,12 @@ export async function recordWhatsAppChatMessage(clinicId, payload = {}) {
   const metaCampanhaId = String(payload.metaCampanhaId || "").trim();
   const metaCampanhaNome = String(payload.metaCampanhaNome || "").trim().slice(0, 200);
   const fonteLead = String(payload.fonteLead || "").trim().slice(0, 80);
+  const metaReferralHeadline = String(payload.metaReferralHeadline || "").trim().slice(0, 300);
+  const metaReferralBody = String(payload.metaReferralBody || "").trim().slice(0, 1000);
+  const metaGreetingMessageBody = String(payload.metaGreetingMessageBody || "").trim().slice(0, 1000);
+  const metaSourceApp = String(payload.metaSourceApp || "").trim().slice(0, 40);
+  const metaContainsAutoReply = payload.metaContainsAutoReply === true;
+  const metaAutomatedGreetingShown = payload.metaAutomatedGreetingShown === true;
 
   const chatRef = db.collection("clinics").doc(clinicId).collection("whatsappChats").doc(phoneKey);
   const existing = await chatRef.get();
@@ -100,6 +106,12 @@ export async function recordWhatsAppChatMessage(clinicId, payload = {}) {
   if (metaCampanhaId) chatPayload.metaCampanhaId = metaCampanhaId;
   if (metaCampanhaNome) chatPayload.metaCampanhaNome = metaCampanhaNome;
   if (fonteLead) chatPayload.fonteLead = fonteLead;
+  if (metaReferralHeadline) chatPayload.metaReferralHeadline = metaReferralHeadline;
+  if (metaReferralBody) chatPayload.metaReferralBody = metaReferralBody;
+  if (metaGreetingMessageBody) chatPayload.metaGreetingMessageBody = metaGreetingMessageBody;
+  if (metaSourceApp) chatPayload.metaSourceApp = metaSourceApp;
+  if (metaContainsAutoReply) chatPayload.metaContainsAutoReply = true;
+  if (metaAutomatedGreetingShown) chatPayload.metaAutomatedGreetingShown = true;
   if (direction === "in") chatPayload.unreadCount = FieldValue.increment(1);
   else if (!existing.exists) chatPayload.unreadCount = 0;
 
