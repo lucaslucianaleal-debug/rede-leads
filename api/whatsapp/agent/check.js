@@ -6,6 +6,9 @@ function isAppointmentAutomation(value) {
   return [
     "appointment_confirmation",
     "appointment_reminder_24h",
+    "appointment_reminder_12h",
+    "appointment_reminder_1h",
+    // legado: pode existir em filas antigas; ainda validamos para cancelar com segurança
     "appointment_reminder_today",
   ].includes(String(value || ""));
 }
@@ -52,6 +55,7 @@ export default async function handler(req, res) {
         lead._deleted ||
         lead.lembretes?.disabled === true ||
         lead.comparecimento === "COMPARECEU" ||
+        lead.comparecimento === "NÃO COMPARECEU" ||
         ["finalizado", "desistência", "desistencia", "fora da região", "fora da regiao"].includes(stage);
 
       if (invalid) {
