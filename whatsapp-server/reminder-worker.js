@@ -2,388 +2,383 @@ import admin from 'firebase-admin';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import fs from 'fs';
-import { blockIfMissingDoc, blockIfEmptyArray, attachLastWriter } from './lib/crmGuard.mjs';
+import { attachLastWriter } from './lib/crmGuard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Initialize Firebase Admin
 const serviceAccountKey = JSON.parse(
-  (await import('fs')).readFileSync(resolve(__dirname, 'serviceAccountKey.json'), 'utf8')
+  fs.readFileSync(resolve(__dirname, 'serviceAccountKey.json'), 'utf8')
 );
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccountKey),
-  databaseURL: 'https://rede-crm-default-rtdb.firebaseio.com'
 });
 
 const db = admin.firestore();
 
-// MODO DE SEGURANÇA: REPORT-ONLY (sem envios automáticos)
-// O worker NUNCA envia mensagens, apenas atualiza a lista de lembretes na UI
-const MY_PHONE = '17991040452';
-const REPORT_ONLY_MODE = true; // ⚠️ SEMPRE true - sem envios automáticos
-const COOLDOWN_MINUTES = 60; // 1 hora
-const BACKEND_URL = 'http://localhost:3001'; // URL do backend (porta do servidor Express/WhatsApp)
+const CLINIC_ID = process.env.REMINDER_CLINIC_ID || 'odontocompany-olimpia';
+const BACKEND_URL = process.env.REMINDER_BACKEND_URL || 'http://127.0.0.1:3001';
+const AUTOMATION_ENABLED = process.env.REMINDER_AUTOMATION_ENABLED !== 'false';
+const INTERVAL_MS = Number(process.env.REMINDER_INTERVAL_MS || 60_000);
+const START_DELAY_MS = Number(process.env.REMINDER_START_DELAY_MS || 15_000);
+const COOLDOWN_MINUTES = Number(process.env.REMINDER_COOLDOWN_MINUTES || 60);
+const MY_PHONE = process.env.REMINDER_BLOCKED_PHONE || '17991040452';
+
 const NEXT_SENDS_FILE = resolve(__dirname, 'next-sends.json');
 const SEND_FAILURES_FILE = resolve(__dirname, 'send-failures.json');
+const SENT_LEDGER_FILE = resolve(__dirname, 'reminder-sent-ledger.json');
 
-// Templates de lembrete personalizados por tempo
-function generateReminderText(dataAgendamento, type, name) {
-  const [datePart, timePart] = (dataAgendamento || "").split(' ');
-  const date = datePart || '[Data]';
-  const time = timePart || '[Horário]';
+const SLOT_CONFIG = {
+  '24h': { hoursBefore: 24, closesHoursBefore: 12 },
+  '12h': { hoursBefore: 12, closesHoursBefore: 1 },
+  '1h': { hoursBefore: 1, closesHoursBefore: 0 },
+};
 
-  switch(type) {
-    case '24h':
-    case '12h':
-      return `Olá, ${name || ''}! Tudo bem? Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${date}, às ${time}. Já deixamos tudo reservado para o seu atendimento. Até amanhã! 🦷💚`;
-
-    case '3h':
-      return `⏰ Faltam 3 horas para sua avaliação!\n\nOlá, ${name || ''}, sua consulta na OdontoCompany Olimpia está chegando. 😄\n\n📅 Data e Horário: ${dataAgendamento}\n\nEstamos te esperando! 💚`;
-
-    case '1h':
-      return `Bom dia, ${name || ''}! Tudo certo para o seu horário hoje às ${time} aqui na OdontoCompany? Já estamos com sua sala preparada e te aguardando. Até logo! 💚✨`;
-
-    default:
-      return `⏰ Lembrete | OdontoCompany Olimpia\n\n📅 Data e Horário: ${dataAgendamento}\n\nTe esperamos! 💚`;
-  }
+function clinicDocRef() {
+  return db.collection('clinics').doc(CLINIC_ID).collection('shared').doc('shared');
 }
 
-// Parse "dd/MM/yyyy HH:mm" → Date
 function parseAppointment(dateStr) {
   if (!dateStr || typeof dateStr !== 'string') return null;
-  
+  const match = dateStr.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, dd, mm, yyyy, hh, min] = match;
+  const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function computeSlotWindow(appointmentDate, slot) {
+  const cfg = SLOT_CONFIG[slot];
+  const start = new Date(appointmentDate.getTime() - cfg.hoursBefore * 60 * 60 * 1000);
+  const end = new Date(appointmentDate.getTime() - cfg.closesHoursBefore * 60 * 60 * 1000);
+  return { start, end };
+}
+
+function firstName(name) {
+  return String(name || '').trim().split(/\s+/)[0] || '';
+}
+
+function generateReminderText(lead, slot) {
+  const [date = '[Data]', time = '[Horário]'] = String(lead.dataAgendamento || '').split(' ');
+  const name = firstName(lead.nome);
+
+  if (slot === '24h') {
+    return `Olá, ${name}! Tudo bem?\n\nPassando para lembrar da sua consulta na OdontoCompany Olímpia amanhã, dia ${date}, às ${time}.\n\nJá deixamos tudo reservado para o seu atendimento.\n\nAté amanhã! 🦷💚`;
+  }
+
+  if (slot === '12h') {
+    return `Olá, ${name}! Tudo bem?\n\nSó reforçando o seu horário na OdontoCompany Olímpia: ${date}, às ${time}.\n\nSeu atendimento está reservado e estaremos te aguardando. 💚`;
+  }
+
+  return `Olá, ${name}! 💚\n\nSeu horário na OdontoCompany Olímpia é daqui a 1 hora, às ${time}.\n\nJá estamos preparando sua sala e te aguardamos por aqui.\n\nAté já! ✨`;
+}
+
+function normalizePhone(phone) {
+  return String(phone || '').replace(/\D/g, '');
+}
+
+function ensure10DigitsLocal(phone) {
+  if (!phone) return null;
+  let digits = normalizePhone(phone);
+  if (digits.startsWith('55')) digits = digits.slice(2);
+  if (digits.length === 11 && digits[2] === '9') digits = digits.slice(0, 2) + digits.slice(3);
+  if (digits.length > 10) digits = digits.slice(-10);
+  return digits.length === 10 ? digits : null;
+}
+
+function isBlockedLead(lead) {
+  if (!lead || !lead.dataAgendamento) return true;
+  if (lead._deleted) return true;
+  if (lead.lembretes?.disabled === true) return true;
+  if (['Desistência', 'Fora da região', 'Finalizado'].includes(lead.etapaLead)) return true;
+  if (['COMPARECEU', 'NÃO COMPARECEU'].includes(lead.comparecimento)) return true;
+  return false;
+}
+
+function readJson(path, fallback) {
   try {
-    const [datePart, timePart] = dateStr.split(' ');
-    const [day, month, year] = datePart.split('/').map(Number);
-    const [hour = 0, minute = 0] = (timePart || '00:00').split(':').map(Number);
-    
-    return new Date(year, month - 1, day, hour, minute, 0, 0);
-  } catch (e) {
-    return null;
+    if (!fs.existsSync(path)) return fallback;
+    return JSON.parse(fs.readFileSync(path, 'utf8'));
+  } catch {
+    return fallback;
   }
 }
 
-// Calcular os horários de envio para cada slot
-function computeSlots(appointmentDate) {
-  return {
-    '24h': new Date(appointmentDate.getTime() - 24 * 60 * 60 * 1000),
-    '12h': new Date(appointmentDate.getTime() - 12 * 60 * 60 * 1000),
-    '3h': new Date(appointmentDate.getTime() - 3 * 60 * 60 * 1000),
-    '1h': new Date(appointmentDate.getTime() - 60 * 60 * 1000),
-  };
-}
-
-// Normalizar telefone: remove tudo que não é dígito
-function normalizePhone(phone) {
-  return phone.replace(/\D/g, '');
-}
-
-// Garantir ID canônico de 10 dígitos: remove '55' e o '9' extra após o DDD quando presente
-function ensure10DigitsLocal(phone) {
-  if (!phone) return null;
-  let d = String(phone).replace(/\D/g, '');
-  if (d.startsWith('55')) d = d.slice(2);
-  if (d.length === 11 && d[2] === '9') d = d.slice(0,2) + d.slice(3);
-  if (d.length > 10) d = d.slice(-10);
-  return d.length === 10 ? d : null;
-}
-
-// Obter a última mensagem enviada pelo bot para este lead (cooldown check)
-async function getLastBotMessageTime(phoneId) {
+function writeJson(path, value) {
   try {
-    const messagesRef = db.collection('conversations')
+    fs.writeFileSync(path, JSON.stringify(value, null, 2));
+  } catch (error) {
+    console.error(`[reminder-worker] Falha ao gravar ${path}:`, error.message);
+  }
+}
+
+function ledgerKey(leadId, slot) {
+  return `${leadId}:${slot}`;
+}
+
+function isInLocalLedger(leadId, slot) {
+  const ledger = readJson(SENT_LEDGER_FILE, {});
+  return Boolean(ledger[ledgerKey(leadId, slot)]);
+}
+
+function markLocalLedger(leadId, slot, timestamp) {
+  const ledger = readJson(SENT_LEDGER_FILE, {});
+  ledger[ledgerKey(leadId, slot)] = timestamp.toISOString();
+  writeJson(SENT_LEDGER_FILE, ledger);
+}
+
+function slotAlreadySent(lead, slot) {
+  if (lead.lembretes?.sent?.[slot]) return true;
+  if (slot === '24h' && lead.lembretes?.h24) return true;
+  if (slot === '1h' && lead.lembretes?.today) return true;
+  return isInLocalLedger(lead.id, slot);
+}
+
+function recordFailure(lead, slot, error) {
+  const failures = readJson(SEND_FAILURES_FILE, {});
+  const key = ledgerKey(lead.id, slot);
+  const current = failures[key] || {
+    leadId: lead.id,
+    leadName: lead.nome,
+    slot,
+    attempts: 0,
+    firstFailedAt: new Date().toISOString(),
+  };
+  current.attempts += 1;
+  current.lastError = String(error || 'Erro desconhecido');
+  current.lastFailedAt = new Date().toISOString();
+  failures[key] = current;
+  writeJson(SEND_FAILURES_FILE, failures);
+}
+
+function clearFailure(leadId, slot) {
+  const failures = readJson(SEND_FAILURES_FILE, {});
+  delete failures[ledgerKey(leadId, slot)];
+  writeJson(SEND_FAILURES_FILE, failures);
+}
+
+async function backendConnected() {
+  try {
+    const response = await fetch(`${BACKEND_URL}/status`, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data?.connected === true;
+  } catch {
+    return false;
+  }
+}
+
+async function getLastOutboundMessageTime(phoneId) {
+  try {
+    const snap = await db.collection('conversations')
       .doc(phoneId)
       .collection('messages')
       .where('fromMe', '==', true)
       .orderBy('timestamp', 'desc')
-      .limit(1);
-    
-    const snap = await messagesRef.get();
+      .limit(1)
+      .get();
+
     if (snap.empty) return null;
-    
-    const msg = snap.docs[0].data();
-    return msg.timestamp instanceof admin.firestore.Timestamp
-      ? msg.timestamp.toDate()
-      : new Date(msg.timestamp);
-  } catch (e) {
-    console.log(`[reminder-worker] ⚠️  Erro ao buscar última mensagem de ${phoneId}:`, e.message);
+    const value = snap.docs[0].data()?.timestamp;
+    if (!value) return null;
+    return value instanceof admin.firestore.Timestamp ? value.toDate() : new Date(value);
+  } catch (error) {
+    console.warn('[reminder-worker] Não foi possível checar cooldown:', error.message);
     return null;
   }
 }
 
-// Verificar se devemos enviar (passa em todas as travas)
-// slotType: '24h'|'12h'|'3h'|'1h'
-// slotTime: Date correspondente ao horário programado
-async function shouldSend(lead, slotType, slotTime, now) {
-  // Trava 1: Telefone válido?
-  const normalized = normalizePhone(lead.telefone);
-  if (normalized.length < 10 || normalized.length > 13) {
-    console.log(
-      `[reminder-worker] 🚫 ${lead.nome}: telefone inválido (${normalized.length} dígitos, precisa 10-13)`
-    );
-    return false;
-  }
-
-  // Trava 2: É o meu próprio número?
-  const canonicalMyPhone = ensure10DigitsLocal(MY_PHONE) || (MY_PHONE.length > 10 ? MY_PHONE.slice(-10) : MY_PHONE);
-  if (normalized.endsWith(canonicalMyPhone) || normalized === canonicalMyPhone) {
-    console.log(`[reminder-worker] 🚫 ${lead.nome}: é o meu próprio número (MY_PHONE)`);
-    return false;
-  }
-
-  // Trava 3: Ja foi enviado neste slot?
-  if (lead.lembretes?.sent?.[slotType]) {
-    console.log(`[reminder-worker] ⏭️  ${lead.nome} (${slotType}): já foi enviado em ${lead.lembretes.sent[slotType]}`);
-    return false;
-  }
-
-  // Trava 4: Agora é >= horário programado?
-  if (now < slotTime) {
-    // Ainda não é hora
-    return false;
-  }
-
-  // Trava 5: Cooldown de 1h (última mensagem do vendedor)?
-  const phoneId = ensure10DigitsLocal(normalized) || (normalized.length >= 10 ? normalized.slice(-10) : normalized);
-  const lastBotMsg = await getLastBotMessageTime(phoneId);
-  
-  if (lastBotMsg) {
-    const minutesSinceLast = (now.getTime() - lastBotMsg.getTime()) / (1000 * 60);
-    if (minutesSinceLast < COOLDOWN_MINUTES) {
-      console.log(
-        `[reminder-worker] ⏳ ${lead.nome}: cooldown ativo (última msg há ${Math.round(minutesSinceLast)}min, precisa ${COOLDOWN_MINUTES}min)`
-      );
-      return false;
-    }
-  }
-
-  return true;
+async function cooldownAllows(lead) {
+  const phoneId = ensure10DigitsLocal(lead.telefone);
+  if (!phoneId) return false;
+  const lastOutbound = await getLastOutboundMessageTime(phoneId);
+  if (!lastOutbound) return true;
+  const diffMinutes = (Date.now() - lastOutbound.getTime()) / 60000;
+  return diffMinutes >= COOLDOWN_MINUTES;
 }
 
-// Enviar lembrete via POST para /send-message
-async function sendReminderToWhatsApp(phoneId, reminderText) {
-  try {
-    const response = await fetch(`${BACKEND_URL}/send-message`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        telefone: phoneId,
-        message: reminderText,
-        isReminder: true // flag para identificar que é um lembrete automático
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log(`[reminder-worker] ✅ Lembrete enviado com sucesso para ${phoneId}`);
-    return true;
-  } catch (error) {
-    console.error(`[reminder-worker] ❌ Erro ao enviar lembrete para ${phoneId}:`, error.message);
-    return false;
+function activeSlotForLead(lead, now, appointment) {
+  const ordered = ['1h', '12h', '24h'];
+  for (const slot of ordered) {
+    if (slotAlreadySent(lead, slot)) continue;
+    const { start, end } = computeSlotWindow(appointment, slot);
+    if (now >= start && now < end) return slot;
   }
+  return null;
 }
 
-// Salvar próximos envios para exibição na UI
-function saveNextSends(nextSends) {
-  try {
-    fs.writeFileSync(NEXT_SENDS_FILE, JSON.stringify(nextSends, null, 2));
-    console.log(`[reminder-worker] 📝 Próximos envios salvos (${nextSends.length} agendados)`);
-  } catch (e) {
-    console.error(`[reminder-worker] ⚠️  Erro ao salvar próximos envios:`, e.message);
-  }
-}
-
-// Registrar tentativa falhada
-function recordFailedAttempt(leadId, slot, error) {
-  try {
-    let failures = {};
-    if (fs.existsSync(SEND_FAILURES_FILE)) {
-      failures = JSON.parse(fs.readFileSync(SEND_FAILURES_FILE, 'utf8'));
-    }
-
-    const key = `${leadId}:${slot}`;
-    if (!failures[key]) {
-      failures[key] = {
-        leadId,
+function futureSlotsForLead(lead, now, appointment) {
+  const out = [];
+  for (const slot of ['24h', '12h', '1h']) {
+    if (slotAlreadySent(lead, slot)) continue;
+    const { start } = computeSlotWindow(appointment, slot);
+    if (start > now) {
+      out.push({
+        leadId: lead.id,
+        leadName: lead.nome,
+        telefone: lead.telefone,
+        servicoProcurado: lead.servicoProcurado,
         slot,
-        attempts: 0,
-        lastError: null,
-        firstFailedAt: new Date().toISOString(),
-        lastFailedAt: null
-      };
+        scheduledFor: start.toISOString(),
+        appointmentDate: lead.dataAgendamento,
+      });
     }
-
-    failures[key].attempts += 1;
-    failures[key].lastError = error;
-    failures[key].lastFailedAt = new Date().toISOString();
-
-    fs.writeFileSync(SEND_FAILURES_FILE, JSON.stringify(failures, null, 2));
-  } catch (e) {
-    console.error(`[reminder-worker] ⚠️  Erro ao registrar falha:`, e.message);
   }
+  return out;
 }
 
-// Limpar registro de falha quando sucesso
-function clearFailedAttempt(leadId, slot) {
-  try {
-    if (!fs.existsSync(SEND_FAILURES_FILE)) return;
-    
-    let failures = JSON.parse(fs.readFileSync(SEND_FAILURES_FILE, 'utf8'));
-    const key = `${leadId}:${slot}`;
-    delete failures[key];
-    
-    fs.writeFileSync(SEND_FAILURES_FILE, JSON.stringify(failures, null, 2));
-  } catch (e) {
-    console.error(`[reminder-worker] ⚠️  Erro ao limpar falha:`, e.message);
+async function sendReminder(lead, slot) {
+  const response = await fetch(`${BACKEND_URL}/send-message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      telefone: lead.telefone,
+      message: generateReminderText(lead, slot),
+      isReminder: true,
+      reminderSlot: slot,
+      clinicId: CLINIC_ID,
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`HTTP ${response.status}: ${body}`);
   }
+  return response.json();
 }
 
-// Marcar como enviado
-async function markSent(leadId, slot, timestamp) {
-  try {
-    const docRef = db.collection('crm_data').doc('shared');
-    const docSnap = await docRef.get();
-    blockIfMissingDoc(docSnap, 'reminder-worker.js');
-    const data = docSnap.data();
-    const leads = data?.leads || [];
+async function markSentInFirestore(leadId, slot, timestamp) {
+  const ref = clinicDocRef();
 
-    const updatedLeads = leads.map(l => {
-      if (l.id === leadId) {
-        return {
-          ...l,
-          lembretes: {
-            ...l.lembretes,
-            sent: {
-              ...(l.lembretes?.sent || {}),
-              [slot]: timestamp.toISOString()
-            }
-          }
-        };
-      }
-      return l;
-    });
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error(`Documento da clínica não encontrado: ${CLINIC_ID}`);
 
-    blockIfEmptyArray(updatedLeads, 'reminder-worker.js');
-    await docRef.set(attachLastWriter({ leads: updatedLeads, lastUpdated: new Date().toISOString() }, 'reminder-worker.js', 'reminder-worker'), { merge: true });
+    const data = snap.data() || {};
+    const leads = Array.isArray(data.leads) ? data.leads : [];
+    const index = leads.findIndex((lead) => lead.id === leadId);
+    if (index < 0) throw new Error(`Lead ${leadId} não encontrado`);
 
-    console.log(`[reminder-worker] 💾 ${leadId}: lembretes.sent[${slot}] marcado como enviado`);
-  } catch (e) {
-    console.error(`[reminder-worker] ❌ Erro ao marcar enviado:`, e.message);
-  }
-}
+    const lead = leads[index];
+    const sent = { ...(lead.lembretes?.sent || {}) };
+    if (sent[slot]) return;
 
-// Main worker loop
-async function runReminder() {
-  const now = new Date();
-  const isoNow = now.toISOString();
-  
-  try {
-    console.log(`\n[reminder-worker] ⏰ Rodada: ${isoNow}`);
+    sent[slot] = timestamp.toISOString();
+    leads[index] = {
+      ...lead,
+      lembretes: {
+        h24: Boolean(lead.lembretes?.h24 || slot === '24h'),
+        today: Boolean(lead.lembretes?.today || slot === '1h'),
+        ...lead.lembretes,
+        sent,
+      },
+    };
 
-    const docRef = db.collection('crm_data').doc('shared');
-    const docSnap = await docRef.get();
-
-    if (!docSnap.exists) {
-      console.log('[reminder-worker] ⚠️  crm_data/shared não encontrado');
-      return;
-    }
-
-    const data = docSnap.data();
-    const leads = data?.leads || [];
-    let checked = 0;
-    let eligible = 0;
-    
-    // Para calcular próximos envios
-    const nextSends = [];
-
-    for (const lead of leads) {
-      if (!lead.dataAgendamento) continue;
-
-      // Ignorar leads com automação desativada
-      if (lead.lembretes?.disabled === true) {
-        console.log(`[reminder-worker] 🚫 ${lead.nome}: automação desativada (lembretes.disabled = true), ignorando`);
-        continue;
-      }
-
-      checked++;
-      const appointmentDate = parseAppointment(lead.dataAgendamento);
-      if (!appointmentDate) continue;
-
-      // Computar slots de envio
-      const slots = computeSlots(appointmentDate);
-
-      // Para cada slot, verificar se deve enviar
-      for (const [slotType, slotTime] of Object.entries(slots)) {
-        // Calcular se foi enviado e se está agendado para o futuro
-        const isAlreadySent = lead.lembretes?.sent?.[slotType];
-        const isFutureSlot = now < slotTime;
-        
-        if (!isAlreadySent && isFutureSlot) {
-          // Adicionar à lista de próximos envios
-          nextSends.push({
-            leadId: lead.id,
-            leadName: lead.nome,
-            telefone: lead.telefone,
-            servicoProcurado: lead.servicoProcurado,
-            slot: slotType,
-            scheduledFor: slotTime.toISOString(),
-            appointmentDate: lead.dataAgendamento
-          });
-        }
-
-        if (!(await shouldSend(lead, slotType, slotTime, now))) continue;
-
-        eligible++;
-
-        // Montar mensagem
-        const reminderText = generateReminderText(lead.dataAgendamento, slotType, lead.nome);
-        const normalized = normalizePhone(lead.telefone);
-        const phoneId = ensure10DigitsLocal(normalized) || (normalized.length >= 10 ? normalized.slice(-10) : normalized);
-
-        // REPORT-ONLY: Apenas registra que o lembrete está pronto, nÃO envia
-        console.log(`[reminder-worker] 📄 REPORT: Lembrete ${slotType} pronto para ENVIO MANUAL para ${lead.nome} (${phoneId})`);
-        console.log(`[reminder-worker]    Mensagem: "${reminderText.split('\n')[0]}..."`);
-        console.log(`[reminder-worker]    Clique no botão na UI para enviar manualmente`);
-        // NÃO marca, NÃO envia, apenas lista
-      }
-    }
-
-    // Salvar próximos envios
-    saveNextSends(nextSends);
-
-    console.log(
-      `[reminder-worker] ✅ Rodada concluída: ${checked} leads com agendamento, ${eligible} lembretes ${DRY_RUN ? '(DRY RUN)' : 'enviados'}, ${nextSends.length} agendados`
+    const payload = attachLastWriter(
+      { leads, lastUpdated: new Date().toISOString() },
+      'reminder-worker.js',
+      'reminder-worker',
     );
+    tx.set(ref, payload, { merge: true });
+  });
+}
+
+async function runReminderCycle() {
+  const now = new Date();
+
+  if (!AUTOMATION_ENABLED) {
+    console.log('[reminder-worker] Automação desabilitada por REMINDER_AUTOMATION_ENABLED=false');
+    return;
+  }
+
+  const connected = await backendConnected();
+  if (!connected) {
+    console.warn('[reminder-worker] WhatsApp/backend offline. Nenhum lembrete será enviado nesta rodada.');
+    return;
+  }
+
+  const ref = clinicDocRef();
+  const snap = await ref.get();
+  if (!snap.exists) {
+    console.error(`[reminder-worker] Documento clinics/${CLINIC_ID}/shared/shared não encontrado`);
+    return;
+  }
+
+  const leads = Array.isArray(snap.data()?.leads) ? snap.data().leads : [];
+  const nextSends = [];
+  let checked = 0;
+  let sentCount = 0;
+
+  for (const lead of leads) {
+    if (isBlockedLead(lead)) continue;
+
+    const appointment = parseAppointment(lead.dataAgendamento);
+    if (!appointment || appointment <= now) continue;
+
+    const normalized = normalizePhone(lead.telefone);
+    const canonicalMyPhone = ensure10DigitsLocal(MY_PHONE);
+    const canonicalLeadPhone = ensure10DigitsLocal(normalized);
+    if (!canonicalLeadPhone) continue;
+    if (canonicalMyPhone && canonicalLeadPhone === canonicalMyPhone) continue;
+
+    checked += 1;
+    nextSends.push(...futureSlotsForLead(lead, now, appointment));
+
+    const slot = activeSlotForLead(lead, now, appointment);
+    if (!slot) continue;
+
+    if (!(await cooldownAllows(lead))) {
+      console.log(`[reminder-worker] ${lead.nome}: ${slot} aguardando cooldown de ${COOLDOWN_MINUTES} min`);
+      continue;
+    }
+
+    try {
+      console.log(`[reminder-worker] Enviando ${slot} para ${lead.nome} (${lead.dataAgendamento})`);
+      await sendReminder(lead, slot);
+
+      const sentAt = new Date();
+      markLocalLedger(lead.id, slot, sentAt);
+      clearFailure(lead.id, slot);
+      await markSentInFirestore(lead.id, slot, sentAt);
+      sentCount += 1;
+      console.log(`[reminder-worker] ✅ ${lead.nome}: ${slot} enviado e registrado`);
+    } catch (error) {
+      recordFailure(lead, slot, error.message);
+      console.error(`[reminder-worker] ❌ ${lead.nome}: falha no ${slot}:`, error.message);
+    }
+  }
+
+  nextSends.sort((a, b) => new Date(a.scheduledFor) - new Date(b.scheduledFor));
+  writeJson(NEXT_SENDS_FILE, nextSends);
+  console.log(`[reminder-worker] Rodada concluída: ${checked} agendamentos futuros, ${sentCount} enviados, ${nextSends.length} próximos disparos`);
+}
+
+let running = false;
+async function safeRun() {
+  if (running) return;
+  running = true;
+  try {
+    await runReminderCycle();
   } catch (error) {
-    console.error('[reminder-worker] ❌ Erro:', error.message);
+    console.error('[reminder-worker] Erro inesperado na rodada:', error);
+  } finally {
+    running = false;
   }
 }
 
-// ⚠️ REMINDER-WORKER DESATIVADO COMPLETAMENTE
-// 🔐 O sistema agora é 100% MANUAL
-// Todos os lembretes são enviados manualmente via UI
-// O worker não roda em background
+console.log('');
+console.log('===========================================================');
+console.log('  LEMBRETES AUTOMÁTICOS ATIVOS — ODONTOCOMPANY OLÍMPIA');
+console.log('  Slots: 24h • 12h • 1h antes da consulta');
+console.log(`  Clínica: ${CLINIC_ID}`);
+console.log(`  Intervalo: ${Math.round(INTERVAL_MS / 1000)}s`);
+console.log(`  Automação: ${AUTOMATION_ENABLED ? 'ATIVA' : 'DESATIVADA'}`);
+console.log('===========================================================');
+console.log('');
 
-console.log(`
-╔════════════════════════════════════════════════╗
-║  🔒 SISTEMA DESATIVADO - MODO 100% MANUAL      ║
-║                                                ║
-║  ✓ Automação: DESLIGADA                        ║
-║  ✓ Worker: NÃO RODANDO                         ║
-║  ✓ Lembretes: APENAS MANUAIS (via UI)          ║
-║  ✓ Segurança: MÁXIMA                           ║
-║                                                ║
-║  Use a interface para enviar lembretes         ║
-╚════════════════════════════════════════════════╝
-`);
-
-// Encerrá imediatamente
-process.exit(0);
+setTimeout(() => {
+  safeRun();
+  setInterval(safeRun, INTERVAL_MS);
+}, START_DELAY_MS);
