@@ -156,7 +156,10 @@ export default async function handler(req, res) {
       const nowIso = new Date().toISOString();
       await contactRef.set({ optOut: true, optOutAt: nowIso, updatedAt: nowIso }, { merge: true });
       if (result?.matched && result?.leadId) {
-        await cancelPendingForLead(clinicId, result.leadId);
+        await cancelPendingForLead(clinicId, result.leadId, {
+          includeAppointmentAutomations: true,
+          reason: "opt_out",
+        });
       }
     }
 
