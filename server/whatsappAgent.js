@@ -221,7 +221,15 @@ export async function markQueueFailure(clinicId, queueId, errorMessage) {
   }, { merge: true });
 }
 
-export async function cancelPendingForLead(clinicId, leadId) {
+function isAppointmentAutomation(data = {}) {
+  return String(data.automationType || "").startsWith("appointment_");
+}
+
+export async function cancelPendingForLead(
+  clinicId,
+  leadId,
+  { includeAppointmentAutomations = false, reason = "lead_replied" } = {},
+) {
   if (!clinicId || !leadId) return 0;
   const db = getAdminDb();
   const snap = await db.collection("clinics").doc(clinicId).collection("whatsappQueue")
@@ -229,8 +237,14 @@ export async function cancelPendingForLead(clinicId, leadId) {
     .get();
 
   const cancellable = snap.docs.filter((doc) => {
-    const status = String(doc.data()?.status || "");
-    return status === "pending" || status === "leased";
+    const data = doc.data() || {};
+    const status = String(data.status || "");
+    if (status !== "pending" && status !== "leased") return false;
+
+    // Resposta comum do paciente pausa/cancela follow-up, mas não deve matar
+    // confirmação/lembretes de uma consulta que continua válida.
+    if (!includeAppointmentAutomations && isAppointmentAutomation(data)) return false;
+    return true;
   });
 
   if (!cancellable.length) return 0;
@@ -239,7 +253,7 @@ export async function cancelPendingForLead(clinicId, leadId) {
   cancellable.forEach((doc) => batch.set(doc.ref, {
     status: "cancelled",
     cancelledAt: nowIso,
-    cancelReason: "lead_replied",
+    cancelReason: reason,
     updatedAt: nowIso,
   }, { merge: true }));
   await batch.commit();
