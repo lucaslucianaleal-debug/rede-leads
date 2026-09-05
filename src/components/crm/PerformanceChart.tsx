@@ -159,7 +159,7 @@ export function PerformanceChart({ leads, followUpGoal = 20, compact = false }: 
       : "0.0";
 
   return (
-    <div className={`glass-card rounded-xl ${compact ? "p-4" : "p-5"}`}>
+    <div className={`glass-card rounded-xl ${compact ? "p-4 lg:h-[360px]" : "p-5"}`}>
       <div className={`flex items-center justify-between ${compact ? "mb-3" : "mb-4"}`}>
         <h3 className={`font-heading font-semibold flex items-center gap-2 ${compact ? "text-base" : "text-lg"}`}>
           <Activity className="h-5 w-5 text-primary" />

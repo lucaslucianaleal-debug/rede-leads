@@ -20,6 +20,7 @@ interface CalendarViewProps {
   onMarkReminder: (id: string, type: "h24" | "today") => void;
   onUpdateLead?: (id: string, updates: Partial<Lead>) => void;
   onOpenChat?: (phone: string, message?: string) => void;
+  compact?: boolean;
 }
 
 type ReminderType = "h24" | "today";
@@ -38,7 +39,7 @@ const reminderStatusStyles: Record<ReminderVisualState, string> = {
   "not-applicable": "border-border bg-muted/40 text-muted-foreground",
 };
 
-export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }: CalendarViewProps) {
+export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, compact = false }: CalendarViewProps) {
   const now = new Date();
   const todayStr = format(now, "dd/MM/yyyy");
   const tomorrowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -279,7 +280,7 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
   };
 
   return (
-    <div className="glass-card rounded-xl p-5">
+    <div className={`glass-card rounded-xl p-5 ${compact ? "lg:h-[360px]" : ""}`}>
       {/* Título — idêntico ao FollowUpQueue */}
       <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2">
         <Bell className="h-5 w-5 text-primary" />
@@ -287,7 +288,7 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat }
         <span className="ml-auto text-sm font-body text-muted-foreground">{relevantLeads.length} agendamentos</span>
       </h3>
 
-      <div className="max-h-[500px] overflow-y-auto space-y-0">
+      <div className={`${compact ? "lg:max-h-[278px]" : "max-h-[500px]"} overflow-y-auto space-y-0`}>
       {/* HOJE */}
       {todayLeads.length > 0 && (
         <div className="mb-5">

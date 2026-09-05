@@ -578,9 +578,9 @@ const CRMDashboard = () => {
                   <DashboardMonthlySummary leads={allLeads} />
                 </motion.div>
 
-                <div className="grid items-start gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-2">
                   <PerformanceChart leads={allLeads} followUpGoal={100} compact />
-                  <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} />
+                  <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} compact />
                 </div>
 
                 {callReturnQueue.length > 0 && (
