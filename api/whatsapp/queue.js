@@ -32,22 +32,54 @@ function parseAppointment(value) {
   const [, day, month, year, hour, minute] = match;
   const appointment = new Date(`${year}-${month}-${day}T${hour}:${minute}:00-03:00`);
   if (Number.isNaN(appointment.getTime())) return null;
-  const dayStart = new Date(`${year}-${month}-${day}T00:00:00-03:00`);
-  const todayAtEight = new Date(`${year}-${month}-${day}T08:00:00-03:00`);
   return {
     appointment,
-    dayStart,
-    todayAtEight,
     key: `${year}${month}${day}_${hour}${minute}`,
   };
+}
+
+function hoursBefore(date, hours) {
+  return new Date(date.getTime() - hours * 60 * 60 * 1000);
 }
 
 function isAppointmentAutomation(data = {}) {
   return [
     "appointment_confirmation",
     "appointment_reminder_24h",
+    "appointment_reminder_12h",
+    "appointment_reminder_1h",
+    // legado — mantido apenas para permitir limpeza/cancelamento seguro
     "appointment_reminder_today",
   ].includes(String(data.automationType || ""));
+}
+
+async function cancelLegacyTodayReminder({ db, clinicRef, leadId, appointmentKey, nowIso }) {
+  const legacyId = `appt_${safeId(leadId)}_${appointmentKey}_today`;
+  const scheduleRef = clinicRef.collection("whatsappSchedule").doc(legacyId);
+  const queueRef = clinicRef.collection("whatsappQueue").doc(legacyId);
+  const [scheduleSnap, queueSnap] = await Promise.all([scheduleRef.get(), queueRef.get()]);
+  const batch = db.batch();
+  let writes = 0;
+
+  if (scheduleSnap.exists) {
+    batch.delete(scheduleRef);
+    writes += 1;
+  }
+
+  if (queueSnap.exists) {
+    const status = String(queueSnap.data()?.status || "");
+    if (["pending", "leased"].includes(status)) {
+      batch.set(queueRef, {
+        status: "cancelled",
+        cancelReason: "replaced_by_1h_reminder",
+        cancelledAt: nowIso,
+        updatedAt: nowIso,
+      }, { merge: true });
+      writes += 1;
+    }
+  }
+
+  if (writes) await batch.commit();
 }
 
 async function scheduleAppointmentAutomation({ db, user, clinicId, body }) {
@@ -102,6 +134,7 @@ async function scheduleAppointmentAutomation({ db, user, clinicId, body }) {
   const nowIso = now.toISOString();
   const appointmentIso = parsed.appointment.toISOString();
 
+  // Limpa automações de agendamentos anteriores do mesmo lead.
   const oldScheduleSnap = await scheduleCol.where("leadId", "==", leadId).get();
   const oldQueueSnap = await queueCol.where("leadId", "==", leadId).get();
   const cleanupBatch = db.batch();
@@ -133,6 +166,15 @@ async function scheduleAppointmentAutomation({ db, user, clinicId, body }) {
 
   if (cleanupWrites) await cleanupBatch.commit();
 
+  // Remove a antiga mensagem "no dia" para este mesmo agendamento.
+  await cancelLegacyTodayReminder({
+    db,
+    clinicRef,
+    leadId,
+    appointmentKey: parsed.key,
+    nowIso,
+  });
+
   const specs = [
     {
       suffix: "confirmation",
@@ -146,18 +188,27 @@ async function scheduleAppointmentAutomation({ db, user, clinicId, body }) {
     {
       suffix: "24h",
       automationType: "appointment_reminder_24h",
-      automationLabel: "Lembrete • amanhã",
+      automationLabel: "Lembrete • 24h antes",
       message: String(messages.h24 || "").trim(),
-      sendAfter: new Date(parsed.appointment.getTime() - 24 * 60 * 60 * 1000),
-      expiresAt: parsed.dayStart,
+      sendAfter: hoursBefore(parsed.appointment, 24),
+      expiresAt: hoursBefore(parsed.appointment, 12),
       immediate: false,
     },
     {
-      suffix: "today",
-      automationType: "appointment_reminder_today",
-      automationLabel: "Lembrete • hoje",
-      message: String(messages.today || "").trim(),
-      sendAfter: parsed.todayAtEight,
+      suffix: "12h",
+      automationType: "appointment_reminder_12h",
+      automationLabel: "Lembrete • 12h antes",
+      message: String(messages.h12 || "").trim(),
+      sendAfter: hoursBefore(parsed.appointment, 12),
+      expiresAt: hoursBefore(parsed.appointment, 1),
+      immediate: false,
+    },
+    {
+      suffix: "1h",
+      automationType: "appointment_reminder_1h",
+      automationLabel: "Lembrete • 1h antes",
+      message: String(messages.h1 || "").trim(),
+      sendAfter: hoursBefore(parsed.appointment, 1),
       expiresAt: parsed.appointment,
       immediate: false,
     },
@@ -177,7 +228,9 @@ async function scheduleAppointmentAutomation({ db, user, clinicId, body }) {
       continue;
     }
     if (!spec.immediate && spec.sendAfter.getTime() <= now.getTime()) {
-      skipped.push(`${spec.suffix}:janela_passou`);
+      // Se o horário exato do slot já passou, não enviamos uma mensagem "12h" com 6h restantes,
+      // por exemplo. A confirmação imediata já cobre agendamentos criados em cima da hora.
+      skipped.push(`${spec.suffix}:janela_iniciada`);
       continue;
     }
     if (spec.sendAfter.getTime() >= spec.expiresAt.getTime()) {
@@ -187,8 +240,10 @@ async function scheduleAppointmentAutomation({ db, user, clinicId, body }) {
 
     const id = `appt_${safeId(leadId)}_${parsed.key}_${spec.suffix}`;
     const queueRef = queueCol.doc(id);
-    const queueSnap = await queueRef.get();
+    const scheduleRef = scheduleCol.doc(id);
+    const [queueSnap, scheduleSnap] = await Promise.all([queueRef.get(), scheduleRef.get()]);
     const existingQueueStatus = queueSnap.exists ? String(queueSnap.data()?.status || "") : "";
+
     if (["pending", "leased", "sent"].includes(existingQueueStatus)) {
       skipped.push(`${spec.suffix}:ja_programado`);
       if (spec.immediate && existingQueueStatus !== "sent") confirmationQueued = true;
@@ -208,7 +263,7 @@ async function scheduleAppointmentAutomation({ db, user, clinicId, body }) {
       appointmentValue,
       appointmentIso,
       expiresAt: spec.expiresAt.toISOString(),
-      createdAt: nowIso,
+      createdAt: scheduleSnap.exists ? (scheduleSnap.data()?.createdAt || nowIso) : nowIso,
       updatedAt: nowIso,
       createdBy: user.uid,
       attempts: 0,
@@ -222,7 +277,7 @@ async function scheduleAppointmentAutomation({ db, user, clinicId, body }) {
       }, { merge: true });
       confirmationQueued = true;
     } else {
-      await scheduleCol.doc(id).set({
+      await scheduleRef.set({
         ...baseData,
         queueId: id,
         sendAfter: spec.sendAfter.toISOString(),
