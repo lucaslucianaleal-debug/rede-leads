@@ -23,7 +23,7 @@ interface CalendarViewProps {
   compact?: boolean;
 }
 
-type ReminderType = "h24" | "today";
+type ReminderType = "24h" | "12h" | "1h";
 type ReminderVisualState = "sent" | "scheduled" | "pending" | "not-applicable";
 
 type ReminderVisualStatus = {
@@ -39,13 +39,18 @@ const reminderStatusStyles: Record<ReminderVisualState, string> = {
   "not-applicable": "border-border bg-muted/40 text-muted-foreground",
 };
 
-export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, compact = false }: CalendarViewProps) {
+const SLOT_HOURS: Record<ReminderType, { start: number; end: number }> = {
+  "24h": { start: 24, end: 12 },
+  "12h": { start: 12, end: 1 },
+  "1h": { start: 1, end: 0 },
+};
+
+export function CalendarView({ leads, onMarkReminder, onUpdateLead, compact = false }: CalendarViewProps) {
   const now = new Date();
   const todayStr = format(now, "dd/MM/yyyy");
   const tomorrowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const tomorrowStr = format(tomorrowDate, "dd/MM/yyyy");
 
-  // Filtrar apenas leads de hoje e amanhã
   const relevantLeads = useMemo(
     () =>
       leads.filter(
@@ -56,7 +61,6 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
     [leads, todayStr, tomorrowStr]
   );
 
-  // Separar por dia
   const parseAppointmentTime = (dateStr?: string) => {
     if (!dateStr) return 0;
     const parts = dateStr.split(" ");
@@ -73,27 +77,33 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
     .filter((l) => l.dataAgendamento?.startsWith(tomorrowStr))
     .sort((a, b) => parseAppointmentTime(a.dataAgendamento) - parseAppointmentTime(b.dataAgendamento));
 
-  // Textos fixos dos lembretes
-  const getReminder24h = (lead: Lead): string => {
+  const getReminderMessage = (lead: Lead, type: ReminderType): string => {
     const data = lead.dataAgendamento?.split(" ")[0] || "[Data]";
     const hora = lead.dataAgendamento?.split(" ")[1] || "[Horário]";
-    const firstName = (lead.nome || "").split(" ")[0] || "!";
-    return (
-      `Olá, ${firstName}! Tudo bem?\n\n` +
-      `Passando para lembrar da sua consulta aqui na OdontoCompany amanhã, dia ${data}, às ${hora}.\n\n` +
-      `Já deixamos tudo reservado para o seu atendimento.\n\n` +
-      `Até amanhã! 🦷💚`
-    );
-  };
+    const firstName = (lead.nome || "").trim().split(/\s+/)[0] || "";
 
-  const getReminder1h = (lead: Lead): string => {
-    const hora = lead.dataAgendamento?.split(" ")[1] || "[Horário]";
-    const firstName = (lead.nome || "").split(" ")[0] || "!";
+    if (type === "24h") {
+      return (
+        `Olá, ${firstName}! Tudo bem?\n\n` +
+        `Passando para lembrar da sua consulta na OdontoCompany Olímpia amanhã, dia ${data}, às ${hora}.\n\n` +
+        `Já deixamos tudo reservado para o seu atendimento.\n\n` +
+        `Até amanhã! 🦷💚`
+      );
+    }
+
+    if (type === "12h") {
+      return (
+        `Olá, ${firstName}! Tudo bem?\n\n` +
+        `Só reforçando o seu horário na OdontoCompany Olímpia: ${data}, às ${hora}.\n\n` +
+        `Seu atendimento está reservado e estaremos te aguardando. 💚`
+      );
+    }
+
     return (
-      `Bom dia, ${firstName}!\n\n` +
-      `Tudo certo para o seu horário hoje às ${hora} aqui na OdontoCompany?\n\n` +
-      `Já estamos com sua sala preparada e te aguardando.\n\n` +
-      `Até logo! 💚✨`
+      `Olá, ${firstName}! 💚\n\n` +
+      `Seu horário na OdontoCompany Olímpia é daqui a 1 hora, às ${hora}.\n\n` +
+      `Já estamos preparando sua sala e te aguardamos por aqui.\n\n` +
+      `Até já! ✨`
     );
   };
 
@@ -116,16 +126,18 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
   };
 
   const getReminderStatus = (lead: Lead, type: ReminderType): ReminderVisualStatus => {
-    const sentAt = type === "h24"
-      ? lead.lembretes?.sent?.["24h"]
-      : lead.lembretes?.sent?.today;
-    const markedAsSent = type === "h24" ? lead.lembretes?.h24 : lead.lembretes?.today;
+    const sentAt = lead.lembretes?.sent?.[type];
+    const legacySent = type === "24h"
+      ? lead.lembretes?.h24
+      : type === "1h"
+        ? lead.lembretes?.today
+        : false;
 
-    if (sentAt || markedAsSent) {
+    if (sentAt || legacySent) {
       return {
         state: "sent",
         title: "Enviado",
-        detail: sentAt ? format(new Date(sentAt), "dd/MM 'às' HH:mm") : "Horário não registrado",
+        detail: sentAt ? format(new Date(sentAt), "dd/MM 'às' HH:mm") : "Registro anterior",
       };
     }
 
@@ -134,15 +146,12 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
       return { state: "not-applicable", title: "Sem registro", detail: "Data inválida" };
     }
 
-    const sendAt = type === "h24"
-      ? new Date(appointment.getTime() - 24 * 60 * 60 * 1000)
-      : new Date(appointment.getFullYear(), appointment.getMonth(), appointment.getDate(), 8, 0, 0, 0);
+    const cfg = SLOT_HOURS[type];
+    const sendAt = new Date(appointment.getTime() - cfg.start * 60 * 60 * 1000);
+    const closeAt = new Date(appointment.getTime() - cfg.end * 60 * 60 * 1000);
+    const nowMs = Date.now();
 
-    if (sendAt.getTime() >= appointment.getTime()) {
-      return { state: "not-applicable", title: "Não se aplica", detail: "Fora da janela" };
-    }
-
-    if (Date.now() < sendAt.getTime()) {
+    if (nowMs < sendAt.getTime()) {
       return {
         state: "scheduled",
         title: "Programado",
@@ -150,52 +159,63 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
       };
     }
 
-    const appointmentDayStart = new Date(
-      appointment.getFullYear(),
-      appointment.getMonth(),
-      appointment.getDate(),
-      0,
-      0,
-      0,
-      0,
-    );
-    const windowClosed = type === "h24"
-      ? Date.now() >= appointmentDayStart.getTime()
-      : Date.now() >= appointment.getTime();
-
-    if (windowClosed) {
+    if (nowMs >= closeAt.getTime()) {
       return { state: "not-applicable", title: "Não enviado", detail: "Janela encerrada" };
     }
 
     return { state: "pending", title: "Aguardando", detail: "Envio automático" };
   };
 
+  const markManualReminderSent = (lead: Lead, type: ReminderType) => {
+    const sentAt = new Date().toISOString();
+
+    if (onUpdateLead) {
+      onUpdateLead(lead.id, {
+        lembretes: {
+          ...lead.lembretes,
+          h24: type === "24h" ? true : Boolean(lead.lembretes?.h24),
+          today: type === "1h" ? true : Boolean(lead.lembretes?.today),
+          sent: {
+            "24h": lead.lembretes?.sent?.["24h"] ?? null,
+            "12h": lead.lembretes?.sent?.["12h"] ?? null,
+            "3h": lead.lembretes?.sent?.["3h"] ?? null,
+            "1h": lead.lembretes?.sent?.["1h"] ?? null,
+            ...lead.lembretes?.sent,
+            [type]: sentAt,
+          },
+        },
+      });
+      return;
+    }
+
+    if (type === "24h") onMarkReminder(lead.id, "h24");
+    if (type === "1h") onMarkReminder(lead.id, "today");
+  };
+
   const handleMarkAbsent = (lead: Lead) => {
     onUpdateLead?.(lead.id, { lembretes: { ...lead.lembretes, disabled: true } });
-    toast.info(`✗ ${lead.nome} — Marcado como desistência`);
+    toast.info(`✗ ${lead.nome} — Automação de lembretes desativada`);
   };
 
   const renderLeadCard = (lead: Lead, isToday: boolean) => {
     const hora = lead.dataAgendamento?.split(" ")[1] || "09:00";
     const [h, m] = hora.split(":");
     const dayLabel = isToday ? "HOJE" : "AMANHÃ";
-    const reminder24h = getReminderStatus(lead, "h24");
-    const reminderToday = getReminderStatus(lead, "today");
 
     const renderReminderStatus = (label: string, status: ReminderVisualStatus) => {
       const StatusIcon = status.state === "sent" ? CheckCircle2 : Clock3;
 
       return (
         <div
-          className={`min-w-[112px] rounded-lg border px-2.5 py-1.5 ${reminderStatusStyles[status.state]}`}
+          className={`min-w-[84px] rounded-lg border px-2 py-1.5 ${reminderStatusStyles[status.state]}`}
           title={`${label}: ${status.title} — ${status.detail}`}
         >
-          <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide opacity-80">
+          <div className="flex items-center gap-1 text-[9px] font-medium uppercase tracking-wide opacity-80">
             <StatusIcon className="h-3 w-3" />
             {label}
           </div>
-          <div className="mt-0.5 text-xs font-semibold leading-tight">{status.title}</div>
-          <div className="text-[10px] leading-tight opacity-80">{status.detail}</div>
+          <div className="mt-0.5 text-[11px] font-semibold leading-tight">{status.title}</div>
+          <div className="text-[9px] leading-tight opacity-80">{status.detail}</div>
         </div>
       );
     };
@@ -205,12 +225,10 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
         key={lead.id}
         className="flex items-center gap-3 p-3 rounded-lg bg-background/50 hover:bg-muted/50 transition-colors"
       >
-        {/* Horário */}
         <span className="text-xl font-bold text-primary tabular-nums leading-none shrink-0 w-14 text-center">
           {h}:{m}
         </span>
 
-        {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm truncate">{lead.nome}</span>
@@ -234,10 +252,10 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
           </div>
         </div>
 
-        {/* Status dos lembretes */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {renderReminderStatus("24h antes", reminder24h)}
-          {renderReminderStatus("No dia", reminderToday)}
+          {renderReminderStatus("24h", getReminderStatus(lead, "24h"))}
+          {renderReminderStatus("12h", getReminderStatus(lead, "12h"))}
+          {renderReminderStatus("1h", getReminderStatus(lead, "1h"))}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -254,14 +272,12 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Envio manual</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleManualReminder(lead, "h24")}>
-                <Send className="mr-2 h-4 w-4" />
-                Lembrete de 24h
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleManualReminder(lead, "today")}>
-                <Send className="mr-2 h-4 w-4" />
-                Lembrete do dia
-              </DropdownMenuItem>
+              {(["24h", "12h", "1h"] as ReminderType[]).map((type) => (
+                <DropdownMenuItem key={type} onClick={() => handleManualReminder(lead, type)}>
+                  <Send className="mr-2 h-4 w-4" />
+                  Lembrete de {type}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -270,7 +286,7 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
             variant="ghost"
             className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-700 text-muted-foreground"
             onClick={() => handleMarkAbsent(lead)}
-            title="Marcar como desistência"
+            title="Desativar automação deste agendamento"
           >
             <X className="h-3.5 w-3.5" />
           </Button>
@@ -281,7 +297,6 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
 
   return (
     <div className={`glass-card rounded-xl p-5 ${compact ? "h-full min-h-0 flex flex-col" : ""}`}>
-      {/* Título — idêntico ao FollowUpQueue */}
       <h3 className="font-heading font-semibold text-lg mb-4 flex items-center gap-2 shrink-0">
         <Bell className="h-5 w-5 text-primary" />
         Lembretes de Agendamento
@@ -289,30 +304,35 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
       </h3>
 
       <div className={`${compact ? "flex-1 min-h-0" : "max-h-[500px]"} overflow-y-auto space-y-0`}>
-      {/* HOJE */}
-      {todayLeads.length > 0 && (
-        <div className="mb-5">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-            📅 Hoje ({todayLeads.length})
-          </p>
-          <div className="space-y-2">
-            {todayLeads.map((lead) => renderLeadCard(lead, true))}
+        {todayLeads.length > 0 && (
+          <div className="mb-5">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              📅 Hoje ({todayLeads.length})
+            </p>
+            <div className="space-y-2">
+              {todayLeads.map((lead) => renderLeadCard(lead, true))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* AMANHÃ */}
-      {tomorrowLeads.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-            📅 Amanhã ({tomorrowLeads.length})
-          </p>
-          <div className="space-y-2">
-            {tomorrowLeads.map((lead) => renderLeadCard(lead, false))}
+        {tomorrowLeads.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              📅 Amanhã ({tomorrowLeads.length})
+            </p>
+            <div className="space-y-2">
+              {tomorrowLeads.map((lead) => renderLeadCard(lead, false))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {relevantLeads.length === 0 && (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            📭 Nenhum agendamento para hoje ou amanhã
+          </p>
+        )}
       </div>
+
       {whatsLead && whatsReminderType && showWhatsDialog && (
         <WhatsAppMessageDialog
           lead={whatsLead}
@@ -321,27 +341,16 @@ export function CalendarView({ leads, onMarkReminder, onUpdateLead, onOpenChat, 
             setShowWhatsDialog(false);
             setWhatsReminderType(null);
           }}
-          suggestedMessage={
-            whatsReminderType === "h24"
-              ? getReminder24h(whatsLead)
-              : getReminder1h(whatsLead)
-          }
+          suggestedMessage={getReminderMessage(whatsLead, whatsReminderType)}
           onDone={() => {
-            if (whatsLead) {
-              onMarkReminder(whatsLead.id, whatsReminderType);
-              toast.success(`✓ ${whatsLead.nome} — Lembrete enviado!`);
+            if (whatsLead && whatsReminderType) {
+              markManualReminderSent(whatsLead, whatsReminderType);
+              toast.success(`✓ ${whatsLead.nome} — Lembrete de ${whatsReminderType} registrado!`);
             }
             setShowWhatsDialog(false);
             setWhatsReminderType(null);
           }}
         />
-      )}
-
-      {/* Vazio */}
-      {relevantLeads.length === 0 && (
-        <p className="text-sm text-muted-foreground py-4 text-center">
-          📭 Nenhum agendamento para hoje ou amanhã
-        </p>
       )}
     </div>
   );
