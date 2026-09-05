@@ -513,7 +513,7 @@ const CRMDashboard = () => {
           </div>
 
           <TabsContent value="dashboard" className="space-y-6 mt-6">
-            <div className="flex justify-end">
+            <div className="-mb-3 flex justify-end">
               <Button
                 type="button"
                 variant="outline"
@@ -578,18 +578,18 @@ const CRMDashboard = () => {
                   <DashboardMonthlySummary leads={allLeads} />
                 </motion.div>
 
-                <div className={`grid gap-4 items-start ${callReturnQueue.length > 0 ? "xl:grid-cols-[minmax(0,1.5fr)_minmax(340px,1fr)]" : "grid-cols-1"}`}>
+                <div className="grid items-start gap-4 lg:grid-cols-2">
+                  <PerformanceChart leads={allLeads} followUpGoal={100} compact />
                   <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} />
-                  {callReturnQueue.length > 0 && (
-                    <CallReturnQueue
-                      leads={callReturnQueue}
-                      onRegisterCall={handleRegisterCall}
-                      onClearReturn={clearCallReturn}
-                    />
-                  )}
                 </div>
 
-                <PerformanceChart leads={allLeads} followUpGoal={100} />
+                {callReturnQueue.length > 0 && (
+                  <CallReturnQueue
+                    leads={callReturnQueue}
+                    onRegisterCall={handleRegisterCall}
+                    onClearReturn={clearCallReturn}
+                  />
+                )}
                 <ComparisonChart leads={allLeads} />
               </>
             )}

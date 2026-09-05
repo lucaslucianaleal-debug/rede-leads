@@ -52,27 +52,20 @@ export function DashboardMonthlySummary({ leads }: DashboardMonthlySummaryProps)
   ];
 
   return (
-    <section aria-label="Resumo do mês" className="space-y-3">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-foreground">Resumo de {summary.monthLabel}</p>
-          <p className="text-xs text-muted-foreground">Indicadores do mês atual e pendências realmente vencidas.</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label={`Resumo de ${summary.monthLabel}`}>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {cards.map(({ label, value, detail, icon: Icon, iconClass }) => (
-          <div key={label} className="stat-card min-h-[126px]">
-            <div className={`mb-3 inline-flex rounded-lg p-2 ${iconClass}`}>
+          <div key={label} className="flex min-h-[86px] items-center gap-3 rounded-xl border border-border/70 bg-card/70 px-3.5 py-3 shadow-sm">
+            <div className={`inline-flex shrink-0 rounded-lg p-2 ${iconClass}`}>
               <Icon className="h-4 w-4" />
             </div>
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-2xl font-bold text-foreground">{value}</p>
-                <p className="mt-1 text-sm font-medium text-foreground">{label}</p>
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2">
+                <p className="text-xl font-bold tabular-nums text-foreground">{value}</p>
+                <p className="truncate text-sm font-medium text-foreground">{label}</p>
               </div>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
           </div>
         ))}
       </div>

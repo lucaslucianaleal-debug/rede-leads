@@ -20,6 +20,7 @@ import {
 interface PerformanceChartProps {
   leads: Lead[];
   followUpGoal?: number;
+  compact?: boolean;
 }
 
 type PeriodKey = "today" | "7d" | "30d";
@@ -28,7 +29,36 @@ const META_ATENDIMENTOS = 40;
 const META_AGENDAMENTOS = 10;
 const META_REAGENDAMENTOS = 5;
 
-export function PerformanceChart({ leads, followUpGoal = 20 }: PerformanceChartProps) {
+interface CompactPerformanceMetricProps {
+  label: string;
+  value: number | string;
+  goal?: number;
+  barClass: string;
+}
+
+function CompactPerformanceMetric({ label, value, goal, barClass }: CompactPerformanceMetricProps) {
+  const numericValue = typeof value === "number" ? value : Number.parseFloat(value);
+  const progress = goal && Number.isFinite(numericValue)
+    ? Math.min((numericValue / goal) * 100, 100)
+    : 0;
+
+  return (
+    <div className="min-w-0 rounded-lg border border-border/60 bg-background/60 p-2.5">
+      <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+      <div className="mt-1 flex items-baseline justify-between gap-1">
+        <p className="text-xl font-bold tabular-nums text-foreground">{value}</p>
+        {goal ? <span className="text-[11px] text-muted-foreground">/{goal}</span> : null}
+      </div>
+      {goal ? (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className={`h-full ${barClass}`} style={{ width: `${progress}%` }} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function PerformanceChart({ leads, followUpGoal = 20, compact = false }: PerformanceChartProps) {
   const [period, setPeriod] = useState<PeriodKey>("today");
 
   const days = period === "today" ? 1 : period === "7d" ? 7 : 30;
@@ -129,9 +159,9 @@ export function PerformanceChart({ leads, followUpGoal = 20 }: PerformanceChartP
       : "0.0";
 
   return (
-    <div className="glass-card rounded-xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-heading font-semibold text-lg flex items-center gap-2">
+    <div className={`glass-card rounded-xl ${compact ? "p-4" : "p-5"}`}>
+      <div className={`flex items-center justify-between ${compact ? "mb-3" : "mb-4"}`}>
+        <h3 className={`font-heading font-semibold flex items-center gap-2 ${compact ? "text-base" : "text-lg"}`}>
           <Activity className="h-5 w-5 text-primary" />
           Performance
         </h3>
@@ -163,6 +193,15 @@ export function PerformanceChart({ leads, followUpGoal = 20 }: PerformanceChartP
         </div>
       )}
 
+      {compact ? (
+        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <CompactPerformanceMetric label="Atendimentos" value={atendimentosHoje} goal={META_ATENDIMENTOS} barClass="bg-green-500" />
+          <CompactPerformanceMetric label="Follow-ups" value={checksDoneToday} goal={followUpGoal} barClass="bg-amber-500" />
+          <CompactPerformanceMetric label="Agendamentos" value={agendamentosHoje} goal={META_AGENDAMENTOS} barClass="bg-blue-500" />
+          <CompactPerformanceMetric label="Reagendamentos" value={reagendamentosHoje} goal={META_REAGENDAMENTOS} barClass="bg-orange-500" />
+          <CompactPerformanceMetric label="Conversão" value={`${taxaHoje}%`} barClass="bg-primary" />
+        </div>
+      ) : (
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
         <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-50/50 border border-green-200/50">
           <div className="mb-3">
@@ -240,10 +279,11 @@ export function PerformanceChart({ leads, followUpGoal = 20 }: PerformanceChartP
           </p>
         </div>
       </div>
+      )}
 
       {period !== "today" && (
         <>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={compact ? 190 : 220}>
             <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
