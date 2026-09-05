@@ -1,4 +1,5 @@
 import { getAdminDb } from "./firebaseAdmin.js";
+import { getNextFollowUpDate } from "../shared/followUpCadence.js";
 
 const TIME_ZONE = "America/Sao_Paulo";
 
@@ -166,13 +167,15 @@ export async function applySentQueueItem(clinicId, queueId, result = {}) {
     const today = brDateDisplay(sentAt);
     const count = Number(lead.followUpCount || 0) || 0;
     const nextStage = queue.nextStage || nextFollowUpStage(lead.etapaLead);
+    const nextFollowUpDate = getNextFollowUpDate(sentAt, lead.etapaLead, nextStage);
 
     leads[index] = {
       ...lead,
       etapaLead: nextStage,
       followUpCount: count + 1,
       lastFollowUpDone: today,
-      dataFollowUp: today,
+      dataFollowUp: nextFollowUpDate,
+      ...(nextFollowUpDate ? {} : { followUpCadenceCompletedAt: nowIso }),
       lastWhatsAppOutboundAt: nowIso,
       whatsappLastOutboundMessageId: result.messageId || "",
       whatsappLastOutboundSource: "local-agent",

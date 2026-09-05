@@ -48,6 +48,8 @@ export interface Lead {
   dataFollowUp: string;
   // Data em que o último follow-up foi efetuado (registro de execução)
   lastFollowUpDone?: string;
+  // Preenchido quando o D12 foi enviado e a régua ativa terminou.
+  followUpCadenceCompletedAt?: string;
   // Índice da variação usada no último follow-up (para FU 1-3 com múltiplas opções)
   lastFollowUpVariation?: number;
   // Data em que o agendamento foi CRIADO/registrado no sistema (dd/MM/yyyy)

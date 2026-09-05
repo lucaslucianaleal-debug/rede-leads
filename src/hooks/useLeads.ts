@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Lead, ClinicFilter, DashboardStats, LeadStage, LeadComparecimento } from "@/types/crm";
-import { format, addDays, parse } from "date-fns";
+import { format, parse } from "date-fns";
 import { normalizePhoneTo10Digits } from "@/lib/phone";
 import Papa from "papaparse";
 import { db } from "@/lib/firebase";
@@ -8,6 +8,7 @@ import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection } from "firebase
 import { attachLastWriter } from '../lib/crmGuard';
 import { saveLeadWithSync } from '@/lib/crmSync';
 import { useAuth } from "./useAuth";
+import { getNextFollowUpDate } from "../../shared/followUpCadence.js";
 
 // Use per-clinic and per-user localStorage key to avoid mixing caches between clinics and users
 const getStorageKey = (clinicId?: string | null, userId?: string | null) => {
@@ -1225,16 +1226,6 @@ export function useLeads() {
     return leads.filter(l => l.lastFollowUpDone === today && !l._deleted).length;
   }, [leads]);
 
-  // Calcula próximo dia útil (pula sábado e domingo)
-  const calcNextFollowUpDate = (followUpCount: number): string => {
-    const daysToAdd = followUpCount >= 5 ? 2 : 1;
-    let next = addDays(new Date(), daysToAdd);
-    const dow = next.getDay();
-    if (dow === 6) next = addDays(next, 2);
-    else if (dow === 0) next = addDays(next, 1);
-    return format(next, "dd/MM/yyyy");
-  };
-
   // Calcular próxima etapa automática (progressão linear)
   const getNextLeadStage = (currentStage?: string): LeadStage => {
     const stageProgression: LeadStage[] = [
@@ -1280,7 +1271,7 @@ export function useLeads() {
         lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
         observacao,
         followUpCount: newCount,
-        dataFollowUp: calcNextFollowUpDate(newCount),
+        dataFollowUp: getNextFollowUpDate(new Date(), l.etapaLead, stageToUse),
         etapaLead: stageToUse,
       };
     }));
@@ -1372,7 +1363,7 @@ export function useLeads() {
       dataRetornoLigacao: returnDate || "",
       lastFollowUpDone: format(new Date(), "dd/MM/yyyy"),
       followUpCount: newCount,
-      dataFollowUp: calcNextFollowUpDate(newCount),
+      dataFollowUp: getNextFollowUpDate(new Date(), leadAtual.etapaLead, stageToUse),
       etapaLead: stageToUse,
     };
 
@@ -1425,4 +1416,3 @@ export function useLeads() {
   };
 
   }
-

@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Lead, LeadStage } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Send, MessageSquareText, CheckSquare, Square, Wifi, WifiOff, MessageCircle, Clock3, Check, Reply, RotateCcw } from "lucide-react";
+import { Search, Send, MessageSquareText, CheckSquare, Square, Wifi, WifiOff, MessageCircle, Clock3, Check, Reply, RotateCcw, ListChecks, CalendarDays } from "lucide-react";
 import { followUpMessages, formatFollowUpMessage } from "@/data/followUpMessages";
 import { useWhatsAppAgent } from "@/hooks/useWhatsAppAgent";
 import { useAuth } from "@/hooks/useAuth";
 import { WhatsAppConversationPanel } from "./WhatsAppConversationPanel";
 import { toast } from "sonner";
+import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const STAGES: { stage: LeadStage; label: string }[] = [
   { stage: "Novo", label: "NOVO" },
@@ -20,6 +22,7 @@ const STAGES: { stage: LeadStage; label: string }[] = [
 ];
 
 type ViewFilter = "vencidos" | "hoje" | "todos";
+type StageFilter = LeadStage | "daily_queue";
 type AttendanceFilter = "todos" | "nao_compareceu" | "compareceu" | "sem_status";
 type SourceFilter = "todos" | "organico" | "promotora" | "indicacao";
 type OperationalLead = Lead & {
@@ -28,7 +31,7 @@ type OperationalLead = Lead & {
 };
 
 type FollowUpFilters = {
-  stage: LeadStage;
+  stage: StageFilter;
   view: ViewFilter;
   service: string;
   attendance: AttendanceFilter;
@@ -37,13 +40,20 @@ type FollowUpFilters = {
 };
 
 const DEFAULT_FILTERS: FollowUpFilters = {
-  stage: "Follow-Up 2",
+  stage: "daily_queue",
   view: "vencidos",
   service: "todos",
   attendance: "todos",
   source: "todos",
   search: "",
 };
+
+const DAILY_FOLLOW_UP_LIMIT = 100;
+const ACTIVE_STAGES = new Set<LeadStage>([
+  "Novo",
+  "Em contato",
+  ...Array.from({ length: 12 }, (_, index) => `Follow-Up ${index + 1}` as LeadStage),
+]);
 
 const VIEW_FILTERS = new Set<ViewFilter>(["vencidos", "hoje", "todos"]);
 const ATTENDANCE_FILTERS = new Set<AttendanceFilter>(["todos", "nao_compareceu", "compareceu", "sem_status"]);
@@ -55,7 +65,9 @@ function readStoredFilters(storageKey: string): FollowUpFilters {
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey) || "{}") as Partial<FollowUpFilters>;
     return {
-      stage: STAGES.some((item) => item.stage === parsed.stage) ? parsed.stage as LeadStage : DEFAULT_FILTERS.stage,
+      stage: parsed.stage === "daily_queue" || STAGES.some((item) => item.stage === parsed.stage)
+        ? parsed.stage as StageFilter
+        : DEFAULT_FILTERS.stage,
       view: VIEW_FILTERS.has(parsed.view as ViewFilter) ? parsed.view as ViewFilter : DEFAULT_FILTERS.view,
       service: typeof parsed.service === "string" && parsed.service ? parsed.service : DEFAULT_FILTERS.service,
       attendance: ATTENDANCE_FILTERS.has(parsed.attendance as AttendanceFilter)
@@ -67,6 +79,11 @@ function readStoredFilters(storageKey: string): FollowUpFilters {
   } catch {
     return DEFAULT_FILTERS;
   }
+}
+
+function brazilDayKey() {
+  const [day, month, year] = todayBR().split("/");
+  return `${year}${month}${day}`;
 }
 
 function todayBR() {
@@ -86,6 +103,19 @@ function daysSince(value?: string) {
   const nowParts = todayBR().split("/");
   const todayTs = Date.UTC(Number(nowParts[2]), Number(nowParts[1]) - 1, Number(nowParts[0]));
   return Math.max(0, Math.floor((todayTs - ts) / 86400000));
+}
+
+function isDue(value?: string) {
+  const due = parseBrDate(value);
+  const current = parseBrDate(todayBR());
+  return due !== null && current !== null && due <= current;
+}
+
+function shortStage(stage?: string) {
+  if (stage === "Novo") return "NOVO";
+  if (stage === "Em contato") return "EC";
+  const match = String(stage || "").match(/^Follow-Up\s+(\d+)$/i);
+  return match ? `D${match[1]}` : String(stage || "—");
 }
 
 function nextStage(stage: LeadStage): LeadStage {
@@ -149,11 +179,11 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
   const base = allLeads || leads;
   const today = todayBR();
   const filtersStorageKey = user?.uid && currentClinic
-    ? `rede-leads:follow-up-filters:v1:${user.uid}:${currentClinic}`
+    ? `rede-leads:follow-up-filters:v2:${user.uid}:${currentClinic}`
     : "";
   const [initialFilters] = useState(() => readStoredFilters(filtersStorageKey));
 
-  const [stage, setStage] = useState<LeadStage>(initialFilters.stage);
+  const [stage, setStage] = useState<StageFilter>(initialFilters.stage);
   const [view, setView] = useState<ViewFilter>(initialFilters.view);
   const [service, setService] = useState(initialFilters.service);
   const [attendance, setAttendance] = useState<AttendanceFilter>(initialFilters.attendance);
@@ -162,6 +192,8 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
   const [hydratedStorageKey, setHydratedStorageKey] = useState(filtersStorageKey);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [queuedLeadIds, setQueuedLeadIds] = useState<Set<string>>(new Set());
+  const [todayQueueLeadIds, setTodayQueueLeadIds] = useState<Set<string>>(new Set());
+  const [todayPendingLeadIds, setTodayPendingLeadIds] = useState<Set<string>>(new Set());
   const [variants, setVariants] = useState<string[]>([]);
   const [singleLead, setSingleLead] = useState<Lead | null>(null);
   const [singleMessage, setSingleMessage] = useState("");
@@ -169,6 +201,36 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [sending, setSending] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState<string>("");
+
+  useEffect(() => {
+    if (!currentClinic) {
+      setTodayQueueLeadIds(new Set());
+      setTodayPendingLeadIds(new Set());
+      return;
+    }
+
+    const dayKey = brazilDayKey();
+    const queueQuery = query(
+      collection(db, "clinics", currentClinic, "whatsappQueue"),
+      orderBy("updatedAt", "desc"),
+      limit(250),
+    );
+
+    return onSnapshot(queueQuery, (snapshot) => {
+      const processed = new Set<string>();
+      const pending = new Set<string>();
+      snapshot.docs.forEach((item) => {
+        const data = item.data() as { kind?: string; dayKey?: string; status?: string; leadId?: string };
+        if (data.kind !== "followup" || !data.leadId) return;
+        if (["pending", "leased"].includes(String(data.status))) pending.add(String(data.leadId));
+        if (data.dayKey === dayKey && ["pending", "leased", "sent"].includes(String(data.status))) processed.add(String(data.leadId));
+      });
+      setTodayQueueLeadIds(processed);
+      setTodayPendingLeadIds(pending);
+    }, () => {
+      // A fila continua protegida contra duplicidade no servidor se a leitura em tempo real falhar.
+    });
+  }, [currentClinic]);
 
   useEffect(() => {
     if (filtersStorageKey === hydratedStorageKey) return;
@@ -210,9 +272,8 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
     return [...new Set(values)].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [base]);
 
-  const filtered = useMemo(() => {
-    let list = base.filter((lead) => !isDeleted(lead) && lead.etapaLead === stage);
-
+  const applySecondaryFilters = useCallback((input: Lead[]) => {
+    let list = input;
     if (source === "promotora") list = list.filter(isPromotora);
     if (source === "indicacao") list = list.filter(isIndicacao);
     if (source === "organico") list = list.filter((lead) => !isPromotora(lead) && !isIndicacao(lead));
@@ -222,12 +283,6 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
     if (attendance === "compareceu") list = list.filter((lead) => lead.comparecimento === "COMPARECEU");
     if (attendance === "sem_status") list = list.filter((lead) => !lead.comparecimento);
 
-    if (view === "vencidos") {
-      list = list.filter((lead) => !!lead.dataFollowUp && daysSince(lead.dataFollowUp) >= 1 && lead.lastFollowUpDone !== today);
-    } else if (view === "hoje") {
-      list = list.filter((lead) => lead.dataFollowUp === today || lead.lastFollowUpDone === today);
-    }
-
     if (search.trim()) {
       const term = search.trim().toLowerCase();
       list = list.filter((lead) =>
@@ -236,11 +291,64 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
       );
     }
 
+    return list;
+  }, [source, service, attendance, search]);
+
+  const sentTodayLeadIds = useMemo(() => new Set(
+    base.filter((lead) => lead.lastFollowUpDone === today).map((lead) => lead.id),
+  ), [base, today]);
+
+  const processedTodayLeadIds = useMemo(() => new Set([
+    ...todayQueueLeadIds,
+    ...todayPendingLeadIds,
+    ...sentTodayLeadIds,
+    ...queuedLeadIds,
+  ]), [todayQueueLeadIds, todayPendingLeadIds, sentTodayLeadIds, queuedLeadIds]);
+
+  const dailyCapacityRemaining = Math.max(0, DAILY_FOLLOW_UP_LIMIT - processedTodayLeadIds.size);
+
+  const dailyCandidates = useMemo(() => {
+    const eligible = base.filter((lead) => (
+      !isDeleted(lead)
+      && ACTIVE_STAGES.has(lead.etapaLead)
+      && lead.comparecimento !== "COMPARECEU"
+      && !needsAttention(lead)
+      && !lead.followUpCadenceCompletedAt
+      && !processedTodayLeadIds.has(lead.id)
+      && (!String(lead.dataFollowUp || "").trim() || isDue(lead.dataFollowUp))
+      && (!String(lead.dataAgendamento || "").trim() || lead.comparecimento === "NÃO COMPARECEU")
+    ));
+
+    return applySecondaryFilters(eligible).sort((a, b) => {
+      const aNoShow = a.comparecimento === "NÃO COMPARECEU";
+      const bNoShow = b.comparecimento === "NÃO COMPARECEU";
+      if (aNoShow !== bNoShow) return aNoShow ? -1 : 1;
+
+      const overdueDiff = daysSince(b.dataFollowUp) - daysSince(a.dataFollowUp);
+      if (overdueDiff !== 0) return overdueDiff;
+
+      const aStage = STAGES.findIndex((item) => item.stage === a.etapaLead);
+      const bStage = STAGES.findIndex((item) => item.stage === b.etapaLead);
+      return aStage - bStage;
+    });
+  }, [base, processedTodayLeadIds, applySecondaryFilters]);
+
+  const filtered = useMemo(() => {
+    if (stage === "daily_queue") return dailyCandidates.slice(0, dailyCapacityRemaining);
+
+    let list = applySecondaryFilters(base.filter((lead) => !isDeleted(lead) && lead.etapaLead === stage));
+
+    if (view === "vencidos") {
+      list = list.filter((lead) => !!lead.dataFollowUp && daysSince(lead.dataFollowUp) >= 1 && lead.lastFollowUpDone !== today);
+    } else if (view === "hoje") {
+      list = list.filter((lead) => lead.dataFollowUp === today || lead.lastFollowUpDone === today);
+    }
+
     return list.sort((a, b) => {
       if (needsAttention(a) !== needsAttention(b)) return needsAttention(a) ? -1 : 1;
       return daysSince(b.lastFollowUpDone || b.dataFollowUp) - daysSince(a.lastFollowUpDone || a.dataFollowUp);
     });
-  }, [base, stage, source, service, attendance, view, search, today]);
+  }, [base, stage, view, today, dailyCandidates, dailyCapacityRemaining, applySecondaryFilters]);
 
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -252,7 +360,7 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
 
   useEffect(() => {
     setSelected(new Set());
-    setVariants(templatesFor(stage, attendance === "nao_compareceu"));
+    setVariants(stage === "daily_queue" ? [] : templatesFor(stage, attendance === "nao_compareceu"));
     setActiveVariantIndex(0);
     setBatchOpen(false);
   }, [stage, attendance]);
@@ -272,11 +380,13 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
   }, [filtered, activeLeadId]);
 
   const activeLead = useMemo(() => base.find((lead) => lead.id === activeLeadId) || null, [base, activeLeadId]);
+  const isDailyQueue = stage === "daily_queue";
   const selectedLeads = useMemo(() => filtered.filter((lead) => selected.has(lead.id)), [filtered, selected]);
-  const previewLead = selectedLeads[0] || filtered[0] || null;
+  const batchLeads = isDailyQueue ? (selectedLeads.length ? selectedLeads : filtered) : selectedLeads;
+  const previewLead = batchLeads[0] || filtered[0] || null;
   const usableVariants = variants.map((v) => v.trim()).filter(Boolean);
   const activeFilterCount = [
-    view !== "todos",
+    !isDailyQueue && view !== "todos",
     service !== "todos",
     attendance !== "todos",
     source !== "todos",
@@ -294,7 +404,7 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
   };
 
   const toggleAll = () => {
-    if (filtered.length > 40) {
+    if (!isDailyQueue && filtered.length > 40) {
       const first40 = filtered.slice(0, 40);
       setSelected(new Set(first40.map((lead) => lead.id)));
       toast.info("Selecionei os 40 primeiros. O limite por lote é 40.");
@@ -316,35 +426,67 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
   };
 
   const openBatch = () => {
-    if (!selectedLeads.length) return toast.info("Selecione os leads que deseja colocar na fila.");
+    if (!batchLeads.length) return toast.info("A fila de hoje já está completa ou não há contatos vencidos.");
     setActiveVariantIndex(0);
     setBatchOpen(true);
   };
 
+  const automaticMessageFor = (lead: Lead) => {
+    const options = templatesFor(lead.etapaLead as LeadStage, lead.comparecimento === "NÃO COMPARECEU")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (!options.length) return "";
+    const template = options[(lead.followUpCount || 0) % options.length];
+    return personalize(template, lead);
+  };
+
+  const stageBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    batchLeads.forEach((lead) => {
+      const label = shortStage(lead.etapaLead);
+      counts.set(label, (counts.get(label) || 0) + 1);
+    });
+    return [...counts.entries()];
+  }, [batchLeads]);
+
   const queueBatch = async () => {
-    if (!selectedLeads.length) return toast.error("Selecione pelo menos um lead.");
-    if (selectedLeads.length > 40) return toast.error("O limite por lote é 40 leads.");
-    if (!usableVariants.length) return toast.error("Escreva pelo menos uma mensagem.");
+    if (!batchLeads.length) return toast.error("Nenhum lead disponível para a fila.");
+    if (!isDailyQueue && batchLeads.length > 40) return toast.error("O limite por lote é 40 leads.");
+    if (!isDailyQueue && !usableVariants.length) return toast.error("Escreva pelo menos uma mensagem.");
     if (!status.connected) return toast.error("WhatsApp está desconectado.");
 
-    const ok = window.confirm(`Colocar ${selectedLeads.length} follow-up(s) na fila?\n\nO agente enviará um por vez, com intervalo aleatório de segurança.`);
-    if (!ok) return;
+    if (!isDailyQueue) {
+      const ok = window.confirm(`Colocar ${batchLeads.length} follow-up(s) na fila?\n\nO agente enviará um por vez, com intervalo aleatório de segurança.`);
+      if (!ok) return;
+    }
 
     setSending(true);
     try {
-      const items = selectedLeads.map((lead, index) => ({
+      const items = batchLeads.map((lead, index) => ({
         leadId: lead.id,
         phone: lead.telefone,
         name: lead.nome,
-        message: personalize(usableVariants[index % usableVariants.length], lead),
+        message: isDailyQueue
+          ? automaticMessageFor(lead)
+          : personalize(usableVariants[index % usableVariants.length], lead),
         kind: "followup" as const,
         stage: lead.etapaLead,
         nextStage: nextStage(lead.etapaLead as LeadStage),
-      }));
-      const result = await queueMessages(items);
-      setQueuedLeadIds((current) => new Set([...current, ...result.queuedIds]));
-      toast.success(`${result.queued} follow-up(s) colocado(s) na fila. O agente enviará espaçado.`);
-      if (result.skipped) toast.info(`${result.skipped} item(ns) foram ignorados por trava de duplicidade/estado.`);
+      })).filter((item) => item.message.trim());
+
+      let queued = 0;
+      let skipped = 0;
+      const queuedIds: string[] = [];
+      for (let index = 0; index < items.length; index += 50) {
+        const result = await queueMessages(items.slice(index, index + 50));
+        queued += result.queued;
+        skipped += result.skipped;
+        queuedIds.push(...result.queuedIds);
+      }
+
+      setQueuedLeadIds((current) => new Set([...current, ...queuedIds]));
+      toast.success(`${queued} follow-up(s) colocado(s) na fila. O agente enviará espaçado.`);
+      if (skipped) toast.info(`${skipped} item(ns) foram ignorados por trava de duplicidade/estado.`);
       setSelected(new Set());
       setBatchOpen(false);
     } catch (error) {
@@ -405,9 +547,34 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
         </div>
       </div>
 
+      {isDailyQueue && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-primary/10 p-2 text-primary"><CalendarDays className="h-5 w-5" /></div>
+              <div>
+                <p className="font-semibold">Fila de hoje pronta</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">O Rede Leads escolheu os contatos vencidos mais importantes entre D1 e D12.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full border bg-background px-2.5 py-1 font-medium">{processedTodayLeadIds.size}/{DAILY_FOLLOW_UP_LIMIT} preparados</span>
+              {todayPendingLeadIds.size > 0 && <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700">{todayPendingLeadIds.size} rodando</span>}
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-medium text-amber-700">{dailyCandidates.length} vencidos na base</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Etapa para trabalhar</p>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Visão de trabalho</p>
         <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => { setStage("daily_queue"); setActiveLeadId(""); }}
+            className={`px-2.5 py-1 rounded-full border text-xs font-semibold transition inline-flex items-center gap-1.5 ${isDailyQueue ? "border-primary bg-primary/10 text-primary ring-1 ring-primary" : "bg-muted/50 text-muted-foreground border-muted hover:bg-muted"}`}
+          >
+            <ListChecks className="h-3.5 w-3.5" /> FILA DE HOJE
+          </button>
           {STAGES.map((item) => (
             <button
               key={item.stage}
@@ -453,13 +620,15 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1 bg-muted/40 rounded-lg p-1 w-fit">
-          {(["vencidos", "hoje", "todos"] as ViewFilter[]).map((item) => (
-            <button key={item} onClick={() => { setView(item); setActiveLeadId(""); }} className={`px-3 py-1.5 rounded-md text-sm ${view === item ? "bg-background shadow font-medium" : "text-muted-foreground"}`}>
-              {item === "vencidos" ? "Vencidos" : item === "hoje" ? "Hoje" : "Todos"}
-            </button>
-          ))}
-        </div>
+        {!isDailyQueue ? (
+          <div className="flex flex-wrap gap-1 bg-muted/40 rounded-lg p-1 w-fit">
+            {(["vencidos", "hoje", "todos"] as ViewFilter[]).map((item) => (
+              <button key={item} onClick={() => { setView(item); setActiveLeadId(""); }} className={`px-3 py-1.5 rounded-md text-sm ${view === item ? "bg-background shadow font-medium" : "text-muted-foreground"}`}>
+                {item === "vencidos" ? "Vencidos" : item === "hoje" ? "Hoje" : "Todos"}
+              </button>
+            ))}
+          </div>
+        ) : <span className="text-xs text-muted-foreground">Prioridade: não compareceu → mais atrasados → etapas iniciais.</span>}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{activeFilterCount ? `${activeFilterCount} filtro${activeFilterCount === 1 ? "" : "s"} ativo${activeFilterCount === 1 ? "" : "s"} • salvo${activeFilterCount === 1 ? "" : "s"} automaticamente` : "Filtros salvos automaticamente"}</span>
           {activeFilterCount > 0 && (
@@ -477,16 +646,16 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
             <div className="flex items-center justify-between gap-3 p-2.5 bg-muted/30 border-b shrink-0">
               <button onClick={toggleAll} className="text-xs font-medium flex items-center gap-1.5 hover:text-primary">
                 {filtered.length > 0 && filtered.every((lead) => selected.has(lead.id)) ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                Selecionar visíveis
+                {isDailyQueue ? "Selecionar fila" : "Selecionar visíveis"}
               </button>
-              <span className="text-xs text-muted-foreground">{filtered.length} lead(s) • {selectedLeads.length} selecionado(s)</span>
+              <span className="text-xs text-muted-foreground">{filtered.length} lead(s) {selectedLeads.length ? `• ${selectedLeads.length} selecionado(s)` : isDailyQueue ? "separados para hoje" : ""}</span>
             </div>
 
             <div className="max-h-[520px] xl:max-h-none xl:flex-1 min-h-0 overflow-y-auto divide-y">
-              {!filtered.length && <div className="p-8 text-sm text-muted-foreground text-center">Nenhum lead encontrado com esses filtros.</div>}
+              {!filtered.length && <div className="p-8 text-sm text-muted-foreground text-center">{isDailyQueue && processedTodayLeadIds.size >= DAILY_FOLLOW_UP_LIMIT ? "Meta diária preparada. Acompanhe os envios pelo sininho." : "Nenhum lead encontrado com esses filtros."}</div>}
               {filtered.map((lead) => {
                 const active = activeLeadId === lead.id;
-                const queued = queuedLeadIds.has(lead.id);
+                const queued = queuedLeadIds.has(lead.id) || todayPendingLeadIds.has(lead.id);
                 const sentToday = lead.lastFollowUpDone === today;
                 const replied = needsAttention(lead);
                 return (
@@ -510,6 +679,7 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm truncate">{lead.nome || "Sem nome"}</span>
+                        {isDailyQueue && <span className="text-[10px] rounded-full border bg-muted px-1.5 py-0.5 font-bold">{shortStage(lead.etapaLead)}</span>}
                         {replied && <span className="text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 inline-flex items-center gap-1"><Reply className="h-3 w-3" />Respondeu</span>}
                         {queued && !sentToday && <span className="text-[10px] rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 inline-flex items-center gap-1"><Clock3 className="h-3 w-3" />Na fila</span>}
                         {sentToday && <span className="text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 inline-flex items-center gap-1"><Check className="h-3 w-3" />Enviado hoje</span>}
@@ -531,12 +701,12 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
 
             <div className="border-t bg-background p-2.5 flex items-center justify-between gap-3 shrink-0">
               <div className="min-w-0">
-                <p className="text-xs font-semibold">{selectedLeads.length ? `${selectedLeads.length} lead(s) prontos para o lote` : "Selecione os leads do lote"}</p>
-                <p className="text-[11px] text-muted-foreground truncate">As mensagens e o envio abrem em uma janela, sem precisar descer a página.</p>
+                <p className="text-xs font-semibold">{isDailyQueue ? `${batchLeads.length} contato(s) prontos para hoje` : selectedLeads.length ? `${selectedLeads.length} lead(s) prontos para o lote` : "Selecione os leads do lote"}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{isDailyQueue ? "Sem seleção manual, o sistema prepara toda a fila mostrada." : "As mensagens e o envio abrem em uma janela, sem precisar descer a página."}</p>
               </div>
-              <Button size="sm" onClick={openBatch} disabled={!selectedLeads.length || !status.connected}>
+              <Button size="sm" onClick={openBatch} disabled={!batchLeads.length || !status.connected}>
                 <Send className="h-4 w-4 mr-1.5" />
-                Preparar envio{selectedLeads.length ? ` (${selectedLeads.length})` : ""}
+                {isDailyQueue ? `Preparar fila (${batchLeads.length})` : `Preparar envio${selectedLeads.length ? ` (${selectedLeads.length})` : ""}`}
               </Button>
             </div>
           </div>
@@ -564,52 +734,82 @@ export function FollowUpOperationsPanel({ leads, allLeads, onUpdateLead }: Follo
       <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Preparar lote • {stage.replace("Follow-Up ", "D")} • {selectedLeads.length} lead(s)</DialogTitle>
+            <DialogTitle>{isDailyQueue ? `Fila de hoje • ${batchLeads.length} contatos` : `Preparar lote • ${stage.replace("Follow-Up ", "D")} • ${batchLeads.length} lead(s)`}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold">Mensagens do lote</p>
-                <p className="text-xs text-muted-foreground">Até 3 variações intercaladas automaticamente. Quebras de linha são preservadas.</p>
+          {isDailyQueue ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <p className="text-sm font-semibold">Tudo organizado automaticamente</p>
+                <p className="mt-1 text-xs text-muted-foreground">Cada lead receberá a mensagem correspondente à etapa atual. Depois do envio confirmado, o sistema avança a etapa e agenda sozinho a próxima data.</p>
               </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setVariants(templatesFor(stage, attendance === "nao_compareceu")); setActiveVariantIndex(0); }}>Carregar sugeridas</Button>
-                {variants.length < 3 && <Button size="sm" variant="outline" onClick={addVariant}>+ Variação</Button>}
-              </div>
-            </div>
 
-            {variants.length > 0 && (
-              <div className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit">
-                {variants.map((_, index) => (
-                  <button key={index} onClick={() => setActiveVariantIndex(index)} className={`px-3 py-1.5 rounded-md text-xs font-semibold ${activeVariantIndex === index ? "bg-background shadow text-foreground" : "text-muted-foreground"}`}>
-                    Variação {index + 1}
-                  </button>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Distribuição da fila</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {stageBreakdown.map(([label, count]) => <span key={label} className="rounded-full border bg-muted/40 px-2.5 py-1 text-xs font-medium">{label} · {count}</span>)}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amostra das mensagens</p>
+                {batchLeads.slice(0, 3).map((lead) => (
+                  <div key={lead.id} className="rounded-lg border bg-muted/20 p-3">
+                    <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                      <span className="font-semibold">{lead.nome || "Sem nome"}</span>
+                      <span className="rounded-full bg-background px-2 py-0.5 font-bold">{shortStage(lead.etapaLead)}</span>
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{automaticMessageFor(lead)}</p>
+                  </div>
                 ))}
               </div>
-            )}
-
-            {variants.length === 0 ? (
-              <Textarea rows={7} placeholder="Escreva a mensagem. Use [primeiro_nome] e [serviço] para personalizar." onChange={(e) => { setVariants([e.target.value]); setActiveVariantIndex(0); }} />
-            ) : (
-              <Textarea value={variants[activeVariantIndex] || ""} onChange={(e) => updateVariant(activeVariantIndex, e.target.value)} rows={8} className="whitespace-pre-wrap" />
-            )}
-
-            {previewLead && usableVariants[0] && (
-              <div className="rounded-md bg-muted/20 border p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview para {previewLead.nome?.split(" ")[0] || "lead"}</p>
-                <div className="text-sm whitespace-pre-wrap leading-relaxed">{personalize(usableVariants[0], previewLead)}</div>
+              {batchLeads.length > 3 && <p className="text-xs text-muted-foreground">Mais {batchLeads.length - 3} contato(s) seguirão a mesma regra por etapa.</p>}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold">Mensagens do lote</p>
+                  <p className="text-xs text-muted-foreground">Até 3 variações intercaladas automaticamente. Quebras de linha são preservadas.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { setVariants(templatesFor(stage as LeadStage, attendance === "nao_compareceu")); setActiveVariantIndex(0); }}>Carregar sugeridas</Button>
+                  {variants.length < 3 && <Button size="sm" variant="outline" onClick={addVariant}>+ Variação</Button>}
+                </div>
               </div>
-            )}
 
-            <p className="text-xs text-muted-foreground">Fila automática: um follow-up por vez, respeitando o intervalo configurado.</p>
-          </div>
+              {variants.length > 0 && (
+                <div className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit">
+                  {variants.map((_, index) => (
+                    <button key={index} onClick={() => setActiveVariantIndex(index)} className={`px-3 py-1.5 rounded-md text-xs font-semibold ${activeVariantIndex === index ? "bg-background shadow text-foreground" : "text-muted-foreground"}`}>
+                      Variação {index + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {variants.length === 0 ? (
+                <Textarea rows={7} placeholder="Escreva a mensagem. Use [primeiro_nome] e [serviço] para personalizar." onChange={(e) => { setVariants([e.target.value]); setActiveVariantIndex(0); }} />
+              ) : (
+                <Textarea value={variants[activeVariantIndex] || ""} onChange={(e) => updateVariant(activeVariantIndex, e.target.value)} rows={8} className="whitespace-pre-wrap" />
+              )}
+
+              {previewLead && usableVariants[0] && (
+                <div className="rounded-md bg-muted/20 border p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Preview para {previewLead.nome?.split(" ")[0] || "lead"}</p>
+                  <div className="text-sm whitespace-pre-wrap leading-relaxed">{personalize(usableVariants[0], previewLead)}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">Fila automática: um follow-up por vez, respeitando o intervalo de segurança.</p>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setBatchOpen(false)}>Cancelar</Button>
-            <Button onClick={queueBatch} disabled={sending || !selectedLeads.length || !usableVariants.length || !status.connected}>
+            <Button onClick={queueBatch} disabled={sending || !batchLeads.length || (!isDailyQueue && !usableVariants.length) || !status.connected}>
               <Send className="h-4 w-4 mr-2" />
-              {sending ? "Colocando na fila..." : `Enviar ${selectedLeads.length} follow-up${selectedLeads.length === 1 ? "" : "s"}`}
+              {sending ? "Colocando na fila..." : isDailyQueue ? `Iniciar ${batchLeads.length} follow-up${batchLeads.length === 1 ? "" : "s"}` : `Enviar ${batchLeads.length} follow-up${batchLeads.length === 1 ? "" : "s"}`}
             </Button>
           </DialogFooter>
         </DialogContent>
