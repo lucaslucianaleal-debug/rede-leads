@@ -121,3 +121,23 @@
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 }
+
+/* Dashboard novo: mantém Performance e Lembretes alinhados sem criar área vazia.
+   Hoje fica compacto; períodos históricos crescem apenas o necessário para o gráfico. */
+@media (min-width: 1024px) {
+  .glass-card:has(.lucide-activity) {
+    height: 285px;
+  }
+
+  .glass-card:has(.lucide-activity) + .glass-card:has(.lucide-bell) {
+    height: 285px;
+  }
+
+  .glass-card:has(.lucide-activity):has(.recharts-responsive-container) {
+    height: 490px;
+  }
+
+  .glass-card:has(.lucide-activity):has(.recharts-responsive-container) + .glass-card:has(.lucide-bell) {
+    height: 490px;
+  }
+}
