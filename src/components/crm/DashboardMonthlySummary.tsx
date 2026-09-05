@@ -7,6 +7,12 @@ interface DashboardMonthlySummaryProps {
   leads: Lead[];
 }
 
+const MONTHLY_GOALS = {
+  leads: 200,
+  appointments: 80,
+  attendance: 40,
+};
+
 export function DashboardMonthlySummary({ leads }: DashboardMonthlySummaryProps) {
   const summary = useMemo(() => {
     const now = new Date();
@@ -15,28 +21,53 @@ export function DashboardMonthlySummary({ leads }: DashboardMonthlySummaryProps)
     return {
       ...metrics,
       monthLabel: now.toLocaleDateString("pt-BR", { month: "long" }),
+      dayOfMonth: now.getDate(),
+      daysInMonth: new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(),
     };
   }, [leads]);
+
+  const goalStatus = (value: number, goal: number) => {
+    const progress = Math.min(Math.round((value / goal) * 100), 100);
+    const expectedByToday = Math.ceil((goal * summary.dayOfMonth) / summary.daysInMonth);
+    return {
+      progress,
+      onTrack: value >= expectedByToday,
+      expectedByToday,
+    };
+  };
+
+  const leadsGoal = goalStatus(summary.leadsThisMonth, MONTHLY_GOALS.leads);
+  const appointmentsGoal = goalStatus(summary.appointmentsCreatedThisMonth, MONTHLY_GOALS.appointments);
+  const attendanceGoal = goalStatus(summary.attendedThisMonth, MONTHLY_GOALS.attendance);
 
   const cards = [
     {
       label: "Leads no mês",
       value: summary.leadsThisMonth,
-      detail: `Recebidos em ${summary.monthLabel}`,
+      detail: `${leadsGoal.progress}% da meta de ${MONTHLY_GOALS.leads}`,
+      status: leadsGoal.onTrack ? "No ritmo" : "Abaixo do ritmo",
+      onTrack: leadsGoal.onTrack,
+      progress: leadsGoal.progress,
       icon: Users,
       iconClass: "bg-primary/10 text-primary",
     },
     {
       label: "Agendamentos no mês",
       value: summary.appointmentsCreatedThisMonth,
-      detail: `${summary.appointmentRate}% dos leads do mês`,
+      detail: `${appointmentsGoal.progress}% da meta de ${MONTHLY_GOALS.appointments}`,
+      status: appointmentsGoal.onTrack ? "No ritmo" : "Abaixo do ritmo",
+      onTrack: appointmentsGoal.onTrack,
+      progress: appointmentsGoal.progress,
       icon: CalendarCheck,
       iconClass: "bg-blue-500/10 text-blue-600",
     },
     {
       label: "Pendências vencidas",
       value: summary.overdueFollowUps,
-      detail: summary.overdueFollowUps === 0 ? "Operação em dia" : "Meta: deixar zerado",
+      detail: summary.overdueFollowUps === 0 ? "Nenhum contato atrasado" : "Meta: deixar zerado",
+      status: summary.overdueFollowUps === 0 ? "Em dia" : "Atenção",
+      onTrack: summary.overdueFollowUps === 0,
+      progress: summary.overdueFollowUps === 0 ? 100 : 0,
       icon: Clock3,
       iconClass: summary.overdueFollowUps === 0
         ? "bg-emerald-500/10 text-emerald-600"
@@ -45,7 +76,10 @@ export function DashboardMonthlySummary({ leads }: DashboardMonthlySummaryProps)
     {
       label: "Comparecimentos no mês",
       value: summary.attendedThisMonth,
-      detail: `${summary.attendanceRate}% dos agendados do mês`,
+      detail: `${attendanceGoal.progress}% da meta de ${MONTHLY_GOALS.attendance}`,
+      status: attendanceGoal.onTrack ? "No ritmo" : "Abaixo do ritmo",
+      onTrack: attendanceGoal.onTrack,
+      progress: attendanceGoal.progress,
       icon: UserCheck,
       iconClass: "bg-emerald-500/10 text-emerald-600",
     },
@@ -54,17 +88,30 @@ export function DashboardMonthlySummary({ leads }: DashboardMonthlySummaryProps)
   return (
     <section aria-label={`Resumo de ${summary.monthLabel}`}>
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {cards.map(({ label, value, detail, icon: Icon, iconClass }) => (
-          <div key={label} className="flex min-h-[86px] items-center gap-3 rounded-xl border border-border/70 bg-card/70 px-3.5 py-3 shadow-sm">
-            <div className={`inline-flex shrink-0 rounded-lg p-2 ${iconClass}`}>
-              <Icon className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-baseline gap-2">
-                <p className="text-xl font-bold tabular-nums text-foreground">{value}</p>
-                <p className="truncate text-sm font-medium text-foreground">{label}</p>
+        {cards.map(({ label, value, detail, status, onTrack, progress, icon: Icon, iconClass }) => (
+          <div key={label} className="min-h-[76px] rounded-xl border border-border/70 bg-card/70 px-3 py-2.5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className={`inline-flex shrink-0 rounded-md p-1.5 ${iconClass}`}>
+                <Icon className="h-3.5 w-3.5" />
               </div>
-              <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+                  <span className={`shrink-0 text-[10px] font-semibold ${onTrack ? "text-emerald-600" : "text-amber-600"}`}>
+                    {status}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex items-baseline gap-2">
+                  <p className="text-xl font-bold tabular-nums text-foreground">{value}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{detail}</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full rounded-full ${onTrack ? "bg-emerald-500" : "bg-amber-500"}`}
+                style={{ width: `${progress}%` }}
+              />
             </div>
           </div>
         ))}
