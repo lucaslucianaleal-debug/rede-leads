@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { BarChart3, BookOpen, Gift, Globe, TrendingUp, UserCheck } from "lucide-react";
 import { Lead, LeadStage } from "@/types/crm";
+import { cadenceLabel } from "../../../shared/followUpCadence.js";
 
 type Tab = "cadencia" | "metricas";
 type SourceFilter = "todos" | "organico" | "promotora" | "indicacao";
@@ -17,18 +18,18 @@ type ReguaEntry = {
 const REGUA: ReguaEntry[] = [
   { stage: "Novo", label: "NOVO", cadencia: "Imediato", tipo: "1º contato", color: "green", desc: "Lead acabou de entrar — atendimento inicial e tentativa de agendamento." },
   { stage: "Em contato", label: "EC", cadencia: "+1 dia", tipo: "Nutrição", color: "teal", desc: "Já houve conversa, mas ainda não existe agendamento." },
-  { stage: "Follow-Up 1", label: "D1", cadencia: "Mesmo dia", tipo: "Primeiro follow-up", color: "blue", desc: "Primeira retomada depois do contato inicial." },
-  { stage: "Follow-Up 2", label: "D2", cadencia: "+1 dia", tipo: "Retomada", color: "blue", desc: "Reengajar sem pressão e buscar avanço na conversa." },
-  { stage: "Follow-Up 3", label: "D3", cadencia: "+1 dia", tipo: "Retomada", color: "blue", desc: "Último bloco da cadência diária antes de espaçar." },
-  { stage: "Follow-Up 4", label: "D4", cadencia: "+1 dia", tipo: "Urgência", color: "amber", desc: "Nova tentativa mantendo a cadência atual da operação." },
-  { stage: "Follow-Up 5", label: "D5", cadencia: "+2 dias", tipo: "Oferta", color: "amber", desc: "A partir daqui os contatos passam a ser mais espaçados." },
-  { stage: "Follow-Up 6", label: "D6", cadencia: "+2 dias", tipo: "Prova social", color: "orange", desc: "Trabalhar confiança e prova social." },
-  { stage: "Follow-Up 7", label: "D7", cadencia: "+2 dias", tipo: "Prova social", color: "orange", desc: "Manter o relacionamento ativo sem excesso de contato." },
-  { stage: "Follow-Up 8", label: "D8", cadencia: "+2 dias", tipo: "Reengajamento", color: "rose", desc: "Reposicionar a conversa e abrir nova oportunidade." },
-  { stage: "Follow-Up 9", label: "D9", cadencia: "+2 dias", tipo: "Reengajamento", color: "rose", desc: "Tentativa de retomada com condição ou contexto atual." },
-  { stage: "Follow-Up 10", label: "D10", cadencia: "+2 dias", tipo: "Reengajamento", color: "rose", desc: "Últimos contatos ativos da régua." },
-  { stage: "Follow-Up 11", label: "D11", cadencia: "+2 dias", tipo: "Encerramento", color: "gray", desc: "Contato de encerramento mantendo o canal aberto." },
-  { stage: "Follow-Up 12", label: "D12", cadencia: "+2 dias", tipo: "Encerramento", color: "gray", desc: "Última tentativa da régua antes de relacionamento latente." },
+  { stage: "Follow-Up 1", label: "D1", cadencia: cadenceLabel("Follow-Up 1"), tipo: "Primeiro follow-up", color: "blue", desc: "Primeira retomada depois do contato inicial." },
+  { stage: "Follow-Up 2", label: "D2", cadencia: cadenceLabel("Follow-Up 2"), tipo: "Retomada", color: "blue", desc: "Reengajar sem pressão e buscar avanço na conversa." },
+  { stage: "Follow-Up 3", label: "D3", cadencia: cadenceLabel("Follow-Up 3"), tipo: "Retomada", color: "blue", desc: "Último bloco mais próximo antes de espaçar a régua." },
+  { stage: "Follow-Up 4", label: "D4", cadencia: cadenceLabel("Follow-Up 4"), tipo: "Urgência", color: "amber", desc: "Nova tentativa com uma pausa maior entre os contatos." },
+  { stage: "Follow-Up 5", label: "D5", cadencia: cadenceLabel("Follow-Up 5"), tipo: "Oferta", color: "amber", desc: "A partir daqui os contatos passam a ser semanais." },
+  { stage: "Follow-Up 6", label: "D6", cadencia: cadenceLabel("Follow-Up 6"), tipo: "Prova social", color: "orange", desc: "Trabalhar confiança e prova social." },
+  { stage: "Follow-Up 7", label: "D7", cadencia: cadenceLabel("Follow-Up 7"), tipo: "Prova social", color: "orange", desc: "Manter o relacionamento ativo sem excesso de contato." },
+  { stage: "Follow-Up 8", label: "D8", cadencia: cadenceLabel("Follow-Up 8"), tipo: "Reengajamento", color: "rose", desc: "Reposicionar a conversa e abrir nova oportunidade." },
+  { stage: "Follow-Up 9", label: "D9", cadencia: cadenceLabel("Follow-Up 9"), tipo: "Reengajamento", color: "rose", desc: "Tentativa de retomada com condição ou contexto atual." },
+  { stage: "Follow-Up 10", label: "D10", cadencia: cadenceLabel("Follow-Up 10"), tipo: "Reengajamento", color: "rose", desc: "Últimos contatos ativos da régua." },
+  { stage: "Follow-Up 11", label: "D11", cadencia: cadenceLabel("Follow-Up 11"), tipo: "Encerramento", color: "gray", desc: "Contato de encerramento mantendo o canal aberto." },
+  { stage: "Follow-Up 12", label: "D12", cadencia: cadenceLabel("Follow-Up 12"), tipo: "Encerramento", color: "gray", desc: "Última tentativa; depois do envio, a régua ativa é concluída." },
   { stage: "Avaliação agendada", label: "AGEND", cadencia: "Antes da consulta", tipo: "Confirmação", color: "purple", desc: "Sai do follow-up comercial e entra na esteira de confirmação/agendamento." },
 ];
 
@@ -56,7 +57,7 @@ export function FollowUpInsightsPanel({ leads, initialTab = "cadencia" }: { lead
   const [tab, setTab] = useState<Tab>(initialTab);
   const [source, setSource] = useState<SourceFilter>("todos");
 
-  const active = useMemo(() => leads.filter((lead) => !(lead as any)._deleted), [leads]);
+  const active = useMemo(() => leads.filter((lead) => !lead._deleted), [leads]);
   const filtered = useMemo(() => {
     if (source === "promotora") return active.filter(isPromotora);
     if (source === "indicacao") return active.filter(isIndicacao);
