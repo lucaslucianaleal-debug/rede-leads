@@ -3,7 +3,6 @@ import { eachDayOfInterval, format, subDays } from "date-fns";
 import { useMemo, useState } from "react";
 import { Activity } from "lucide-react";
 import { Lead } from "@/types/crm";
-import "@/styles/performance-layout.css";
 
 import {
   CartesianGrid,
@@ -301,7 +300,7 @@ export function PerformanceChart({ leads, followUpGoal = 20, compact = false }: 
   ];
 
   return (
-    <div className={`glass-card rounded-xl ${compact ? "performance-dashboard-wide p-4" : "p-5"}`}>
+    <div className={`glass-card rounded-xl ${compact ? "p-4" : "p-5"}`}>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className={`flex items-center gap-2 font-heading font-semibold ${compact ? "text-base" : "text-lg"}`}>
@@ -330,7 +329,7 @@ export function PerformanceChart({ leads, followUpGoal = 20, compact = false }: 
         </div>
       </div>
 
-      <div className={`mb-5 grid grid-cols-2 gap-3 ${compact ? "xl:grid-cols-5" : "lg:grid-cols-5"}`}>
+      <div className={`mb-5 grid grid-cols-2 gap-3 ${compact ? "sm:grid-cols-5" : "lg:grid-cols-5"}`}>
         {metrics.map((metric) => (
           <PerformanceMetricCard key={metric.label} {...metric} compact={compact} />
         ))}
