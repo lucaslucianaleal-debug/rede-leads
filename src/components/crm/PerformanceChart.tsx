@@ -1,81 +1,244 @@
 import { ptBR } from "date-fns/locale";
-import { subDays, eachDayOfInterval, format } from "date-fns";
+import { eachDayOfInterval, format, subDays } from "date-fns";
 import { useMemo, useState } from "react";
-import { Activity, TrendingUp } from "lucide-react";
+import { Activity } from "lucide-react";
 import { Lead } from "@/types/crm";
-import { ProgressWithLabel } from "@/components/ui/progress-with-label";
 
 import {
-  LineChart,
+  CartesianGrid,
+  Legend,
   Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ReferenceLine,
-  ResponsiveContainer
 } from "recharts";
 
 interface PerformanceChartProps {
   leads: Lead[];
+  followUpGoal?: number;
+  compact?: boolean;
 }
 
-type PeriodKey = "today" | "7d" | "30d";
+type PeriodKey = "today" | "7d" | "15d" | "30d";
+type MetricFormat = "number" | "percent";
+type MetricTone = "green" | "amber" | "blue" | "orange" | "primary";
 
 const META_ATENDIMENTOS = 40;
 const META_AGENDAMENTOS = 10;
 const META_REAGENDAMENTOS = 5;
-const META_FOLLOWUPS = 20;
+const META_CONVERSAO = (META_AGENDAMENTOS / META_ATENDIMENTOS) * 100;
 
-export function PerformanceChart({ leads }: PerformanceChartProps) {
+const PERIOD_OPTIONS: Array<{ key: PeriodKey; label: string; days: number }> = [
+  { key: "today", label: "Hoje", days: 1 },
+  { key: "7d", label: "7 dias", days: 7 },
+  { key: "15d", label: "15 dias", days: 15 },
+  { key: "30d", label: "30 dias", days: 30 },
+];
+
+const TONE_STYLES: Record<MetricTone, { value: string; bar: string; shell: string }> = {
+  green: {
+    value: "text-green-600",
+    bar: "bg-green-500",
+    shell: "bg-gradient-to-br from-green-50 to-green-50/50 border-green-200/50",
+  },
+  amber: {
+    value: "text-amber-700",
+    bar: "bg-amber-500",
+    shell: "bg-gradient-to-br from-amber-50 to-amber-50/50 border-amber-200/50",
+  },
+  blue: {
+    value: "text-blue-600",
+    bar: "bg-blue-500",
+    shell: "bg-gradient-to-br from-blue-50 to-blue-50/50 border-blue-200/50",
+  },
+  orange: {
+    value: "text-orange-600",
+    bar: "bg-orange-500",
+    shell: "bg-gradient-to-br from-orange-50 to-orange-50/50 border-orange-200/50",
+  },
+  primary: {
+    value: "text-primary",
+    bar: "bg-primary",
+    shell: "bg-gradient-to-br from-primary/5 to-background border-primary/20",
+  },
+};
+
+function isBusinessDay(day: Date) {
+  const weekDay = day.getDay();
+  return weekDay !== 0 && weekDay !== 6;
+}
+
+function formatMetric(value: number, formatType: MetricFormat) {
+  if (formatType === "percent") {
+    return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  }
+  return Math.round(value).toLocaleString("pt-BR");
+}
+
+function formatGap(value: number, formatType: MetricFormat) {
+  const absolute = Math.abs(value);
+  if (formatType === "percent") {
+    return `${absolute.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} p.p.`;
+  }
+  return Math.round(absolute).toLocaleString("pt-BR");
+}
+
+function metricStatus(current: number, goal: number) {
+  if (goal <= 0) {
+    return {
+      progress: 0,
+      percent: 0,
+      label: "Sem meta",
+      pillClass: "border-border bg-muted text-muted-foreground",
+      deltaClass: "text-muted-foreground",
+    };
+  }
+
+  const ratio = current / goal;
+  const percent = Math.round(ratio * 100);
+
+  if (ratio >= 1) {
+    return {
+      progress: 100,
+      percent,
+      label: "Na meta",
+      pillClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      deltaClass: "text-emerald-700",
+    };
+  }
+
+  if (ratio >= 0.85) {
+    return {
+      progress: Math.max(0, Math.min(ratio * 100, 100)),
+      percent,
+      label: "Atenção",
+      pillClass: "border-amber-200 bg-amber-50 text-amber-700",
+      deltaClass: "text-amber-700",
+    };
+  }
+
+  return {
+    progress: Math.max(0, Math.min(ratio * 100, 100)),
+    percent,
+    label: "Abaixo",
+    pillClass: "border-red-200 bg-red-50 text-red-700",
+    deltaClass: "text-red-700",
+  };
+}
+
+interface PerformanceMetricCardProps {
+  label: string;
+  current: number;
+  goal: number;
+  tone: MetricTone;
+  formatType?: MetricFormat;
+  compact?: boolean;
+}
+
+function PerformanceMetricCard({
+  label,
+  current,
+  goal,
+  tone,
+  formatType = "number",
+  compact = false,
+}: PerformanceMetricCardProps) {
+  const styles = TONE_STYLES[tone];
+  const status = metricStatus(current, goal);
+  const gap = current - goal;
+  const gapText = goal <= 0
+    ? "Sem meta para o período"
+    : gap >= 0
+      ? `${formatGap(gap, formatType)} acima do ritmo`
+      : `${formatGap(gap, formatType)} abaixo do ritmo`;
+
+  return (
+    <div
+      className={`min-w-0 rounded-lg border ${
+        compact ? "bg-background/70 p-3" : `${styles.shell} p-4`
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold ${status.pillClass}`}>
+          {status.label}
+        </span>
+      </div>
+
+      <p className={`${compact ? "mt-1 text-xl" : "mt-2 text-2xl"} font-bold tabular-nums ${styles.value}`}>
+        {formatMetric(current, formatType)}
+      </p>
+
+      <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+        <span>Esperado: {formatMetric(goal, formatType)}</span>
+        {goal > 0 && <span className="font-semibold">{status.percent}%</span>}
+      </div>
+
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${styles.bar}`}
+          style={{ width: `${status.progress}%` }}
+        />
+      </div>
+
+      <p className={`mt-1.5 truncate text-[10px] font-semibold ${status.deltaClass}`}>
+        {gapText}
+      </p>
+    </div>
+  );
+}
+
+export function PerformanceChart({ leads, followUpGoal = 20, compact = false }: PerformanceChartProps) {
   const [period, setPeriod] = useState<PeriodKey>("today");
+  const selectedPeriod = PERIOD_OPTIONS.find((item) => item.key === period) || PERIOD_OPTIONS[0];
+  const days = selectedPeriod.days;
 
-  const days = period === "today" ? 1 : period === "7d" ? 7 : 30;
+  const activeLeads = useMemo(() => leads.filter((lead) => !lead._deleted), [leads]);
 
-  // Gera os dados por dia para o período selecionado.
-  // Follow-up é contado pela data real de execução (lastFollowUpDone), inclusive
-  // quando o envio foi confirmado pelo WhatsApp Agent local.
-  const { chartData, totalAtendimentos, totalAgendamentos, totalReagendamentos, totalFollowUps } = useMemo(() => {
+  const {
+    chartData,
+    totalAtendimentos,
+    totalAgendamentos,
+    totalReagendamentos,
+    totalFollowUps,
+    businessDays,
+  } = useMemo(() => {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
     const start = subDays(today, days - 1);
     start.setHours(0, 0, 0, 0);
 
     const interval = eachDayOfInterval({ start, end: today });
+    const usefulDays = interval.filter(isBusinessDay).length;
 
     const data = interval.map((day) => {
       const dayStr = format(day, "dd/MM/yyyy");
 
-      const newLeads = leads.filter((l) => {
-        const dc = l.dataContato || "";
-        return dc.startsWith(dayStr);
-      });
+      const newLeads = activeLeads.filter((lead) => (lead.dataContato || "").startsWith(dayStr));
+      const followUpsDone = activeLeads.filter((lead) => (lead.lastFollowUpDone || "").startsWith(dayStr));
+      const appointmentsMade = activeLeads.filter((lead) => (lead.dataAgendamentoCriado || "").startsWith(dayStr));
+      const reschedulesMade = activeLeads.filter((lead) => (lead.dataAgendamentoAlterado || "").startsWith(dayStr));
 
-      const followUpsDone = leads.filter((l) => {
-        const df = l.lastFollowUpDone || "";
-        return df.startsWith(dayStr);
-      });
-
-      const appointmentsMade = leads.filter((l) => {
-        const dac = l.dataAgendamentoCriado || "";
-        return dac.startsWith(dayStr);
-      });
-
-      const reschedulesMade = leads.filter((l) => {
-        const daa = l.dataAgendamentoAlterado || "";
-        return daa.startsWith(dayStr);
-      });
-
-      // Deduplicar atendimentos com prioridade: agendamento > follow-up > novo.
       const seen = new Set<string>();
-      const allDetails: Lead[] = [] as any;
-      for (const l of [...appointmentsMade, ...reschedulesMade, ...followUpsDone, ...newLeads]) {
-        if (!seen.has(l.id)) { seen.add(l.id); allDetails.push(l); }
+      const allDetails: Lead[] = [];
+      for (const lead of [...appointmentsMade, ...reschedulesMade, ...followUpsDone, ...newLeads]) {
+        if (!seen.has(lead.id)) {
+          seen.add(lead.id);
+          allDetails.push(lead);
+        }
       }
 
       return {
-        dia: format(day, days === 1 ? "'Hoje'" : days === 7 ? "EEE dd/MM" : "dd/MM", { locale: ptBR }),
+        dia: format(
+          day,
+          days === 1 ? "'Hoje'" : days === 7 ? "EEE dd/MM" : "dd/MM",
+          { locale: ptBR },
+        ),
         Atendimentos: allDetails.length,
         FollowUps: followUpsDone.length,
         Agendamentos: appointmentsMade.length,
@@ -83,167 +246,98 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
       };
     });
 
-    const totalAt = data.reduce((acc, d) => acc + d.Atendimentos, 0);
-    const totalFu = data.reduce((acc, d) => acc + d.FollowUps, 0);
-    const totalAg = data.reduce((acc, d) => acc + d.Agendamentos, 0);
-    const totalRes = data.reduce((acc, d) => acc + d.Reagendamentos, 0);
-
     return {
       chartData: data,
-      totalAtendimentos: totalAt,
-      totalFollowUps: totalFu,
-      totalAgendamentos: totalAg,
-      totalReagendamentos: totalRes,
+      totalAtendimentos: data.reduce((acc, item) => acc + item.Atendimentos, 0),
+      totalFollowUps: data.reduce((acc, item) => acc + item.FollowUps, 0),
+      totalAgendamentos: data.reduce((acc, item) => acc + item.Agendamentos, 0),
+      totalReagendamentos: data.reduce((acc, item) => acc + item.Reagendamentos, 0),
+      businessDays: usefulDays,
     };
-  }, [leads, days]);
+  }, [activeLeads, days]);
 
-  const taxaConversao =
-    totalAtendimentos > 0
-      ? ((totalAgendamentos / totalAtendimentos) * 100).toFixed(1)
-      : "0.0";
+  const taxaConversao = totalAtendimentos > 0
+    ? (totalAgendamentos / totalAtendimentos) * 100
+    : 0;
 
-  const todayStr = format(new Date(), "dd/MM/yyyy");
-  const newLeadsToday = leads.filter((l) => (l.dataContato || "").startsWith(todayStr));
-  const followUpsDoneToday = leads.filter((l) => (l.lastFollowUpDone || "").startsWith(todayStr));
-  const appointmentsMadeToday = leads.filter((l) => (l.dataAgendamentoCriado || "").startsWith(todayStr));
-  const reschedulesToday = leads.filter((l) => (l.dataAgendamentoAlterado || "").startsWith(todayStr));
+  const metaAtendimentosPeriodo = META_ATENDIMENTOS * businessDays;
+  const metaFollowUpsPeriodo = followUpGoal * businessDays;
+  const metaAgendamentosPeriodo = META_AGENDAMENTOS * businessDays;
+  const metaReagendamentosPeriodo = META_REAGENDAMENTOS * businessDays;
 
-  const newLeadsTodayIds = newLeadsToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
-  const followUpsDoneTodayIds = followUpsDoneToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
-  const appointmentsMadeTodayIds = appointmentsMadeToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
-  const reschedulesTodayIds = reschedulesToday.map(l => `${l.id}:${l.nome}`).slice(0, 20);
-
-  const seenToday = new Set<string>();
-  const allToday: Lead[] = [] as any;
-  for (const l of [...appointmentsMadeToday, ...reschedulesToday, ...followUpsDoneToday, ...newLeadsToday]) {
-    if (!seenToday.has(l.id)) { seenToday.add(l.id); allToday.push(l); }
-  }
-
-  const atendimentosHoje = allToday.length;
-  const agendamentosHoje = appointmentsMadeToday.length;
-  const reagendamentosHoje = reschedulesToday.length;
-  const checksDoneToday = followUpsDoneToday.length;
-  const taxaHoje =
-    atendimentosHoje > 0
-      ? ((agendamentosHoje / atendimentosHoje) * 100).toFixed(1)
-      : "0.0";
+  const metrics: Array<PerformanceMetricCardProps> = [
+    {
+      label: "Atendimentos",
+      current: totalAtendimentos,
+      goal: metaAtendimentosPeriodo,
+      tone: "green",
+    },
+    {
+      label: "Follow-ups",
+      current: totalFollowUps,
+      goal: metaFollowUpsPeriodo,
+      tone: "amber",
+    },
+    {
+      label: "Agendamentos",
+      current: totalAgendamentos,
+      goal: metaAgendamentosPeriodo,
+      tone: "blue",
+    },
+    {
+      label: "Reagendamentos",
+      current: totalReagendamentos,
+      goal: metaReagendamentosPeriodo,
+      tone: "orange",
+    },
+    {
+      label: "Conversão",
+      current: taxaConversao,
+      goal: META_CONVERSAO,
+      tone: "primary",
+      formatType: "percent",
+    },
+  ];
 
   return (
-    <div className="glass-card rounded-xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-heading font-semibold text-lg flex items-center gap-2">
-          <Activity className="h-5 w-5 text-primary" />
-          Performance
-        </h3>
-        <div className="flex gap-1 bg-muted rounded-lg p-1">
-          {(["today", "7d", "30d"] as PeriodKey[]).map((p) => (
+    <div className={`glass-card rounded-xl ${compact ? "p-4" : "p-5"}`}>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className={`flex items-center gap-2 font-heading font-semibold ${compact ? "text-base" : "text-lg"}`}>
+            <Activity className="h-5 w-5 text-primary" />
+            Performance
+          </h3>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            Meta do período calculada por {businessDays} {businessDays === 1 ? "dia útil" : "dias úteis"} • segunda a sexta
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
+          {PERIOD_OPTIONS.map((item) => (
             <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                period === p
+              key={item.key}
+              onClick={() => setPeriod(item.key)}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                period === item.key
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {p === "today" ? "Hoje" : p === "7d" ? "7 dias" : "30 dias"}
+              {item.label}
             </button>
           ))}
         </div>
       </div>
 
-      {typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost' && (
-        <div className="mt-3 p-3 rounded-md bg-muted/40 text-xs">
-          <strong>DEBUG (localhost):</strong>
-          <div>newLeadsToday: {newLeadsToday.length} — ids: {newLeadsTodayIds.join(', ')}</div>
-          <div>followUpsDoneToday: {followUpsDoneToday.length} — ids: {followUpsDoneTodayIds.join(', ')}</div>
-          <div>appointmentsMadeToday: {appointmentsMadeToday.length} — ids: {appointmentsMadeTodayIds.join(', ')}</div>
-          <div>reschedulesToday: {reschedulesToday.length} — ids: {reschedulesTodayIds.join(', ')}</div>
-          <div className="mt-2">Atendimentos hoje (deduplicados): {atendimentosHoje} — exemplos: {allToday.slice(0,10).map(l=>l.id+':'+l.nome).join(', ')}</div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
-        <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-green-50/50 border border-green-200/50">
-          <div className="mb-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
-              Atendimentos
-            </p>
-            <p className="text-2xl font-bold text-green-600">{totalAtendimentos}</p>
-            <p className="text-[10px] text-muted-foreground">Período: meta {META_ATENDIMENTOS}/dia</p>
-          </div>
-          <ProgressWithLabel
-            label="Hoje"
-            current={atendimentosHoje}
-            goal={META_ATENDIMENTOS}
-            variant="success"
-          />
-        </div>
-
-        <div className="p-4 rounded-lg bg-gradient-to-br from-yellow-50 to-yellow-50/50 border border-yellow-200/50">
-          <div className="mb-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
-              Follow-ups
-            </p>
-            <p className="text-2xl font-bold text-yellow-700">{totalFollowUps}</p>
-            <p className="text-[10px] text-muted-foreground">Somente envios/ações realmente concluídos</p>
-          </div>
-          <ProgressWithLabel
-            label="Hoje"
-            current={checksDoneToday}
-            goal={META_FOLLOWUPS}
-            variant="warning"
-          />
-        </div>
-
-        <div className="p-4 rounded-lg bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-200/50">
-          <div className="mb-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
-              Agendamentos
-            </p>
-            <p className="text-2xl font-bold text-blue-600">{totalAgendamentos}</p>
-            <p className="text-[10px] text-muted-foreground">Período: meta {META_AGENDAMENTOS}/dia</p>
-          </div>
-          <ProgressWithLabel
-            label="Hoje"
-            current={agendamentosHoje}
-            goal={META_AGENDAMENTOS}
-            variant="info"
-            showTrophy={true}
-          />
-        </div>
-
-        <div className="p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
-          <div className="mb-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
-              Reagendamentos
-            </p>
-            <p className="text-2xl font-bold text-amber-600">{totalReagendamentos}</p>
-            <p className="text-[10px] text-muted-foreground">Período: reagendamentos registrados</p>
-          </div>
-          <ProgressWithLabel
-            label="Hoje"
-            current={reagendamentosHoje}
-            goal={META_REAGENDAMENTOS}
-            variant="warning"
-          />
-        </div>
-
-        <div className="p-4 rounded-lg bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200/50">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-1 flex items-center gap-1">
-            <TrendingUp className="h-3 w-3" />
-            Conversão Hoje
-          </p>
-          <p className="text-2xl font-bold text-amber-600">{taxaHoje}%</p>
-          <p className="text-[10px] text-muted-foreground mt-3">
-            {agendamentosHoje} agendamentos de {atendimentosHoje} atendimentos
-          </p>
-        </div>
+      <div className={`mb-5 grid grid-cols-2 gap-3 ${compact ? "sm:grid-cols-5" : "lg:grid-cols-5"}`}>
+        {metrics.map((metric) => (
+          <PerformanceMetricCard key={metric.label} {...metric} compact={compact} />
+        ))}
       </div>
 
       {period !== "today" && (
         <>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={compact ? 210 : 220}>
             <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
@@ -272,14 +366,24 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
                 stroke="hsl(var(--primary))"
                 strokeDasharray="4 4"
                 strokeOpacity={0.5}
-                label={{ value: `Meta ${META_ATENDIMENTOS}`, fontSize: 9, fill: "hsl(var(--primary))", position: "insideTopRight" }}
+                label={{
+                  value: `Meta ${META_ATENDIMENTOS}`,
+                  fontSize: 9,
+                  fill: "hsl(var(--primary))",
+                  position: "insideTopRight",
+                }}
               />
               <ReferenceLine
                 y={META_AGENDAMENTOS}
                 stroke="#2563eb"
                 strokeDasharray="4 4"
                 strokeOpacity={0.5}
-                label={{ value: `Meta ${META_AGENDAMENTOS}`, fontSize: 9, fill: "#2563eb", position: "insideTopRight" }}
+                label={{
+                  value: `Meta ${META_AGENDAMENTOS}`,
+                  fontSize: 9,
+                  fill: "#2563eb",
+                  position: "insideTopRight",
+                }}
               />
 
               <Line
@@ -318,14 +422,14 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
             </LineChart>
           </ResponsiveContainer>
 
-          <p className="text-[10px] text-muted-foreground mt-2 text-center">
+          <p className="mt-2 text-center text-[10px] text-muted-foreground">
             Atendimentos = contatos únicos trabalhados no dia &nbsp;|&nbsp; Follow-ups = ações concluídas &nbsp;|&nbsp; Agendamentos = consultas criadas
           </p>
         </>
       )}
 
       {period === "today" && (
-        <p className="text-[10px] text-muted-foreground text-center mt-2">
+        <p className="mt-1 text-center text-[10px] text-muted-foreground">
           Progresso em tempo real das metas do dia
         </p>
       )}

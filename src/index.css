@@ -121,3 +121,137 @@
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 }
+
+/* Dashboard novo: mantém Performance e Lembretes alinhados sem criar área vazia.
+   Hoje fica compacto; períodos históricos crescem apenas o necessário para o gráfico. */
+@media (min-width: 1024px) {
+  .glass-card:has(.lucide-activity) {
+    height: 285px;
+  }
+
+  .glass-card:has(.lucide-activity) + .glass-card:has(.lucide-bell) {
+    height: 285px;
+  }
+
+  .glass-card:has(.lucide-activity):has(.recharts-responsive-container) {
+    height: 490px;
+  }
+
+  .glass-card:has(.lucide-activity):has(.recharts-responsive-container) + .glass-card:has(.lucide-bell) {
+    height: 490px;
+  }
+}
+
+/* Navegação principal: acompanha a mesma largura útil do restante do dashboard. */
+@media (min-width: 1024px) {
+  div[class*="max-w-[1180px]"] {
+    max-width: 100% !important;
+  }
+}
+
+/* Comparação de Períodos: dark premium integrado ao restante do dashboard.
+   Mantém personalidade e contraste, mas usa tipografia e acentos da OdontoCompany. */
+[class~="bg-[#1C1C1E]"] {
+  background: linear-gradient(180deg, hsl(138 30% 10%) 0%, hsl(138 32% 8%) 100%);
+  color: hsl(0 0% 95%);
+  border-color: hsl(138 22% 19%);
+  box-shadow: 0 14px 34px rgb(10 35 20 / 0.12);
+  padding: 1.25rem;
+}
+
+[class~="bg-[#1C1C1E]"] h3 {
+  font-family: var(--font-heading);
+  color: hsl(0 0% 96%);
+  letter-spacing: -0.01em;
+}
+
+[class~="bg-[#1C1C1E]"] .lucide-trending-up {
+  color: hsl(135 57% 50%);
+}
+
+[class~="bg-[#1C1C1E]"] .text-white,
+[class~="bg-[#1C1C1E]"] .text-gray-300 {
+  color: hsl(0 0% 94%);
+}
+
+[class~="bg-[#1C1C1E]"] .text-gray-400 {
+  color: hsl(135 8% 70%);
+}
+
+[class~="bg-[#1C1C1E]"] .text-gray-500,
+[class~="bg-[#1C1C1E]"] .text-gray-600 {
+  color: hsl(135 7% 55%);
+}
+
+[class~="bg-[#1C1C1E]"] .text-indigo-300,
+[class~="bg-[#1C1C1E]"] .text-indigo-400,
+[class~="bg-[#1C1C1E]"] .text-teal-400 {
+  color: hsl(135 57% 50%);
+}
+
+[class~="bg-[#1C1C1E]"] .bg-gray-900 {
+  background: hsl(138 27% 12%);
+}
+
+[class~="bg-[#1C1C1E]"] .bg-gray-800 {
+  background: hsl(138 22% 16%);
+}
+
+[class~="bg-[#1C1C1E]"] .border-gray-800,
+[class~="bg-[#1C1C1E]"] .border-gray-700 {
+  border-color: hsl(138 20% 21%);
+}
+
+[class~="bg-[#1C1C1E]"] .bg-indigo-500 {
+  background: hsl(135 57% 40%);
+  box-shadow: 0 0 0 1px hsl(135 57% 50% / 0.2), 0 6px 18px hsl(135 57% 20% / 0.18);
+}
+
+[class~="bg-[#1C1C1E]"] .bg-indigo-500.text-white {
+  color: #fff;
+}
+
+[class~="bg-[#1C1C1E]"] button:not([style]) {
+  border-color: hsl(138 20% 22%);
+}
+
+[class~="bg-[#1C1C1E]"] button[style] {
+  color: #fff;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.16);
+}
+
+[class~="bg-[#1C1C1E]"] .hover\:bg-gray-700:hover {
+  background: hsl(138 24% 20%);
+}
+
+[class~="bg-[#1C1C1E]"] .recharts-cartesian-grid line {
+  stroke: hsl(138 18% 22%) !important;
+}
+
+[class~="bg-[#1C1C1E]"] .recharts-cartesian-axis-tick-value {
+  fill: hsl(135 8% 67%) !important;
+}
+
+[class~="bg-[#1C1C1E]"] .recharts-cartesian-axis-line {
+  stroke: hsl(138 18% 23%) !important;
+}
+
+[class~="bg-[#1C1C1E]"] .recharts-reference-line line {
+  stroke: hsl(135 18% 35%) !important;
+}
+
+[class~="bg-[#1C1C1E]"] .recharts-default-tooltip {
+  background: hsl(138 28% 11%) !important;
+  border-color: hsl(138 20% 24%) !important;
+  color: hsl(0 0% 95%) !important;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.28);
+}
+
+[class~="bg-[#1C1C1E]"] .recharts-tooltip-label,
+[class~="bg-[#1C1C1E]"] .recharts-tooltip-item {
+  color: hsl(0 0% 94%) !important;
+}
+
+[class~="bg-[#1C1C1E]"] .recharts-legend-item-text {
+  font-family: var(--font-body);
+}
