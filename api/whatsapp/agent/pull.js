@@ -65,10 +65,25 @@ function reminderMessages(lead, parsed) {
   };
 }
 
+function sameSchedule(scheduleData, spec, appointmentValue) {
+  return Boolean(
+    scheduleData &&
+    String(scheduleData.automationType || "") === spec.automationType &&
+    String(scheduleData.appointmentValue || "") === appointmentValue &&
+    String(scheduleData.sendAfter || "") === spec.sendAfter.toISOString() &&
+    String(scheduleData.expiresAt || "") === spec.expiresAt.toISOString() &&
+    String(scheduleData.message || "") === spec.message
+  );
+}
+
 /**
  * Migra/garante a nova régua para agendamentos que já existiam antes do deploy.
  * Trabalha apenas com as próximas 72h; consultas mais distantes serão preparadas
  * automaticamente quando entrarem nessa janela.
+ *
+ * Importante: não cria lembrete retroativo. Se o horário exato de um slot já passou
+ * e não havia programação anterior, esperamos o próximo slot. Uma fila que falhou,
+ * porém, pode ser tentada novamente até 3 vezes enquanto a janela ainda estiver aberta.
  */
 async function ensureUpcomingAppointmentReminders(db, clinicId) {
   const clinicRef = db.collection("clinics").doc(clinicId);
@@ -152,15 +167,25 @@ async function ensureUpcomingAppointmentReminders(db, clinicId) {
     if (legacyWrites) await legacyBatch.commit();
 
     for (const spec of specs) {
-      if (spec.expiresAt <= now) continue;
-
       const id = `appt_${safeId(leadId)}_${parsed.key}_${spec.suffix}`;
       const queueRef = queueCol.doc(id);
       const scheduleRef = scheduleCol.doc(id);
       const [queueSnap, scheduleSnap] = await Promise.all([queueRef.get(), scheduleRef.get()]);
-      const queueStatus = queueSnap.exists ? String(queueSnap.data()?.status || "") : "";
+      const queueData = queueSnap.exists ? (queueSnap.data() || {}) : {};
+      const queueStatus = String(queueData.status || "");
+      const attempts = Number(queueData.attempts || 0) || 0;
 
-      if (["pending", "leased", "sent"].includes(queueStatus)) continue;
+      // Slot já fora da janela: remove uma programação antiga, se existir.
+      if (spec.expiresAt <= now) {
+        if (scheduleSnap.exists) {
+          await scheduleRef.delete();
+          touched += 1;
+        }
+        continue;
+      }
+
+      // Nunca recria envio concluído/cancelado nem interfere em item atualmente em lease.
+      if (["pending", "leased", "sent", "cancelled"].includes(queueStatus)) continue;
 
       const baseData = {
         clinicId,
@@ -178,28 +203,51 @@ async function ensureUpcomingAppointmentReminders(db, clinicId) {
         createdAt: scheduleSnap.exists ? (scheduleSnap.data()?.createdAt || nowIso) : nowIso,
         updatedAt: nowIso,
         createdBy: "agent-backfill",
-        attempts: 0,
+        attempts,
       };
 
-      if (spec.sendAfter <= now) {
-        // Estamos dentro da janela deste slot: coloca na fila agora.
+      // Falhou no envio? Retenta no máximo 3 vezes enquanto a janela estiver aberta.
+      if (queueStatus === "failed") {
+        if (attempts >= 3) continue;
         await queueRef.set({
           ...baseData,
           status: "pending",
           sendAfter: nowIso,
-          migratedAt: nowIso,
-        }, { merge: true });
-        if (scheduleSnap.exists) await scheduleRef.delete();
-        touched += 1;
-      } else {
-        await scheduleRef.set({
-          ...baseData,
-          queueId: id,
-          sendAfter: spec.sendAfter.toISOString(),
-          migratedAt: nowIso,
+          retryAt: nowIso,
         }, { merge: true });
         touched += 1;
+        continue;
       }
+
+      if (spec.sendAfter <= now) {
+        // Sem fila anterior e horário já passou: não cria mensagem retroativa.
+        // Se já havia um schedule legado, apenas corrige sua janela e deixa a promoção decidir.
+        if (scheduleSnap.exists) {
+          const scheduleData = scheduleSnap.data() || {};
+          if (!sameSchedule(scheduleData, spec, appointmentValue)) {
+            await scheduleRef.set({
+              ...baseData,
+              queueId: id,
+              sendAfter: spec.sendAfter.toISOString(),
+              migratedAt: nowIso,
+            }, { merge: true });
+            touched += 1;
+          }
+        }
+        continue;
+      }
+
+      // Futuro: cria uma vez e só atualiza se a definição mudou.
+      const scheduleData = scheduleSnap.exists ? (scheduleSnap.data() || {}) : null;
+      if (sameSchedule(scheduleData, spec, appointmentValue)) continue;
+
+      await scheduleRef.set({
+        ...baseData,
+        queueId: id,
+        sendAfter: spec.sendAfter.toISOString(),
+        migratedAt: nowIso,
+      }, { merge: true });
+      touched += 1;
     }
   }
 
@@ -240,7 +288,7 @@ async function promoteDueScheduled(db, clinicId) {
       !lead ||
       !appointmentMatches ||
       isFinalLead(lead) ||
-      ["pending", "leased", "sent"].includes(existingStatus)
+      ["pending", "leased", "sent", "cancelled"].includes(existingStatus)
     ) {
       batch.delete(scheduleDoc.ref);
       return;
