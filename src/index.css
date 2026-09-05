@@ -142,6 +142,13 @@
   }
 }
 
+/* Navegação principal: acompanha a mesma largura útil do restante do dashboard. */
+@media (min-width: 1024px) {
+  div[class*="max-w-[1180px]"] {
+    max-width: 100% !important;
+  }
+}
+
 /* Comparação de Períodos: dark premium integrado ao restante do dashboard.
    Mantém personalidade e contraste, mas usa tipografia e acentos da OdontoCompany. */
 [class~="bg-[#1C1C1E]"] {
