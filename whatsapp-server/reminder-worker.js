@@ -3,6 +3,8 @@ import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import fs from 'fs';
 import { attachLastWriter } from './lib/crmGuard.mjs';
+import { sendTextMessage } from './services/zapi-client.js';
+import { getClinicZApiConfig, normalizeForZApi } from './services/lead-triage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,6 +31,8 @@ const NEXT_SENDS_FILE = resolve(__dirname, 'next-sends.json');
 const SEND_FAILURES_FILE = resolve(__dirname, 'send-failures.json');
 const SENT_LEDGER_FILE = resolve(__dirname, 'reminder-sent-ledger.json');
 
+// Cada slot tem uma janela própria. Se o servidor ficar offline e a janela passar,
+// aquele slot é descartado em vez de ser enviado atrasado junto com os próximos.
 const SLOT_CONFIG = {
   '24h': { hoursBefore: 24, closesHoursBefore: 12 },
   '12h': { hoursBefore: 12, closesHoursBefore: 1 },
@@ -64,14 +68,14 @@ function generateReminderText(lead, slot) {
   const name = firstName(lead.nome);
 
   if (slot === '24h') {
-    return `Olá, ${name}! Tudo bem?\n\nPassando para lembrar da sua consulta na OdontoCompany Olímpia amanhã, dia ${date}, às ${time}.\n\nJá deixamos tudo reservado para o seu atendimento.\n\nAté amanhã! 🦷💚`;
+    return `Olá, ${name}! Tudo bem?\n\nPassando para lembrar da sua consulta na OdontoCompany Olímpia, dia ${date}, às ${time}.\n\nJá deixamos tudo reservado para o seu atendimento.\n\nTe esperamos! 🦷💚`;
   }
 
   if (slot === '12h') {
-    return `Olá, ${name}! Tudo bem?\n\nSó reforçando o seu horário na OdontoCompany Olímpia: ${date}, às ${time}.\n\nSeu atendimento está reservado e estaremos te aguardando. 💚`;
+    return `Olá, ${name}! Tudo bem?\n\nSó reforçando o seu horário na OdontoCompany Olímpia: dia ${date}, às ${time}.\n\nSeu atendimento está reservado e estaremos te aguardando. 💚`;
   }
 
-  return `Olá, ${name}! 💚\n\nSeu horário na OdontoCompany Olímpia é daqui a 1 hora, às ${time}.\n\nJá estamos preparando sua sala e te aguardamos por aqui.\n\nAté já! ✨`;
+  return `Olá, ${name}! 💚\n\nEstá chegando a hora do seu atendimento na OdontoCompany Olímpia. Seu horário é às ${time}.\n\nJá estamos preparando sua sala e te aguardamos por aqui.\n\nAté já! ✨`;
 }
 
 function normalizePhone(phone) {
@@ -169,38 +173,56 @@ async function backendConnected() {
   }
 }
 
-async function getLastOutboundMessageTime(phoneId) {
-  try {
-    const snap = await db.collection('conversations')
-      .doc(phoneId)
-      .collection('messages')
-      .where('fromMe', '==', true)
-      .orderBy('timestamp', 'desc')
-      .limit(1)
-      .get();
+async function getZApiCredentials() {
+  const config = await getClinicZApiConfig(CLINIC_ID);
+  const envKey = CLINIC_ID.toUpperCase().replace(/-/g, '_');
+  const instanceId = config?.instanceId || process.env[`ZAPI_INSTANCE_${envKey}`] || process.env.ZAPI_INSTANCE_ID;
+  const instanceToken = config?.instanceToken || process.env[`ZAPI_TOKEN_${envKey}`] || process.env.ZAPI_TOKEN;
+  return instanceId && instanceToken ? { instanceId, instanceToken } : null;
+}
 
-    if (snap.empty) return null;
-    const value = snap.docs[0].data()?.timestamp;
-    if (!value) return null;
-    return value instanceof admin.firestore.Timestamp ? value.toDate() : new Date(value);
-  } catch (error) {
-    console.warn('[reminder-worker] Não foi possível checar cooldown:', error.message);
-    return null;
+async function getLastOutboundMessageTime(phoneId, originalPhone) {
+  const possibleIds = new Set([phoneId]);
+  try {
+    possibleIds.add(normalizeForZApi(originalPhone));
+  } catch {}
+
+  let latest = null;
+  for (const id of possibleIds) {
+    if (!id) continue;
+    try {
+      const snap = await db.collection('conversations')
+        .doc(id)
+        .collection('messages')
+        .where('fromMe', '==', true)
+        .orderBy('timestamp', 'desc')
+        .limit(1)
+        .get();
+
+      if (snap.empty) continue;
+      const value = snap.docs[0].data()?.timestamp;
+      if (!value) continue;
+      const date = value instanceof admin.firestore.Timestamp ? value.toDate() : new Date(value);
+      if (!Number.isNaN(date.getTime()) && (!latest || date > latest)) latest = date;
+    } catch (error) {
+      console.warn(`[reminder-worker] Não foi possível checar cooldown em conversations/${id}:`, error.message);
+    }
   }
+  return latest;
 }
 
 async function cooldownAllows(lead) {
   const phoneId = ensure10DigitsLocal(lead.telefone);
   if (!phoneId) return false;
-  const lastOutbound = await getLastOutboundMessageTime(phoneId);
+  const lastOutbound = await getLastOutboundMessageTime(phoneId, lead.telefone);
   if (!lastOutbound) return true;
   const diffMinutes = (Date.now() - lastOutbound.getTime()) / 60000;
   return diffMinutes >= COOLDOWN_MINUTES;
 }
 
 function activeSlotForLead(lead, now, appointment) {
-  const ordered = ['1h', '12h', '24h'];
-  for (const slot of ordered) {
+  // Mais próximo da consulta ganha prioridade caso haja qualquer sobreposição acidental.
+  for (const slot of ['1h', '12h', '24h']) {
     if (slotAlreadySent(lead, slot)) continue;
     const { start, end } = computeSlotWindow(appointment, slot);
     if (now >= start && now < end) return slot;
@@ -228,13 +250,71 @@ function futureSlotsForLead(lead, now, appointment) {
   return out;
 }
 
-async function sendReminder(lead, slot) {
+async function saveZApiOutboundMessage(lead, slot, message, zapiData) {
+  try {
+    const phone = normalizeForZApi(lead.telefone);
+    const msgId = String(zapiData?.messageId || zapiData?.id || `reminder-${slot}-${Date.now()}`);
+    const convRef = db.collection('conversations').doc(phone);
+    const msgRef = convRef.collection('messages').doc(msgId);
+    const timestamp = admin.firestore.Timestamp.now();
+
+    await msgRef.set({
+      id: msgId,
+      body: message,
+      fromMe: true,
+      timestamp,
+      read: true,
+      source: 'z-api-reminder',
+      reminderSlot: slot,
+      clinicId: CLINIC_ID,
+    }, { merge: true });
+
+    await convRef.set({
+      telefone: phone,
+      leadNome: lead.nome || null,
+      lastMessage: message,
+      lastMessageAt: timestamp,
+      unreadCount: 0,
+    }, { merge: true });
+  } catch (error) {
+    console.warn('[reminder-worker] Lembrete enviado, mas falhou ao registrar conversa Z-API:', error.message);
+  }
+}
+
+async function sendReminder(lead, slot, zapiCredentials) {
+  const message = generateReminderText(lead, slot);
+
+  // Preferência: Z-API, porque não depende do Chrome/WhatsApp Web local.
+  if (zapiCredentials) {
+    try {
+      const phone = normalizeForZApi(lead.telefone);
+      const result = await sendTextMessage(
+        zapiCredentials.instanceId,
+        zapiCredentials.instanceToken,
+        phone,
+        message,
+      );
+
+      if (result.success) {
+        await saveZApiOutboundMessage(lead, slot, message, result.data);
+        return { transport: 'z-api', data: result.data };
+      }
+      console.warn(`[reminder-worker] Z-API falhou para ${lead.nome}; tentando servidor local: ${result.error}`);
+    } catch (error) {
+      console.warn(`[reminder-worker] Erro Z-API para ${lead.nome}; tentando servidor local: ${error.message}`);
+    }
+  }
+
+  if (!(await backendConnected())) {
+    throw new Error('Z-API indisponível e servidor WhatsApp local desconectado');
+  }
+
   const response = await fetch(`${BACKEND_URL}/send-message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       telefone: lead.telefone,
-      message: generateReminderText(lead, slot),
+      message,
       isReminder: true,
       reminderSlot: slot,
       clinicId: CLINIC_ID,
@@ -246,7 +326,8 @@ async function sendReminder(lead, slot) {
     const body = await response.text();
     throw new Error(`HTTP ${response.status}: ${body}`);
   }
-  return response.json();
+
+  return { transport: 'whatsapp-web', data: await response.json() };
 }
 
 async function markSentInFirestore(leadId, slot, timestamp) {
@@ -293,17 +374,18 @@ async function runReminderCycle() {
     return;
   }
 
-  const connected = await backendConnected();
-  if (!connected) {
-    console.warn('[reminder-worker] WhatsApp/backend offline. Nenhum lembrete será enviado nesta rodada.');
-    return;
-  }
-
   const ref = clinicDocRef();
   const snap = await ref.get();
   if (!snap.exists) {
     console.error(`[reminder-worker] Documento clinics/${CLINIC_ID}/shared/shared não encontrado`);
     return;
+  }
+
+  const zapiCredentials = await getZApiCredentials();
+  if (zapiCredentials) {
+    console.log('[reminder-worker] Transporte preferencial: Z-API (fallback WhatsApp Web)');
+  } else {
+    console.log('[reminder-worker] Z-API não configurada; usando WhatsApp Web local');
   }
 
   const leads = Array.isArray(snap.data()?.leads) ? snap.data().leads : [];
@@ -336,14 +418,14 @@ async function runReminderCycle() {
 
     try {
       console.log(`[reminder-worker] Enviando ${slot} para ${lead.nome} (${lead.dataAgendamento})`);
-      await sendReminder(lead, slot);
+      const result = await sendReminder(lead, slot, zapiCredentials);
 
       const sentAt = new Date();
       markLocalLedger(lead.id, slot, sentAt);
       clearFailure(lead.id, slot);
       await markSentInFirestore(lead.id, slot, sentAt);
       sentCount += 1;
-      console.log(`[reminder-worker] ✅ ${lead.nome}: ${slot} enviado e registrado`);
+      console.log(`[reminder-worker] ✅ ${lead.nome}: ${slot} enviado via ${result.transport} e registrado`);
     } catch (error) {
       recordFailure(lead, slot, error.message);
       console.error(`[reminder-worker] ❌ ${lead.nome}: falha no ${slot}:`, error.message);
