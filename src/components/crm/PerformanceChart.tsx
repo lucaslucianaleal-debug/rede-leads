@@ -19,6 +19,7 @@ import {
 
 interface PerformanceChartProps {
   leads: Lead[];
+  followUpGoal?: number;
 }
 
 type PeriodKey = "today" | "7d" | "30d";
@@ -26,9 +27,8 @@ type PeriodKey = "today" | "7d" | "30d";
 const META_ATENDIMENTOS = 40;
 const META_AGENDAMENTOS = 10;
 const META_REAGENDAMENTOS = 5;
-const META_FOLLOWUPS = 20;
 
-export function PerformanceChart({ leads }: PerformanceChartProps) {
+export function PerformanceChart({ leads, followUpGoal = 20 }: PerformanceChartProps) {
   const [period, setPeriod] = useState<PeriodKey>("today");
 
   const days = period === "today" ? 1 : period === "7d" ? 7 : 30;
@@ -191,7 +191,7 @@ export function PerformanceChart({ leads }: PerformanceChartProps) {
           <ProgressWithLabel
             label="Hoje"
             current={checksDoneToday}
-            goal={META_FOLLOWUPS}
+            goal={followUpGoal}
             variant="warning"
           />
         </div>

@@ -6,6 +6,7 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { Lead } from "@/types/crm";
 import { CLINICAS } from "@/hooks/useCupons";
 import { StatsCards } from "@/components/crm/StatsCards";
+import { DashboardMonthlySummary } from "@/components/crm/DashboardMonthlySummary";
 import { FollowUpQueue } from "@/components/crm/FollowUpQueue";
 import { CallReturnQueue } from "@/components/crm/CallReturnQueue";
 import { AuthComponent } from "@/components/crm/AuthComponent";
@@ -33,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Download, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, Plus, Inbox, Ticket, BookOpen, Menu, TrendingUp } from "lucide-react";
+import { Download, Calendar as CalendarIcon, LayoutDashboard, Database, Trash2, Copy, FileText, FileSpreadsheet, CalendarCheck, MoreVertical, Plus, Inbox, Ticket, BookOpen, Menu, TrendingUp, RotateCcw, Sparkles } from "lucide-react";
 import { CreateLeadDialog } from "@/components/crm/CreateLeadDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FunnelIcon } from "@/components/FunnelIcon";
@@ -97,6 +98,10 @@ const CRMDashboard = () => {
   const [clientTab, setClientTab] = useState("agenda");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newLeadsCount, setNewLeadsCount] = useState(0);
+  const [dashboardVersion, setDashboardVersion] = useState<"classic" | "new">(() => {
+    if (typeof window === "undefined") return "new";
+    return localStorage.getItem("rede-leads-dashboard-version") === "classic" ? "classic" : "new";
+  });
   const [isClient, setIsClient] = useState(false);
   const [clientClinicIds, setClientClinicIds] = useState<string[]>([]);
   const isMpcToolOnly = role === "mpc_tool";
@@ -508,37 +513,86 @@ const CRMDashboard = () => {
           </div>
 
           <TabsContent value="dashboard" className="space-y-6 mt-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <StatsCards stats={stats} />
-            </motion.div>
-
-            <div className="grid lg:grid-cols-2 gap-4 items-start">
-              <div className="space-y-4">
-                <FollowUpQueue 
-                  leads={followUpQueue}
-                  allLeads={allLeads}
-                  onSendFollowUp={handleFollowUp}
-                  onDeleteLead={deleteLead}
-                  onRegisterCall={handleRegisterCall}
-                  followUpsDoneToday={followUpsDoneToday}
-                  followUpGoal={followUpGoal}
-                  onCreateLead={handleCreateLead}
-                  onUpdateLead={(id, updates) => updateLead(id, updates)}
-                />
-                {callReturnQueue.length > 0 && (
-                  <CallReturnQueue
-                    leads={callReturnQueue}
-                    onRegisterCall={handleRegisterCall}
-                    onClearReturn={clearCallReturn}
-                  />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => {
+                  const nextVersion = dashboardVersion === "new" ? "classic" : "new";
+                  setDashboardVersion(nextVersion);
+                  localStorage.setItem("rede-leads-dashboard-version", nextVersion);
+                }}
+              >
+                {dashboardVersion === "new" ? (
+                  <>
+                    <RotateCcw className="h-4 w-4" />
+                    Ver painel anterior
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Testar painel novo
+                  </>
                 )}
-              </div>
-              <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} />
+              </Button>
             </div>
 
-            {/* Gráfico de performance */}
-            <PerformanceChart leads={allLeads} />
-            <ComparisonChart leads={allLeads} />
+            {dashboardVersion === "classic" ? (
+              <>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <StatsCards stats={stats} />
+                </motion.div>
+
+                <div className="grid lg:grid-cols-2 gap-4 items-start">
+                  <div className="space-y-4">
+                    <FollowUpQueue
+                      leads={followUpQueue}
+                      allLeads={allLeads}
+                      onSendFollowUp={handleFollowUp}
+                      onDeleteLead={deleteLead}
+                      onRegisterCall={handleRegisterCall}
+                      followUpsDoneToday={followUpsDoneToday}
+                      followUpGoal={followUpGoal}
+                      onCreateLead={handleCreateLead}
+                      onUpdateLead={(id, updates) => updateLead(id, updates)}
+                    />
+                    {callReturnQueue.length > 0 && (
+                      <CallReturnQueue
+                        leads={callReturnQueue}
+                        onRegisterCall={handleRegisterCall}
+                        onClearReturn={clearCallReturn}
+                      />
+                    )}
+                  </div>
+                  <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} />
+                </div>
+
+                <PerformanceChart leads={allLeads} />
+                <ComparisonChart leads={allLeads} />
+              </>
+            ) : (
+              <>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <DashboardMonthlySummary leads={allLeads} />
+                </motion.div>
+
+                <div className={`grid gap-4 items-start ${callReturnQueue.length > 0 ? "xl:grid-cols-[minmax(0,1.5fr)_minmax(340px,1fr)]" : "grid-cols-1"}`}>
+                  <CalendarView leads={leads} onMarkReminder={handleReminder} onUpdateLead={(id, updates) => updateLead(id, updates)} />
+                  {callReturnQueue.length > 0 && (
+                    <CallReturnQueue
+                      leads={callReturnQueue}
+                      onRegisterCall={handleRegisterCall}
+                      onClearReturn={clearCallReturn}
+                    />
+                  )}
+                </div>
+
+                <PerformanceChart leads={allLeads} followUpGoal={100} />
+                <ComparisonChart leads={allLeads} />
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="dashboard-executivo" className="mt-6">
