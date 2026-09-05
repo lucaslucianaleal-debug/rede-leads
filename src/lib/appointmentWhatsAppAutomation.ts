@@ -1,5 +1,5 @@
 import type { Lead } from "@/types/crm";
-import { generateAppointmentConfirmationTextForClinic, generateReminderText } from "@/lib/whatsapp";
+import { generateAppointmentConfirmationTextForClinic } from "@/lib/whatsapp";
 
 type FirebaseUserLike = {
   getIdToken: () => Promise<string>;
@@ -27,6 +27,27 @@ export type AppointmentAutomationResult = {
   skipped?: string[];
 };
 
+function buildReminderMessages(dataAgendamento: string, firstName: string) {
+  const [date = "[Data]", time = "[Horário]"] = String(dataAgendamento || "").split(" ");
+
+  return {
+    h24:
+      `Olá, ${firstName}! Tudo bem?\n\n` +
+      `Passando para lembrar da sua consulta na OdontoCompany Olímpia, dia ${date}, às ${time}.\n\n` +
+      `Já deixamos tudo reservado para o seu atendimento.\n\n` +
+      `Te esperamos! 🦷💚`,
+    h12:
+      `Olá, ${firstName}! Tudo bem?\n\n` +
+      `Só reforçando o seu horário na OdontoCompany Olímpia: dia ${date}, às ${time}.\n\n` +
+      `Seu atendimento está reservado e estaremos te aguardando. 💚`,
+    h1:
+      `Olá, ${firstName}! 💚\n\n` +
+      `Está chegando a hora do seu atendimento na OdontoCompany Olímpia. Seu horário é às ${time}.\n\n` +
+      `Já estamos preparando sua sala e te aguardamos por aqui.\n\n` +
+      `Até já! ✨`,
+  };
+}
+
 export async function scheduleAppointmentWhatsAppAutomation({
   user,
   clinicId,
@@ -42,6 +63,7 @@ export async function scheduleAppointmentWhatsAppAutomation({
 
   const firstName = (lead.nome || "").trim().split(/\s+/)[0] || "";
   const services = lead.servicoProcurado ? [lead.servicoProcurado] : [];
+  const reminders = buildReminderMessages(dataAgendamento, firstName);
   const messages = {
     confirmation:
       confirmationMessage?.trim() ||
@@ -51,8 +73,7 @@ export async function scheduleAppointmentWhatsAppAutomation({
         firstName,
         services,
       ),
-    h24: generateReminderText(dataAgendamento, "h24", firstName),
-    today: generateReminderText(dataAgendamento, "today", firstName),
+    ...reminders,
   };
 
   const token = await user.getIdToken();

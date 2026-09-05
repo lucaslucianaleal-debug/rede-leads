@@ -34,7 +34,7 @@ describe("CalendarView", () => {
     vi.useRealTimers();
   });
 
-  it("mostra separadamente lembretes enviados e programados", () => {
+  it("mostra a régua de 24h, 12h e 1h com enviados e programados", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 8, 4, 12, 0, 0));
 
@@ -63,9 +63,11 @@ describe("CalendarView", () => {
     );
 
     expect(screen.getByText("Enviado")).toBeInTheDocument();
-    expect(screen.getByTitle(/24h antes: Enviado/)).toBeInTheDocument();
-    expect(screen.getAllByText("Programado")).toHaveLength(2);
-    expect(screen.getAllByText("24h antes")).toHaveLength(2);
-    expect(screen.getAllByText("No dia")).toHaveLength(2);
+    expect(screen.getByTitle(/24h: Enviado/)).toBeInTheDocument();
+    expect(screen.getAllByText("24h")).toHaveLength(2);
+    expect(screen.getAllByText("12h")).toHaveLength(2);
+    expect(screen.getAllByText("1h")).toHaveLength(2);
+    expect(screen.queryByText("No dia")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Programado").length).toBeGreaterThanOrEqual(3);
   });
 });

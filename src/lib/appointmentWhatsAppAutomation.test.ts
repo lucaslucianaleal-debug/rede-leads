@@ -7,13 +7,17 @@ describe("scheduleAppointmentWhatsAppAutomation", () => {
     vi.unstubAllGlobals();
   });
 
-  it("envia a mensagem revisada e mantém os lembretes automáticos", async () => {
+  it("envia a confirmação revisada e programa lembretes de 24h, 12h e 1h", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         ok: true,
         confirmationQueued: true,
-        scheduled: ["appointment_reminder_24h", "appointment_reminder_today"],
+        scheduled: [
+          "appointment_reminder_24h",
+          "appointment_reminder_12h",
+          "appointment_reminder_1h",
+        ],
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -38,7 +42,9 @@ describe("scheduleAppointmentWhatsAppAutomation", () => {
 
     expect(body.action).toBe("schedule_appointment");
     expect(body.messages.confirmation).toBe("Mensagem revisada pela atendente");
-    expect(body.messages.h24).toBeTruthy();
-    expect(body.messages.today).toBeTruthy();
+    expect(body.messages.h24).toContain("10/09/2026");
+    expect(body.messages.h12).toContain("14:30");
+    expect(body.messages.h1).toContain("14:30");
+    expect(body.messages.today).toBeUndefined();
   });
 });

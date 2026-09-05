@@ -32,25 +32,30 @@ async function markAppointmentAutomationSent(clinicId, queue, messageId) {
       nextLead.appointmentConfirmationMessageId = messageId || "";
     }
 
-    if (automationType === "appointment_reminder_24h") {
-      nextLead.lembretes = {
-        ...(lead.lembretes || {}),
-        h24: true,
-        sent: {
-          ...(lead.lembretes?.sent || {}),
-          "24h": nowIso,
-        },
-      };
-    }
+    const reminderSlot = automationType === "appointment_reminder_24h"
+      ? "24h"
+      : automationType === "appointment_reminder_12h"
+        ? "12h"
+        : automationType === "appointment_reminder_1h"
+          ? "1h"
+          : automationType === "appointment_reminder_today"
+            ? "today"
+            : null;
 
-    if (automationType === "appointment_reminder_today") {
+    if (reminderSlot) {
+      const sent = {
+        ...(lead.lembretes?.sent || {}),
+        [reminderSlot]: nowIso,
+      };
+
+      // Retrocompatibilidade: h24/today ainda são usados por partes antigas da interface.
+      if (reminderSlot === "1h") sent["1h"] = nowIso;
+
       nextLead.lembretes = {
         ...(lead.lembretes || {}),
-        today: true,
-        sent: {
-          ...(lead.lembretes?.sent || {}),
-          today: nowIso,
-        },
+        h24: reminderSlot === "24h" ? true : Boolean(lead.lembretes?.h24),
+        today: ["1h", "today"].includes(reminderSlot) ? true : Boolean(lead.lembretes?.today),
+        sent,
       };
     }
 
@@ -80,8 +85,7 @@ export default async function handler(req, res) {
 
       // O histórico possui uma única fonte para mensagens enviadas: o evento
       // `message_create` do agente. O endpoint de resultado apenas confirma a fila
-      // e atualiza o lead. Gravar aqui novamente criava dois balões para um envio.
-
+      // e atualiza o lead. Gravar aqui novamente criaria dois balões para um envio.
       return res.status(200).json({ ok: true, leadUpdated: result.leadUpdated || appointmentLeadUpdated });
     }
 

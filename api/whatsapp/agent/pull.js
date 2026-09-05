@@ -1,12 +1,19 @@
 import { getAdminDb } from "../../../server/firebaseAdmin.js";
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
-import { findLeadIndex } from "../../../server/whatsappAgent.js";
+import { canonicalPhoneKey, findLeadIndex, whatsappPhone } from "../../../server/whatsappAgent.js";
+
+function safeId(value) {
+  return String(value || "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .slice(0, 120);
+}
 
 function isFinalLead(lead = {}) {
   const stage = String(lead.etapaLead || "").toLowerCase();
   return Boolean(
     lead._deleted ||
     lead.comparecimento === "COMPARECEU" ||
+    lead.comparecimento === "NÃO COMPARECEU" ||
     lead.lembretes?.disabled === true ||
     stage === "finalizado" ||
     stage === "desistência" ||
@@ -14,6 +21,237 @@ function isFinalLead(lead = {}) {
     stage === "fora da região" ||
     stage === "fora da regiao"
   );
+}
+
+function parseAppointment(value) {
+  const match = String(value || "").trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, day, month, year, hour, minute] = match;
+  const appointment = new Date(`${year}-${month}-${day}T${hour}:${minute}:00-03:00`);
+  if (Number.isNaN(appointment.getTime())) return null;
+  return {
+    appointment,
+    key: `${year}${month}${day}_${hour}${minute}`,
+    date: `${day}/${month}/${year}`,
+    time: `${hour}:${minute}`,
+  };
+}
+
+function hoursBefore(date, hours) {
+  return new Date(date.getTime() - hours * 60 * 60 * 1000);
+}
+
+function firstName(name) {
+  return String(name || "").trim().split(/\s+/)[0] || "";
+}
+
+function reminderMessages(lead, parsed) {
+  const name = firstName(lead.nome);
+  return {
+    "24h":
+      `Olá, ${name}! Tudo bem?\n\n` +
+      `Passando para lembrar da sua consulta na OdontoCompany Olímpia, dia ${parsed.date}, às ${parsed.time}.\n\n` +
+      `Já deixamos tudo reservado para o seu atendimento.\n\n` +
+      `Te esperamos! 🦷💚`,
+    "12h":
+      `Olá, ${name}! Tudo bem?\n\n` +
+      `Só reforçando o seu horário na OdontoCompany Olímpia: dia ${parsed.date}, às ${parsed.time}.\n\n` +
+      `Seu atendimento está reservado e estaremos te aguardando. 💚`,
+    "1h":
+      `Olá, ${name}! 💚\n\n` +
+      `Está chegando a hora do seu atendimento na OdontoCompany Olímpia. Seu horário é às ${parsed.time}.\n\n` +
+      `Já estamos preparando sua sala e te aguardamos por aqui.\n\n` +
+      `Até já! ✨`,
+  };
+}
+
+function sameSchedule(scheduleData, spec, appointmentValue) {
+  return Boolean(
+    scheduleData &&
+    String(scheduleData.automationType || "") === spec.automationType &&
+    String(scheduleData.appointmentValue || "") === appointmentValue &&
+    String(scheduleData.sendAfter || "") === spec.sendAfter.toISOString() &&
+    String(scheduleData.expiresAt || "") === spec.expiresAt.toISOString() &&
+    String(scheduleData.message || "") === spec.message
+  );
+}
+
+/**
+ * Migra/garante a nova régua para agendamentos que já existiam antes do deploy.
+ * Trabalha apenas com as próximas 72h; consultas mais distantes serão preparadas
+ * automaticamente quando entrarem nessa janela.
+ *
+ * Importante: não cria lembrete retroativo. Se o horário exato de um slot já passou
+ * e não havia programação anterior, esperamos o próximo slot. Uma fila que falhou,
+ * porém, pode ser tentada novamente até 3 vezes enquanto a janela ainda estiver aberta.
+ */
+async function ensureUpcomingAppointmentReminders(db, clinicId) {
+  const clinicRef = db.collection("clinics").doc(clinicId);
+  const sharedSnap = await clinicRef.collection("shared").doc("shared").get();
+  if (!sharedSnap.exists) return 0;
+
+  const shared = sharedSnap.data() || {};
+  const leads = Array.isArray(shared.leads) ? shared.leads : [];
+  const scheduleCol = clinicRef.collection("whatsappSchedule");
+  const queueCol = clinicRef.collection("whatsappQueue");
+  const now = new Date();
+  const horizon = new Date(now.getTime() + 72 * 60 * 60 * 1000);
+  const nowIso = now.toISOString();
+  let touched = 0;
+
+  const candidates = leads
+    .filter((lead) => !isFinalLead(lead))
+    .map((lead) => ({ lead, parsed: parseAppointment(lead.dataAgendamento) }))
+    .filter(({ parsed }) => parsed && parsed.appointment > now && parsed.appointment <= horizon)
+    .slice(0, 40);
+
+  for (const { lead, parsed } of candidates) {
+    const leadId = String(lead.id || "").trim();
+    const phone = whatsappPhone(lead.telefone);
+    const phoneKey = canonicalPhoneKey(lead.telefone);
+    if (!leadId || !phone || !phoneKey) continue;
+
+    const messages = reminderMessages(lead, parsed);
+    const appointmentValue = String(lead.dataAgendamento || "");
+    const appointmentIso = parsed.appointment.toISOString();
+    const specs = [
+      {
+        suffix: "24h",
+        automationType: "appointment_reminder_24h",
+        automationLabel: "Lembrete • 24h antes",
+        message: messages["24h"],
+        sendAfter: hoursBefore(parsed.appointment, 24),
+        expiresAt: hoursBefore(parsed.appointment, 12),
+      },
+      {
+        suffix: "12h",
+        automationType: "appointment_reminder_12h",
+        automationLabel: "Lembrete • 12h antes",
+        message: messages["12h"],
+        sendAfter: hoursBefore(parsed.appointment, 12),
+        expiresAt: hoursBefore(parsed.appointment, 1),
+      },
+      {
+        suffix: "1h",
+        automationType: "appointment_reminder_1h",
+        automationLabel: "Lembrete • 1h antes",
+        message: messages["1h"],
+        sendAfter: hoursBefore(parsed.appointment, 1),
+        expiresAt: parsed.appointment,
+      },
+    ];
+
+    // Cancela o lembrete legado "no dia" para este agendamento.
+    const legacyId = `appt_${safeId(leadId)}_${parsed.key}_today`;
+    const legacyScheduleRef = scheduleCol.doc(legacyId);
+    const legacyQueueRef = queueCol.doc(legacyId);
+    const [legacyScheduleSnap, legacyQueueSnap] = await Promise.all([
+      legacyScheduleRef.get(),
+      legacyQueueRef.get(),
+    ]);
+    const legacyBatch = db.batch();
+    let legacyWrites = 0;
+    if (legacyScheduleSnap.exists) {
+      legacyBatch.delete(legacyScheduleRef);
+      legacyWrites += 1;
+    }
+    if (legacyQueueSnap.exists && ["pending", "leased"].includes(String(legacyQueueSnap.data()?.status || ""))) {
+      legacyBatch.set(legacyQueueRef, {
+        status: "cancelled",
+        cancelReason: "replaced_by_1h_reminder",
+        cancelledAt: nowIso,
+        updatedAt: nowIso,
+      }, { merge: true });
+      legacyWrites += 1;
+    }
+    if (legacyWrites) await legacyBatch.commit();
+
+    for (const spec of specs) {
+      const id = `appt_${safeId(leadId)}_${parsed.key}_${spec.suffix}`;
+      const queueRef = queueCol.doc(id);
+      const scheduleRef = scheduleCol.doc(id);
+      const [queueSnap, scheduleSnap] = await Promise.all([queueRef.get(), scheduleRef.get()]);
+      const queueData = queueSnap.exists ? (queueSnap.data() || {}) : {};
+      const queueStatus = String(queueData.status || "");
+      const attempts = Number(queueData.attempts || 0) || 0;
+
+      // Slot já fora da janela: remove uma programação antiga, se existir.
+      if (spec.expiresAt <= now) {
+        if (scheduleSnap.exists) {
+          await scheduleRef.delete();
+          touched += 1;
+        }
+        continue;
+      }
+
+      // Nunca recria envio concluído/cancelado nem interfere em item atualmente em lease.
+      if (["pending", "leased", "sent", "cancelled"].includes(queueStatus)) continue;
+
+      const baseData = {
+        clinicId,
+        leadId,
+        phone,
+        phoneKey,
+        name: String(lead.nome || "").trim().slice(0, 150),
+        message: spec.message.slice(0, 4000),
+        kind: "manual",
+        automationType: spec.automationType,
+        automationLabel: spec.automationLabel,
+        appointmentValue,
+        appointmentIso,
+        expiresAt: spec.expiresAt.toISOString(),
+        createdAt: scheduleSnap.exists ? (scheduleSnap.data()?.createdAt || nowIso) : nowIso,
+        updatedAt: nowIso,
+        createdBy: "agent-backfill",
+        attempts,
+      };
+
+      // Falhou no envio? Retenta no máximo 3 vezes enquanto a janela estiver aberta.
+      if (queueStatus === "failed") {
+        if (attempts >= 3) continue;
+        await queueRef.set({
+          ...baseData,
+          status: "pending",
+          sendAfter: nowIso,
+          retryAt: nowIso,
+        }, { merge: true });
+        touched += 1;
+        continue;
+      }
+
+      if (spec.sendAfter <= now) {
+        // Sem fila anterior e horário já passou: não cria mensagem retroativa.
+        // Se já havia um schedule legado, apenas corrige sua janela e deixa a promoção decidir.
+        if (scheduleSnap.exists) {
+          const scheduleData = scheduleSnap.data() || {};
+          if (!sameSchedule(scheduleData, spec, appointmentValue)) {
+            await scheduleRef.set({
+              ...baseData,
+              queueId: id,
+              sendAfter: spec.sendAfter.toISOString(),
+              migratedAt: nowIso,
+            }, { merge: true });
+            touched += 1;
+          }
+        }
+        continue;
+      }
+
+      // Futuro: cria uma vez e só atualiza se a definição mudou.
+      const scheduleData = scheduleSnap.exists ? (scheduleSnap.data() || {}) : null;
+      if (sameSchedule(scheduleData, spec, appointmentValue)) continue;
+
+      await scheduleRef.set({
+        ...baseData,
+        queueId: id,
+        sendAfter: spec.sendAfter.toISOString(),
+        migratedAt: nowIso,
+      }, { merge: true });
+      touched += 1;
+    }
+  }
+
+  return touched;
 }
 
 async function promoteDueScheduled(db, clinicId) {
@@ -50,7 +288,7 @@ async function promoteDueScheduled(db, clinicId) {
       !lead ||
       !appointmentMatches ||
       isFinalLead(lead) ||
-      ["pending", "leased", "sent"].includes(existingStatus)
+      ["pending", "leased", "sent", "cancelled"].includes(existingStatus)
     ) {
       batch.delete(scheduleDoc.ref);
       return;
@@ -86,9 +324,12 @@ export default async function handler(req, res) {
     const col = db.collection("clinics").doc(clinicId).collection("whatsappQueue");
     const now = Date.now();
 
-    // O agente já consulta mensagens manuais a cada poucos segundos. Para não gerar
-    // leituras desnecessárias, varremos a agenda futura só perto do início de cada minuto.
+    // O agente consulta mensagens manuais a cada poucos segundos. No início de cada
+    // minuto, migramos agendamentos existentes e promovemos os lembretes vencidos.
     if (requestedKind === "manual" && new Date().getUTCSeconds() < 10) {
+      await ensureUpcomingAppointmentReminders(db, clinicId).catch((error) => {
+        console.warn("[whatsapp-agent/pull] falha ao garantir régua de agendamentos:", error?.message || error);
+      });
       await promoteDueScheduled(db, clinicId).catch((error) => {
         console.warn("[whatsapp-agent/pull] falha ao promover lembretes:", error?.message || error);
       });
