@@ -39,6 +39,32 @@ function fromMetaMinorUnits(value, currency) {
   return roundMoney(numeric / minorUnitFactor(currency));
 }
 
+function parseFundingSourceBalance(details) {
+  const display = String(details?.display_string || "").replace(/\u00a0/g, " ").trim();
+  if (!display) return null;
+
+  const matches = display.match(/-?\d[\d.,]*/g);
+  const token = matches?.[matches.length - 1];
+  if (!token) return null;
+
+  const lastComma = token.lastIndexOf(",");
+  const lastDot = token.lastIndexOf(".");
+  let normalized = token;
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    if (lastComma > lastDot) {
+      normalized = token.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = token.replace(/,/g, "");
+    }
+  } else if (lastComma >= 0) {
+    normalized = token.replace(/\./g, "").replace(",", ".");
+  }
+
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) ? roundMoney(numeric) : null;
+}
+
 function daysBetweenIso(fromIso, toIso) {
   if (!fromIso || !toIso) return null;
   const from = new Date(`${fromIso}T12:00:00Z`).getTime();
@@ -173,8 +199,11 @@ async function buildFinancialSnapshot({ account, adAccountId, accessToken, timeZ
   const disableReason = Number(account?.disable_reason || 0) || 0;
   const amountSpent = fromMetaMinorUnits(account?.amount_spent, currency);
   const rawBalance = fromMetaMinorUnits(account?.balance, currency);
+  const fundingSourceBalance = parseFundingSourceBalance(account?.funding_source_details);
   const spendCap = fromMetaMinorUnits(account?.spend_cap, currency);
-  const availableBalance = isPrepayAccount ? rawBalance : null;
+  const availableBalance = isPrepayAccount ? (fundingSourceBalance ?? rawBalance) : null;
+  const balanceSource = fundingSourceBalance !== null ? "funding_source_details" : "account_balance";
+  const fundingSourceDisplay = String(account?.funding_source_details?.display_string || "").trim() || null;
   const remainingSpendCap = spendCap !== null && amountSpent !== null && spendCap > 0
     ? roundMoney(Math.max(spendCap - amountSpent, 0))
     : null;
@@ -187,9 +216,13 @@ async function buildFinancialSnapshot({ account, adAccountId, accessToken, timeZ
   let lastTopUpAt = integration?.financial?.lastTopUpAt || null;
   let lastTopUpAmount = Number(integration?.financial?.lastTopUpAmount || 0) || 0;
   let estimatedTopUp = 0;
+  const sameBalanceSource = previousSnapshot?.balanceSource
+    ? previousSnapshot.balanceSource === balanceSource
+    : balanceSource === "account_balance";
 
   if (
     isPrepayAccount &&
+    sameBalanceSource &&
     previousSnapshot &&
     typeof previousSnapshot.balance === "number" &&
     availableBalance !== null
@@ -222,7 +255,7 @@ async function buildFinancialSnapshot({ account, adAccountId, accessToken, timeZ
   } else if (isPrepayAccount && availableBalance !== null && availableBalance <= 0) {
     alertLevel = "critical";
     alertCode = "PREPAID_BALANCE_EMPTY";
-    alertMessage = "Saldo pré-pago da Meta está zerado. Adicionar fundos antes de esperar nova entrega.";
+    alertMessage = "Saldo disponível da Meta está zerado. Adicionar fundos antes de esperar nova entrega.";
   } else if (isPrepayAccount && autonomyDays !== null && autonomyDays <= 1.5) {
     alertLevel = "critical";
     alertCode = "LOW_AUTONOMY_CRITICAL";
@@ -246,6 +279,8 @@ async function buildFinancialSnapshot({ account, adAccountId, accessToken, timeZ
     isPrepayAccount,
     balance: availableBalance,
     rawBalance,
+    balanceSource,
+    fundingSourceDisplay,
     amountSpent,
     spendCap,
     remainingSpendCap,
@@ -273,6 +308,8 @@ async function buildFinancialSnapshot({ account, adAccountId, accessToken, timeZ
     syncedAt,
     balance: availableBalance,
     rawBalance,
+    balanceSource,
+    fundingSourceDisplay,
     amountSpent,
     yesterdaySpend,
     avg7SpendDays,
@@ -316,7 +353,7 @@ export async function syncMetaForClinic({ clinicId, adAccountId: requestedAdAcco
   let financeError = null;
   try {
     const financeAccount = await graphGet(adAccountId, {
-      fields: "currency,account_status,disable_reason,amount_spent,balance,spend_cap,is_prepay_account",
+      fields: "currency,account_status,disable_reason,amount_spent,balance,spend_cap,is_prepay_account,funding_source_details",
     }, accessToken);
     financeState = await buildFinancialSnapshot({
       account: { ...account, ...financeAccount },
