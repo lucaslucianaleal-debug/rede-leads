@@ -93,9 +93,13 @@ export default function MetaFinanceCard({ status, loading = false, errorMessage 
   const lastSpendText = financial.lastSpendDate
     ? `${dateBr(financial.lastSpendDate)}${financial.zeroSpendStreak > 0 ? ` • ${financial.zeroSpendStreak} dia(s) sem gasto` : ""}`
     : "Sem gasto nos últimos 30 dias";
+  const topUpIsPaymentHistory = financial.lastTopUpSource === "meta_payment_history";
   const topUpText = financial.lastTopUpAt
-    ? `${dateTimeBr(financial.lastTopUpAt)}${financial.lastTopUpAmount > 0 ? ` • ~${money(financial.lastTopUpAmount, currency)}` : ""}`
+    ? `${dateBr(financial.lastTopUpAt)}${financial.lastTopUpAmount > 0 ? ` • ${topUpIsPaymentHistory ? "" : "~"}${money(financial.lastTopUpAmount, currency)}` : ""}`
     : `Monitoramento iniciado em ${dateTimeBr(financial.monitoringStartedAt)}`;
+  const topUpSourceText = financial.lastTopUpAt
+    ? (topUpIsPaymentHistory ? "Histórico de pagamento Meta" : "Detectada automaticamente pelo saldo")
+    : null;
 
   return (
     <div style={{ background: "#202020", border: `0.5px solid ${tone.border}` }} className="rounded-lg p-4 mb-4">
@@ -141,8 +145,11 @@ export default function MetaFinanceCard({ status, loading = false, errorMessage 
           <p style={{ color: financial.zeroSpendStreak >= 2 ? "#ef4444" : "#d1d5db", fontSize: "10px" }} className="font-semibold">{lastSpendText}</p>
         </div>
         <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
-          <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Recarga detectada</p>
+          <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Última recarga</p>
           <p style={{ color: "#d1d5db", fontSize: "10px" }} className="font-semibold">{topUpText}</p>
+          {topUpSourceText && (
+            <p style={{ color: "#666", fontSize: "9px" }} className="mt-0.5">{topUpSourceText}</p>
+          )}
         </div>
         <div style={{ background: "#262626", border: "0.5px solid #3a3a3a" }} className="rounded p-2">
           <p style={{ color: "#777", fontSize: "9px" }} className="uppercase">Entrega / conta</p>

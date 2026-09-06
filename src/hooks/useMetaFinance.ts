@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
 
 export type MetaFinanceAlertLevel = "ok" | "warning" | "critical";
+export type MetaTopUpSource = "meta_payment_history" | "balance_detection";
 
 export interface MetaFinancialSnapshot {
   currency: string;
@@ -25,6 +26,8 @@ export interface MetaFinancialSnapshot {
   activeAds: number;
   lastTopUpAt: string | null;
   lastTopUpAmount: number;
+  lastTopUpSource?: MetaTopUpSource | null;
+  lastTopUpTransactionId?: string | null;
   estimatedTopUpDetected: number;
   monitoringStartedAt: string;
   alertLevel: MetaFinanceAlertLevel;

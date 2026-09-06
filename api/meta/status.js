@@ -1,5 +1,42 @@
 import { getAdminAuth, getAdminDb } from "../../server/firebaseAdmin.js";
 
+const KNOWN_TOP_UPS = {
+  "751127997357262": {
+    at: "2026-09-03T12:00:00-03:00",
+    amount: 200,
+    source: "meta_payment_history",
+    transactionId: "28559209447100304-28533065296381387",
+    legacyDetectionCutoff: Date.parse("2026-09-06T19:03:41Z"),
+  },
+};
+
+function normalizeAdAccountId(value) {
+  return String(value || "").replace(/^act_/, "").replace(/\D/g, "");
+}
+
+function withKnownTopUp(financial, adAccountId) {
+  if (!financial) return financial;
+
+  const known = KNOWN_TOP_UPS[normalizeAdAccountId(adAccountId)];
+  if (!known) return financial;
+
+  const detectedAt = Date.parse(String(financial.lastTopUpAt || ""));
+  if (Number.isFinite(detectedAt) && detectedAt > known.legacyDetectionCutoff) {
+    return {
+      ...financial,
+      lastTopUpSource: financial.lastTopUpSource || "balance_detection",
+    };
+  }
+
+  return {
+    ...financial,
+    lastTopUpAt: known.at,
+    lastTopUpAmount: known.amount,
+    lastTopUpSource: known.source,
+    lastTopUpTransactionId: known.transactionId,
+  };
+}
+
 async function requireFirebaseUser(req) {
   const header = String(req.headers.authorization || "");
   if (!header.startsWith("Bearer ")) {
@@ -38,7 +75,7 @@ export default async function handler(req, res) {
       accountName: data.accountName || "",
       timezone: data.timezone || "",
       lastSyncAt: data.lastSyncAt || null,
-      financial: data.financial || null,
+      financial: withKnownTopUp(data.financial || null, data.adAccountId || ""),
       financeLastError: data.financeLastError || null,
       financeHistory: Array.isArray(data.financeHistory) ? data.financeHistory.slice(-14) : [],
     });
