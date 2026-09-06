@@ -85,7 +85,7 @@ export default function MetaFinanceCard({ status, loading = false, errorMessage 
       : { border: "#10b981", color: "#10b981", label: "SEM ALERTA CRÍTICO", emoji: "🟢" };
 
   const currency = financial.currency || "BRL";
-  const balanceLabel = financial.isPrepayAccount ? "Saldo pré-pago" : "Saldo disponível";
+  const balanceLabel = "Saldo disponível";
   const balanceValue = financial.isPrepayAccount ? money(financial.balance, currency) : "Não aplicável";
   const autonomyValue = financial.isPrepayAccount
     ? (financial.autonomyDays !== null ? `${financial.autonomyDays} dia${financial.autonomyDays === 1 ? "" : "s"}` : "Sem base")
@@ -159,7 +159,7 @@ export default function MetaFinanceCard({ status, loading = false, errorMessage 
       )}
       {financial.isPrepayAccount && (
         <p style={{ color: "#666", fontSize: "9px" }} className="mt-2">
-          Autonomia = saldo pré-pago ÷ média dos últimos dias com gasto. É uma estimativa operacional, não garantia de entrega futura.
+          Autonomia = saldo disponível ÷ média dos últimos dias com gasto. É uma estimativa operacional, não garantia de entrega futura.
         </p>
       )}
     </div>
