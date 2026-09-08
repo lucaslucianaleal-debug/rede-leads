@@ -21,7 +21,7 @@ export function generateWhatsAppLink(
 }
 
 export function generateAppointmentConfirmationMessage(leadPhone: string, dataAgendamento: string): string {
-  const message = `Confirmação de Consulta na Odontocompany💚\n\nSua consulta está agendada para:\n\nData e Horario: ${dataAgendamento}\n\n📍 Endereço : R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+  const message = `Confirmação de Avaliação na Odontocompany💚\n\nSua avaliação está agendada para:\n\nData e horário: ${dataAgendamento}\n\n📍 Endereço: R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
   const phone = leadPhone.replace(/[^0-9]/g, "");
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
@@ -57,7 +57,7 @@ export function generateReminderText(
 }
 
 export function generateAppointmentConfirmationText(dataAgendamento: string): string {
-  return `Confirmação de Consulta na Odontocompany💚\n\nSua consulta está agendada para:\n\nData e Horario: ${dataAgendamento}\n\n📍 Endereço : R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+  return `Confirmação de Avaliação na Odontocompany💚\n\nSua avaliação está agendada para:\n\nData e horário: ${dataAgendamento}\n\n📍 Endereço: R. Bernardino de Campos, 840 - Centro, Olímpia - SP, 15400-079\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
 }
 
 const CLINIC_ADDRESS_FALLBACK: Record<string, string> = {
@@ -95,17 +95,6 @@ function slugify(s: string | undefined) {
     .replace(/^-+|-+$/g, "");
 }
 
-function getArticleForServico(servico: string): string {
-  // Serviços femininos (usa "sua")
-  const femininos = ["limpeza", "avaliação", "restauração"];
-  const servicoLower = servico.toLowerCase();
-  if (femininos.some((f) => servicoLower.includes(f))) {
-    return "sua";
-  }
-  // Padrão: "seu" (clareamento, implante, etc)
-  return "seu";
-}
-
 export function generateAppointmentConfirmationTextForClinic(
   clinicMeta: any | undefined,
   dataAgendamento: string,
@@ -116,21 +105,16 @@ export function generateAppointmentConfirmationTextForClinic(
   const clinicId = clinicMeta?.id;
   const clinicAddressFromMeta = clinicMeta?.address;
 
-  // Build services text with correct grammar
-  let servicoText = "sua avaliação";
-  if (servicos && servicos.length > 0) {
-    const servicoComArtigo = servicos
-      .map((s) => `${getArticleForServico(s)} ${s}`)
-      .join(", ");
-    servicoText = servicoComArtigo;
-  }
+  // O serviço procurado é apenas o interesse do lead. O que está sendo confirmado
+  // nesta etapa é sempre a avaliação clínica, nunca o procedimento/tratamento.
+  void servicos;
 
   const greeting = clientName ? `Oi ${clientName}!\n\n` : "";
-  const msgHeader = `${greeting}Essa é a confirmação do ${servicoText} na ${clinicName}💚\n\nSua bonificação está agendada para:\n\nData e Horario: ${dataAgendamento}`;
+  const msgHeader = `${greeting}Essa é a confirmação da sua avaliação na ${clinicName} 💚\n\nSua avaliação está agendada para:\n\n📅 Data e horário: ${dataAgendamento}`;
 
   // If clinic has explicit address, use it
   if (clinicAddressFromMeta) {
-    return `${msgHeader}\n\n📍 Endereço : ${clinicAddressFromMeta}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+    return `${msgHeader}\n\n📍 Endereço: ${clinicAddressFromMeta}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
   }
 
   // Try multiple keys to find a fallback address (using normalized keys)
@@ -154,7 +138,7 @@ export function generateAppointmentConfirmationTextForClinic(
   // final fallback to olympia
   if (!address) address = CLINIC_ADDRESS_FALLBACK["odontocompany-olimpia"];
 
-  return `${msgHeader}\n\n📍 Endereço : ${address}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
+  return `${msgHeader}\n\n📍 Endereço: ${address}\n\n⏰ Pedimos que chegue 15 minutinhos antes do horário combinado, tá bem?\n\nPode me confirmar as informações, por favor? 😊`;
 }
 
 export function generateAppointmentConfirmationLinkForClinic(leadPhone: string, clinicMeta: any | undefined, dataAgendamento: string): string {
