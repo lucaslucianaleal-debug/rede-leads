@@ -36,6 +36,7 @@ type AgendaItem = {
   lastReplyAt?: string;
   lastReplyText?: string;
   replyClassification?: string;
+  manualReviewedAt?: string;
 };
 
 type ChatItem = {
@@ -92,7 +93,7 @@ function classifyReply(value: string) {
   const text = normalizeText(value);
   const rebookTerms = ["reagendar", "remarcar", "outro horario", "outro dia", "trocar horario", "mudar horario", "nao consigo esse horario"];
   const noTerms = ["nao vou", "nao poderei", "nao posso ir", "cancelar", "cancela", "nao consigo ir", "nao compareco"];
-  const yesTerms = ["sim", "confirmo", "confirmado", "vou sim", "estarei ai", "pode confirmar", "presenca confirmada", "vou estar ai"];
+  const yesTerms = ["sim", "sim pode", "pode sim", "confirmo", "confirmado", "vou sim", "estarei ai", "pode confirmar", "presenca confirmada", "vou estar ai"];
   if (rebookTerms.some((term) => text.includes(term))) return "reschedule";
   if (noTerms.some((term) => text.includes(term))) return "wont_attend";
   if (yesTerms.some((term) => text === term || text.includes(term))) return "confirmed";
@@ -123,6 +124,48 @@ function latestValue(items: AgendaItem[], field: "lastReminderSentAt" | "lastRep
     .map((item) => String(item[field] || ""))
     .filter(Boolean)
     .sort((a, b) => isoTime(b) - isoTime(a))[0] || "";
+}
+
+function samePatientDay(a: AgendaItem, b: AgendaItem) {
+  if (!a.date || a.date !== b.date) return false;
+  const nameA = normalizeText(a.name || "");
+  const nameB = normalizeText(b.name || "");
+  if (!nameA || nameA !== nameB) return false;
+  const phoneA = canonicalPhoneKey(a.phoneKey || a.phone || "");
+  const phoneB = canonicalPhoneKey(b.phoneKey || b.phone || "");
+  if (phoneA && phoneB && phoneA !== phoneB) return false;
+  return true;
+}
+
+function visitItems(all: AgendaItem[], base: AgendaItem) {
+  return all
+    .filter((item) => item.active !== false && samePatientDay(base, item))
+    .sort((a, b) => appointmentTime(a) - appointmentTime(b));
+}
+
+async function cancelPendingForAppointment(clinicId: string, appointmentId: string, reason: string) {
+  const clinicRef = doc(db, "clinics", clinicId);
+  const [queueSnap, scheduleSnap] = await Promise.all([
+    getDocs(query(collection(clinicRef, "whatsappQueue"), where("clinicAppointmentId", "==", appointmentId))),
+    getDocs(query(collection(clinicRef, "whatsappSchedule"), where("clinicAppointmentId", "==", appointmentId))),
+  ]);
+  const nowIso = new Date().toISOString();
+  const batch = writeBatch(db);
+  let writes = 0;
+
+  queueSnap.docs.forEach((queueDoc) => {
+    const data = queueDoc.data() || {};
+    if (!["pending", "leased"].includes(String(data.status || ""))) return;
+    batch.set(queueDoc.ref, { status: "cancelled", cancelReason: reason, cancelledAt: nowIso, updatedAt: nowIso }, { merge: true });
+    writes += 1;
+  });
+  scheduleSnap.docs.forEach((scheduleDoc) => {
+    const data = scheduleDoc.data() || {};
+    if (["sent", "failed", "cancelled"].includes(String(data.status || ""))) return;
+    batch.set(scheduleDoc.ref, { status: "cancelled", cancelReason: reason, cancelledAt: nowIso, updatedAt: nowIso }, { merge: true });
+    writes += 1;
+  });
+  if (writes) await batch.commit();
 }
 
 async function mergeAdjacentDuplicateAppointments(clinicId: string, items: AgendaItem[], mergingKeys: Set<string>) {
@@ -230,7 +273,28 @@ async function mergeAdjacentDuplicateAppointments(clinicId: string, items: Agend
   }
 }
 
-/** Mantém a agenda da clínica sincronizada com fila, envio, erro e resposta real do WhatsApp. */
+async function syncManualVisitActions(clinicId: string, items: AgendaItem[]) {
+  const sources = items.filter((item) => item.active !== false && item.manualReviewedAt && ["confirmed", "wont_attend", "cancelled", "reschedule"].includes(String(item.confirmationStatus || "")));
+  for (const source of sources) {
+    const siblings = visitItems(items, source).filter((item) => item.id !== source.id);
+    for (const sibling of siblings) {
+      if (isoTime(sibling.manualReviewedAt) > isoTime(source.manualReviewedAt)) continue;
+      const sameStatus = String(sibling.confirmationStatus || "") === String(source.confirmationStatus || "");
+      if (sameStatus && isoTime(sibling.lastReplyAt) >= isoTime(source.manualReviewedAt)) continue;
+      const nowIso = new Date().toISOString();
+      await setDoc(doc(db, "clinics", clinicId, "clinicAgenda", sibling.id), {
+        confirmationStatus: source.confirmationStatus,
+        visitSyncedFrom: source.id,
+        visitSyncedAt: nowIso,
+        ...(source.confirmationStatus !== "confirmed" ? { vacancyReleasedAt: nowIso } : {}),
+        updatedAt: nowIso,
+      }, { merge: true });
+      await cancelPendingForAppointment(clinicId, sibling.id, "clinic_same_visit_manual_action");
+    }
+  }
+}
+
+/** Mantém a agenda da clínica sincronizada com fila, envio, erro, resposta e a visita completa do paciente. */
 export function ClinicStatusBridge() {
   const { currentClinic } = useAuth();
   const agendaRef = useRef<AgendaItem[]>([]);
@@ -244,6 +308,7 @@ export function ClinicStatusBridge() {
       const list = snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...(snapshotDoc.data() as Omit<AgendaItem, "id">) }));
       agendaRef.current = list;
       void mergeAdjacentDuplicateAppointments(currentClinic, list, mergingKeysRef.current);
+      void syncManualVisitActions(currentClinic, list).catch((error) => console.error("[clinic-status-bridge][sync-visit]", error));
     }, (error) => console.error("[clinic-status-bridge][agenda]", error));
 
     const queueQuery = query(collection(db, "clinics", currentClinic, "whatsappQueue"), orderBy("updatedAt", "desc"), limit(300));
@@ -261,21 +326,32 @@ export function ClinicStatusBridge() {
         if (!item.automationLabel) queuePatch.automationLabel = "Confirmação da clínica";
         if (Object.keys(queuePatch).length) void setDoc(snapshotDoc.ref, { ...queuePatch, updatedAt: item.updatedAt || nowIso }, { merge: true });
 
+        if (!existing) return;
         const appointmentRef = doc(db, "clinics", currentClinic, "clinicAgenda", appointmentId);
         const status = String(item.status || "");
-        const keepFinal = existing && FINAL_STATUSES.has(String(existing.confirmationStatus || ""));
+        const keepFinal = FINAL_STATUSES.has(String(existing.confirmationStatus || ""));
 
         if (status === "sent") {
           const sentAt = item.sentAt || item.updatedAt || nowIso;
-          void setDoc(appointmentRef, {
-            ...(keepFinal ? {} : { confirmationStatus: "sent" }),
-            remindersSent: { [String(item.automationType || "manual")]: sentAt },
-            lastReminderSentAt: sentAt,
-            lastReminderMessageId: item.messageId || "",
-            lastReminderError: null,
-            lastReminderFailedAt: null,
-            updatedAt: sentAt,
-          }, { merge: true });
+          const linkedVisit = visitItems(agendaRef.current, existing);
+          linkedVisit.forEach((visitAppointment) => {
+            const visitFinal = FINAL_STATUSES.has(String(visitAppointment.confirmationStatus || ""));
+            void setDoc(doc(db, "clinics", currentClinic, "clinicAgenda", visitAppointment.id), {
+              ...(visitFinal ? {} : { confirmationStatus: "sent" }),
+              remindersSent: { [String(item.automationType || "manual")]: sentAt },
+              lastReminderSentAt: sentAt,
+              lastReminderMessageId: item.messageId || "",
+              lastReminderError: null,
+              lastReminderFailedAt: null,
+              visitContactedFrom: appointmentId,
+              visitContactedAt: sentAt,
+              updatedAt: sentAt,
+            }, { merge: true });
+            if (visitAppointment.id !== appointmentId) {
+              void cancelPendingForAppointment(currentClinic, visitAppointment.id, "clinic_same_visit_already_contacted")
+                .catch((error) => console.error("[clinic-status-bridge][cancel-linked-visit]", error));
+            }
+          });
           return;
         }
 
@@ -320,13 +396,22 @@ export function ClinicStatusBridge() {
         let classified = classifyReply(chat.lastMessage || "");
         if (appointment.confirmationStatus === "released_unconfirmed" && classified === "confirmed") classified = "reschedule";
 
-        void setDoc(doc(db, "clinics", currentClinic, "clinicAgenda", appointment.id), {
-          confirmationStatus: classified,
-          lastReplyAt: chat.lastMessageAt,
-          lastReplyText: String(chat.lastMessage || "Mensagem recebida").slice(0, 500),
-          replyClassification: classified,
-          updatedAt: chat.lastMessageAt,
-        }, { merge: true });
+        const linkedVisit = visitItems(agendaRef.current, appointment);
+        linkedVisit.forEach((visitAppointment) => {
+          void setDoc(doc(db, "clinics", currentClinic, "clinicAgenda", visitAppointment.id), {
+            confirmationStatus: classified,
+            lastReplyAt: chat.lastMessageAt,
+            lastReplyText: String(chat.lastMessage || "Mensagem recebida").slice(0, 500),
+            replyClassification: classified,
+            visitReplyFrom: appointment.id,
+            visitReplyAt: chat.lastMessageAt,
+            updatedAt: chat.lastMessageAt,
+          }, { merge: true });
+          if (["confirmed", "wont_attend", "reschedule"].includes(classified)) {
+            void cancelPendingForAppointment(currentClinic, visitAppointment.id, "clinic_same_visit_reply")
+              .catch((error) => console.error("[clinic-status-bridge][cancel-after-reply]", error));
+          }
+        });
       });
     }, (error) => console.error("[clinic-status-bridge][chats]", error));
 
