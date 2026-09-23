@@ -6,6 +6,7 @@ import { ClinicChip } from "@/components/ClinicChip";
 import { ClinicCalendar } from "@/components/crm/ClinicCalendar";
 import { ClinicConfirmationCenter } from "@/components/crm/ClinicConfirmationCenter";
 import { ClinicFinanceDashboardV2 } from "@/components/crm/ClinicFinanceDashboardV2";
+import { ClinicSalesImportPanel } from "@/components/crm/ClinicSalesImportPanel";
 import { ClinicVacancies } from "@/components/crm/ClinicVacancies";
 import { ClinicRebookings } from "@/components/crm/ClinicRebookings";
 import { ClinicStatusBridge } from "@/components/crm/ClinicStatusBridge";
@@ -49,7 +50,12 @@ export default function ClinicConfirmationsPage() {
         {activeView === "confirmations" && <ClinicConfirmationCenter />}
         {activeView === "vacancies" && <ClinicVacancies />}
         {activeView === "rebookings" && <ClinicRebookings />}
-        {activeView === "finance" && <ClinicFinanceDashboardV2 />}
+        {activeView === "finance" && (
+          <div className="space-y-4">
+            <ClinicSalesImportPanel />
+            <ClinicFinanceDashboardV2 />
+          </div>
+        )}
       </main>
     </div>
   );
