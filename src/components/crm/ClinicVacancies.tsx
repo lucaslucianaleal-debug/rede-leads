@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
-import { AlertCircle, Clock3, Stethoscope } from "lucide-react";
+import { AlertCircle, Clock3, Stethoscope, Utensils } from "lucide-react";
 
 type ClinicAppointment = {
   id: string;
@@ -27,6 +27,8 @@ type Vacancy = {
   originalPatient?: string;
 };
 
+type ProtectedBreak = { start: number; end: number; label: string };
+
 const timeToMinutes = (value: string) => {
   const [h, m] = String(value || "").split(":").map(Number);
   return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : 0;
@@ -46,6 +48,40 @@ function slotMinutes(professional: string) {
   if (key.includes("tailuene")) return 30;
   if (key.includes("lucas") || key.includes("gabriela") || key.includes("manuela")) return 60;
   return 60;
+}
+
+function protectedBreaks(professional: string): ProtectedBreak[] {
+  const key = prettyProfessional(professional).toLowerCase();
+
+  // Regra operacional confirmada: Tailuene tem 2h de almoço e o histórico
+  // mostra retomada muito consistente às 14:00. Os demais profissionais ficam
+  // configuráveis depois que a clínica fechar a jornada oficial de cada um.
+  if (key.includes("tailuene")) {
+    return [{ start: timeToMinutes("12:00"), end: timeToMinutes("14:00"), label: "Almoço" }];
+  }
+
+  return [];
+}
+
+function overlapsBreak(start: number, end: number, professional: string) {
+  return protectedBreaks(professional).some((pause) => start < pause.end && end > pause.start);
+}
+
+function splitGapAroundBreaks(start: number, end: number, professional: string) {
+  let segments = [{ start, end }];
+  protectedBreaks(professional).forEach((pause) => {
+    const next: Array<{ start: number; end: number }> = [];
+    segments.forEach((segment) => {
+      if (segment.end <= pause.start || segment.start >= pause.end) {
+        next.push(segment);
+        return;
+      }
+      if (segment.start < pause.start) next.push({ start: segment.start, end: pause.start });
+      if (segment.end > pause.end) next.push({ start: pause.end, end: segment.end });
+    });
+    segments = next;
+  });
+  return segments;
 }
 
 function isFreeStatus(status?: string) {
@@ -71,6 +107,7 @@ export function ClinicVacancies() {
     future.filter((item) => isFreeStatus(item.confirmationStatus)).forEach((item) => {
       const start = timeToMinutes(item.startTime);
       const end = Math.max(start + slotMinutes(item.professional), timeToMinutes(item.endTime));
+      if (overlapsBreak(start, end, item.professional)) return;
       result.push({
         id: `released_${item.id}`,
         date: item.date,
@@ -99,21 +136,24 @@ export function ClinicVacancies() {
       for (let i = 0; i < sorted.length - 1; i += 1) {
         const currentEnd = timeToMinutes(sorted[i].endTime);
         const nextStart = timeToMinutes(sorted[i + 1].startTime);
-        const gap = nextStart - currentEnd;
-        if (gap < required) continue;
-        let cursor = currentEnd;
-        while (cursor + required <= nextStart) {
-          result.push({
-            id: `gap_${date}_${professional}_${cursor}`,
-            date,
-            startTime: minutesToTime(cursor),
-            endTime: minutesToTime(cursor + required),
-            professional,
-            minutes: required,
-            source: "gap",
-          });
-          cursor += required;
-        }
+
+        splitGapAroundBreaks(currentEnd, nextStart, professional).forEach((segment) => {
+          const gap = segment.end - segment.start;
+          if (gap < required) return;
+          let cursor = segment.start;
+          while (cursor + required <= segment.end) {
+            result.push({
+              id: `gap_${date}_${professional}_${cursor}`,
+              date,
+              startTime: minutesToTime(cursor),
+              endTime: minutesToTime(cursor + required),
+              professional,
+              minutes: required,
+              source: "gap",
+            });
+            cursor += required;
+          }
+        });
       }
     });
 
@@ -136,18 +176,22 @@ export function ClinicVacancies() {
     <div className="space-y-5">
       <div>
         <h2 className="text-xl font-heading font-bold">Vagas para preencher</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Enxerga buracos utilizáveis entre consultas e vagas liberadas por falta de confirmação.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Enxerga buracos utilizáveis entre consultas e vagas liberadas por falta de confirmação, respeitando pausas protegidas.</p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <Rule title="Dra. Tailuene" detail="30 min por atendimento" extra="Vaga de 30 min pode receber avaliação" />
+        <Rule title="Dra. Tailuene" detail="30 min por atendimento" extra="Almoço protegido: 12:00–14:00 • vaga de 30 min pode receber avaliação" />
         <Rule title="Dr. Lucas" detail="mínimo 60 min" />
         <Rule title="Dra. Gabriela" detail="mínimo 60 min" />
         <Rule title="Dra. Manuela" detail="mínimo 60 min" />
       </div>
 
+      <div className="rounded-xl border bg-violet-50/40 p-4 text-sm text-violet-900">
+        <div className="flex gap-2"><Utensils className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>Pausa protegida:</strong> o intervalo de almoço da Dra. Tailuene (12:00–14:00) não entra no cálculo de vagas, mesmo quando aparece como um grande espaço vazio no calendário.</div></div>
+      </div>
+
       <div className="rounded-xl border bg-amber-50/40 p-4 text-sm text-amber-900">
-        <div className="flex gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>V1:</strong> estamos detectando vagas dentro do intervalo já ocupado do profissional. Os horários antes do primeiro e depois do último paciente só entram quando cadastrarmos a jornada oficial de cada dentista.</div></div>
+        <div className="flex gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>V1:</strong> estamos detectando vagas dentro do intervalo já ocupado do profissional. Os horários antes do primeiro e depois do último paciente, além das pausas dos demais dentistas, entram quando fecharmos a jornada oficial de cada um.</div></div>
       </div>
 
       {[...grouped.entries()].slice(0, 14).map(([date, items]) => (
