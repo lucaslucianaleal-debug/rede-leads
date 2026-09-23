@@ -457,7 +457,7 @@ export default function MPCClinicReportImport({ store, allLeads, updateLead, set
 
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          <XCircle2 size={16} className="mt-0.5 shrink-0" /> {error}
+          <XCircle size={16} className="mt-0.5 shrink-0" /> {error}
         </div>
       )}
       {message && (
