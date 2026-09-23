@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDocs, onSnapshot, query, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ClinicConfirmations } from "@/components/crm/ClinicConfirmations";
 import { AlertCircle, CheckCircle2, Clock3, Filter, MessageCircle, RotateCcw, Send, UserRound, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 type ClinicAppointment = {
   id: string;
@@ -25,6 +33,7 @@ type ClinicAppointment = {
 };
 
 type RangeKey = "today" | "tomorrow" | "48h" | "7d" | "pending" | "rebook";
+type ReviewDecision = "confirmed" | "wont_attend" | "reschedule";
 
 const DOCTOR_COLORS = [
   { bg: "#E8F0FE", border: "#6B8FDB", text: "#2E4A7D" },
@@ -37,6 +46,7 @@ const DOCTOR_COLORS = [
 
 const stripAccents = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const normalizeKey = (value: string) => stripAccents(String(value || "")).toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+const normalizeReply = (value: string) => stripAccents(String(value || "")).toLowerCase().trim();
 const hashString = (value: string) => {
   let hash = 2166136261;
   for (let i = 0; i < value.length; i += 1) {
@@ -81,6 +91,25 @@ function statusMeta(item: ClinicAppointment) {
   return { label: "Programado", cls: "bg-slate-100 text-slate-700", icon: Clock3 };
 }
 
+function suggestedDecision(value?: string): ReviewDecision | null {
+  const text = normalizeReply(value || "");
+  if (!text) return null;
+  const rebookTerms = ["reagendar", "remarcar", "outro horario", "outro dia", "trocar horario", "mudar horario", "nao consigo esse horario"];
+  const noTerms = ["nao vou", "nao poderei", "nao posso ir", "cancelar", "cancela", "nao consigo ir", "nao compareco"];
+  const yesTerms = ["sim", "sim pode", "pode sim", "confirmo", "confirmado", "vou sim", "estarei ai", "pode confirmar", "presenca confirmada", "vou estar ai"];
+  if (rebookTerms.some((term) => text.includes(term))) return "reschedule";
+  if (noTerms.some((term) => text.includes(term))) return "wont_attend";
+  if (yesTerms.some((term) => text === term || text.includes(term))) return "confirmed";
+  return null;
+}
+
+function decisionLabel(value: ReviewDecision | null) {
+  if (value === "confirmed") return "Confirmar presença";
+  if (value === "wont_attend") return "Marcar que não vai";
+  if (value === "reschedule") return "Enviar para reagendamento";
+  return "Revisão manual necessária";
+}
+
 function formatDeadline(value?: string) {
   if (!value) return "";
   const date = new Date(value);
@@ -94,6 +123,8 @@ export function ClinicConfirmationCenter() {
   const [range, setRange] = useState<RangeKey>("48h");
   const [doctor, setDoctor] = useState("all");
   const [manualOpen, setManualOpen] = useState(false);
+  const [reviewItem, setReviewItem] = useState<ClinicAppointment | null>(null);
+  const [savingReview, setSavingReview] = useState(false);
 
   useEffect(() => {
     if (!currentClinic) return;
@@ -147,6 +178,49 @@ export function ClinicConfirmationCenter() {
     return map;
   }, [visible]);
 
+  const saveReview = async (decision: ReviewDecision) => {
+    if (!currentClinic || !reviewItem) return;
+    setSavingReview(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const batch = writeBatch(db);
+      const appointmentRef = doc(db, "clinics", currentClinic, "clinicAgenda", reviewItem.id);
+      batch.set(appointmentRef, {
+        confirmationStatus: decision,
+        replyClassification: decision,
+        manualReviewedAt: nowIso,
+        manualReviewDecision: decision,
+        updatedAt: nowIso,
+      }, { merge: true });
+
+      const queueSnapshot = await getDocs(query(
+        collection(db, "clinics", currentClinic, "whatsappQueue"),
+        where("clinicAppointmentId", "==", reviewItem.id),
+      ));
+
+      queueSnapshot.docs.forEach((queueDoc) => {
+        const queueData = queueDoc.data() || {};
+        if (!["pending", "leased"].includes(String(queueData.status || ""))) return;
+        if (decision === "confirmed" && String(queueData.automationType || "") === "appointment_clinic_1h") return;
+        batch.set(queueDoc.ref, {
+          status: "cancelled",
+          cancelReason: decision === "confirmed" ? "clinic_confirmed_manual_review" : "clinic_manual_review",
+          cancelledAt: nowIso,
+          updatedAt: nowIso,
+        }, { merge: true });
+      });
+
+      await batch.commit();
+      toast.success(decision === "confirmed" ? "Presença confirmada." : decision === "wont_attend" ? "Paciente marcado como não vai." : "Paciente enviado para reagendamento.");
+      setReviewItem(null);
+    } catch (error) {
+      console.error("[clinic-confirmation-review]", error);
+      toast.error("Não foi possível salvar a revisão.");
+    } finally {
+      setSavingReview(false);
+    }
+  };
+
   if (!currentClinic) return null;
   if (manualOpen) return (
     <div className="space-y-4">
@@ -154,6 +228,8 @@ export function ClinicConfirmationCenter() {
       <ClinicConfirmations />
     </div>
   );
+
+  const suggestion = suggestedDecision(reviewItem?.lastReplyText);
 
   return (
     <div className="space-y-5">
@@ -214,6 +290,7 @@ export function ClinicConfirmationCenter() {
                   {items.map((item) => {
                     const meta = statusMeta(item);
                     const Icon = meta.icon;
+                    const needsReview = String(item.confirmationStatus || "") === "replied" || (Boolean(item.lastReplyAt) && !["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"].includes(String(item.confirmationStatus || "")));
                     return (
                       <div key={item.id} className="grid gap-2 px-4 py-3 md:grid-cols-[90px_1fr_220px] md:items-center">
                         <div className="font-semibold">{item.startTime}–{item.endTime}</div>
@@ -224,7 +301,17 @@ export function ClinicConfirmationCenter() {
                           </div>
                         </div>
                         <div className="md:text-right">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${meta.cls}`}><Icon className="h-3.5 w-3.5" />{meta.label}</span>
+                          {needsReview ? (
+                            <button
+                              type="button"
+                              onClick={() => setReviewItem(item)}
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition hover:ring-2 hover:ring-amber-200 ${meta.cls}`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />{meta.label}
+                            </button>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${meta.cls}`}><Icon className="h-3.5 w-3.5" />{meta.label}</span>
+                          )}
                           {item.confirmationDeadlineAt && !["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"].includes(String(item.confirmationStatus || "")) && (
                             <div className="mt-1 text-[11px] text-muted-foreground">Prazo: {formatDeadline(item.confirmationDeadlineAt)}</div>
                           )}
@@ -240,6 +327,48 @@ export function ClinicConfirmationCenter() {
       ))}
 
       {!visible.length && <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">Nenhuma consulta neste filtro.</div>}
+
+      <Dialog open={Boolean(reviewItem)} onOpenChange={(open) => !open && !savingReview && setReviewItem(null)}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Revisar resposta do paciente</DialogTitle>
+          </DialogHeader>
+
+          {reviewItem && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="font-semibold">{reviewItem.name}</div>
+                <div className="mt-1 text-sm text-muted-foreground">{reviewItem.date} • {reviewItem.startTime}–{reviewItem.endTime} • {prettyProfessional(reviewItem.professional)}</div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Resposta recebida</div>
+                <div className="rounded-lg border bg-background p-4 text-base font-medium leading-relaxed">“{reviewItem.lastReplyText || "Mensagem recebida"}”</div>
+              </div>
+
+              <div className={`rounded-lg border p-3 text-sm ${suggestion === "confirmed" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : suggestion === "wont_attend" ? "border-red-200 bg-red-50 text-red-800" : suggestion === "reschedule" ? "border-violet-200 bg-violet-50 text-violet-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+                <strong>Sugestão do sistema:</strong> {decisionLabel(suggestion)}
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Button onClick={() => void saveReview("confirmed")} disabled={savingReview} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                  <CheckCircle2 className="h-4 w-4" />Confirmar presença
+                </Button>
+                <Button variant="destructive" onClick={() => void saveReview("wont_attend")} disabled={savingReview} className="gap-2">
+                  <XCircle className="h-4 w-4" />Não vai
+                </Button>
+                <Button variant="outline" onClick={() => void saveReview("reschedule")} disabled={savingReview} className="gap-2 border-violet-200 text-violet-700 hover:bg-violet-50">
+                  <RotateCcw className="h-4 w-4" />Reagendar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReviewItem(null)} disabled={savingReview}>Manter em revisão</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
