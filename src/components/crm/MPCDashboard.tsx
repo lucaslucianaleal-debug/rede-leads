@@ -28,7 +28,7 @@ type MPCDashboardProps = {
 };
 
 export default function MPCDashboard({ data, isLoading = false, store, mutations }: MPCDashboardProps) {
-  const { allLeads } = useLeads();
+  const { allLeads, updateLead } = useLeads();
 
   if (isLoading) {
     return (
@@ -48,7 +48,6 @@ export default function MPCDashboard({ data, isLoading = false, store, mutations
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -74,44 +73,37 @@ export default function MPCDashboard({ data, isLoading = false, store, mutations
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* 1. Data Input Panel */}
         <section className="mb-8">
           <MPCDataPanel store={store} mutations={mutations} />
         </section>
 
-        {/* 1.1 Relatórios oficiais da clínica */}
         <section className="mb-8">
           <MPCClinicReportImport
             store={store}
             allLeads={allLeads}
+            updateLead={updateLead}
             setStore={mutations.setStore}
             saveNow={mutations.saveNow}
           />
         </section>
 
-        {/* 2. KPI Strip (Resumo Executivo) */}
         <section className="mb-8">
           <MPCKPIStrip metrics={data.metrics} />
         </section>
 
-        {/* 3. Alertas MPC (Área Crítica) */}
         <section className="mb-8">
           <MPCAlertsFeed alerts={data.alerts} />
         </section>
 
-        {/* 4. Performance por Dentista */}
         <section className="mb-8">
           <MPCDentistPerformance dentists={data.dentistPerformance} store={store} mutations={mutations} />
         </section>
 
-        {/* 5. Saúde dos Setores */}
         <section className="mb-8">
           <MPCSectorHealth sectors={data.sectorHealth} store={store} mutations={mutations} />
         </section>
 
-        {/* 6. Foco da Semana + Decisões Recomendadas (Side by side) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <section>
             <MPCWeeklyFocus focus={data.weeklyFocus} />
@@ -121,7 +113,6 @@ export default function MPCDashboard({ data, isLoading = false, store, mutations
           </section>
         </div>
 
-        {/* 7. Relatório Semanal (responde perguntas de gestão) */}
         <section className="mb-8">
           <MPCWeeklyReport report={data.weeklyReport} store={store} />
         </section>
