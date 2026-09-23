@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CalendarCheck, CheckCircle2, Clock3, FileUp, RefreshCw, Send, Stethoscope, UserRound, XCircle } from "lucide-react";
+import { AlertCircle, CalendarCheck, CheckCircle2, Clock3, FileUp, MessageCircleReply, RefreshCw, Send, Stethoscope, UserRound, XCircle } from "lucide-react";
 
 type ClinicAppointment = {
   id: string;
@@ -26,8 +26,13 @@ type ClinicAppointment = {
   professional: string;
   sourceFile?: string;
   active?: boolean;
-  confirmationStatus?: "pending" | "queued" | "confirmed" | "wont_attend" | "reschedule" | "cancelled";
+  confirmationStatus?: "pending" | "queued" | "sent" | "failed" | "replied" | "confirmed" | "wont_attend" | "reschedule" | "cancelled";
   remindersSent?: Record<string, string>;
+  lastReminderSentAt?: string;
+  lastReminderFailedAt?: string;
+  lastReminderError?: string | null;
+  lastReplyAt?: string;
+  lastReplyText?: string;
   importedAt?: string;
   updatedAt?: string;
 };
@@ -291,7 +296,7 @@ export function ClinicConfirmations() {
 
   const upcomingAppointments = useMemo(() => doctorAppointments.filter((item) => !isPast(item)), [doctorAppointments]);
   const pastAppointments = useMemo(() => doctorAppointments.filter((item) => isPast(item)), [doctorAppointments]);
-  const selectable = useMemo(() => upcomingAppointments.filter((item) => validPhone(item.phone) && item.confirmationStatus !== "queued" && !appointmentWasSent(item)), [upcomingAppointments]);
+  const selectable = useMemo(() => upcomingAppointments.filter((item) => validPhone(item.phone) && item.confirmationStatus !== "queued" && item.confirmationStatus !== "replied" && !appointmentWasSent(item)), [upcomingAppointments]);
   const selectedAppointments = useMemo(() => selectable.filter((item) => selectedIds.includes(item.id)), [selectable, selectedIds]);
 
   useEffect(() => {
@@ -384,6 +389,7 @@ export function ClinicConfirmations() {
         .filter((item) => queuedIds.has(item.id))
         .map((item) => updateDoc(doc(db, "clinics", currentClinic, "clinicAgenda", item.id), {
           confirmationStatus: "queued",
+          lastReminderError: null,
           updatedAt: now,
         })));
 
@@ -495,13 +501,15 @@ export function ClinicConfirmations() {
                   const past = isPast(appointment);
                   const phoneOk = validPhone(appointment.phone);
                   const queued = appointment.confirmationStatus === "queued";
+                  const replied = appointment.confirmationStatus === "replied" || Boolean(appointment.lastReplyAt);
+                  const failed = appointment.confirmationStatus === "failed" || Boolean(appointment.lastReminderError);
                   const sent = appointmentWasSent(appointment);
                   return (
-                    <tr key={appointment.id} className={past ? "bg-muted/20 text-muted-foreground" : "hover:bg-muted/20"}>
+                    <tr key={appointment.id} className={past && !replied && !failed ? "bg-muted/20 text-muted-foreground" : "hover:bg-muted/20"}>
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
-                          disabled={past || !phoneOk || queued || sent}
+                          disabled={past || !phoneOk || queued || sent || replied}
                           checked={selectedIds.includes(appointment.id)}
                           onChange={() => setSelectedIds((current) => current.includes(appointment.id) ? current.filter((id) => id !== appointment.id) : [...current, appointment.id])}
                         />
@@ -514,12 +522,22 @@ export function ClinicConfirmations() {
                       </td>
                       <td className="px-3 py-3">{appointment.phone || "—"}</td>
                       <td className="px-3 py-3">
-                        {past ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs"><Clock3 className="h-3.5 w-3.5" />Horário passou</span>
+                        {replied ? (
+                          <div className="max-w-[360px]">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700"><MessageCircleReply className="h-3.5 w-3.5" />Respondeu</span>
+                            <div className="mt-1.5 text-xs font-medium text-emerald-800">“{appointment.lastReplyText || "Mensagem recebida"}”</div>
+                          </div>
+                        ) : failed ? (
+                          <div className="max-w-[360px]">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700"><AlertCircle className="h-3.5 w-3.5" />Erro no envio</span>
+                            <div className="mt-1.5 text-xs font-medium text-red-700">{appointment.lastReminderError || "Falha no envio"}</div>
+                          </div>
                         ) : sent ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Enviado</span>
                         ) : queued ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700"><Send className="h-3.5 w-3.5" />Na fila</span>
+                        ) : past ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs"><Clock3 className="h-3.5 w-3.5" />Horário passou</span>
                         ) : !phoneOk ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-xs text-red-700"><XCircle className="h-3.5 w-3.5" />Telefone inválido</span>
                         ) : (
@@ -580,5 +598,5 @@ export function ClinicConfirmations() {
 }
 
 function appointmentWasSent(appointment: ClinicAppointment) {
-  return Boolean(appointment.remindersSent?.manual);
+  return Boolean(appointment.remindersSent?.manual || appointment.lastReminderSentAt || appointment.confirmationStatus === "sent" || appointment.confirmationStatus === "replied");
 }
