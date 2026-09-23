@@ -5,19 +5,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWhatsAppAgent } from "@/hooks/useWhatsAppAgent";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { CalendarCheck, CheckCircle2, Clock3, FileUp, MessageCircle, RefreshCw, Send, UserRound, XCircle } from "lucide-react";
+import { CalendarCheck, CheckCircle2, Clock3, FileUp, RefreshCw, Send, Stethoscope, UserRound, XCircle } from "lucide-react";
 
 type ClinicAppointment = {
   id: string;
   name: string;
   phone: string;
+  phoneKey?: string | null;
   date: string;
   startTime: string;
   endTime: string;
   professional: string;
   sourceFile?: string;
   active?: boolean;
-  confirmationStatus?: "pending" | "queued" | "confirmed" | "reschedule" | "cancelled";
+  confirmationStatus?: "pending" | "queued" | "confirmed" | "wont_attend" | "reschedule" | "cancelled";
+  remindersSent?: Record<string, string>;
   importedAt?: string;
   updatedAt?: string;
 };
@@ -31,12 +33,21 @@ type PdfRow = {
 };
 
 type PdfTextItem = { str?: string; transform?: number[] };
-
 type PositionedText = { text: string; x: number; y: number };
 
 const stripAccents = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const normalizeKey = (value: string) => stripAccents(String(value || "")).toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
 const digitsOnly = (value: string) => String(value || "").replace(/\D/g, "");
+
+const canonicalPhoneKey = (value: string) => {
+  let digits = digitsOnly(value);
+  if (!digits) return null;
+  if (digits.startsWith("55")) digits = digits.slice(2);
+  if (digits.length === 11 && digits[2] === "9") digits = `${digits.slice(0, 2)}${digits.slice(3)}`;
+  return digits.length === 10 ? `55${digits}` : null;
+};
+
+const validPhone = (value: string) => Boolean(canonicalPhoneKey(value));
 
 const hashString = (value: string) => {
   let hash = 2166136261;
@@ -57,25 +68,14 @@ const minutesToTime = (minutes: number) => {
   return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
 };
 
-const dateToSortable = (value: string) => {
-  const [d, m, y] = value.split("/");
-  return `${y || "0000"}-${m || "00"}-${d || "00"}`;
-};
-
 const todayBr = () => {
   const now = new Date();
   return `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
 };
 
-const tomorrowBr = () => {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
-};
-
-const firstName = (name: string) => {
-  const first = String(name || "").trim().split(/\s+/)[0] || "";
-  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+const dateToSortable = (value: string) => {
+  const [d, m, y] = value.split("/");
+  return `${y || "0000"}-${m || "00"}-${d || "00"}`;
 };
 
 const prettyProfessional = (value: string) => {
@@ -85,30 +85,21 @@ const prettyProfessional = (value: string) => {
     .trim()
     .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase());
-  return clean.replace(/^Dra\.?\s*/i, "Dra. ");
+  return clean.replace(/^Dra\.?\s*/i, "Dra. ") || "Profissional não identificada";
 };
 
-const validPhone = (phone: string) => {
-  const digits = digitsOnly(phone);
-  return (digits.length === 10 || digits.length === 11) && !/^0+$/.test(digits);
+const appointmentDate = (appointment: ClinicAppointment) => {
+  const match = `${appointment.date} ${appointment.startTime}`.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, day, month, year, hour, minute] = match;
+  const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:00-03:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
-function clinicLabel(clinicId: string | null) {
-  const id = String(clinicId || "").toLowerCase();
-  if (id.includes("olimpia")) return "OdontoCompany Olímpia";
-  if (id.includes("bady")) return "OdontoCompany Bady Bassitt";
-  if (id.includes("novo")) return "OdontoCompany Novo Horizonte";
-  return "OdontoCompany";
-}
-
-function buildMessage(appointment: ClinicAppointment, clinicId: string | null) {
-  const when = appointment.date === todayBr()
-    ? "hoje"
-    : appointment.date === tomorrowBr()
-      ? "amanhã"
-      : `no dia ${appointment.date}`;
-  return `Olá, ${firstName(appointment.name)}! 💚 Passando para lembrar da sua consulta ${when}, às ${appointment.startTime}, com a ${prettyProfessional(appointment.professional)}, na ${clinicLabel(clinicId)}. Podemos confirmar sua presença?`;
-}
+const isPast = (appointment: ClinicAppointment) => {
+  const date = appointmentDate(appointment);
+  return !date || date.getTime() <= Date.now();
+};
 
 function groupPageItems(items: PdfTextItem[]) {
   const positioned: PositionedText[] = items
@@ -142,8 +133,7 @@ async function extractRowsFromPdf(file: File): Promise<PdfRow[]> {
   const pdfjs: any = await import(/* @vite-ignore */ pdfJsUrl);
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   const parsed: PdfRow[] = [];
   let headerXs: { label: string; x: number }[] | null = null;
 
@@ -156,9 +146,7 @@ async function extractRowsFromPdf(file: File): Promise<PdfRow[]> {
       const normalizedItems = row.items.map((item) => ({ ...item, normalized: normalizeKey(item.text) }));
       const headerCandidates = normalizedItems.filter((item) => ["HORA", "NOME", "FONE", "FICHA", "RESPONSAVEL", "USUARIO", "DATA"].includes(item.normalized));
       if (headerCandidates.length >= 5) {
-        headerXs = headerCandidates
-          .map((item) => ({ label: item.normalized, x: item.x }))
-          .sort((a, b) => a.x - b.x);
+        headerXs = headerCandidates.map((item) => ({ label: item.normalized, x: item.x })).sort((a, b) => a.x - b.x);
         continue;
       }
 
@@ -180,20 +168,14 @@ async function extractRowsFromPdf(file: File): Promise<PdfRow[]> {
       const name = (columns.get("NOME") || []).join(" ").trim();
       const phone = (columns.get("FONE") || []).join(" ").trim();
       const professional = (columns.get("RESPONSAVEL") || []).join(" ").trim();
-      const dateColumn = (columns.get("DATA") || []).join(" ").trim();
       const joined = row.items.map((item) => item.text).join(" ");
-      const date = dateColumn.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || joined.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || "";
+      const date = ((columns.get("DATA") || []).join(" ").match(/\d{2}\/\d{2}\/\d{4}/)?.[0]) || joined.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || "";
 
-      if (time && name && professional && date) {
-        parsed.push({ time, name, phone, professional, date });
-      }
+      if (time && name && professional && date) parsed.push({ time, name, phone, professional, date });
     }
   }
 
-  if (!parsed.length) {
-    throw new Error("Não consegui ler as linhas da agenda. Confirme se este é o PDF de 'Agenda - Relatórios - Marcados'.");
-  }
-
+  if (!parsed.length) throw new Error("Não consegui ler as linhas da agenda.");
   return parsed;
 }
 
@@ -210,12 +192,10 @@ function consolidateRows(rows: PdfRow[]) {
   byPatient.forEach((group, groupKey) => {
     const sorted = [...group].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
     const segments: PdfRow[][] = [];
+
     sorted.forEach((row) => {
       const current = segments[segments.length - 1];
-      if (!current) {
-        segments.push([row]);
-        return;
-      }
+      if (!current) return void segments.push([row]);
       const last = current[current.length - 1];
       if (timeToMinutes(row.time) - timeToMinutes(last.time) <= 16) current.push(row);
       else segments.push([row]);
@@ -224,11 +204,11 @@ function consolidateRows(rows: PdfRow[]) {
     segments.forEach((segment, segmentIndex) => {
       const first = segment[0];
       const last = segment[segment.length - 1];
-      const stableId = `clinic_${dateToSortable(first.date).replace(/-/g, "")}_${hashString(groupKey)}_${segmentIndex + 1}`;
       appointments.push({
-        id: stableId,
+        id: `clinic_${dateToSortable(first.date).replace(/-/g, "")}_${hashString(groupKey)}_${segmentIndex + 1}`,
         name: first.name,
         phone: first.phone,
+        phoneKey: canonicalPhoneKey(first.phone),
         date: first.date,
         startTime: first.time,
         endTime: minutesToTime(timeToMinutes(last.time) + 15),
@@ -239,100 +219,92 @@ function consolidateRows(rows: PdfRow[]) {
     });
   });
 
-  return appointments.sort((a, b) => dateToSortable(a.date).localeCompare(dateToSortable(b.date)) || a.startTime.localeCompare(b.startTime));
+  return appointments.sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 
 export function ClinicConfirmations() {
-  const { currentClinic } = useAuth();
-  const { queueMessages, status: agentStatus } = useWhatsAppAgent();
+  const { currentClinic, user } = useAuth();
+  const { status: agentStatus } = useWhatsAppAgent();
   const inputRef = useRef<HTMLInputElement>(null);
   const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [sending, setSending] = useState(false);
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedProfessional, setSelectedProfessional] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!currentClinic) {
-      setAppointments([]);
-      setLoading(false);
-      return;
-    }
+    if (!currentClinic) return;
     setLoading(true);
     const ref = collection(db, "clinics", currentClinic, "clinicAgenda");
     return onSnapshot(ref, (snapshot) => {
       const list = snapshot.docs
         .map((item) => ({ id: item.id, ...(item.data() as Omit<ClinicAppointment, "id">) }))
-        .filter((item) => item.active !== false)
-        .sort((a, b) => dateToSortable(a.date).localeCompare(dateToSortable(b.date)) || a.startTime.localeCompare(b.startTime));
+        .filter((item) => item.active !== false && item.date === todayBr())
+        .sort((a, b) => a.startTime.localeCompare(b.startTime));
       setAppointments(list);
       setLoading(false);
-    }, (error) => {
-      console.error("[clinic-agenda]", error);
-      toast.error("Não foi possível carregar a agenda da clínica.");
-      setLoading(false);
-    });
+    }, () => setLoading(false));
   }, [currentClinic]);
 
-  const dates = useMemo(() => Array.from(new Set(appointments.map((item) => item.date))).sort((a, b) => dateToSortable(a).localeCompare(dateToSortable(b))), [appointments]);
+  const professionals = useMemo(() => {
+    return Array.from(new Set(appointments.map((item) => prettyProfessional(item.professional)))).sort();
+  }, [appointments]);
 
   useEffect(() => {
-    if (!dates.length) {
-      setSelectedDate("");
+    if (!professionals.length) {
+      setSelectedProfessional("");
       return;
     }
-    if (dates.includes(selectedDate)) return;
-    const today = todayBr();
-    const tomorrow = tomorrowBr();
-    setSelectedDate(dates.includes(today) ? today : dates.includes(tomorrow) ? tomorrow : dates[0]);
-  }, [dates, selectedDate]);
+    if (!professionals.includes(selectedProfessional)) setSelectedProfessional(professionals[0]);
+  }, [professionals, selectedProfessional]);
 
-  const visibleAppointments = useMemo(() => appointments.filter((item) => item.date === selectedDate), [appointments, selectedDate]);
-  const selectableAppointments = useMemo(() => visibleAppointments.filter((item) => validPhone(item.phone) && item.confirmationStatus !== "queued"), [visibleAppointments]);
+  const doctorAppointments = useMemo(() => {
+    return appointments.filter((item) => prettyProfessional(item.professional) === selectedProfessional);
+  }, [appointments, selectedProfessional]);
+
+  const upcomingAppointments = useMemo(() => doctorAppointments.filter((item) => !isPast(item)), [doctorAppointments]);
+  const pastAppointments = useMemo(() => doctorAppointments.filter((item) => isPast(item)), [doctorAppointments]);
+  const selectable = useMemo(() => upcomingAppointments.filter((item) => validPhone(item.phone) && item.confirmationStatus !== "queued"), [upcomingAppointments]);
 
   useEffect(() => {
-    setSelectedIds(selectableAppointments.map((item) => item.id));
-  }, [selectedDate]);
-
-  const stats = useMemo(() => ({
-    total: visibleAppointments.length,
-    valid: visibleAppointments.filter((item) => validPhone(item.phone)).length,
-    queued: visibleAppointments.filter((item) => item.confirmationStatus === "queued").length,
-    invalid: visibleAppointments.filter((item) => !validPhone(item.phone)).length,
-  }), [visibleAppointments]);
+    setSelectedIds(selectable.map((item) => item.id));
+  }, [selectedProfessional, appointments.length]);
 
   const importAgenda = async (file: File) => {
     if (!currentClinic) return;
     setImporting(true);
     try {
-      const rawRows = await extractRowsFromPdf(file);
-      const consolidated = consolidateRows(rawRows);
-      const now = new Date().toISOString();
-      const importedDates = new Set(consolidated.map((item) => item.date));
-      const importedIds = new Set(consolidated.map((item) => item.id));
+      const rows = await extractRowsFromPdf(file);
+      const todayRows = rows.filter((row) => row.date === todayBr());
+      if (!todayRows.length) throw new Error(`O PDF não possui agenda de hoje (${todayBr()}).`);
+
+      const consolidated = consolidateRows(todayRows);
       const agendaRef = collection(db, "clinics", currentClinic, "clinicAgenda");
-
-      await Promise.all(consolidated.map((item) => setDoc(doc(agendaRef, item.id), {
-        ...item,
-        sourceFile: file.name,
-        active: true,
-        importedAt: now,
-        updatedAt: now,
-      }, { merge: true })));
-
       const existing = await getDocs(agendaRef);
+      const existingById = new Map(existing.docs.map((item) => [item.id, item.data() as ClinicAppointment]));
+      const now = new Date().toISOString();
+      const importedIds = new Set(consolidated.map((item) => item.id));
+
+      await Promise.all(consolidated.map((item) => {
+        const previous = existingById.get(item.id);
+        return setDoc(doc(agendaRef, item.id), {
+          ...item,
+          confirmationStatus: previous?.confirmationStatus || "pending",
+          sourceFile: file.name,
+          importedAt: previous?.importedAt || now,
+          updatedAt: now,
+        }, { merge: true });
+      }));
+
       const obsolete = existing.docs.filter((item) => {
         const data = item.data() as ClinicAppointment;
-        return importedDates.has(data.date) && !importedIds.has(item.id) && data.active !== false;
+        return data.date === todayBr() && !importedIds.has(item.id) && data.active !== false;
       });
       await Promise.all(obsolete.map((item) => updateDoc(item.ref, { active: false, updatedAt: now })));
 
-      const valid = consolidated.filter((item) => validPhone(item.phone)).length;
-      const invalid = consolidated.length - valid;
-      toast.success(`${consolidated.length} consultas importadas. ${valid} prontas para WhatsApp${invalid ? ` e ${invalid} sem telefone válido` : ""}.`);
-      const firstImportedDate = Array.from(importedDates).sort((a, b) => dateToSortable(a).localeCompare(dateToSortable(b)))[0];
-      if (firstImportedDate) setSelectedDate(firstImportedDate);
+      const dras = new Set(consolidated.map((item) => prettyProfessional(item.professional))).size;
+      toast.success(`${consolidated.length} consultas de hoje importadas • ${dras} profissional(is).`);
     } catch (error) {
       console.error("[clinic-import]", error);
       toast.error(error instanceof Error ? error.message : "Erro ao importar a agenda.");
@@ -342,52 +314,40 @@ export function ClinicConfirmations() {
     }
   };
 
-  const toggleAll = () => {
-    const ids = selectableAppointments.map((item) => item.id);
-    const allSelected = ids.length > 0 && ids.every((id) => selectedIds.includes(id));
-    setSelectedIds(allSelected ? [] : ids);
-  };
-
-  const toggleOne = (id: string) => {
-    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  };
-
   const sendSelected = async () => {
-    if (!currentClinic) return;
-    const selected = visibleAppointments.filter((item) => selectedIds.includes(item.id) && validPhone(item.phone));
+    if (!currentClinic || !user) return;
+    const selected = selectable.filter((item) => selectedIds.includes(item.id));
     if (!selected.length) {
-      toast.error("Selecione pelo menos uma consulta com telefone válido.");
+      toast.error("Não há pacientes selecionados para envio.");
       return;
     }
-    if (!window.confirm(`Disparar ${selected.length} lembrete(s) agora pelo agente do WhatsApp?`)) return;
+
+    if (!window.confirm(`Enviar lembrete agora para ${selected.length} paciente(s) da ${selectedProfessional}?`)) return;
 
     setSending(true);
     try {
-      let queuedTotal = 0;
-      let skippedTotal = 0;
-      for (let index = 0; index < selected.length; index += 50) {
-        const chunk = selected.slice(index, index + 50);
-        const result = await queueMessages(chunk.map((appointment) => ({
-          leadId: appointment.id,
-          phone: appointment.phone,
-          name: appointment.name,
-          message: buildMessage(appointment, currentClinic),
-          kind: "manual" as const,
-          clientRequestId: `clinic_reminder_${appointment.id}`,
-        })));
-        queuedTotal += result.queued;
-        skippedTotal += result.skipped;
+      const token = await user.getIdToken();
+      const response = await fetch("/api/whatsapp/clinic-appointments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          clinicId: currentClinic,
+          action: "send_now",
+          appointmentIds: selected.map((item) => item.id),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "Erro ao enviar lembretes");
 
-        const queuedIds = new Set(result.queuedIds);
-        await Promise.all(chunk
-          .filter((appointment) => queuedIds.has(appointment.id))
-          .map((appointment) => updateDoc(doc(db, "clinics", currentClinic, "clinicAgenda", appointment.id), {
-            confirmationStatus: "queued",
-            reminderQueuedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          })));
-      }
-      toast.success(`${queuedTotal} lembrete(s) colocado(s) na fila${skippedTotal ? ` • ${skippedTotal} já estavam na fila/enviados` : ""}.`);
+      await Promise.all(selected.map((item) => updateDoc(doc(db, "clinics", currentClinic, "clinicAgenda", item.id), {
+        confirmationStatus: "queued",
+        updatedAt: new Date().toISOString(),
+      })));
+
+      toast.success(`${data.queued || 0} lembrete(s) colocado(s) na fila para ${selectedProfessional}.`);
       setSelectedIds([]);
     } catch (error) {
       console.error("[clinic-send]", error);
@@ -398,7 +358,7 @@ export function ClinicConfirmations() {
   };
 
   if (!currentClinic) {
-    return <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">Selecione a clínica para usar as confirmações.</div>;
+    return <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">Selecione a clínica.</div>;
   }
 
   return (
@@ -407,11 +367,11 @@ export function ClinicConfirmations() {
         <div>
           <div className="flex items-center gap-2">
             <CalendarCheck className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-heading font-bold">Clínica • Confirmações</h2>
+            <h2 className="text-xl font-heading font-bold">Confirmações de hoje</h2>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">Importe o PDF da agenda, confira os pacientes e dispare os lembretes pelo mesmo agente do Rede Leads.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Escolha a Dra., confira a agenda e dispare os lembretes. Só os horários de hoje entram aqui.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <div className={`rounded-full border px-3 py-1.5 text-xs font-medium ${agentStatus.connected ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
             Agente {agentStatus.connected ? "conectado" : "desconectado"}
           </div>
@@ -421,77 +381,107 @@ export function ClinicConfirmations() {
           }} />
           <Button variant="outline" onClick={() => inputRef.current?.click()} disabled={importing} className="gap-2">
             {importing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-            {importing ? "Lendo agenda..." : "Importar agenda PDF"}
+            {importing ? "Lendo..." : "Importar agenda de hoje"}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border bg-card p-4"><div className="text-xs text-muted-foreground">Consultas</div><div className="mt-1 text-2xl font-bold">{stats.total}</div></div>
-        <div className="rounded-xl border bg-card p-4"><div className="text-xs text-muted-foreground">Prontas para WhatsApp</div><div className="mt-1 text-2xl font-bold">{stats.valid}</div></div>
-        <div className="rounded-xl border bg-card p-4"><div className="text-xs text-muted-foreground">Na fila</div><div className="mt-1 text-2xl font-bold">{stats.queued}</div></div>
-        <div className="rounded-xl border bg-card p-4"><div className="text-xs text-muted-foreground">Sem telefone válido</div><div className="mt-1 text-2xl font-bold">{stats.invalid}</div></div>
-      </div>
+      {professionals.length > 0 && (
+        <div className="rounded-xl border bg-card p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium"><Stethoscope className="h-4 w-4" />Escolha a profissional</div>
+          <div className="flex flex-wrap gap-2">
+            {professionals.map((professional) => {
+              const count = appointments.filter((item) => prettyProfessional(item.professional) === professional).length;
+              return (
+                <Button
+                  key={professional}
+                  variant={selectedProfessional === professional ? "default" : "outline"}
+                  onClick={() => setSelectedProfessional(professional)}
+                >
+                  {professional} · {count}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card">
         <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm font-medium">Dia</label>
-            <select value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
-              {dates.length === 0 && <option value="">Sem agenda importada</option>}
-              {dates.map((date) => <option key={date} value={date}>{date}</option>)}
-            </select>
-            {visibleAppointments.length > 0 && <span className="text-xs text-muted-foreground">{visibleAppointments.length} consulta(s)</span>}
+          <div>
+            <div className="font-semibold">{selectedProfessional || "Agenda de hoje"}</div>
+            <div className="text-xs text-muted-foreground">
+              {upcomingAppointments.length} ainda vão acontecer • {pastAppointments.length} já passaram
+            </div>
           </div>
           <Button onClick={sendSelected} disabled={sending || selectedIds.length === 0 || !agentStatus.connected} className="gap-2">
             {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {sending ? "Colocando na fila..." : `Disparar selecionados (${selectedIds.length})`}
+            {sending ? "Enviando..." : `Enviar para selecionados (${selectedIds.length})`}
           </Button>
         </div>
 
         {loading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">Carregando agenda...</div>
-        ) : visibleAppointments.length === 0 ? (
-          <div className="p-10 text-center">
-            <FileUp className="mx-auto h-8 w-8 text-muted-foreground" />
-            <h3 className="mt-3 font-semibold">Importe a agenda da clínica</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Use o relatório “Agenda - Relatórios - Marcados”. O sistema junta automaticamente os blocos de 15 minutos do mesmo paciente.</p>
-          </div>
+        ) : !doctorAppointments.length ? (
+          <div className="p-10 text-center text-sm text-muted-foreground">Importe a agenda de hoje para começar.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[820px] text-sm">
               <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
                 <tr>
-                  <th className="w-12 px-4 py-3"><input type="checkbox" checked={selectableAppointments.length > 0 && selectableAppointments.every((item) => selectedIds.includes(item.id))} onChange={toggleAll} /></th>
+                  <th className="w-12 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectable.length > 0 && selectable.every((item) => selectedIds.includes(item.id))}
+                      onChange={() => {
+                        const ids = selectable.map((item) => item.id);
+                        const all = ids.every((id) => selectedIds.includes(id));
+                        setSelectedIds(all ? [] : ids);
+                      }}
+                    />
+                  </th>
                   <th className="px-3 py-3">Horário</th>
                   <th className="px-3 py-3">Paciente</th>
                   <th className="px-3 py-3">Telefone</th>
-                  <th className="px-3 py-3">Profissional</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Mensagem</th>
+                  <th className="px-3 py-3">Situação</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {visibleAppointments.map((appointment) => {
+                {[...upcomingAppointments, ...pastAppointments].map((appointment) => {
+                  const past = isPast(appointment);
                   const phoneOk = validPhone(appointment.phone);
                   const queued = appointment.confirmationStatus === "queued";
+                  const sent = Boolean(appointment.remindersSent?.manual);
                   return (
-                    <tr key={appointment.id} className="align-top hover:bg-muted/20">
-                      <td className="px-4 py-3"><input type="checkbox" disabled={!phoneOk || queued} checked={selectedIds.includes(appointment.id)} onChange={() => toggleOne(appointment.id)} /></td>
-                      <td className="whitespace-nowrap px-3 py-3 font-medium"><div className="flex items-center gap-1.5"><Clock3 className="h-4 w-4 text-muted-foreground" />{appointment.startTime}<span className="text-xs font-normal text-muted-foreground">– {appointment.endTime}</span></div></td>
-                      <td className="px-3 py-3"><div className="flex items-center gap-1.5 font-medium"><UserRound className="h-4 w-4 text-muted-foreground" />{appointment.name}</div></td>
-                      <td className="whitespace-nowrap px-3 py-3">{appointment.phone || <span className="text-destructive">Sem telefone</span>}</td>
-                      <td className="px-3 py-3">{prettyProfessional(appointment.professional)}</td>
+                    <tr key={appointment.id} className={past ? "bg-muted/20 text-muted-foreground" : "hover:bg-muted/20"}>
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          disabled={past || !phoneOk || queued || sent}
+                          checked={selectedIds.includes(appointment.id)}
+                          onChange={() => setSelectedIds((current) => current.includes(appointment.id) ? current.filter((id) => id !== appointment.id) : [...current, appointment.id])}
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 font-medium">
+                        <div className="flex items-center gap-1.5"><Clock3 className="h-4 w-4" />{appointment.startTime} <span className="text-xs font-normal opacity-60">– {appointment.endTime}</span></div>
+                      </td>
                       <td className="px-3 py-3">
-                        {queued ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Na fila</span>
-                        ) : phoneOk ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"><MessageCircle className="h-3.5 w-3.5" />Pendente</span>
+                        <div className="flex items-center gap-1.5"><UserRound className="h-4 w-4" />{appointment.name}</div>
+                      </td>
+                      <td className="px-3 py-3">{appointment.phone || "—"}</td>
+                      <td className="px-3 py-3">
+                        {past ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs"><Clock3 className="h-3.5 w-3.5" />Horário passou</span>
+                        ) : sent ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Enviado</span>
+                        ) : queued ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700"><Send className="h-3.5 w-3.5" />Na fila</span>
+                        ) : !phoneOk ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-xs text-red-700"><XCircle className="h-3.5 w-3.5" />Telefone inválido</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700"><XCircle className="h-3.5 w-3.5" />Telefone inválido</span>
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-700">Pronto para enviar</span>
                         )}
                       </td>
-                      <td className="max-w-[420px] px-3 py-3 text-xs leading-relaxed text-muted-foreground">{phoneOk ? buildMessage(appointment, currentClinic) : "—"}</td>
                     </tr>
                   );
                 })}
