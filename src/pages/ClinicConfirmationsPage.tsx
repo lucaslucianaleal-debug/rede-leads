@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { ArrowLeft, CalendarDays, MessageCircle } from "lucide-react";
+import { ArrowLeft, CalendarDays, MessageCircle, RotateCcw, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ClinicChip } from "@/components/ClinicChip";
-import { ClinicConfirmations } from "@/components/crm/ClinicConfirmations";
 import { ClinicCalendar } from "@/components/crm/ClinicCalendar";
+import { ClinicConfirmationCenter } from "@/components/crm/ClinicConfirmationCenter";
+import { ClinicVacancies } from "@/components/crm/ClinicVacancies";
+import { ClinicRebookings } from "@/components/crm/ClinicRebookings";
 import { ClinicStatusBridge } from "@/components/crm/ClinicStatusBridge";
+
+type ClinicView = "calendar" | "confirmations" | "vacancies" | "rebookings";
 
 export default function ClinicConfirmationsPage() {
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState<"calendar" | "confirmations">("calendar");
+  const [activeView, setActiveView] = useState<ClinicView>("calendar");
 
   return (
     <div className="min-h-screen bg-background">
@@ -23,37 +27,31 @@ export default function ClinicConfirmationsPage() {
               </Button>
               <div>
                 <div className="font-heading text-lg font-bold">Clínica</div>
-                <div className="text-xs text-muted-foreground">Agenda, confirmações e operação da clínica</div>
+                <div className="text-xs text-muted-foreground">Agenda, confirmações, vagas e operação da clínica</div>
               </div>
             </div>
             <ClinicChip />
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
-            <Button
-              variant={activeView === "calendar" ? "default" : "ghost"}
-              size="sm"
-              className="gap-2"
-              onClick={() => setActiveView("calendar")}
-            >
-              <CalendarDays className="h-4 w-4" />
-              Calendário
-            </Button>
-            <Button
-              variant={activeView === "confirmations" ? "default" : "ghost"}
-              size="sm"
-              className="gap-2"
-              onClick={() => setActiveView("confirmations")}
-            >
-              <MessageCircle className="h-4 w-4" />
-              Confirmações de hoje
-            </Button>
+            <NavButton active={activeView === "calendar"} onClick={() => setActiveView("calendar")} icon={<CalendarDays className="h-4 w-4" />} label="Calendário" />
+            <NavButton active={activeView === "confirmations"} onClick={() => setActiveView("confirmations")} icon={<MessageCircle className="h-4 w-4" />} label="Confirmações" />
+            <NavButton active={activeView === "vacancies"} onClick={() => setActiveView("vacancies")} icon={<Search className="h-4 w-4" />} label="Vagas" />
+            <NavButton active={activeView === "rebookings"} onClick={() => setActiveView("rebookings")} icon={<RotateCcw className="h-4 w-4" />} label="Reagendamentos" />
           </div>
         </div>
       </header>
+
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
-        {activeView === "calendar" ? <ClinicCalendar /> : <ClinicConfirmations />}
+        {activeView === "calendar" && <ClinicCalendar />}
+        {activeView === "confirmations" && <ClinicConfirmationCenter />}
+        {activeView === "vacancies" && <ClinicVacancies />}
+        {activeView === "rebookings" && <ClinicRebookings />}
       </main>
     </div>
   );
+}
+
+function NavButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return <Button variant={active ? "default" : "ghost"} size="sm" className="gap-2" onClick={onClick}>{icon}{label}</Button>;
 }
