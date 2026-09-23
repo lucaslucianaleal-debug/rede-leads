@@ -1,367 +1,179 @@
 import { getAdminDb } from "../../../server/firebaseAdmin.js";
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
-import { canonicalPhoneKey, findLeadIndex, whatsappPhone } from "../../../server/whatsappAgent.js";
-import { processClinicAgendaAutomation } from "../../../server/clinicAgendaAutomation.js";
+import legacyPull from "./pull-original.js";
 
-function safeId(value) {
-  return String(value || "")
-    .replace(/[^a-zA-Z0-9_-]/g, "_")
-    .slice(0, 120);
+const CLINIC_MANUAL_STALE_MS = 10 * 60 * 1000;
+const CLINIC_LEASE_RECOVER_MS = 2 * 60 * 1000;
+const LEASE_MS = 3 * 60 * 1000;
+
+function isClinicManual(data = {}) {
+  return String(data.leadId || "").startsWith("clinic_") || String(data.automationType || "") === "appointment_clinic_manual";
 }
 
-function isFinalLead(lead = {}) {
-  const stage = String(lead.etapaLead || "").toLowerCase();
-  return Boolean(
-    lead._deleted ||
-    lead.comparecimento === "COMPARECEU" ||
-    lead.comparecimento === "NÃO COMPARECEU" ||
-    lead.lembretes?.disabled === true ||
-    stage === "finalizado" ||
-    stage === "desistência" ||
-    stage === "desistencia" ||
-    stage === "fora da região" ||
-    stage === "fora da regiao"
-  );
+function parseMs(value) {
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function parseAppointment(value) {
-  const match = String(value || "").trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
-  if (!match) return null;
-  const [, day, month, year, hour, minute] = match;
-  const appointment = new Date(`${year}-${month}-${day}T${hour}:${minute}:00-03:00`);
-  if (Number.isNaN(appointment.getTime())) return null;
-  return {
-    appointment,
-    key: `${year}${month}${day}_${hour}${minute}`,
-    date: `${day}/${month}/${year}`,
-    time: `${hour}:${minute}`,
-  };
-}
-
-function hoursBefore(date, hours) {
-  return new Date(date.getTime() - hours * 60 * 60 * 1000);
-}
-
-function firstName(name) {
-  return String(name || "").trim().split(/\s+/)[0] || "";
-}
-
-function reminderMessages(lead, parsed) {
-  const name = firstName(lead.nome);
-  return {
-    "24h":
-      `Olá, ${name}! Tudo bem?\n\n` +
-      `Passando para lembrar da sua consulta na OdontoCompany Olímpia, dia ${parsed.date}, às ${parsed.time}.\n\n` +
-      `Já deixamos tudo reservado para o seu atendimento.\n\n` +
-      `Te esperamos! 🦷💚`,
-    "12h":
-      `Olá, ${name}! Tudo bem?\n\n` +
-      `Só reforçando o seu horário na OdontoCompany Olímpia: dia ${parsed.date}, às ${parsed.time}.\n\n` +
-      `Seu atendimento está reservado e estaremos te aguardando. 💚`,
-    "1h":
-      `Olá, ${name}! 💚\n\n` +
-      `Está chegando a hora do seu atendimento na OdontoCompany Olímpia. Seu horário é às ${parsed.time}.\n\n` +
-      `Já estamos preparando sua sala e te aguardamos por aqui.\n\n` +
-      `Até já! ✨`,
-  };
-}
-
-function sameSchedule(scheduleData, spec, appointmentValue) {
-  return Boolean(
-    scheduleData &&
-    String(scheduleData.automationType || "") === spec.automationType &&
-    String(scheduleData.appointmentValue || "") === appointmentValue &&
-    String(scheduleData.sendAfter || "") === spec.sendAfter.toISOString() &&
-    String(scheduleData.expiresAt || "") === spec.expiresAt.toISOString() &&
-    String(scheduleData.message || "") === spec.message
-  );
-}
-
-async function ensureUpcomingAppointmentReminders(db, clinicId) {
-  const clinicRef = db.collection("clinics").doc(clinicId);
-  const sharedSnap = await clinicRef.collection("shared").doc("shared").get();
-  if (!sharedSnap.exists) return 0;
-
-  const shared = sharedSnap.data() || {};
-  const leads = Array.isArray(shared.leads) ? shared.leads : [];
-  const scheduleCol = clinicRef.collection("whatsappSchedule");
-  const queueCol = clinicRef.collection("whatsappQueue");
-  const now = new Date();
-  const horizon = new Date(now.getTime() + 72 * 60 * 60 * 1000);
-  const nowIso = now.toISOString();
-  let touched = 0;
-
-  const candidates = leads
-    .filter((lead) => !isFinalLead(lead))
-    .map((lead) => ({ lead, parsed: parseAppointment(lead.dataAgendamento) }))
-    .filter(({ parsed }) => parsed && parsed.appointment > now && parsed.appointment <= horizon)
-    .slice(0, 40);
-
-  for (const { lead, parsed } of candidates) {
-    const leadId = String(lead.id || "").trim();
-    const phone = whatsappPhone(lead.telefone);
-    const phoneKey = canonicalPhoneKey(lead.telefone);
-    if (!leadId || !phone || !phoneKey) continue;
-
-    const messages = reminderMessages(lead, parsed);
-    const appointmentValue = String(lead.dataAgendamento || "");
-    const appointmentIso = parsed.appointment.toISOString();
-    const specs = [
-      {
-        suffix: "24h",
-        automationType: "appointment_reminder_24h",
-        automationLabel: "Lembrete • 24h antes",
-        message: messages["24h"],
-        sendAfter: hoursBefore(parsed.appointment, 24),
-        expiresAt: hoursBefore(parsed.appointment, 12),
-      },
-      {
-        suffix: "12h",
-        automationType: "appointment_reminder_12h",
-        automationLabel: "Lembrete • 12h antes",
-        message: messages["12h"],
-        sendAfter: hoursBefore(parsed.appointment, 12),
-        expiresAt: hoursBefore(parsed.appointment, 1),
-      },
-      {
-        suffix: "1h",
-        automationType: "appointment_reminder_1h",
-        automationLabel: "Lembrete • 1h antes",
-        message: messages["1h"],
-        sendAfter: hoursBefore(parsed.appointment, 1),
-        expiresAt: parsed.appointment,
-      },
-    ];
-
-    const legacyId = `appt_${safeId(leadId)}_${parsed.key}_today`;
-    const legacyScheduleRef = scheduleCol.doc(legacyId);
-    const legacyQueueRef = queueCol.doc(legacyId);
-    const [legacyScheduleSnap, legacyQueueSnap] = await Promise.all([legacyScheduleRef.get(), legacyQueueRef.get()]);
-    const legacyBatch = db.batch();
-    let legacyWrites = 0;
-    if (legacyScheduleSnap.exists) {
-      legacyBatch.delete(legacyScheduleRef);
-      legacyWrites += 1;
-    }
-    if (legacyQueueSnap.exists && ["pending", "leased"].includes(String(legacyQueueSnap.data()?.status || ""))) {
-      legacyBatch.set(legacyQueueRef, { status: "cancelled", cancelReason: "replaced_by_1h_reminder", cancelledAt: nowIso, updatedAt: nowIso }, { merge: true });
-      legacyWrites += 1;
-    }
-    if (legacyWrites) await legacyBatch.commit();
-
-    for (const spec of specs) {
-      const id = `appt_${safeId(leadId)}_${parsed.key}_${spec.suffix}`;
-      const queueRef = queueCol.doc(id);
-      const scheduleRef = scheduleCol.doc(id);
-      const [queueSnap, scheduleSnap] = await Promise.all([queueRef.get(), scheduleRef.get()]);
-      const queueData = queueSnap.exists ? (queueSnap.data() || {}) : {};
-      const queueStatus = String(queueData.status || "");
-      const attempts = Number(queueData.attempts || 0) || 0;
-
-      if (spec.expiresAt <= now) {
-        if (scheduleSnap.exists) {
-          await scheduleRef.delete();
-          touched += 1;
-        }
-        continue;
-      }
-
-      if (["pending", "leased", "sent", "cancelled"].includes(queueStatus)) continue;
-
-      const baseData = {
-        clinicId,
-        leadId,
-        phone,
-        phoneKey,
-        name: String(lead.nome || "").trim().slice(0, 150),
-        message: spec.message.slice(0, 4000),
-        kind: "manual",
-        automationType: spec.automationType,
-        automationLabel: spec.automationLabel,
-        appointmentValue,
-        appointmentIso,
-        expiresAt: spec.expiresAt.toISOString(),
-        createdAt: scheduleSnap.exists ? (scheduleSnap.data()?.createdAt || nowIso) : nowIso,
-        updatedAt: nowIso,
-        createdBy: "agent-backfill",
-        attempts,
-      };
-
-      if (queueStatus === "failed") {
-        if (attempts >= 3) continue;
-        await queueRef.set({ ...baseData, status: "pending", sendAfter: nowIso, retryAt: nowIso }, { merge: true });
-        touched += 1;
-        continue;
-      }
-
-      if (spec.sendAfter <= now) {
-        if (scheduleSnap.exists) {
-          const scheduleData = scheduleSnap.data() || {};
-          if (!sameSchedule(scheduleData, spec, appointmentValue)) {
-            await scheduleRef.set({ ...baseData, queueId: id, sendAfter: spec.sendAfter.toISOString(), migratedAt: nowIso }, { merge: true });
-            touched += 1;
-          }
-        }
-        continue;
-      }
-
-      const scheduleData = scheduleSnap.exists ? (scheduleSnap.data() || {}) : null;
-      if (sameSchedule(scheduleData, spec, appointmentValue)) continue;
-
-      await scheduleRef.set({ ...baseData, queueId: id, sendAfter: spec.sendAfter.toISOString(), migratedAt: nowIso }, { merge: true });
-      touched += 1;
-    }
+async function docsByStatusAndKind(col, status, kind, max = 200) {
+  try {
+    const snap = await col.where("status", "==", status).where("kind", "==", kind).limit(max).get();
+    return snap.docs;
+  } catch (error) {
+    // Fallback para bases sem índice composto pronto. Mantém a fila viva enquanto
+    // o Firestore provisiona/usa os índices simples existentes.
+    console.warn(`[whatsapp-agent/pull] fallback ${status}/${kind}:`, error?.message || error);
+    const snap = await col.where("status", "==", status).limit(500).get();
+    return snap.docs.filter((doc) => String(doc.data()?.kind || "manual") === kind);
   }
-
-  return touched;
 }
 
-async function promoteDueScheduled(db, clinicId) {
-  const clinicRef = db.collection("clinics").doc(clinicId);
-  const scheduleCol = clinicRef.collection("whatsappSchedule");
-  const queueCol = clinicRef.collection("whatsappQueue");
-  const now = new Date();
-  const nowIso = now.toISOString();
-
-  const dueSnap = await scheduleCol.where("sendAfter", "<=", nowIso).limit(20).get();
-  if (dueSnap.empty) return 0;
-
-  const sharedSnap = await clinicRef.collection("shared").doc("shared").get();
-  const shared = sharedSnap.exists ? (sharedSnap.data() || {}) : {};
-  const leads = Array.isArray(shared.leads) ? shared.leads : [];
-  const queueRefs = dueSnap.docs.map((doc) => queueCol.doc(String(doc.data()?.queueId || doc.id)));
-  const existingQueueSnaps = queueRefs.length ? await db.getAll(...queueRefs) : [];
+async function recoverLeases(db, clinicRef, kind, now) {
+  const col = clinicRef.collection("whatsappQueue");
+  const leasedDocs = await docsByStatusAndKind(col, "leased", kind, 100);
+  const nowIso = new Date(now).toISOString();
   const batch = db.batch();
-  let promoted = 0;
+  let writes = 0;
 
-  dueSnap.docs.forEach((scheduleDoc, index) => {
-    const data = scheduleDoc.data() || {};
-    const queueRef = queueRefs[index];
-    const existingStatus = existingQueueSnaps[index]?.exists ? String(existingQueueSnaps[index].data()?.status || "") : "";
-    const expiresAt = Date.parse(String(data.expiresAt || ""));
-    const leadIndex = findLeadIndex(leads, { leadId: data.leadId, phone: data.phone });
-    const lead = leadIndex >= 0 ? (leads[leadIndex] || {}) : null;
-    const appointmentMatches = Boolean(lead && String(lead.dataAgendamento || "") === String(data.appointmentValue || ""));
+  leasedDocs.forEach((doc) => {
+    const data = doc.data() || {};
+    const leaseExpiresAt = parseMs(data.leaseExpiresAt);
+    const leasedAt = parseMs(data.leasedAt);
+    const expired = !leaseExpiresAt || leaseExpiresAt <= now;
+    const clinicStuck = isClinicManual(data) && leasedAt > 0 && leasedAt + CLINIC_LEASE_RECOVER_MS <= now;
+    if (!expired && !clinicStuck) return;
+    batch.set(doc.ref, {
+      status: "pending",
+      leaseRecoveredAt: nowIso,
+      leaseExpiresAt: null,
+      updatedAt: nowIso,
+    }, { merge: true });
+    writes += 1;
+  });
 
-    if (
-      (Number.isFinite(expiresAt) && expiresAt <= now.getTime()) ||
-      !lead ||
-      !appointmentMatches ||
-      isFinalLead(lead) ||
-      ["pending", "leased", "sent", "cancelled"].includes(existingStatus)
-    ) {
-      batch.delete(scheduleDoc.ref);
+  if (writes) await batch.commit();
+  return writes;
+}
+
+async function cancelStaleClinicManual(db, clinicRef, docs, now) {
+  const nowIso = new Date(now).toISOString();
+  const batch = db.batch();
+  const keep = [];
+  let writes = 0;
+
+  docs.forEach((doc) => {
+    const data = doc.data() || {};
+    if (!isClinicManual(data)) {
+      keep.push(doc);
       return;
     }
 
-    batch.set(queueRef, { ...data, status: "pending", promotedAt: nowIso, updatedAt: nowIso, attempts: Number(data.attempts || 0) || 0 }, { merge: true });
-    batch.delete(scheduleDoc.ref);
-    promoted += 1;
+    const createdAt = parseMs(data.createdAt);
+    if (!createdAt || now - createdAt <= CLINIC_MANUAL_STALE_MS) {
+      keep.push(doc);
+      return;
+    }
+
+    batch.set(doc.ref, {
+      status: "cancelled",
+      cancelReason: "stale_clinic_manual_not_replayed",
+      cancelledAt: nowIso,
+      updatedAt: nowIso,
+    }, { merge: true });
+
+    const appointmentId = String(data.clinicAppointmentId || data.leadId || "").trim();
+    if (appointmentId.startsWith("clinic_")) {
+      batch.set(clinicRef.collection("clinicAgenda").doc(appointmentId), {
+        confirmationStatus: "pending",
+        lastReminderError: "Envio antigo retirado da fila por segurança. Reenvie manualmente se necessário.",
+        updatedAt: nowIso,
+      }, { merge: true });
+    }
+    writes += 1;
+  });
+
+  if (writes) await batch.commit();
+  return keep;
+}
+
+async function pullSeparatedQueue(req, res, kind) {
+  await requireWhatsAppAgent(req);
+  const clinicId = String(req.query.clinicId || "").trim();
+  const requestedLimit = Math.max(1, Math.min(Number(req.query.limit || 10) || 10, 20));
+  if (!clinicId) return res.status(400).json({ error: "clinicId obrigatório" });
+
+  const db = getAdminDb();
+  const clinicRef = db.collection("clinics").doc(clinicId);
+  const col = clinicRef.collection("whatsappQueue");
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+
+  // Recupera leases em TODA consulta. Antes isso dependia apenas do primeiro pull
+  // do processo e um item podia ficar congelado por 45 minutos.
+  await recoverLeases(db, clinicRef, kind, now);
+
+  let docs = await docsByStatusAndKind(col, "pending", kind, 200);
+  if (kind === "manual") docs = await cancelStaleClinicManual(db, clinicRef, docs, now);
+
+  docs = docs.filter((doc) => {
+    const data = doc.data() || {};
+    const sendAfter = parseMs(data.sendAfter);
+    const expiresAt = parseMs(data.expiresAt);
+    if (sendAfter && sendAfter > now) return false;
+    if (expiresAt && expiresAt <= now) return false;
+    return true;
+  });
+
+  docs.sort((a, b) => parseMs(a.data()?.createdAt) - parseMs(b.data()?.createdAt));
+  docs = docs.slice(0, requestedLimit);
+  if (!docs.length) return null;
+
+  const leaseExpiresAt = new Date(now + LEASE_MS).toISOString();
+  const batch = db.batch();
+  const items = docs.map((doc) => {
+    const data = doc.data() || {};
+    batch.set(doc.ref, {
+      status: "leased",
+      leasedAt: nowIso,
+      leaseExpiresAt,
+      attempts: (Number(data.attempts || 0) || 0) + 1,
+      updatedAt: nowIso,
+    }, { merge: true });
+    return {
+      id: doc.id,
+      leadId: data.leadId || "",
+      phone: data.phone || "",
+      name: data.name || "",
+      message: data.message || "",
+      kind: data.kind || "manual",
+      clientRequestId: data.clientRequestId || "",
+      automationType: data.automationType || "",
+      automationLabel: data.automationLabel || "",
+    };
   });
 
   await batch.commit();
-  return promoted;
+  return res.status(200).json({ ok: true, items });
 }
 
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
+  const kind = ["manual", "followup"].includes(String(req.query.kind || "")) ? String(req.query.kind) : "";
+  if (!kind) return legacyPull(req, res);
+
   try {
-    await requireWhatsAppAgent(req);
-    const clinicId = String(req.query.clinicId || "").trim();
-    const limit = Math.max(1, Math.min(Number(req.query.limit || 10) || 10, 20));
-    const recover = String(req.query.recover || "") === "1";
-    const requestedKind = ["manual", "followup"].includes(String(req.query.kind || "")) ? String(req.query.kind) : "";
-    if (!clinicId) return res.status(400).json({ error: "clinicId obrigatório" });
+    const response = await pullSeparatedQueue(req, res, kind);
+    if (response) return response;
 
-    const db = getAdminDb();
-    const col = db.collection("clinics").doc(clinicId).collection("whatsappQueue");
-    const now = Date.now();
-
-    if (requestedKind === "manual" && new Date().getUTCSeconds() < 10) {
-      await processClinicAgendaAutomation(db, clinicId).catch((error) => {
-        console.warn("[whatsapp-agent/pull] falha na automação da agenda da clínica:", error?.message || error);
-      });
-      await ensureUpcomingAppointmentReminders(db, clinicId).catch((error) => {
-        console.warn("[whatsapp-agent/pull] falha ao garantir régua de agendamentos:", error?.message || error);
-      });
-      await promoteDueScheduled(db, clinicId).catch((error) => {
-        console.warn("[whatsapp-agent/pull] falha ao promover lembretes:", error?.message || error);
-      });
-    }
-
-    if (recover) {
-      const leasedSnap = await col.where("status", "==", "leased").limit(50).get();
-      const stale = leasedSnap.docs.filter((doc) => {
-        const expiresAt = Date.parse(String(doc.data()?.leaseExpiresAt || ""));
-        return !Number.isFinite(expiresAt) || expiresAt <= now;
-      });
-      if (stale.length) {
-        const recoveryBatch = db.batch();
-        const nowIso = new Date().toISOString();
-        stale.forEach((doc) => recoveryBatch.set(doc.ref, { status: "pending", leaseRecoveredAt: nowIso, updatedAt: nowIso }, { merge: true }));
-        await recoveryBatch.commit();
-      }
-    }
-
-    const snap = await col.where("status", "==", "pending").limit(60).get();
-    if (snap.empty) return res.status(200).json({ ok: true, items: [] });
-
-    const nowMs = Date.now();
-    let docs = [...snap.docs].filter((doc) => {
-      const data = doc.data() || {};
-      const sendAfter = Date.parse(String(data.sendAfter || ""));
-      const expiresAt = Date.parse(String(data.expiresAt || ""));
-      if (Number.isFinite(sendAfter) && sendAfter > nowMs) return false;
-      if (Number.isFinite(expiresAt) && expiresAt <= nowMs) return false;
-      return true;
-    });
-
-    if (requestedKind) {
-      docs = docs.filter((doc) => String(doc.data()?.kind || "manual") === requestedKind);
-    } else {
-      docs.sort((a, b) => {
-        const aData = a.data() || {};
-        const bData = b.data() || {};
-        const aPriority = String(aData.kind || "manual") === "manual" ? 0 : 1;
-        const bPriority = String(bData.kind || "manual") === "manual" ? 0 : 1;
-        if (aPriority !== bPriority) return aPriority - bPriority;
-        return String(aData.createdAt || "").localeCompare(String(bData.createdAt || ""));
-      });
-    }
-    docs = docs.slice(0, limit);
-    if (!docs.length) return res.status(200).json({ ok: true, items: [] });
-
-    const leaseAt = new Date();
-    const leaseExpiresAt = new Date(leaseAt.getTime() + 45 * 60 * 1000).toISOString();
-    const batch = db.batch();
-    const items = docs.map((doc) => {
-      const data = doc.data() || {};
-      batch.set(doc.ref, {
-        status: "leased",
-        leasedAt: leaseAt.toISOString(),
-        leaseExpiresAt,
-        attempts: (Number(data.attempts || 0) || 0) + 1,
-        updatedAt: leaseAt.toISOString(),
-      }, { merge: true });
-      return {
-        id: doc.id,
-        leadId: data.leadId || "",
-        phone: data.phone || "",
-        name: data.name || "",
-        message: data.message || "",
-        kind: data.kind || "manual",
-        clientRequestId: data.clientRequestId || "",
-        automationType: data.automationType || "",
-        automationLabel: data.automationLabel || "",
-      };
-    });
-
-    await batch.commit();
-    return res.status(200).json({ ok: true, items });
+    // Quando a fila manual está vazia, executa o fluxo legado apenas para manter
+    // as rotinas de manutenção/programações já existentes. Se ele promover algo,
+    // o próximo poll (em ~8s) pega pelo caminho corrigido acima.
+    if (kind === "manual") return legacyPull(req, res);
+    return res.status(200).json({ ok: true, items: [] });
   } catch (error) {
     const status = error?.statusCode || 500;
-    console.error("[whatsapp-agent/pull]", error?.message || error);
+    console.error("[whatsapp-agent/pull-v2]", error?.message || error);
     return res.status(status).json({ error: status === 401 ? "Não autorizado" : error?.message || "Erro" });
   }
 }
