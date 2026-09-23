@@ -4,6 +4,14 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { useWhatsAppAgent } from "@/hooks/useWhatsAppAgent";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { CalendarCheck, CheckCircle2, Clock3, FileUp, RefreshCw, Send, Stethoscope, UserRound, XCircle } from "lucide-react";
 
@@ -34,6 +42,8 @@ type PdfRow = {
 
 type PdfTextItem = { str?: string; transform?: number[] };
 type PositionedText = { text: string; x: number; y: number };
+
+const DEFAULT_MESSAGE = `Olá, {nome}! 💚\n\nPassando para lembrar da sua consulta hoje, às {horario}, com a {dra}, na OdontoCompany Olímpia.\n\nPodemos confirmar sua presença?`;
 
 const stripAccents = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const normalizeKey = (value: string) => stripAccents(String(value || "")).toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
@@ -88,6 +98,11 @@ const prettyProfessional = (value: string) => {
   return clean.replace(/^Dra\.?\s*/i, "Dra. ") || "Profissional não identificada";
 };
 
+const firstName = (value: string) => {
+  const first = String(value || "").trim().split(/\s+/)[0] || "";
+  return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : "";
+};
+
 const appointmentDate = (appointment: ClinicAppointment) => {
   const match = `${appointment.date} ${appointment.startTime}`.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
   if (!match) return null;
@@ -99,6 +114,13 @@ const appointmentDate = (appointment: ClinicAppointment) => {
 const isPast = (appointment: ClinicAppointment) => {
   const date = appointmentDate(appointment);
   return !date || date.getTime() <= Date.now();
+};
+
+const fillMessage = (template: string, appointment: ClinicAppointment) => {
+  return template
+    .replaceAll("{nome}", firstName(appointment.name))
+    .replaceAll("{horario}", appointment.startTime)
+    .replaceAll("{dra}", prettyProfessional(appointment.professional));
 };
 
 function groupPageItems(items: PdfTextItem[]) {
@@ -219,12 +241,12 @@ function consolidateRows(rows: PdfRow[]) {
     });
   });
 
-  return appointments.sort((a, b) => a.startTime.localeCompare(b.startTime));
+  return appointments.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 }
 
 export function ClinicConfirmations() {
-  const { currentClinic, user } = useAuth();
-  const { status: agentStatus } = useWhatsAppAgent();
+  const { currentClinic } = useAuth();
+  const { queueMessages, status: agentStatus } = useWhatsAppAgent();
   const inputRef = useRef<HTMLInputElement>(null);
   const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,6 +254,8 @@ export function ClinicConfirmations() {
   const [sending, setSending] = useState(false);
   const [selectedProfessional, setSelectedProfessional] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [messageTemplate, setMessageTemplate] = useState(DEFAULT_MESSAGE);
 
   useEffect(() => {
     if (!currentClinic) return;
@@ -241,7 +265,7 @@ export function ClinicConfirmations() {
       const list = snapshot.docs
         .map((item) => ({ id: item.id, ...(item.data() as Omit<ClinicAppointment, "id">) }))
         .filter((item) => item.active !== false && item.date === todayBr())
-        .sort((a, b) => a.startTime.localeCompare(b.startTime));
+        .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
       setAppointments(list);
       setLoading(false);
     }, () => setLoading(false));
@@ -260,12 +284,15 @@ export function ClinicConfirmations() {
   }, [professionals, selectedProfessional]);
 
   const doctorAppointments = useMemo(() => {
-    return appointments.filter((item) => prettyProfessional(item.professional) === selectedProfessional);
+    return appointments
+      .filter((item) => prettyProfessional(item.professional) === selectedProfessional)
+      .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
   }, [appointments, selectedProfessional]);
 
   const upcomingAppointments = useMemo(() => doctorAppointments.filter((item) => !isPast(item)), [doctorAppointments]);
   const pastAppointments = useMemo(() => doctorAppointments.filter((item) => isPast(item)), [doctorAppointments]);
-  const selectable = useMemo(() => upcomingAppointments.filter((item) => validPhone(item.phone) && item.confirmationStatus !== "queued"), [upcomingAppointments]);
+  const selectable = useMemo(() => upcomingAppointments.filter((item) => validPhone(item.phone) && item.confirmationStatus !== "queued" && !appointmentWasSent(item)), [upcomingAppointments]);
+  const selectedAppointments = useMemo(() => selectable.filter((item) => selectedIds.includes(item.id)), [selectable, selectedIds]);
 
   useEffect(() => {
     setSelectedIds(selectable.map((item) => item.id));
@@ -291,6 +318,7 @@ export function ClinicConfirmations() {
         return setDoc(doc(agendaRef, item.id), {
           ...item,
           confirmationStatus: previous?.confirmationStatus || "pending",
+          remindersSent: previous?.remindersSent || {},
           sourceFile: file.name,
           importedAt: previous?.importedAt || now,
           updatedAt: now,
@@ -314,40 +342,53 @@ export function ClinicConfirmations() {
     }
   };
 
-  const sendSelected = async () => {
-    if (!currentClinic || !user) return;
-    const selected = selectable.filter((item) => selectedIds.includes(item.id));
-    if (!selected.length) {
+  const openPreview = () => {
+    if (!selectedAppointments.length) {
       toast.error("Não há pacientes selecionados para envio.");
       return;
     }
+    setMessageTemplate(DEFAULT_MESSAGE);
+    setPreviewOpen(true);
+  };
 
-    if (!window.confirm(`Enviar lembrete agora para ${selected.length} paciente(s) da ${selectedProfessional}?`)) return;
+  const sendSelected = async () => {
+    if (!currentClinic || !selectedAppointments.length) return;
+    if (!messageTemplate.trim()) {
+      toast.error("A mensagem não pode ficar vazia.");
+      return;
+    }
 
     setSending(true);
     try {
-      const token = await user.getIdToken();
-      const response = await fetch("/api/whatsapp/clinic-appointments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          clinicId: currentClinic,
-          action: "send_now",
-          appointmentIds: selected.map((item) => item.id),
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error || "Erro ao enviar lembretes");
+      let queuedTotal = 0;
+      let skippedTotal = 0;
+      const queuedIds = new Set<string>();
 
-      await Promise.all(selected.map((item) => updateDoc(doc(db, "clinics", currentClinic, "clinicAgenda", item.id), {
-        confirmationStatus: "queued",
-        updatedAt: new Date().toISOString(),
-      })));
+      for (let index = 0; index < selectedAppointments.length; index += 50) {
+        const chunk = selectedAppointments.slice(index, index + 50);
+        const result = await queueMessages(chunk.map((appointment) => ({
+          leadId: appointment.id,
+          phone: appointment.phone,
+          name: appointment.name,
+          message: fillMessage(messageTemplate, appointment),
+          kind: "manual" as const,
+          clientRequestId: `clinic_today_${appointment.id}`,
+        })));
+        queuedTotal += result.queued;
+        skippedTotal += result.skipped;
+        result.queuedIds.forEach((id) => queuedIds.add(id));
+      }
 
-      toast.success(`${data.queued || 0} lembrete(s) colocado(s) na fila para ${selectedProfessional}.`);
+      const now = new Date().toISOString();
+      await Promise.all(selectedAppointments
+        .filter((item) => queuedIds.has(item.id))
+        .map((item) => updateDoc(doc(db, "clinics", currentClinic, "clinicAgenda", item.id), {
+          confirmationStatus: "queued",
+          updatedAt: now,
+        })));
+
+      toast.success(`${queuedTotal} lembrete(s) colocado(s) na fila${skippedTotal ? ` • ${skippedTotal} já estavam enviados/na fila` : ""}.`);
+      setPreviewOpen(false);
       setSelectedIds([]);
     } catch (error) {
       console.error("[clinic-send]", error);
@@ -360,6 +401,9 @@ export function ClinicConfirmations() {
   if (!currentClinic) {
     return <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">Selecione a clínica.</div>;
   }
+
+  const previewAppointment = selectedAppointments[0] || null;
+  const previewMessage = previewAppointment ? fillMessage(messageTemplate, previewAppointment) : messageTemplate;
 
   return (
     <div className="space-y-5">
@@ -414,9 +458,9 @@ export function ClinicConfirmations() {
               {upcomingAppointments.length} ainda vão acontecer • {pastAppointments.length} já passaram
             </div>
           </div>
-          <Button onClick={sendSelected} disabled={sending || selectedIds.length === 0 || !agentStatus.connected} className="gap-2">
-            {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {sending ? "Enviando..." : `Enviar para selecionados (${selectedIds.length})`}
+          <Button onClick={openPreview} disabled={sending || selectedIds.length === 0 || !agentStatus.connected} className="gap-2">
+            <Send className="h-4 w-4" />
+            {`Revisar e enviar (${selectedIds.length})`}
           </Button>
         </div>
 
@@ -447,11 +491,11 @@ export function ClinicConfirmations() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {[...upcomingAppointments, ...pastAppointments].map((appointment) => {
+                {doctorAppointments.map((appointment) => {
                   const past = isPast(appointment);
                   const phoneOk = validPhone(appointment.phone);
                   const queued = appointment.confirmationStatus === "queued";
-                  const sent = Boolean(appointment.remindersSent?.manual);
+                  const sent = appointmentWasSent(appointment);
                   return (
                     <tr key={appointment.id} className={past ? "bg-muted/20 text-muted-foreground" : "hover:bg-muted/20"}>
                       <td className="px-4 py-3">
@@ -490,6 +534,51 @@ export function ClinicConfirmations() {
           </div>
         )}
       </div>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-[640px]">
+          <DialogHeader>
+            <DialogTitle>Revisar mensagem antes do envio</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <div className="font-medium">{selectedProfessional}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{selectedAppointments.length} paciente(s) selecionado(s). A mensagem será personalizada com nome, horário e Dra.</div>
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium">Mensagem</div>
+              <Textarea
+                value={messageTemplate}
+                onChange={(event) => setMessageTemplate(event.target.value)}
+                rows={7}
+                className="resize-none"
+              />
+              <div className="mt-2 text-xs text-muted-foreground">Você pode editar normalmente. Mantenha <strong>{"{nome}"}</strong>, <strong>{"{horario}"}</strong> e <strong>{"{dra}"}</strong> se quiser personalização automática.</div>
+            </div>
+
+            {previewAppointment && (
+              <div className="rounded-lg border p-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prévia para {previewAppointment.name}</div>
+                <div className="whitespace-pre-wrap text-sm leading-relaxed">{previewMessage}</div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewOpen(false)} disabled={sending}>Cancelar</Button>
+            <Button onClick={sendSelected} disabled={sending || !messageTemplate.trim()} className="gap-2">
+              {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {sending ? "Enviando..." : `Confirmar envio (${selectedAppointments.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function appointmentWasSent(appointment: ClinicAppointment) {
+  return Boolean(appointment.remindersSent?.manual);
 }
