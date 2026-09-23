@@ -4,6 +4,7 @@
 
 function isClinicAutomation(data = {}) {
   const type = String(data.automationType || "");
+  if (type === "appointment_clinic_manual") return false;
   return type.startsWith("appointment_clinic_") || String(data.createdBy || "") === "clinic-agenda-automation";
 }
 
