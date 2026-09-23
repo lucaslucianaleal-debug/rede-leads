@@ -53,11 +53,14 @@ function slotMinutes(professional: string) {
 function protectedBreaks(professional: string): ProtectedBreak[] {
   const key = prettyProfessional(professional).toLowerCase();
 
-  // Regra operacional confirmada: Tailuene tem 2h de almoço e o histórico
-  // mostra retomada muito consistente às 14:00. Os demais profissionais ficam
-  // configuráveis depois que a clínica fechar a jornada oficial de cada um.
+  // Regra operacional da clínica:
+  // - Tailuene: almoço das 12:00 às 14:00
+  // - Lucas, Gabriela e Manuela: almoço das 12:00 às 13:00
   if (key.includes("tailuene")) {
     return [{ start: timeToMinutes("12:00"), end: timeToMinutes("14:00"), label: "Almoço" }];
+  }
+  if (key.includes("lucas") || key.includes("gabriela") || key.includes("manuela")) {
+    return [{ start: timeToMinutes("12:00"), end: timeToMinutes("13:00"), label: "Almoço" }];
   }
 
   return [];
@@ -180,18 +183,18 @@ export function ClinicVacancies() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <Rule title="Dra. Tailuene" detail="30 min por atendimento" extra="Almoço protegido: 12:00–14:00 • vaga de 30 min pode receber avaliação" />
-        <Rule title="Dr. Lucas" detail="mínimo 60 min" />
-        <Rule title="Dra. Gabriela" detail="mínimo 60 min" />
-        <Rule title="Dra. Manuela" detail="mínimo 60 min" />
+        <Rule title="Dra. Tailuene" detail="30 min por atendimento" extra="Almoço 12:00–14:00 • vaga de 30 min pode receber avaliação" />
+        <Rule title="Dr. Lucas" detail="mínimo 60 min" extra="Almoço 12:00–13:00" />
+        <Rule title="Dra. Gabriela" detail="mínimo 60 min" extra="Almoço 12:00–13:00" />
+        <Rule title="Dra. Manuela" detail="mínimo 60 min" extra="Almoço 12:00–13:00" />
       </div>
 
       <div className="rounded-xl border bg-violet-50/40 p-4 text-sm text-violet-900">
-        <div className="flex gap-2"><Utensils className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>Pausa protegida:</strong> o intervalo de almoço da Dra. Tailuene (12:00–14:00) não entra no cálculo de vagas, mesmo quando aparece como um grande espaço vazio no calendário.</div></div>
+        <div className="flex gap-2"><Utensils className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>Pausas protegidas:</strong> Tailuene 12:00–14:00; Lucas, Gabriela e Manuela 12:00–13:00. Esses períodos nunca entram como vagas disponíveis.</div></div>
       </div>
 
       <div className="rounded-xl border bg-amber-50/40 p-4 text-sm text-amber-900">
-        <div className="flex gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>V1:</strong> estamos detectando vagas dentro do intervalo já ocupado do profissional. Os horários antes do primeiro e depois do último paciente, além das pausas dos demais dentistas, entram quando fecharmos a jornada oficial de cada um.</div></div>
+        <div className="flex gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>V1:</strong> estamos detectando vagas dentro do intervalo já ocupado do profissional. Os horários antes do primeiro e depois do último paciente entram quando cadastrarmos a jornada oficial de cada dentista.</div></div>
       </div>
 
       {[...grouped.entries()].slice(0, 14).map(([date, items]) => (
