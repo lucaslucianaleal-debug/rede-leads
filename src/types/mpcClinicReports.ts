@@ -8,11 +8,15 @@ export interface MPCClinicLeadLink {
   crmPhone?: string;
   crmAppointmentDate?: string;
   crmComparecimento?: string;
+  crmEntryDate?: string;
   metaCampanhaId?: string;
   metaCampanhaNome?: string;
   fonteLead?: string;
   servicoProcurado?: string;
   sameDayAppointment?: boolean;
+  presenceConfirmed?: boolean;
+  presenceDate?: string;
+  presenceTiming?: "scheduled_day" | "other_day";
 }
 
 export interface MPCClinicBudgetSalesRow {
@@ -82,5 +86,7 @@ export interface MPCClinicReportImport {
   rowCount: number;
   linkedCount: number;
   unmatchedCount: number;
+  confirmedPresenceCount?: number;
   sameDayConfirmedCount?: number;
+  otherDayConfirmedCount?: number;
 }
