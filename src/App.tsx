@@ -16,6 +16,7 @@ import VisitaComercial from "./pages/VisitaComercial";
 import Promotora from "./pages/Promotora";
 import MPCToolPage from "./pages/MPCToolPage";
 import WhatsAppAgentPage from "./pages/WhatsAppAgentPage";
+import ClinicConfirmationsPage from "./pages/ClinicConfirmationsPage";
 
 const queryClient = new QueryClient();
 
@@ -97,6 +98,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
+      <Route path="/clinica" element={<ClinicConfirmationsPage />} />
       <Route path="/mpc-tool" element={<MPCToolPage />} />
       <Route path="/whatsapp-agent" element={<WhatsAppAgentPage />} />
       <Route path="/sorteio-cupons" element={<SorteioCupons />} />
