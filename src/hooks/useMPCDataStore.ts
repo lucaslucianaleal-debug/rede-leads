@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { toast } from "sonner";
+import type {
+  MPCClinicBudgetSalesSnapshot,
+  MPCClinicProcedureRecord,
+  MPCClinicReportImport,
+  MPCClinicSaleRecord,
+} from "@/types/mpcClinicReports";
 
 export type MPCStore = {
   dentists: Array<{ id: string; name: string; specialty?: string; dailyTarget: number; workDays?: number[]; isOrcamentista?: boolean; startDate?: string; leadId?: string }>;
@@ -9,10 +15,24 @@ export type MPCStore = {
   budgets: Array<{ id: string; dentistId: string; patientName: string; patientId?: string; patientPhone?: string; budgetAt: string; procedure?: string; source?: string; saleValue?: number; saleProcedure?: string }>;
   surveys: Array<{ id: string; leadId?: string; patientName?: string; sector: "reception" | "clinic" | "ortho" | "sales" | "dentist"; dentistId?: string; score: number; comment?: string; createdAt: string }>;
   averageTicket: number;
+  clinicBudgetSalesSnapshots?: MPCClinicBudgetSalesSnapshot[];
+  clinicSales?: MPCClinicSaleRecord[];
+  clinicProcedures?: MPCClinicProcedureRecord[];
+  clinicReportImports?: MPCClinicReportImport[];
 };
 
 function defaultStore(): MPCStore {
-  return { dentists: [], appointments: [], budgets: [], surveys: [], averageTicket: 500 };
+  return {
+    dentists: [],
+    appointments: [],
+    budgets: [],
+    surveys: [],
+    averageTicket: 500,
+    clinicBudgetSalesSnapshots: [],
+    clinicSales: [],
+    clinicProcedures: [],
+    clinicReportImports: [],
+  };
 }
 
 function normalizeStoreShape(store: any): MPCStore {
@@ -46,6 +66,10 @@ function normalizeStoreShape(store: any): MPCStore {
     budgets: Array.isArray(store?.budgets) ? store.budgets : [],
     surveys: Array.isArray(store?.surveys) ? store.surveys : [],
     averageTicket: Number(store?.averageTicket ?? 500),
+    clinicBudgetSalesSnapshots: Array.isArray(store?.clinicBudgetSalesSnapshots) ? store.clinicBudgetSalesSnapshots : [],
+    clinicSales: Array.isArray(store?.clinicSales) ? store.clinicSales : [],
+    clinicProcedures: Array.isArray(store?.clinicProcedures) ? store.clinicProcedures : [],
+    clinicReportImports: Array.isArray(store?.clinicReportImports) ? store.clinicReportImports : [],
   };
 }
 
@@ -100,7 +124,13 @@ function sanitizeStore(store: MPCStore): MPCStore {
 }
 
 function isStoreEmpty(s: MPCStore) {
-  return s.dentists.length === 0 && s.appointments.length === 0 && s.budgets.length === 0 && s.surveys.length === 0;
+  return s.dentists.length === 0
+    && s.appointments.length === 0
+    && s.budgets.length === 0
+    && s.surveys.length === 0
+    && (s.clinicBudgetSalesSnapshots || []).length === 0
+    && (s.clinicSales || []).length === 0
+    && (s.clinicProcedures || []).length === 0;
 }
 
 export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: boolean }) {
@@ -166,7 +196,6 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
           setStoreState(data);
           setClinicCacheStore(clinicId, data);
         } else {
-          // Mesmo comportamento de "leads": tenta bootstrap via cache local da clínica.
           const cached = getClinicCacheStore(clinicId);
           if (cached && !isStoreEmpty(cached)) {
             console.log(`[MPC] ♻️ Bootstrap do cache local para Firebase | clinic=${clinicId}`);
@@ -187,13 +216,11 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
         canWrite.current = true;
       } catch (e) {
         console.warn("[MPC] Erro ao carregar:", e);
-        // Mesmo com falha no getDoc inicial, permite escrita para não perder dados digitados/importados.
         canWrite.current = true;
       } finally {
         if (active) setLoading(false);
       }
 
-      // Assinar atualizações em tempo real APÓS o getDoc inicial
       try {
         unsub = onSnapshot(docRef, (snap) => {
           if (!active) return;
@@ -225,15 +252,9 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
     };
   }, [docRef, isDemo, clinicId]);
 
-  // ─── Save Effect ────────────────────────────────────────────────────────────
-  // Só salva quando:
-  //   1. isFromFirebase.current = false  → mudança veio do USUÁRIO (não do Firebase)
-  //   2. canWrite.current = true          → getDoc inicial já foi concluído
-  //   3. store não está completamente vazio
   useEffect(() => {
     if (!docRef || isDemo || readOnly) return;
 
-    // Mudança veio do Firebase → reseta flag e não salva de volta
     if (isFromFirebase.current) {
       isFromFirebase.current = false;
       return;
@@ -265,7 +286,6 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
     return () => clearTimeout(timer);
   }, [store, docRef, isDemo, readOnly, clinicId]);
 
-  // ─── Mutations ──────────────────────────────────────────────────────────────
   const normalizeWorkDays = (days: any) => {
     const arr = Array.isArray(days) ? days.map((x) => Number(x)).filter((x) => Number.isInteger(x) && x >= 0 && x <= 6) : [];
     const unique = Array.from(new Set(arr)).sort((a, b) => a - b);
@@ -325,4 +345,3 @@ export function useMPCDataStore(clinicId: string | null, options?: { readOnly?: 
 
   return { store, setStore, addDentist, updateDentist, removeDentist, recordAppointment, addSurvey, reset, saveNow, loading };
 }
-
