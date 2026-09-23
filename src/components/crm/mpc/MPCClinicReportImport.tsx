@@ -396,7 +396,7 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
                   <div className="flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{report.linkedRows.length} linhas</span>
                     <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">{linked} no CRM</span>
-                    <span className="rounded-full bg-amber-50 px-2 py-1 text-amber-700">{report.linkedRows.length - linked} pendentes</span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600">{report.linkedRows.length - linked} não localizados no CRM</span>
                     {report.type === "completed" && <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">{sameDay} presença(s) na mesma data</span>}
                   </div>
                 </div>
@@ -427,8 +427,8 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
                 )}
 
                 {unmatched.length > 0 && (
-                  <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    <strong>Pendentes de vínculo:</strong> {unmatched.map((row: any) => row.patientName).join(" · ")}
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <strong>Não localizados no CRM:</strong> {unmatched.map((row: any) => row.patientName).join(" · ")}
                     {report.linkedRows.length - linked > unmatched.length ? " · ..." : ""}
                   </div>
                 )}
