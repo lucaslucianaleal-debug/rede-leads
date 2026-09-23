@@ -1,5 +1,6 @@
 export type MPCClinicReportType = "budgets_sales" | "ortho_sales" | "completed";
 export type MPCClinicMatchMethod = "cpf" | "phone" | "name";
+export type MPCClinicPresenceTiming = "scheduled_day" | "other_day" | "report_period";
 
 export interface MPCClinicLeadLink {
   leadId: string;
@@ -16,7 +17,8 @@ export interface MPCClinicLeadLink {
   sameDayAppointment?: boolean;
   presenceConfirmed?: boolean;
   presenceDate?: string;
-  presenceTiming?: "scheduled_day" | "other_day";
+  presenceTiming?: MPCClinicPresenceTiming;
+  presenceSource?: MPCClinicReportType;
 }
 
 export interface MPCClinicBudgetSalesRow {
@@ -89,4 +91,5 @@ export interface MPCClinicReportImport {
   confirmedPresenceCount?: number;
   sameDayConfirmedCount?: number;
   otherDayConfirmedCount?: number;
+  periodConfirmedCount?: number;
 }
