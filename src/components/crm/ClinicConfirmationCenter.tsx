@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, getDocs, onSnapshot, query, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
+import { useLeads } from "@/hooks/useLeads";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -11,13 +13,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ClinicConfirmations } from "@/components/crm/ClinicConfirmations";
-import { AlertCircle, CheckCircle2, Clock3, Filter, MessageCircle, RotateCcw, Send, UserRound, XCircle } from "lucide-react";
+import { formatPhoneNumber, isValidPhone, maskPhone, normalizePhoneTo10Digits } from "@/lib/phone";
+import { AlertCircle, CheckCircle2, Clock3, Filter, MessageCircle, Pencil, Phone, RotateCcw, Send, UserRound, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type ClinicAppointment = {
   id: string;
+  leadId?: string;
   name: string;
   phone: string;
+  phoneKey?: string | null;
   date: string;
   startTime: string;
   endTime: string;
@@ -119,12 +124,17 @@ function formatDeadline(value?: string) {
 
 export function ClinicConfirmationCenter() {
   const { currentClinic } = useAuth();
+  const { leads, updateLead } = useLeads();
   const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
   const [range, setRange] = useState<RangeKey>("48h");
   const [doctor, setDoctor] = useState("all");
   const [manualOpen, setManualOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState<ClinicAppointment | null>(null);
   const [savingReview, setSavingReview] = useState(false);
+  const [editItem, setEditItem] = useState<ClinicAppointment | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     if (!currentClinic) return;
@@ -177,6 +187,100 @@ export function ClinicConfirmationCenter() {
     });
     return map;
   }, [visible]);
+
+  const leadMatches = useMemo(() => {
+    if (!editItem) return [];
+    if (editItem.leadId) {
+      const linked = leads.filter((lead) => lead.id === editItem.leadId && !lead._deleted);
+      if (linked.length) return linked;
+    }
+    const nameKey = normalizeKey(editItem.name);
+    if (!nameKey) return [];
+    return leads.filter((lead) => !lead._deleted && normalizeKey(lead.nome) === nameKey);
+  }, [editItem, leads]);
+
+  const linkedLead = leadMatches.length === 1 ? leadMatches[0] : null;
+
+  const openQuickEdit = (item: ClinicAppointment) => {
+    setEditItem(item);
+    setEditName(item.name || "");
+    setEditPhone(item.phone || "");
+  };
+
+  const saveQuickEdit = async () => {
+    if (!currentClinic || !editItem) return;
+    const cleanName = editName.trim();
+    const cleanPhone = editPhone.trim();
+    if (!cleanName) {
+      toast.error("Informe o nome do paciente.");
+      return;
+    }
+    if (cleanPhone && !isValidPhone(cleanPhone)) {
+      toast.error("Telefone inválido. Informe DDD + número.");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const canonical = cleanPhone ? normalizePhoneTo10Digits(cleanPhone) : "";
+      const phoneKey = canonical ? `55${canonical}` : null;
+      const storedPhone = cleanPhone ? formatPhoneNumber(cleanPhone) : "";
+      const batch = writeBatch(db);
+      const appointmentRef = doc(db, "clinics", currentClinic, "clinicAgenda", editItem.id);
+
+      batch.set(appointmentRef, {
+        name: cleanName,
+        phone: storedPhone,
+        phoneKey,
+        ...(linkedLead ? { leadId: linkedLead.id } : {}),
+        manuallyEditedAt: nowIso,
+        updatedAt: nowIso,
+      }, { merge: true });
+
+      const [queueSnapshot, scheduleSnapshot] = await Promise.all([
+        getDocs(query(collection(db, "clinics", currentClinic, "whatsappQueue"), where("clinicAppointmentId", "==", editItem.id))),
+        getDocs(query(collection(db, "clinics", currentClinic, "whatsappSchedule"), where("clinicAppointmentId", "==", editItem.id))),
+      ]);
+
+      queueSnapshot.docs.forEach((queueDoc) => {
+        const data = queueDoc.data() || {};
+        if (!["pending", "leased"].includes(String(data.status || ""))) return;
+        batch.set(queueDoc.ref, {
+          phone: storedPhone,
+          phoneKey,
+          name: cleanName,
+          updatedAt: nowIso,
+        }, { merge: true });
+      });
+
+      scheduleSnapshot.docs.forEach((scheduleDoc) => {
+        batch.set(scheduleDoc.ref, {
+          phone: storedPhone,
+          phoneKey,
+          name: cleanName,
+          updatedAt: nowIso,
+        }, { merge: true });
+      });
+
+      await batch.commit();
+
+      if (linkedLead) {
+        await Promise.resolve(updateLead(linkedLead.id, { nome: cleanName, telefone: storedPhone }));
+        toast.success("Paciente atualizado na agenda e no Rede Leads.");
+      } else if (leadMatches.length > 1) {
+        toast.success("Agenda atualizada. Há mais de um lead com esse nome; o Rede Leads não foi alterado.");
+      } else {
+        toast.success("Paciente atualizado na agenda.");
+      }
+      setEditItem(null);
+    } catch (error) {
+      console.error("[clinic-quick-edit]", error);
+      toast.error("Não foi possível atualizar o paciente.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const saveReview = async (decision: ReviewDecision) => {
     if (!currentClinic || !reviewItem) return;
@@ -295,9 +399,27 @@ export function ClinicConfirmationCenter() {
                       <div key={item.id} className="grid gap-2 px-4 py-3 md:grid-cols-[90px_1fr_220px] md:items-center">
                         <div className="font-semibold">{item.startTime}–{item.endTime}</div>
                         <div>
-                          <div className="flex items-center gap-2 font-medium"><UserRound className="h-4 w-4" />{item.name}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {item.lastReplyText ? `Resposta: “${item.lastReplyText}”` : item.lastReminderError ? `Erro: ${item.lastReminderError}` : item.phone || "Sem telefone"}
+                          <div className="flex items-center gap-2 font-medium">
+                            <UserRound className="h-4 w-4" />
+                            <span>{item.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => openQuickEdit(item)}
+                              className="rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                              title="Editar nome ou telefone"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          {item.lastReplyText && <div className="mt-1 text-xs text-muted-foreground">Resposta: “{item.lastReplyText}”</div>}
+                          {item.lastReminderError && !item.lastReplyText && <div className="mt-1 text-xs text-red-600">Erro: {item.lastReminderError}</div>}
+                          <div className="mt-1 flex items-center gap-1.5 text-xs">
+                            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                            {item.phone ? (
+                              <button type="button" onClick={() => openQuickEdit(item)} className="text-muted-foreground hover:text-foreground hover:underline">{item.phone}</button>
+                            ) : (
+                              <button type="button" onClick={() => openQuickEdit(item)} className="font-medium text-amber-700 hover:underline">Sem telefone — adicionar</button>
+                            )}
                           </div>
                         </div>
                         <div className="md:text-right">
@@ -327,6 +449,52 @@ export function ClinicConfirmationCenter() {
       ))}
 
       {!visible.length && <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">Nenhuma consulta neste filtro.</div>}
+
+      <Dialog open={Boolean(editItem)} onOpenChange={(open) => !open && !savingEdit && setEditItem(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar paciente</DialogTitle>
+          </DialogHeader>
+          {editItem && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+                {editItem.date} • {editItem.startTime}–{editItem.endTime} • {prettyProfessional(editItem.professional)}
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nome</label>
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Telefone</label>
+                <Input
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(maskPhone(e.target.value))}
+                  placeholder="(17) 99999-9999"
+                  inputMode="tel"
+                />
+                <div className="text-xs text-muted-foreground">Pode salvar o agendamento mesmo sem telefone. Quando encontrar o número, volte aqui e complete.</div>
+              </div>
+              {linkedLead ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+                  <strong>Rede Leads vinculado:</strong> {linkedLead.nome}. Nome e telefone serão atualizados nos dois lugares.
+                </div>
+              ) : leadMatches.length > 1 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  Há mais de um lead com esse nome. Para segurança, esta edição altera somente a agenda da clínica.
+                </div>
+              ) : (
+                <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+                  Nenhum lead único correspondente foi encontrado. Esta edição altera somente a agenda da clínica.
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditItem(null)} disabled={savingEdit}>Cancelar</Button>
+            <Button onClick={() => void saveQuickEdit()} disabled={savingEdit}>{savingEdit ? "Salvando..." : "Salvar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(reviewItem)} onOpenChange={(open) => !open && !savingReview && setReviewItem(null)}>
         <DialogContent className="sm:max-w-[560px]">
