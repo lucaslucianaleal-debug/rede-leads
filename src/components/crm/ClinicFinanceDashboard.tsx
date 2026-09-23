@@ -182,7 +182,7 @@ export function ClinicFinanceDashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} />
                       <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} width={44} />
-                      <Tooltip formatter={(value: number) => [formatCurrency(value), "Valor atualizado"]} />
+                      <Tooltip formatter={(value) => [formatCurrency(Number(value)), "Valor atualizado"]} />
                       <Bar dataKey="current" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
