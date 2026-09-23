@@ -5,10 +5,27 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CalendarDays, ChevronLeft, ChevronRight, FileUp, Filter, RefreshCw, Stethoscope, UserRound } from "lucide-react";
+import {
+  AlertCircle,
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  FileUp,
+  Filter,
+  MessageCircle,
+  Phone,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  UserRound,
+  XCircle,
+} from "lucide-react";
 
 type ClinicAppointment = {
   id: string;
+  leadId?: string;
   name: string;
   phone: string;
   phoneKey?: string | null;
@@ -18,12 +35,15 @@ type ClinicAppointment = {
   professional: string;
   sourceFile?: string;
   active?: boolean;
-  confirmationStatus?: "pending" | "queued" | "sent" | "failed" | "replied" | "confirmed" | "wont_attend" | "reschedule" | "cancelled";
+  confirmationStatus?: "pending" | "queued" | "sent" | "failed" | "replied" | "confirmed" | "wont_attend" | "reschedule" | "cancelled" | "released_unconfirmed";
   remindersSent?: Record<string, string>;
   lastReminderSentAt?: string;
   lastReminderError?: string | null;
   lastReplyAt?: string;
   lastReplyText?: string;
+  confirmationDeadlineAt?: string;
+  vacancyReleasedAt?: string;
+  manuallyEditedAt?: string;
   importedAt?: string;
   updatedAt?: string;
 };
@@ -105,6 +125,30 @@ const prettyProfessional = (value: string) => {
 
 function colorForDoctor(value: string) {
   return DOCTOR_COLORS[hashString(normalizeKey(value)) % DOCTOR_COLORS.length];
+}
+
+function stableAppointmentKey(item: Pick<ClinicAppointment, "date" | "name" | "professional" | "startTime">) {
+  return [item.date, normalizeKey(item.name), normalizeKey(item.professional), item.startTime].join("|");
+}
+
+function statusMeta(appointment: ClinicAppointment) {
+  const status = String(appointment.confirmationStatus || "pending");
+  if (status === "confirmed") return { label: "Confirmado", cls: "bg-emerald-50 text-emerald-700", icon: CheckCircle2 };
+  if (status === "wont_attend" || status === "cancelled") return { label: "Não vai", cls: "bg-red-50 text-red-700", icon: XCircle };
+  if (status === "reschedule") return { label: "Reagendar", cls: "bg-violet-50 text-violet-700", icon: RotateCcw };
+  if (status === "released_unconfirmed") return { label: "Vaga liberada", cls: "bg-red-50 text-red-700", icon: AlertCircle };
+  if (status === "replied" || appointment.lastReplyAt) return { label: "Resposta para revisar", cls: "bg-amber-50 text-amber-700", icon: MessageCircle };
+  if (status === "failed" || appointment.lastReminderError) return { label: "Erro", cls: "bg-red-50 text-red-700", icon: AlertCircle };
+  if (status === "sent" || appointment.lastReminderSentAt || appointment.remindersSent?.manual) return { label: "Aguardando resposta", cls: "bg-blue-50 text-blue-700", icon: Send };
+  if (status === "queued") return { label: "Na fila", cls: "bg-blue-50 text-blue-700", icon: Send };
+  return { label: "Programado", cls: "bg-slate-100 text-slate-700", icon: Clock3 };
+}
+
+function formatDeadline(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 }
 
 function groupPageItems(items: PdfTextItem[]) {
@@ -234,14 +278,6 @@ function sameMonth(dateValue: string, month: Date) {
   return y === month.getFullYear() && m === month.getMonth() + 1 && Boolean(d);
 }
 
-function statusLabel(appointment: ClinicAppointment) {
-  if (appointment.confirmationStatus === "replied" || appointment.lastReplyAt) return "Respondeu";
-  if (appointment.confirmationStatus === "failed" || appointment.lastReminderError) return "Erro";
-  if (appointment.confirmationStatus === "sent" || appointment.lastReminderSentAt || appointment.remindersSent?.manual) return "Enviado";
-  if (appointment.confirmationStatus === "queued") return "Na fila";
-  return "Pendente";
-}
-
 export function ClinicCalendar() {
   const { currentClinic } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -316,19 +352,32 @@ export function ClinicCalendar() {
       const agendaRef = collection(db, "clinics", currentClinic, "clinicAgenda");
       const existing = await getDocs(agendaRef);
       const existingById = new Map(existing.docs.map((item) => [item.id, item.data() as ClinicAppointment]));
+      const existingByStableKey = new Map<string, ClinicAppointment>();
+      existing.docs.forEach((snapshotDoc) => {
+        const data = { id: snapshotDoc.id, ...(snapshotDoc.data() as Omit<ClinicAppointment, "id">) };
+        existingByStableKey.set(stableAppointmentKey(data), data);
+      });
       const now = new Date().toISOString();
       const importedIds = new Set(consolidated.map((item) => item.id));
 
       await Promise.all(consolidated.map((item) => {
-        const previous = existingById.get(item.id);
+        const previous = existingById.get(item.id) || existingByStableKey.get(stableAppointmentKey(item));
+        const preserveManualEdit = Boolean(previous?.manuallyEditedAt);
         return setDoc(doc(agendaRef, item.id), {
           ...item,
+          name: preserveManualEdit && previous?.name ? previous.name : item.name,
+          phone: preserveManualEdit ? (previous?.phone || "") : item.phone,
+          phoneKey: preserveManualEdit ? (previous?.phoneKey || canonicalPhoneKey(previous?.phone || "")) : item.phoneKey,
+          ...(previous?.leadId ? { leadId: previous.leadId } : {}),
+          ...(previous?.manuallyEditedAt ? { manuallyEditedAt: previous.manuallyEditedAt } : {}),
           confirmationStatus: previous?.confirmationStatus || "pending",
           remindersSent: previous?.remindersSent || {},
           lastReminderSentAt: previous?.lastReminderSentAt || null,
           lastReminderError: previous?.lastReminderError || null,
           lastReplyAt: previous?.lastReplyAt || null,
           lastReplyText: previous?.lastReplyText || null,
+          confirmationDeadlineAt: previous?.confirmationDeadlineAt || null,
+          vacancyReleasedAt: previous?.vacancyReleasedAt || null,
           sourceFile: file.name,
           importedAt: previous?.importedAt || now,
           updatedAt: now,
@@ -359,6 +408,17 @@ export function ClinicCalendar() {
   };
 
   const selectedDayAppointments = selectedDate ? (appointmentsByDate.get(selectedDate) || []) : [];
+  const selectedDayByDoctor = useMemo(() => {
+    const grouped = new Map<string, ClinicAppointment[]>();
+    selectedDayAppointments.forEach((appointment) => {
+      const doctor = prettyProfessional(appointment.professional);
+      const list = grouped.get(doctor) || [];
+      list.push(appointment);
+      grouped.set(doctor, list);
+    });
+    grouped.forEach((list) => list.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)));
+    return grouped;
+  }, [selectedDayAppointments]);
 
   if (!currentClinic) return null;
 
@@ -461,29 +521,42 @@ export function ClinicCalendar() {
       </div>
 
       <Dialog open={Boolean(selectedDate)} onOpenChange={(open) => !open && setSelectedDate(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[760px]">
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-[1100px]">
           <DialogHeader>
             <DialogTitle>Agenda de {selectedDate}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            {selectedDayAppointments.map((appointment) => {
-              const doctor = prettyProfessional(appointment.professional);
-              const color = colorForDoctor(doctor);
+          <div className="overflow-hidden rounded-xl border bg-card">
+            {[...selectedDayByDoctor.entries()].map(([doctorName, items]) => {
+              const color = colorForDoctor(doctorName);
+              const confirmed = items.filter((item) => item.confirmationStatus === "confirmed").length;
               return (
-                <div key={appointment.id} className="rounded-lg border p-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-md px-2 py-1 text-sm font-bold" style={{ backgroundColor: color.bg, color: color.text }}>{appointment.startTime}</div>
-                      <div>
-                        <div className="flex items-center gap-1.5 font-medium"><UserRound className="h-4 w-4" />{appointment.name}</div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><Stethoscope className="h-3.5 w-3.5" />{doctor}<span>•</span><span>{appointment.phone || "Sem telefone"}</span></div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs font-semibold">{statusLabel(appointment)}</div>
-                      {appointment.lastReplyText && <div className="mt-1 max-w-[260px] truncate text-xs text-muted-foreground">“{appointment.lastReplyText}”</div>}
-                      {appointment.lastReminderError && <div className="mt-1 max-w-[260px] truncate text-xs text-red-600">{appointment.lastReminderError}</div>}
-                    </div>
+                <div key={doctorName} className="border-b last:border-b-0">
+                  <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: color.bg }}>
+                    <div className="font-semibold" style={{ color: color.text }}>{doctorName}</div>
+                    <div className="text-xs" style={{ color: color.text }}>{confirmed}/{items.length} confirmados</div>
+                  </div>
+                  <div className="divide-y">
+                    {items.map((appointment) => {
+                      const meta = statusMeta(appointment);
+                      const Icon = meta.icon;
+                      return (
+                        <div key={appointment.id} className="grid gap-2 px-4 py-3 md:grid-cols-[90px_1fr_220px] md:items-center">
+                          <div className="font-semibold">{appointment.startTime}–{appointment.endTime}</div>
+                          <div>
+                            <div className="flex items-center gap-2 font-medium"><UserRound className="h-4 w-4" />{appointment.name}</div>
+                            {appointment.lastReplyText && <div className="mt-1 text-xs text-muted-foreground">Resposta: “{appointment.lastReplyText}”</div>}
+                            {appointment.lastReminderError && !appointment.lastReplyText && <div className="mt-1 text-xs text-red-600">Erro: {appointment.lastReminderError}</div>}
+                            <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"><Phone className="h-3.5 w-3.5" />{appointment.phone || "Sem telefone"}</div>
+                          </div>
+                          <div className="md:text-right">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${meta.cls}`}><Icon className="h-3.5 w-3.5" />{meta.label}</span>
+                            {appointment.confirmationDeadlineAt && !["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"].includes(String(appointment.confirmationStatus || "")) && (
+                              <div className="mt-1 text-[11px] text-muted-foreground">Prazo: {formatDeadline(appointment.confirmationDeadlineAt)}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
