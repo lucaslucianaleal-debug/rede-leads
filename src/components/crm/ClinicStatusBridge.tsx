@@ -24,7 +24,9 @@ type AgendaItem = {
   phone?: string;
   phoneKey?: string | null;
   date?: string;
+  startTime?: string;
   active?: boolean;
+  confirmationStatus?: string;
   remindersSent?: Record<string, string>;
   lastReminderSentAt?: string;
 };
@@ -50,17 +52,6 @@ function canonicalPhoneKey(value: string) {
   return digits.length === 10 ? `55${digits}` : "";
 }
 
-function todayBr() {
-  const parts = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
-  return `${get("day")}/${get("month")}/${get("year")}`;
-}
-
 function appointmentIdFromQueue(item: QueueItem) {
   const explicit = String(item.clinicAppointmentId || "").trim();
   if (explicit) return explicit;
@@ -73,11 +64,31 @@ function isoTime(value?: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-/**
- * Mantém a agenda da clínica sincronizada com as duas fontes reais do WhatsApp:
- * - whatsappQueue: fila, envio e erro
- * - whatsappChats: resposta recebida do paciente
- */
+function appointmentTime(item: AgendaItem) {
+  const match = `${item.date || ""} ${item.startTime || ""}`.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!match) return 0;
+  const [, d, m, y, h, min] = match;
+  return Date.parse(`${y}-${m}-${d}T${h}:${min}:00-03:00`) || 0;
+}
+
+function normalizeText(value: string) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+function classifyReply(value: string) {
+  const text = normalizeText(value);
+  const rebookTerms = ["reagendar", "remarcar", "outro horario", "outro dia", "trocar horario", "mudar horario", "nao consigo esse horario"];
+  const noTerms = ["nao vou", "nao poderei", "nao posso ir", "cancelar", "cancela", "nao consigo ir", "nao compareco"];
+  const yesTerms = ["sim", "confirmo", "confirmado", "vou sim", "estarei ai", "pode confirmar", "presenca confirmada", "vou estar ai"];
+  if (rebookTerms.some((term) => text.includes(term))) return "reschedule";
+  if (noTerms.some((term) => text.includes(term))) return "wont_attend";
+  if (yesTerms.some((term) => text === term || text.includes(term))) return "confirmed";
+  return "replied";
+}
+
+const FINAL_STATUSES = new Set(["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"]);
+
+/** Mantém a agenda da clínica sincronizada com fila, envio, erro e resposta real do WhatsApp. */
 export function ClinicStatusBridge() {
   const { currentClinic } = useAuth();
   const agendaRef = useRef<AgendaItem[]>([]);
@@ -87,48 +98,33 @@ export function ClinicStatusBridge() {
 
     const agendaCollection = collection(db, "clinics", currentClinic, "clinicAgenda");
     const unsubscribeAgenda = onSnapshot(agendaCollection, (snapshot) => {
-      agendaRef.current = snapshot.docs.map((snapshotDoc) => ({
-        id: snapshotDoc.id,
-        ...(snapshotDoc.data() as Omit<AgendaItem, "id">),
-      }));
-    }, (error) => {
-      console.error("[clinic-status-bridge][agenda]", error);
-    });
+      agendaRef.current = snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...(snapshotDoc.data() as Omit<AgendaItem, "id">) }));
+    }, (error) => console.error("[clinic-status-bridge][agenda]", error));
 
-    const queueQuery = query(
-      collection(db, "clinics", currentClinic, "whatsappQueue"),
-      orderBy("updatedAt", "desc"),
-      limit(300),
-    );
-
+    const queueQuery = query(collection(db, "clinics", currentClinic, "whatsappQueue"), orderBy("updatedAt", "desc"), limit(300));
     const unsubscribeQueue = onSnapshot(queueQuery, (snapshot) => {
       snapshot.docs.forEach((snapshotDoc) => {
-        const data = snapshotDoc.data() as Omit<QueueItem, "id">;
-        const item: QueueItem = { id: snapshotDoc.id, ...data };
+        const item: QueueItem = { id: snapshotDoc.id, ...(snapshotDoc.data() as Omit<QueueItem, "id">) };
         const appointmentId = appointmentIdFromQueue(item);
         if (!appointmentId) return;
 
+        const existing = agendaRef.current.find((appointment) => appointment.id === appointmentId);
         const nowIso = new Date().toISOString();
         const queuePatch: Record<string, unknown> = {};
-
         if (!item.clinicAppointmentId) queuePatch.clinicAppointmentId = appointmentId;
-        if (!String(item.automationType || "").startsWith("appointment_clinic")) {
-          queuePatch.automationType = "appointment_clinic_manual";
-        }
+        if (!String(item.automationType || "").startsWith("appointment_clinic")) queuePatch.automationType = "appointment_clinic_manual";
         if (!item.automationLabel) queuePatch.automationLabel = "Confirmação da clínica";
-
-        if (Object.keys(queuePatch).length) {
-          void setDoc(snapshotDoc.ref, { ...queuePatch, updatedAt: item.updatedAt || nowIso }, { merge: true });
-        }
+        if (Object.keys(queuePatch).length) void setDoc(snapshotDoc.ref, { ...queuePatch, updatedAt: item.updatedAt || nowIso }, { merge: true });
 
         const appointmentRef = doc(db, "clinics", currentClinic, "clinicAgenda", appointmentId);
         const status = String(item.status || "");
+        const keepFinal = existing && FINAL_STATUSES.has(String(existing.confirmationStatus || ""));
 
         if (status === "sent") {
           const sentAt = item.sentAt || item.updatedAt || nowIso;
           void setDoc(appointmentRef, {
-            confirmationStatus: "sent",
-            remindersSent: { manual: sentAt },
+            ...(keepFinal ? {} : { confirmationStatus: "sent" }),
+            remindersSent: { [String(item.automationType || "manual")]: sentAt },
             lastReminderSentAt: sentAt,
             lastReminderMessageId: item.messageId || "",
             lastReminderError: null,
@@ -141,7 +137,7 @@ export function ClinicStatusBridge() {
         if (status === "failed") {
           const failedAt = item.failedAt || item.updatedAt || nowIso;
           void setDoc(appointmentRef, {
-            confirmationStatus: "failed",
+            ...(keepFinal ? {} : { confirmationStatus: "failed" }),
             lastReminderFailedAt: failedAt,
             lastReminderError: String(item.error || "Falha no envio").slice(0, 500),
             updatedAt: failedAt,
@@ -149,62 +145,47 @@ export function ClinicStatusBridge() {
           return;
         }
 
-        if (status === "pending" || status === "leased") {
-          void setDoc(appointmentRef, {
-            confirmationStatus: "queued",
-            updatedAt: item.updatedAt || nowIso,
-          }, { merge: true });
+        if ((status === "pending" || status === "leased") && !keepFinal) {
+          void setDoc(appointmentRef, { confirmationStatus: "queued", updatedAt: item.updatedAt || nowIso }, { merge: true });
         }
       });
-    }, (error) => {
-      console.error("[clinic-status-bridge][queue]", error);
-    });
+    }, (error) => console.error("[clinic-status-bridge][queue]", error));
 
-    const chatsQuery = query(
-      collection(db, "clinics", currentClinic, "whatsappChats"),
-      orderBy("lastMessageAt", "desc"),
-      limit(150),
-    );
-
+    const chatsQuery = query(collection(db, "clinics", currentClinic, "whatsappChats"), orderBy("lastMessageAt", "desc"), limit(150));
     const unsubscribeChats = onSnapshot(chatsQuery, (snapshot) => {
-      const today = todayBr();
       snapshot.docs.forEach((snapshotDoc) => {
-        const data = snapshotDoc.data() as Omit<ChatItem, "id">;
-        const chat: ChatItem = { id: snapshotDoc.id, ...data };
+        const chat: ChatItem = { id: snapshotDoc.id, ...(snapshotDoc.data() as Omit<ChatItem, "id">) };
         if (chat.lastDirection !== "in" || !chat.lastMessageAt) return;
-
         const chatPhoneKey = canonicalPhoneKey(chat.phoneKey || chat.phone || chat.id);
-        if (!chatPhoneKey) return;
         const replyAtMs = isoTime(chat.lastMessageAt);
-        if (!replyAtMs) return;
+        if (!chatPhoneKey || !replyAtMs) return;
 
-        const matches = agendaRef.current.filter((appointment) => {
-          if (appointment.active === false || appointment.date !== today) return false;
-          const appointmentPhoneKey = canonicalPhoneKey(appointment.phoneKey || appointment.phone || "");
-          if (!appointmentPhoneKey || appointmentPhoneKey !== chatPhoneKey) return false;
-          const sentAt = appointment.lastReminderSentAt || appointment.remindersSent?.manual;
-          const sentAtMs = isoTime(sentAt);
-          return sentAtMs > 0 && replyAtMs >= sentAtMs;
-        });
+        const candidates = agendaRef.current
+          .filter((appointment) => {
+            if (appointment.active === false) return false;
+            const appointmentPhoneKey = canonicalPhoneKey(appointment.phoneKey || appointment.phone || "");
+            const sentAtMs = isoTime(appointment.lastReminderSentAt || appointment.remindersSent?.manual);
+            const apptMs = appointmentTime(appointment);
+            return appointmentPhoneKey === chatPhoneKey && sentAtMs > 0 && replyAtMs >= sentAtMs && apptMs > replyAtMs - 2 * 60 * 60 * 1000;
+          })
+          .sort((a, b) => appointmentTime(a) - appointmentTime(b));
 
-        matches.forEach((appointment) => {
-          void setDoc(doc(db, "clinics", currentClinic, "clinicAgenda", appointment.id), {
-            confirmationStatus: "replied",
-            lastReplyAt: chat.lastMessageAt,
-            lastReplyText: String(chat.lastMessage || "Mensagem recebida").slice(0, 500),
-            updatedAt: chat.lastMessageAt,
-          }, { merge: true });
-        });
+        const appointment = candidates[0];
+        if (!appointment) return;
+        let classified = classifyReply(chat.lastMessage || "");
+        if (appointment.confirmationStatus === "released_unconfirmed" && classified === "confirmed") classified = "reschedule";
+
+        void setDoc(doc(db, "clinics", currentClinic, "clinicAgenda", appointment.id), {
+          confirmationStatus: classified,
+          lastReplyAt: chat.lastMessageAt,
+          lastReplyText: String(chat.lastMessage || "Mensagem recebida").slice(0, 500),
+          replyClassification: classified,
+          updatedAt: chat.lastMessageAt,
+        }, { merge: true });
       });
-    }, (error) => {
-      console.error("[clinic-status-bridge][chats]", error);
-    });
+    }, (error) => console.error("[clinic-status-bridge][chats]", error));
 
-    return () => {
-      unsubscribeAgenda();
-      unsubscribeQueue();
-      unsubscribeChats();
-    };
+    return () => { unsubscribeAgenda(); unsubscribeQueue(); unsubscribeChats(); };
   }, [currentClinic]);
 
   return null;
