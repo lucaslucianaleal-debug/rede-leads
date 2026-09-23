@@ -15,11 +15,18 @@ import type {
 type Props = {
   store: MPCStore;
   allLeads: Lead[];
+  updateLead: (leadId: string, updates: Partial<Lead>) => void;
   setStore: (s: MPCStore | ((prev: MPCStore) => MPCStore)) => void;
   saveNow: (nextStore?: MPCStore) => Promise<void>;
 };
 
 type LinkedReport = ParsedClinicReport & { linkedRows: any[] };
+
+type PresenceEvidence = {
+  sources: Set<MPCClinicReportType>;
+  dates: Set<string>;
+  periods: Set<string>;
+};
 
 function normalizeName(value?: string) {
   return String(value || "")
@@ -133,7 +140,7 @@ function reportLabel(type: ParsedClinicReport["type"]) {
   return "Atendimentos / Concluídos";
 }
 
-export default function MPCClinicReportImport({ store, allLeads, setStore, saveNow }: Props) {
+export default function MPCClinicReportImport({ store, allLeads, updateLead, setStore, saveNow }: Props) {
   const [reports, setReports] = useState<LinkedReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -240,12 +247,14 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
     setSaving(true);
     setError(null);
     setMessage(null);
+
     try {
       const importedAt = new Date().toISOString();
       let snapshots = [...(store.clinicBudgetSalesSnapshots || [])];
       let sales = [...(store.clinicSales || [])];
       let procedures = [...(store.clinicProcedures || [])];
       let imports = [...(store.clinicReportImports || [])];
+      const presenceByLead = new Map<string, PresenceEvidence>();
 
       reports.forEach((report) => {
         const linkedCount = report.linkedRows.filter((row: any) => row.link?.leadId).length;
@@ -254,6 +263,20 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
         const otherDayIds = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceTiming === "other_day");
         const periodIds = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceTiming === "report_period");
         const importId = stableId("clinic_import", [report.type, report.periodStart, report.periodEnd]);
+
+        report.linkedRows.forEach((row: any) => {
+          const link = row.link as MPCClinicLeadLink | undefined;
+          if (!link?.leadId || !link.presenceConfirmed) return;
+          const evidence = presenceByLead.get(link.leadId) || {
+            sources: new Set<MPCClinicReportType>(),
+            dates: new Set<string>(),
+            periods: new Set<string>(),
+          };
+          if (link.presenceSource) evidence.sources.add(link.presenceSource);
+          if (link.presenceDate) evidence.dates.add(link.presenceDate);
+          evidence.periods.add(`${report.periodStart}|${report.periodEnd}`);
+          presenceByLead.set(link.leadId, evidence);
+        });
 
         const importRecord: MPCClinicReportImport = {
           id: importId,
@@ -331,10 +354,32 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
         clinicProcedures: procedures,
         clinicReportImports: imports,
       };
+
       setStore(nextStore);
       await saveNow(nextStore);
+
+      presenceByLead.forEach((evidence, leadId) => {
+        const lead = allLeads.find((item) => item.id === leadId);
+        if (!lead) return;
+
+        updateLead(leadId, {
+          comparecimento: "COMPARECEU",
+          customFields: {
+            ...(lead.customFields || {}),
+            mpcPresencaConfirmada: true,
+            mpcPresencaFonte: "relatorio_oficial_clinica",
+            mpcPresencaRelatorios: Array.from(evidence.sources),
+            mpcPresencaDatas: Array.from(evidence.dates).sort(),
+            mpcPresencaPeriodos: Array.from(evidence.periods).sort(),
+            mpcPresencaAtualizadaEm: importedAt,
+          },
+        });
+      });
+
       setReports([]);
-      setMessage(`Importação concluída: ${reports.length} relatório(s) cruzado(s) e atualizado(s) no MPC, sem duplicar o mesmo período.`);
+      setMessage(
+        `Importação concluída: ${reports.length} relatório(s) salvo(s), ${presenceByLead.size} presença(s) gravada(s) nos leads do CRM, sem duplicar o mesmo paciente.`,
+      );
     } catch (e) {
       console.error("[MPC] Falha ao salvar relatórios da clínica", e);
       setError(e instanceof Error ? e.message : String(e));
@@ -389,7 +434,7 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
           <div>
             <h4 className="text-sm font-semibold text-slate-900">Relatórios oficiais da clínica</h4>
             <p className="mt-1 text-xs text-slate-600">
-              Como o Rede Leads é a base de prospecção, todo lead localizado em um relatório oficial da clínica conta como comparecimento confirmado no MPC. A origem da confirmação e a data, quando existir, ficam registradas separadamente.
+              Todo lead localizado em um relatório oficial da clínica conta como comparecimento confirmado. Ao confirmar a importação, essa presença também é gravada no próprio lead do CRM.
             </p>
           </div>
           <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600">
@@ -412,7 +457,7 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
 
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          <XCircle size={16} className="mt-0.5 shrink-0" /> {error}
+          <XCircle2 size={16} className="mt-0.5 shrink-0" /> {error}
         </div>
       )}
       {message && (
