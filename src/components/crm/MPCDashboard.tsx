@@ -1,6 +1,7 @@
 import React from "react";
 import { MPCDashboardData } from "@/types/mpc";
 import { MPCStore } from "@/hooks/useMPCDataStore";
+import { useLeads } from "@/hooks/useLeads";
 import MPCKPIStrip from "./mpc/MPCKPIStrip";
 import MPCAlertsFeed from "./mpc/MPCAlertsFeed";
 import MPCDentistPerformance from "./mpc/MPCDentistPerformance";
@@ -9,6 +10,7 @@ import MPCWeeklyFocus from "./mpc/MPCWeeklyFocus";
 import MPCRecommendedDecisions from "./mpc/MPCRecommendedDecisions";
 import MPCDataPanel from "./mpc/MPCDataPanel";
 import MPCWeeklyReport from "./mpc/MPCWeeklyReport";
+import MPCClinicReportImport from "./mpc/MPCClinicReportImport";
 
 type MPCDashboardProps = {
   data: MPCDashboardData | null;
@@ -26,6 +28,8 @@ type MPCDashboardProps = {
 };
 
 export default function MPCDashboard({ data, isLoading = false, store, mutations }: MPCDashboardProps) {
+  const { allLeads } = useLeads();
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -75,6 +79,16 @@ export default function MPCDashboard({ data, isLoading = false, store, mutations
         {/* 1. Data Input Panel */}
         <section className="mb-8">
           <MPCDataPanel store={store} mutations={mutations} />
+        </section>
+
+        {/* 1.1 Relatórios oficiais da clínica */}
+        <section className="mb-8">
+          <MPCClinicReportImport
+            store={store}
+            allLeads={allLeads}
+            setStore={mutations.setStore}
+            saveNow={mutations.saveNow}
+          />
         </section>
 
         {/* 2. KPI Strip (Resumo Executivo) */}
