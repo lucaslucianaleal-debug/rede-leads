@@ -1,6 +1,7 @@
 import { getAdminDb } from "../../../server/firebaseAdmin.js";
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
 import { canonicalPhoneKey, findLeadIndex, whatsappPhone } from "../../../server/whatsappAgent.js";
+import { processClinicAgendaAutomation } from "../../../server/clinicAgendaAutomation.js";
 
 function safeId(value) {
   return String(value || "")
@@ -76,15 +77,6 @@ function sameSchedule(scheduleData, spec, appointmentValue) {
   );
 }
 
-/**
- * Migra/garante a nova régua para agendamentos que já existiam antes do deploy.
- * Trabalha apenas com as próximas 72h; consultas mais distantes serão preparadas
- * automaticamente quando entrarem nessa janela.
- *
- * Importante: não cria lembrete retroativo. Se o horário exato de um slot já passou
- * e não havia programação anterior, esperamos o próximo slot. Uma fila que falhou,
- * porém, pode ser tentada novamente até 3 vezes enquanto a janela ainda estiver aberta.
- */
 async function ensureUpcomingAppointmentReminders(db, clinicId) {
   const clinicRef = db.collection("clinics").doc(clinicId);
   const sharedSnap = await clinicRef.collection("shared").doc("shared").get();
@@ -141,14 +133,10 @@ async function ensureUpcomingAppointmentReminders(db, clinicId) {
       },
     ];
 
-    // Cancela o lembrete legado "no dia" para este agendamento.
     const legacyId = `appt_${safeId(leadId)}_${parsed.key}_today`;
     const legacyScheduleRef = scheduleCol.doc(legacyId);
     const legacyQueueRef = queueCol.doc(legacyId);
-    const [legacyScheduleSnap, legacyQueueSnap] = await Promise.all([
-      legacyScheduleRef.get(),
-      legacyQueueRef.get(),
-    ]);
+    const [legacyScheduleSnap, legacyQueueSnap] = await Promise.all([legacyScheduleRef.get(), legacyQueueRef.get()]);
     const legacyBatch = db.batch();
     let legacyWrites = 0;
     if (legacyScheduleSnap.exists) {
@@ -156,12 +144,7 @@ async function ensureUpcomingAppointmentReminders(db, clinicId) {
       legacyWrites += 1;
     }
     if (legacyQueueSnap.exists && ["pending", "leased"].includes(String(legacyQueueSnap.data()?.status || ""))) {
-      legacyBatch.set(legacyQueueRef, {
-        status: "cancelled",
-        cancelReason: "replaced_by_1h_reminder",
-        cancelledAt: nowIso,
-        updatedAt: nowIso,
-      }, { merge: true });
+      legacyBatch.set(legacyQueueRef, { status: "cancelled", cancelReason: "replaced_by_1h_reminder", cancelledAt: nowIso, updatedAt: nowIso }, { merge: true });
       legacyWrites += 1;
     }
     if (legacyWrites) await legacyBatch.commit();
@@ -175,7 +158,6 @@ async function ensureUpcomingAppointmentReminders(db, clinicId) {
       const queueStatus = String(queueData.status || "");
       const attempts = Number(queueData.attempts || 0) || 0;
 
-      // Slot já fora da janela: remove uma programação antiga, se existir.
       if (spec.expiresAt <= now) {
         if (scheduleSnap.exists) {
           await scheduleRef.delete();
@@ -184,7 +166,6 @@ async function ensureUpcomingAppointmentReminders(db, clinicId) {
         continue;
       }
 
-      // Nunca recria envio concluído/cancelado nem interfere em item atualmente em lease.
       if (["pending", "leased", "sent", "cancelled"].includes(queueStatus)) continue;
 
       const baseData = {
@@ -206,47 +187,28 @@ async function ensureUpcomingAppointmentReminders(db, clinicId) {
         attempts,
       };
 
-      // Falhou no envio? Retenta no máximo 3 vezes enquanto a janela estiver aberta.
       if (queueStatus === "failed") {
         if (attempts >= 3) continue;
-        await queueRef.set({
-          ...baseData,
-          status: "pending",
-          sendAfter: nowIso,
-          retryAt: nowIso,
-        }, { merge: true });
+        await queueRef.set({ ...baseData, status: "pending", sendAfter: nowIso, retryAt: nowIso }, { merge: true });
         touched += 1;
         continue;
       }
 
       if (spec.sendAfter <= now) {
-        // Sem fila anterior e horário já passou: não cria mensagem retroativa.
-        // Se já havia um schedule legado, apenas corrige sua janela e deixa a promoção decidir.
         if (scheduleSnap.exists) {
           const scheduleData = scheduleSnap.data() || {};
           if (!sameSchedule(scheduleData, spec, appointmentValue)) {
-            await scheduleRef.set({
-              ...baseData,
-              queueId: id,
-              sendAfter: spec.sendAfter.toISOString(),
-              migratedAt: nowIso,
-            }, { merge: true });
+            await scheduleRef.set({ ...baseData, queueId: id, sendAfter: spec.sendAfter.toISOString(), migratedAt: nowIso }, { merge: true });
             touched += 1;
           }
         }
         continue;
       }
 
-      // Futuro: cria uma vez e só atualiza se a definição mudou.
       const scheduleData = scheduleSnap.exists ? (scheduleSnap.data() || {}) : null;
       if (sameSchedule(scheduleData, spec, appointmentValue)) continue;
 
-      await scheduleRef.set({
-        ...baseData,
-        queueId: id,
-        sendAfter: spec.sendAfter.toISOString(),
-        migratedAt: nowIso,
-      }, { merge: true });
+      await scheduleRef.set({ ...baseData, queueId: id, sendAfter: spec.sendAfter.toISOString(), migratedAt: nowIso }, { merge: true });
       touched += 1;
     }
   }
@@ -275,9 +237,7 @@ async function promoteDueScheduled(db, clinicId) {
   dueSnap.docs.forEach((scheduleDoc, index) => {
     const data = scheduleDoc.data() || {};
     const queueRef = queueRefs[index];
-    const existingStatus = existingQueueSnaps[index]?.exists
-      ? String(existingQueueSnaps[index].data()?.status || "")
-      : "";
+    const existingStatus = existingQueueSnaps[index]?.exists ? String(existingQueueSnaps[index].data()?.status || "") : "";
     const expiresAt = Date.parse(String(data.expiresAt || ""));
     const leadIndex = findLeadIndex(leads, { leadId: data.leadId, phone: data.phone });
     const lead = leadIndex >= 0 ? (leads[leadIndex] || {}) : null;
@@ -294,13 +254,7 @@ async function promoteDueScheduled(db, clinicId) {
       return;
     }
 
-    batch.set(queueRef, {
-      ...data,
-      status: "pending",
-      promotedAt: nowIso,
-      updatedAt: nowIso,
-      attempts: Number(data.attempts || 0) || 0,
-    }, { merge: true });
+    batch.set(queueRef, { ...data, status: "pending", promotedAt: nowIso, updatedAt: nowIso, attempts: Number(data.attempts || 0) || 0 }, { merge: true });
     batch.delete(scheduleDoc.ref);
     promoted += 1;
   });
@@ -324,9 +278,10 @@ export default async function handler(req, res) {
     const col = db.collection("clinics").doc(clinicId).collection("whatsappQueue");
     const now = Date.now();
 
-    // O agente consulta mensagens manuais a cada poucos segundos. No início de cada
-    // minuto, migramos agendamentos existentes e promovemos os lembretes vencidos.
     if (requestedKind === "manual" && new Date().getUTCSeconds() < 10) {
+      await processClinicAgendaAutomation(db, clinicId).catch((error) => {
+        console.warn("[whatsapp-agent/pull] falha na automação da agenda da clínica:", error?.message || error);
+      });
       await ensureUpcomingAppointmentReminders(db, clinicId).catch((error) => {
         console.warn("[whatsapp-agent/pull] falha ao garantir régua de agendamentos:", error?.message || error);
       });
@@ -344,11 +299,7 @@ export default async function handler(req, res) {
       if (stale.length) {
         const recoveryBatch = db.batch();
         const nowIso = new Date().toISOString();
-        stale.forEach((doc) => recoveryBatch.set(doc.ref, {
-          status: "pending",
-          leaseRecoveredAt: nowIso,
-          updatedAt: nowIso,
-        }, { merge: true }));
+        stale.forEach((doc) => recoveryBatch.set(doc.ref, { status: "pending", leaseRecoveredAt: nowIso, updatedAt: nowIso }, { merge: true }));
         await recoveryBatch.commit();
       }
     }
