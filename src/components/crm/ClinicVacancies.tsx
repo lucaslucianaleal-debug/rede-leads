@@ -28,6 +28,14 @@ type Vacancy = {
 };
 
 type ProtectedBreak = { start: number; end: number; label: string };
+type Interval = { start: number; end: number };
+type OccupancyRow = {
+  date: string;
+  occupiedMinutes: number;
+  capacityMinutes: number;
+  percentage: number;
+  vacancyCount: number;
+};
 
 const timeToMinutes = (value: string) => {
   const [h, m] = String(value || "").split(":").map(Number);
@@ -88,6 +96,46 @@ function isFreeStatus(status?: string) {
   return ["released_unconfirmed", "wont_attend", "cancelled", "reschedule"].includes(String(status || ""));
 }
 
+function isBlockedName(name?: string) {
+  const text = String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  return text === "." || text.includes("nao agendar") || text.includes("feriado") || text.includes("folga") || text.includes("bloqueio") || text.includes("bloqueado");
+}
+
+function mergeIntervals(intervals: Interval[]) {
+  const sorted = intervals
+    .filter((item) => item.end > item.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+  const merged: Interval[] = [];
+  sorted.forEach((item) => {
+    const last = merged[merged.length - 1];
+    if (!last || item.start > last.end) {
+      merged.push({ ...item });
+      return;
+    }
+    last.end = Math.max(last.end, item.end);
+  });
+  return merged;
+}
+
+function intervalMinutes(intervals: Interval[]) {
+  return mergeIntervals(intervals).reduce((sum, item) => sum + (item.end - item.start), 0);
+}
+
+function occupancyStatus(percentage: number) {
+  if (percentage >= 80) return { label: "Dentro", cls: "bg-emerald-50 text-emerald-700 border-emerald-200", bar: "bg-emerald-500" };
+  if (percentage >= 60) return { label: "Atenção", cls: "bg-amber-50 text-amber-700 border-amber-200", bar: "bg-amber-500" };
+  return { label: "Abaixo", cls: "bg-red-50 text-red-700 border-red-200", bar: "bg-red-500" };
+}
+
+function formatHours(minutes: number) {
+  if (minutes <= 0) return "0h";
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!hours) return `${rest}min`;
+  if (!rest) return `${hours}h`;
+  return `${hours}h${String(rest).padStart(2, "0")}`;
+}
+
 export function ClinicVacancies() {
   const { currentClinic } = useAuth();
   const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
@@ -100,8 +148,9 @@ export function ClinicVacancies() {
     });
   }, [currentClinic]);
 
+  const todayKey = useMemo(() => dateSortKey(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date())), []);
+
   const vacancies = useMemo(() => {
-    const todayKey = dateSortKey(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date()));
     const future = appointments.filter((item) => dateSortKey(item.date) >= todayKey);
     const result: Vacancy[] = [];
 
@@ -159,11 +208,14 @@ export function ClinicVacancies() {
     });
 
     return result.sort((a, b) => dateSortKey(a.date).localeCompare(dateSortKey(b.date)) || timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-  }, [appointments]);
+  }, [appointments, todayKey]);
 
   const professionals = useMemo(() => {
-    return Array.from(new Set(vacancies.map((item) => item.professional))).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [vacancies]);
+    const names = appointments
+      .filter((item) => dateSortKey(item.date) >= todayKey && !isBlockedName(item.name))
+      .map((item) => prettyProfessional(item.professional));
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [appointments, todayKey]);
 
   useEffect(() => {
     if (selectedProfessional !== "Todas" && !professionals.includes(selectedProfessional)) {
@@ -182,6 +234,72 @@ export function ClinicVacancies() {
     return map;
   }, [vacancies]);
 
+  const occupancy = useMemo<OccupancyRow[]>(() => {
+    const selectedAppointments = appointments.filter((item) => {
+      if (dateSortKey(item.date) < todayKey || isBlockedName(item.name)) return false;
+      const professional = prettyProfessional(item.professional);
+      return selectedProfessional === "Todas" || professional === selectedProfessional;
+    });
+
+    const selectedVacancies = selectedProfessional === "Todas"
+      ? vacancies
+      : vacancies.filter((item) => item.professional === selectedProfessional);
+
+    const byProfessionalDay = new Map<string, { date: string; professional: string; occupied: Interval[]; free: Interval[] }>();
+
+    const ensure = (date: string, professional: string) => {
+      const key = `${date}|${professional}`;
+      const current = byProfessionalDay.get(key);
+      if (current) return current;
+      const created = { date, professional, occupied: [] as Interval[], free: [] as Interval[] };
+      byProfessionalDay.set(key, created);
+      return created;
+    };
+
+    selectedAppointments.forEach((item) => {
+      if (isFreeStatus(item.confirmationStatus)) return;
+      const professional = prettyProfessional(item.professional);
+      const start = timeToMinutes(item.startTime);
+      const rawEnd = Math.max(start + slotMinutes(professional), timeToMinutes(item.endTime));
+      splitGapAroundBreaks(start, rawEnd, professional).forEach((segment) => ensure(item.date, professional).occupied.push(segment));
+    });
+
+    selectedVacancies.forEach((item) => {
+      ensure(item.date, item.professional).free.push({ start: timeToMinutes(item.startTime), end: timeToMinutes(item.endTime) });
+    });
+
+    const byDate = new Map<string, { occupiedMinutes: number; capacityMinutes: number; vacancyCount: number }>();
+
+    byProfessionalDay.forEach((group) => {
+      const occupiedMinutes = intervalMinutes(group.occupied);
+      const capacityMinutes = intervalMinutes([...group.occupied, ...group.free]);
+      if (!capacityMinutes) return;
+      const current = byDate.get(group.date) || { occupiedMinutes: 0, capacityMinutes: 0, vacancyCount: 0 };
+      current.occupiedMinutes += occupiedMinutes;
+      current.capacityMinutes += capacityMinutes;
+      current.vacancyCount += selectedVacancies.filter((item) => item.date === group.date && item.professional === group.professional).length;
+      byDate.set(group.date, current);
+    });
+
+    return [...byDate.entries()]
+      .map(([date, data]) => ({
+        date,
+        occupiedMinutes: data.occupiedMinutes,
+        capacityMinutes: data.capacityMinutes,
+        percentage: data.capacityMinutes ? Math.round((data.occupiedMinutes / data.capacityMinutes) * 100) : 0,
+        vacancyCount: data.vacancyCount,
+      }))
+      .sort((a, b) => dateSortKey(a.date).localeCompare(dateSortKey(b.date)))
+      .slice(0, 7);
+  }, [appointments, vacancies, selectedProfessional, todayKey]);
+
+  const occupancySummary = useMemo(() => {
+    const occupied = occupancy.reduce((sum, item) => sum + item.occupiedMinutes, 0);
+    const capacity = occupancy.reduce((sum, item) => sum + item.capacityMinutes, 0);
+    const percentage = capacity ? Math.round((occupied / capacity) * 100) : 0;
+    return { occupied, capacity, percentage, status: occupancyStatus(percentage) };
+  }, [occupancy]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, Vacancy[]>();
     filteredVacancies.forEach((item) => {
@@ -198,7 +316,7 @@ export function ClinicVacancies() {
     <div className="space-y-5">
       <div>
         <h2 className="text-xl font-heading font-bold">Vagas para preencher</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Enxerga buracos utilizáveis entre consultas e vagas liberadas por falta de confirmação, respeitando pausas protegidas.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Enxerga a ocupação da agenda, buracos utilizáveis e vagas liberadas por falta de confirmação.</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
@@ -222,6 +340,54 @@ export function ClinicVacancies() {
         ))}
       </div>
 
+      {occupancy.length > 0 && (
+        <div className="space-y-3">
+          <div className="rounded-xl border bg-card p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Ocupação detectada • próximos dias</div>
+                <div className="mt-1 flex items-end gap-3">
+                  <div className="text-3xl font-bold">{occupancySummary.percentage}%</div>
+                  <span className={`mb-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${occupancySummary.status.cls}`}>{occupancySummary.status.label}</span>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {formatHours(occupancySummary.occupied)} ocupadas de {formatHours(occupancySummary.capacity)} detectadas
+                  {selectedProfessional !== "Todas" ? ` • ${selectedProfessional}` : " • todas as profissionais"}
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground md:max-w-[380px] md:text-right">
+                Referência V1: ≥80% dentro • 60–79% atenção • abaixo de 60% precisa de ação.
+              </div>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+              <div className={`h-full rounded-full ${occupancySummary.status.bar}`} style={{ width: `${Math.min(100, occupancySummary.percentage)}%` }} />
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {occupancy.map((row) => {
+              const status = occupancyStatus(row.percentage);
+              return (
+                <div key={row.date} className="rounded-xl border bg-card p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold">{row.date}</div>
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${status.cls}`}>{status.label}</span>
+                  </div>
+                  <div className="mt-3 flex items-end justify-between gap-3">
+                    <div className="text-2xl font-bold">{row.percentage}%</div>
+                    <div className="text-right text-xs text-muted-foreground">{row.vacancyCount} vaga(s)</div>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div className={`h-full rounded-full ${status.bar}`} style={{ width: `${Math.min(100, row.percentage)}%` }} />
+                  </div>
+                  <div className="mt-2 text-[11px] text-muted-foreground">{formatHours(row.occupiedMinutes)} / {formatHours(row.capacityMinutes)} detectadas</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-3 md:grid-cols-4">
         <Rule title="Dra. Tailuene" detail="30 min por atendimento" extra="Almoço 12:00–14:00 • vaga de 30 min pode receber avaliação" />
         <Rule title="Dr. Lucas" detail="mínimo 60 min" extra="Almoço 12:00–13:00" />
@@ -234,7 +400,7 @@ export function ClinicVacancies() {
       </div>
 
       <div className="rounded-xl border bg-amber-50/40 p-4 text-sm text-amber-900">
-        <div className="flex gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>V1:</strong> estamos detectando vagas dentro do intervalo já ocupado do profissional. Os horários antes do primeiro e depois do último paciente entram quando cadastrarmos a jornada oficial de cada dentista.</div></div>
+        <div className="flex gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div><strong>Ocupação V1:</strong> a porcentagem usa os horários ocupados + as vagas que já conseguimos detectar dentro da agenda. Ainda não conta o período antes do primeiro e depois do último paciente enquanto não cadastrarmos a jornada oficial de cada dentista.</div></div>
       </div>
 
       {[...grouped.entries()].slice(0, 14).map(([date, items]) => (
