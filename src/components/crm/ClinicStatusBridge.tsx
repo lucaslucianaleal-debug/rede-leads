@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { collection, doc, limit, onSnapshot, orderBy, query, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, setDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -21,14 +21,21 @@ type QueueItem = {
 
 type AgendaItem = {
   id: string;
+  name?: string;
   phone?: string;
   phoneKey?: string | null;
   date?: string;
   startTime?: string;
+  endTime?: string;
+  professional?: string;
   active?: boolean;
   confirmationStatus?: string;
   remindersSent?: Record<string, string>;
   lastReminderSentAt?: string;
+  lastReminderError?: string | null;
+  lastReplyAt?: string;
+  lastReplyText?: string;
+  replyClassification?: string;
 };
 
 type ChatItem = {
@@ -71,6 +78,12 @@ function appointmentTime(item: AgendaItem) {
   return Date.parse(`${y}-${m}-${d}T${h}:${min}:00-03:00`) || 0;
 }
 
+function timeToMinutes(value?: string) {
+  const match = String(value || "").match(/^(\d{2}):(\d{2})$/);
+  if (!match) return -1;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
 function normalizeText(value: string) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
@@ -87,18 +100,150 @@ function classifyReply(value: string) {
 }
 
 const FINAL_STATUSES = new Set(["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"]);
+const STATUS_RANK: Record<string, number> = {
+  pending: 1,
+  queued: 2,
+  failed: 3,
+  sent: 4,
+  replied: 5,
+  released_unconfirmed: 6,
+  reschedule: 7,
+  wont_attend: 8,
+  cancelled: 8,
+  confirmed: 9,
+};
+
+function pickMergedStatus(items: AgendaItem[]) {
+  return [...items]
+    .sort((a, b) => (STATUS_RANK[String(b.confirmationStatus || "pending")] || 0) - (STATUS_RANK[String(a.confirmationStatus || "pending")] || 0))[0]?.confirmationStatus || "pending";
+}
+
+function latestValue(items: AgendaItem[], field: "lastReminderSentAt" | "lastReplyAt") {
+  return [...items]
+    .map((item) => String(item[field] || ""))
+    .filter(Boolean)
+    .sort((a, b) => isoTime(b) - isoTime(a))[0] || "";
+}
+
+async function mergeAdjacentDuplicateAppointments(clinicId: string, items: AgendaItem[], mergingKeys: Set<string>) {
+  const active = items.filter((item) => item.active !== false && item.date && item.startTime && item.endTime && item.name && item.professional);
+  const groups = new Map<string, AgendaItem[]>();
+
+  active.forEach((item) => {
+    const key = [item.date, normalizeText(item.name || ""), normalizeText(item.professional || "")].join("|");
+    const list = groups.get(key) || [];
+    list.push(item);
+    groups.set(key, list);
+  });
+
+  for (const [groupKey, group] of groups) {
+    if (mergingKeys.has(groupKey) || group.length < 2) continue;
+    const sorted = [...group].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+    const chains: AgendaItem[][] = [];
+
+    sorted.forEach((item) => {
+      const chain = chains[chains.length - 1];
+      if (!chain) {
+        chains.push([item]);
+        return;
+      }
+      const chainEnd = Math.max(...chain.map((entry) => timeToMinutes(entry.endTime)));
+      const nextStart = timeToMinutes(item.startTime);
+      if (nextStart >= 0 && chainEnd >= 0 && nextStart <= chainEnd) chain.push(item);
+      else chains.push([item]);
+    });
+
+    for (const chain of chains.filter((value) => value.length > 1)) {
+      mergingKeys.add(groupKey);
+      try {
+        const primary = chain[0];
+        const duplicates = chain.slice(1);
+        const mergedEnd = chain
+          .map((item) => item.endTime || "")
+          .sort((a, b) => timeToMinutes(b) - timeToMinutes(a))[0] || primary.endTime || "";
+        const phoneSource = chain.find((item) => canonicalPhoneKey(item.phoneKey || item.phone || "")) || primary;
+        const mergedPhone = phoneSource.phone || primary.phone || "";
+        const mergedPhoneKey = canonicalPhoneKey(phoneSource.phoneKey || mergedPhone || "") || null;
+        const mergedStatus = pickMergedStatus(chain);
+        const mergedReminders = Object.assign({}, ...chain.map((item) => item.remindersSent || {}));
+        const lastReminderSentAt = latestValue(chain, "lastReminderSentAt");
+        const lastReplyAt = latestValue(chain, "lastReplyAt");
+        const replySource = lastReplyAt ? chain.find((item) => item.lastReplyAt === lastReplyAt) : undefined;
+        const nowIso = new Date().toISOString();
+        const clinicRef = doc(db, "clinics", clinicId);
+        const batch = writeBatch(db);
+
+        batch.set(doc(db, "clinics", clinicId, "clinicAgenda", primary.id), {
+          endTime: mergedEnd,
+          phone: mergedPhone,
+          phoneKey: mergedPhoneKey,
+          confirmationStatus: mergedStatus,
+          remindersSent: mergedReminders,
+          ...(lastReminderSentAt ? { lastReminderSentAt } : {}),
+          ...(lastReplyAt ? {
+            lastReplyAt,
+            lastReplyText: replySource?.lastReplyText || primary.lastReplyText || "",
+            replyClassification: replySource?.replyClassification || primary.replyClassification || mergedStatus,
+          } : {}),
+          mergedAppointmentIds: duplicates.map((item) => item.id),
+          mergedAt: nowIso,
+          updatedAt: nowIso,
+        }, { merge: true });
+
+        duplicates.forEach((duplicate) => {
+          batch.set(doc(db, "clinics", clinicId, "clinicAgenda", duplicate.id), {
+            active: false,
+            mergedIntoAppointmentId: primary.id,
+            mergedAt: nowIso,
+            updatedAt: nowIso,
+          }, { merge: true });
+        });
+
+        const duplicateIds = duplicates.map((item) => item.id);
+        const queueAndSchedule = await Promise.all(duplicateIds.flatMap((duplicateId) => [
+          getDocs(query(collection(clinicRef, "whatsappQueue"), where("clinicAppointmentId", "==", duplicateId))),
+          getDocs(query(collection(clinicRef, "whatsappSchedule"), where("clinicAppointmentId", "==", duplicateId))),
+        ]));
+
+        queueAndSchedule.forEach((snapshot) => {
+          snapshot.docs.forEach((snapshotDoc) => {
+            const data = snapshotDoc.data() || {};
+            const status = String(data.status || "");
+            if (["sent", "failed", "cancelled"].includes(status)) return;
+            batch.set(snapshotDoc.ref, {
+              status: "cancelled",
+              cancelReason: "clinic_duplicate_merged",
+              mergedIntoAppointmentId: primary.id,
+              cancelledAt: nowIso,
+              updatedAt: nowIso,
+            }, { merge: true });
+          });
+        });
+
+        await batch.commit();
+      } catch (error) {
+        console.error("[clinic-status-bridge][merge-duplicate]", error);
+      } finally {
+        mergingKeys.delete(groupKey);
+      }
+    }
+  }
+}
 
 /** Mantém a agenda da clínica sincronizada com fila, envio, erro e resposta real do WhatsApp. */
 export function ClinicStatusBridge() {
   const { currentClinic } = useAuth();
   const agendaRef = useRef<AgendaItem[]>([]);
+  const mergingKeysRef = useRef(new Set<string>());
 
   useEffect(() => {
     if (!currentClinic) return;
 
     const agendaCollection = collection(db, "clinics", currentClinic, "clinicAgenda");
     const unsubscribeAgenda = onSnapshot(agendaCollection, (snapshot) => {
-      agendaRef.current = snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...(snapshotDoc.data() as Omit<AgendaItem, "id">) }));
+      const list = snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, ...(snapshotDoc.data() as Omit<AgendaItem, "id">) }));
+      agendaRef.current = list;
+      void mergeAdjacentDuplicateAppointments(currentClinic, list, mergingKeysRef.current);
     }, (error) => console.error("[clinic-status-bridge][agenda]", error));
 
     const queueQuery = query(collection(db, "clinics", currentClinic, "whatsappQueue"), orderBy("updatedAt", "desc"), limit(300));
