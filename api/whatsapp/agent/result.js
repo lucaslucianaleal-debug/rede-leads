@@ -52,6 +52,20 @@ async function markClinicAgendaFailed(clinicId, queue, errorMessage) {
   return true;
 }
 
+async function markClinicQueueIdentity(clinicId, queueId, queue) {
+  const appointmentId = clinicAppointmentIdFromQueue(queue);
+  if (!appointmentId) return false;
+
+  const db = getAdminDb();
+  await db.collection("clinics").doc(clinicId).collection("whatsappQueue").doc(queueId).set({
+    clinicAppointmentId: appointmentId,
+    automationType: String(queue?.automationType || "").trim() || "appointment_clinic_manual",
+    automationLabel: String(queue?.automationLabel || "").trim() || "Confirmação da clínica",
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
+  return true;
+}
+
 async function markAppointmentAutomationSent(clinicId, queue, messageId) {
   const automationType = String(queue?.automationType || "");
   if (!automationType.startsWith("appointment_")) return false;
@@ -131,15 +145,16 @@ export default async function handler(req, res) {
     if (statusValue === "sent") {
       const result = await applySentQueueItem(clinicId, queueId, { messageId: body.messageId || "" });
       const queue = result.queue || {};
-      const [appointmentLeadUpdated, clinicAgendaUpdated] = await Promise.all([
+      const [appointmentLeadUpdated, clinicAgendaUpdated, clinicQueueUpdated] = await Promise.all([
         markAppointmentAutomationSent(clinicId, queue, body.messageId || ""),
         markClinicAgendaSent(clinicId, queue, body.messageId || ""),
+        markClinicQueueIdentity(clinicId, queueId, queue),
       ]);
 
       // O histórico possui uma única fonte para mensagens enviadas: o evento
       // `message_create` do agente. O endpoint de resultado apenas confirma a fila
       // e atualiza o lead/consulta. Gravar aqui novamente criaria dois balões para um envio.
-      return res.status(200).json({ ok: true, leadUpdated: result.leadUpdated || appointmentLeadUpdated || clinicAgendaUpdated });
+      return res.status(200).json({ ok: true, leadUpdated: result.leadUpdated || appointmentLeadUpdated || clinicAgendaUpdated || clinicQueueUpdated });
     }
 
     if (statusValue === "failed") {
@@ -148,7 +163,10 @@ export default async function handler(req, res) {
       const queueSnap = await queueRef.get();
       const queue = queueSnap.exists ? (queueSnap.data() || {}) : {};
       await markQueueFailure(clinicId, queueId, body.error || "Falha no envio");
-      await markClinicAgendaFailed(clinicId, queue, body.error || "Falha no envio");
+      await Promise.all([
+        markClinicAgendaFailed(clinicId, queue, body.error || "Falha no envio"),
+        markClinicQueueIdentity(clinicId, queueId, queue),
+      ]);
       return res.status(200).json({ ok: true });
     }
 
