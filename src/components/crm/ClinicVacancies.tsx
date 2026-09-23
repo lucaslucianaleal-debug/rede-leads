@@ -53,9 +53,6 @@ function slotMinutes(professional: string) {
 function protectedBreaks(professional: string): ProtectedBreak[] {
   const key = prettyProfessional(professional).toLowerCase();
 
-  // Regra operacional da clínica:
-  // - Tailuene: almoço das 12:00 às 14:00
-  // - Lucas, Gabriela e Manuela: almoço das 12:00 às 13:00
   if (key.includes("tailuene")) {
     return [{ start: timeToMinutes("12:00"), end: timeToMinutes("14:00"), label: "Almoço" }];
   }
@@ -94,6 +91,7 @@ function isFreeStatus(status?: string) {
 export function ClinicVacancies() {
   const { currentClinic } = useAuth();
   const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
+  const [selectedProfessional, setSelectedProfessional] = useState("Todas");
 
   useEffect(() => {
     if (!currentClinic) return;
@@ -163,15 +161,36 @@ export function ClinicVacancies() {
     return result.sort((a, b) => dateSortKey(a.date).localeCompare(dateSortKey(b.date)) || timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
   }, [appointments]);
 
+  const professionals = useMemo(() => {
+    return Array.from(new Set(vacancies.map((item) => item.professional))).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [vacancies]);
+
+  useEffect(() => {
+    if (selectedProfessional !== "Todas" && !professionals.includes(selectedProfessional)) {
+      setSelectedProfessional("Todas");
+    }
+  }, [professionals, selectedProfessional]);
+
+  const filteredVacancies = useMemo(() => {
+    if (selectedProfessional === "Todas") return vacancies;
+    return vacancies.filter((item) => item.professional === selectedProfessional);
+  }, [vacancies, selectedProfessional]);
+
+  const countByProfessional = useMemo(() => {
+    const map = new Map<string, number>();
+    vacancies.forEach((item) => map.set(item.professional, (map.get(item.professional) || 0) + 1));
+    return map;
+  }, [vacancies]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, Vacancy[]>();
-    vacancies.forEach((item) => {
+    filteredVacancies.forEach((item) => {
       const list = map.get(item.date) || [];
       list.push(item);
       map.set(item.date, list);
     });
     return map;
-  }, [vacancies]);
+  }, [filteredVacancies]);
 
   if (!currentClinic) return null;
 
@@ -180,6 +199,27 @@ export function ClinicVacancies() {
       <div>
         <h2 className="text-xl font-heading font-bold">Vagas para preencher</h2>
         <p className="mt-1 text-sm text-muted-foreground">Enxerga buracos utilizáveis entre consultas e vagas liberadas por falta de confirmação, respeitando pausas protegidas.</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
+        <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Filtrar por Dra.</span>
+        <button
+          type="button"
+          onClick={() => setSelectedProfessional("Todas")}
+          className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${selectedProfessional === "Todas" ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+        >
+          Todas · {vacancies.length}
+        </button>
+        {professionals.map((professional) => (
+          <button
+            key={professional}
+            type="button"
+            onClick={() => setSelectedProfessional(professional)}
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${selectedProfessional === professional ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+          >
+            {professional} · {countByProfessional.get(professional) || 0}
+          </button>
+        ))}
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -220,7 +260,7 @@ export function ClinicVacancies() {
         </div>
       ))}
 
-      {!vacancies.length && <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">Nenhuma vaga utilizável detectada nos próximos dias.</div>}
+      {!filteredVacancies.length && <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">Nenhuma vaga utilizável para o filtro selecionado.</div>}
     </div>
   );
 }
