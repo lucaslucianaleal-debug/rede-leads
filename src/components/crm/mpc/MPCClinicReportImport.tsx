@@ -8,6 +8,7 @@ import type {
   MPCClinicLeadLink,
   MPCClinicProcedureRecord,
   MPCClinicReportImport,
+  MPCClinicReportType,
   MPCClinicSaleRecord,
 } from "@/types/mpcClinicReports";
 
@@ -148,8 +149,8 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
 
   const makeLink = (
     row: { patientName?: string; cpf?: string; phone?: string },
+    presenceSource: MPCClinicReportType,
     eventDate?: string,
-    confirmPresence = false,
   ): MPCClinicLeadLink | undefined => {
     const cpf = normalizeCpf(row.cpf);
     const phone = normalizePhone(row.phone);
@@ -173,7 +174,6 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
     const eventIso = dateToIso(eventDate);
     const crmEntryDate = getLeadEntryDate(lead);
     const sameDayAppointment = eventIso ? extractLeadAppointmentDates(lead).has(eventIso) : false;
-    const presenceConfirmed = Boolean(confirmPresence && eventIso && (!crmEntryDate || eventIso >= crmEntryDate));
 
     return {
       leadId: lead.id,
@@ -188,22 +188,29 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
       fonteLead: lead.fonteLead,
       servicoProcurado: lead.servicoProcurado,
       sameDayAppointment,
-      presenceConfirmed,
-      presenceDate: presenceConfirmed ? eventIso : undefined,
-      presenceTiming: presenceConfirmed ? (sameDayAppointment ? "scheduled_day" : "other_day") : undefined,
+      presenceConfirmed: true,
+      presenceDate: eventIso || undefined,
+      presenceTiming: eventIso ? (sameDayAppointment ? "scheduled_day" : "other_day") : "report_period",
+      presenceSource,
     };
   };
 
   const linkReport = (report: ParsedClinicReport): LinkedReport => {
     if (report.type === "budgets_sales") {
-      return { ...report, linkedRows: report.rows.map((row) => ({ ...row, link: makeLink(row) })) };
+      return {
+        ...report,
+        linkedRows: report.rows.map((row) => ({ ...row, link: makeLink(row, "budgets_sales") })),
+      };
     }
     if (report.type === "ortho_sales") {
-      return { ...report, linkedRows: report.rows.map((row) => ({ ...row, link: makeLink(row, row.saleDate) })) };
+      return {
+        ...report,
+        linkedRows: report.rows.map((row) => ({ ...row, link: makeLink(row, "ortho_sales", row.saleDate) })),
+      };
     }
     return {
       ...report,
-      linkedRows: report.rows.map((row) => ({ ...row, link: makeLink(row, row.completedAt, true) })),
+      linkedRows: report.rows.map((row) => ({ ...row, link: makeLink(row, "completed", row.completedAt) })),
     };
   };
 
@@ -243,8 +250,9 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
       reports.forEach((report) => {
         const linkedCount = report.linkedRows.filter((row: any) => row.link?.leadId).length;
         const confirmedPresenceIds = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceConfirmed);
-        const sameDayIds = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceConfirmed && row.link?.presenceTiming === "scheduled_day");
-        const otherDayIds = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceConfirmed && row.link?.presenceTiming === "other_day");
+        const sameDayIds = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceTiming === "scheduled_day");
+        const otherDayIds = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceTiming === "other_day");
+        const periodIds = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceTiming === "report_period");
         const importId = stableId("clinic_import", [report.type, report.periodStart, report.periodEnd]);
 
         const importRecord: MPCClinicReportImport = {
@@ -260,6 +268,7 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
           confirmedPresenceCount: confirmedPresenceIds.size,
           sameDayConfirmedCount: sameDayIds.size,
           otherDayConfirmedCount: otherDayIds.size,
+          periodConfirmedCount: periodIds.size,
         };
         imports = mergeById(imports, [importRecord]);
 
@@ -342,16 +351,21 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
     const confirmedPresence = new Set<string>();
     const sameDay = new Set<string>();
     const otherDay = new Set<string>();
+    const reportPeriod = new Set<string>();
 
-    sales.forEach((r) => r.link?.leadId && linked.add(r.link.leadId));
-    procedures.forEach((r) => {
-      const leadId = r.link?.leadId;
-      if (leadId) linked.add(leadId);
-      if (leadId && r.link?.presenceConfirmed) confirmedPresence.add(leadId);
-      if (leadId && r.link?.presenceConfirmed && r.link?.presenceTiming === "scheduled_day") sameDay.add(leadId);
-      if (leadId && r.link?.presenceConfirmed && r.link?.presenceTiming === "other_day") otherDay.add(leadId);
-    });
-    latestSnapshot?.rows.forEach((r) => r.link?.leadId && linked.add(r.link.leadId));
+    const collect = (link?: MPCClinicLeadLink) => {
+      const leadId = link?.leadId;
+      if (!leadId) return;
+      linked.add(leadId);
+      if (link.presenceConfirmed) confirmedPresence.add(leadId);
+      if (link.presenceTiming === "scheduled_day") sameDay.add(leadId);
+      if (link.presenceTiming === "other_day") otherDay.add(leadId);
+      if (link.presenceTiming === "report_period") reportPeriod.add(leadId);
+    };
+
+    sales.forEach((r) => collect(r.link));
+    procedures.forEach((r) => collect(r.link));
+    latestSnapshot?.rows.forEach((r) => collect(r.link));
 
     return {
       latestSnapshot,
@@ -363,6 +377,7 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
       confirmedPresence: confirmedPresence.size,
       sameDay: sameDay.size,
       otherDay: otherDay.size,
+      reportPeriod: reportPeriod.size,
       imports: (store.clinicReportImports || []).length,
     };
   }, [store]);
@@ -374,7 +389,7 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
           <div>
             <h4 className="text-sm font-semibold text-slate-900">Relatórios oficiais da clínica</h4>
             <p className="mt-1 text-xs text-slate-600">
-              O MPC cruza CPF, telefone e nome com o CRM. Em Concluídos, um paciente do CRM conta como comparecimento quando o procedimento ocorreu após a entrada dele na nossa base, mesmo em outra data do agendamento.
+              Como o Rede Leads é a base de prospecção, todo lead localizado em um relatório oficial da clínica conta como comparecimento confirmado no MPC. A origem da confirmação e a data, quando existir, ficam registradas separadamente.
             </p>
           </div>
           <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600">
@@ -428,8 +443,9 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
             const linkedRows = report.linkedRows.filter((row: any) => row.link?.leadId).length;
             const linkedPatients = uniqueLeadIds(report.linkedRows).size;
             const confirmedPresence = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceConfirmed).size;
-            const sameDay = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceConfirmed && row.link?.presenceTiming === "scheduled_day").size;
-            const otherDay = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceConfirmed && row.link?.presenceTiming === "other_day").size;
+            const sameDay = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceTiming === "scheduled_day").size;
+            const otherDay = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceTiming === "other_day").size;
+            const reportPeriod = uniqueLeadIds(report.linkedRows, (row) => row.link?.presenceTiming === "report_period").size;
             const unmatched = report.linkedRows.filter((row: any) => !row.link?.leadId).slice(0, 8);
             const linkedDisplay = report.type === "completed" ? linkedPatients : linkedRows;
 
@@ -447,24 +463,28 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{report.linkedRows.length} linhas</span>
                     <span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">{linkedDisplay} {report.type === "completed" ? "paciente(s) no CRM" : "no CRM"}</span>
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600">{report.linkedRows.length - linkedRows} não localizados no CRM</span>
-                    {report.type === "completed" && <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">{confirmedPresence} comparecimento(s) confirmado(s)</span>}
+                    {confirmedPresence > 0 && <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">{confirmedPresence} comparecimento(s) confirmado(s)</span>}
                   </div>
                 </div>
 
                 {report.type === "budgets_sales" && (
-                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
                     <Stat label="Orçamentos" value={report.totals.budgets} />
                     <Stat label="Vendas" value={report.totals.sales} />
                     <Stat label="Conversão" value={`${report.totals.budgets ? ((report.totals.sales / report.totals.budgets) * 100).toFixed(1) : "0"}%`} />
                     <Stat label="PART. / ODC" value={`${report.totals.particular} / ${report.totals.odc}`} />
+                    <Stat label="Pacientes no CRM" value={linkedPatients} />
+                    <Stat label="Compareceram" value={confirmedPresence} />
                   </div>
                 )}
                 {report.type === "ortho_sales" && (
-                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
                     <Stat label="Vendas" value={report.totals.sales} />
                     <Stat label="Complementos" value={report.totals.complements} />
                     <Stat label="Movimentos" value={report.totals.records} />
                     <Stat label="Valor" value={formatMoney(report.totals.value)} />
+                    <Stat label="Pacientes no CRM" value={linkedPatients} />
+                    <Stat label="Compareceram" value={confirmedPresence} />
                   </div>
                 )}
                 {report.type === "completed" && (
@@ -475,6 +495,12 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
                     <Stat label="Compareceram" value={confirmedPresence} />
                     <Stat label="Na data agendada" value={sameDay} />
                     <Stat label="Em outra data" value={otherDay} />
+                  </div>
+                )}
+
+                {reportPeriod > 0 && (
+                  <div className="mt-2 text-xs text-slate-500">
+                    {reportPeriod} presença(s) confirmada(s) pelo relatório no período, sem data individual disponível nesse PDF.
                   </div>
                 )}
 
@@ -496,12 +522,13 @@ export default function MPCClinicReportImport({ store, allLeads, setStore, saveN
             <Link2 size={16} className="text-slate-700" />
             <h4 className="text-sm font-semibold text-slate-900">Base clínica já conciliada no MPC</h4>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-8">
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-9">
             <Stat label="Relatórios" value={storedSummary.imports} />
             <Stat label="Leads encontrados" value={storedSummary.linkedLeads} />
             <Stat label="Compareceram" value={storedSummary.confirmedPresence} />
             <Stat label="Na data" value={storedSummary.sameDay} />
             <Stat label="Outra data" value={storedSummary.otherDay} />
+            <Stat label="No período" value={storedSummary.reportPeriod} />
             <Stat label="Vendas Orto" value={storedSummary.saleCount} />
             <Stat label="Valor vendas Orto" value={formatMoney(storedSummary.saleValue)} />
             <Stat label="Procedimentos" value={storedSummary.procedures} />
