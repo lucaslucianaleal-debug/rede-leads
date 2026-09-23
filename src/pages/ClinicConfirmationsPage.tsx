@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, CalendarDays, MessageCircleCheck } from "lucide-react";
+import { ArrowLeft, CalendarDays, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ClinicChip } from "@/components/ClinicChip";
@@ -45,7 +45,7 @@ export default function ClinicConfirmationsPage() {
               className="gap-2"
               onClick={() => setActiveView("confirmations")}
             >
-              <MessageCircleCheck className="h-4 w-4" />
+              <MessageCircle className="h-4 w-4" />
               Confirmações de hoje
             </Button>
           </div>
