@@ -2,6 +2,56 @@ import { getAdminDb } from "../../../server/firebaseAdmin.js";
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
 import { applySentQueueItem, findLeadIndex, markQueueFailure } from "../../../server/whatsappAgent.js";
 
+function clinicAppointmentIdFromQueue(queue = {}) {
+  const explicit = String(queue?.clinicAppointmentId || "").trim();
+  if (explicit) return explicit;
+  const leadId = String(queue?.leadId || "").trim();
+  return leadId.startsWith("clinic_") ? leadId : "";
+}
+
+async function markClinicAgendaSent(clinicId, queue, messageId) {
+  const appointmentId = clinicAppointmentIdFromQueue(queue);
+  if (!appointmentId) return false;
+
+  const db = getAdminDb();
+  const appointmentRef = db.collection("clinics").doc(clinicId).collection("clinicAgenda").doc(appointmentId);
+  const snap = await appointmentRef.get();
+  if (!snap.exists) return false;
+
+  const current = snap.data() || {};
+  const nowIso = new Date().toISOString();
+  await appointmentRef.set({
+    remindersSent: {
+      ...(current.remindersSent || {}),
+      manual: nowIso,
+    },
+    lastReminderSentAt: nowIso,
+    lastReminderMessageId: messageId || "",
+    lastReminderError: null,
+    updatedAt: nowIso,
+  }, { merge: true });
+  return true;
+}
+
+async function markClinicAgendaFailed(clinicId, queue, errorMessage) {
+  const appointmentId = clinicAppointmentIdFromQueue(queue);
+  if (!appointmentId) return false;
+
+  const db = getAdminDb();
+  const appointmentRef = db.collection("clinics").doc(clinicId).collection("clinicAgenda").doc(appointmentId);
+  const snap = await appointmentRef.get();
+  if (!snap.exists) return false;
+
+  const nowIso = new Date().toISOString();
+  await appointmentRef.set({
+    confirmationStatus: "pending",
+    lastReminderFailedAt: nowIso,
+    lastReminderError: String(errorMessage || "Falha no envio").slice(0, 500),
+    updatedAt: nowIso,
+  }, { merge: true });
+  return true;
+}
+
 async function markAppointmentAutomationSent(clinicId, queue, messageId) {
   const automationType = String(queue?.automationType || "");
   if (!automationType.startsWith("appointment_")) return false;
@@ -81,16 +131,24 @@ export default async function handler(req, res) {
     if (statusValue === "sent") {
       const result = await applySentQueueItem(clinicId, queueId, { messageId: body.messageId || "" });
       const queue = result.queue || {};
-      const appointmentLeadUpdated = await markAppointmentAutomationSent(clinicId, queue, body.messageId || "");
+      const [appointmentLeadUpdated, clinicAgendaUpdated] = await Promise.all([
+        markAppointmentAutomationSent(clinicId, queue, body.messageId || ""),
+        markClinicAgendaSent(clinicId, queue, body.messageId || ""),
+      ]);
 
       // O histórico possui uma única fonte para mensagens enviadas: o evento
       // `message_create` do agente. O endpoint de resultado apenas confirma a fila
-      // e atualiza o lead. Gravar aqui novamente criaria dois balões para um envio.
-      return res.status(200).json({ ok: true, leadUpdated: result.leadUpdated || appointmentLeadUpdated });
+      // e atualiza o lead/consulta. Gravar aqui novamente criaria dois balões para um envio.
+      return res.status(200).json({ ok: true, leadUpdated: result.leadUpdated || appointmentLeadUpdated || clinicAgendaUpdated });
     }
 
     if (statusValue === "failed") {
+      const db = getAdminDb();
+      const queueRef = db.collection("clinics").doc(clinicId).collection("whatsappQueue").doc(queueId);
+      const queueSnap = await queueRef.get();
+      const queue = queueSnap.exists ? (queueSnap.data() || {}) : {};
       await markQueueFailure(clinicId, queueId, body.error || "Falha no envio");
+      await markClinicAgendaFailed(clinicId, queue, body.error || "Falha no envio");
       return res.status(200).json({ ok: true });
     }
 
