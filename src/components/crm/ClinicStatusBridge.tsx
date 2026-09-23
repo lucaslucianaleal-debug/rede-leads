@@ -37,6 +37,7 @@ type AgendaItem = {
   lastReplyText?: string;
   replyClassification?: string;
   manualReviewedAt?: string;
+  manualReviewDecision?: string;
 };
 
 type ChatItem = {
@@ -143,6 +144,12 @@ function visitItems(all: AgendaItem[], base: AgendaItem) {
     .sort((a, b) => appointmentTime(a) - appointmentTime(b));
 }
 
+function latestManualAction(items: AgendaItem[]) {
+  return [...items]
+    .filter((item) => item.manualReviewedAt && ["confirmed", "wont_attend", "cancelled", "reschedule"].includes(String(item.confirmationStatus || "")))
+    .sort((a, b) => isoTime(b.manualReviewedAt) - isoTime(a.manualReviewedAt))[0] || null;
+}
+
 async function cancelPendingForAppointment(clinicId: string, appointmentId: string, reason: string) {
   const clinicRef = doc(db, "clinics", clinicId);
   const [queueSnap, scheduleSnap] = await Promise.all([
@@ -212,6 +219,7 @@ async function mergeAdjacentDuplicateAppointments(clinicId: string, items: Agend
         const lastReminderSentAt = latestValue(chain, "lastReminderSentAt");
         const lastReplyAt = latestValue(chain, "lastReplyAt");
         const replySource = lastReplyAt ? chain.find((item) => item.lastReplyAt === lastReplyAt) : undefined;
+        const latestManual = latestManualAction(chain);
         const nowIso = new Date().toISOString();
         const clinicRef = doc(db, "clinics", clinicId);
         const batch = writeBatch(db);
@@ -220,13 +228,17 @@ async function mergeAdjacentDuplicateAppointments(clinicId: string, items: Agend
           endTime: mergedEnd,
           phone: mergedPhone,
           phoneKey: mergedPhoneKey,
-          confirmationStatus: mergedStatus,
+          confirmationStatus: latestManual?.confirmationStatus || mergedStatus,
           remindersSent: mergedReminders,
           ...(lastReminderSentAt ? { lastReminderSentAt } : {}),
           ...(lastReplyAt ? {
             lastReplyAt,
             lastReplyText: replySource?.lastReplyText || primary.lastReplyText || "",
             replyClassification: replySource?.replyClassification || primary.replyClassification || mergedStatus,
+          } : {}),
+          ...(latestManual?.manualReviewedAt ? {
+            manualReviewedAt: latestManual.manualReviewedAt,
+            manualReviewDecision: latestManual.manualReviewDecision || latestManual.confirmationStatus,
           } : {}),
           mergedAppointmentIds: duplicates.map((item) => item.id),
           mergedAt: nowIso,
@@ -274,16 +286,33 @@ async function mergeAdjacentDuplicateAppointments(clinicId: string, items: Agend
 }
 
 async function syncManualVisitActions(clinicId: string, items: AgendaItem[]) {
-  const sources = items.filter((item) => item.active !== false && item.manualReviewedAt && ["confirmed", "wont_attend", "cancelled", "reschedule"].includes(String(item.confirmationStatus || "")));
-  for (const source of sources) {
-    const siblings = visitItems(items, source).filter((item) => item.id !== source.id);
-    for (const sibling of siblings) {
-      if (isoTime(sibling.manualReviewedAt) > isoTime(source.manualReviewedAt)) continue;
+  const activeSources = items
+    .filter((item) => item.active !== false && item.manualReviewedAt && ["confirmed", "wont_attend", "cancelled", "reschedule"].includes(String(item.confirmationStatus || "")))
+    .sort((a, b) => isoTime(b.manualReviewedAt) - isoTime(a.manualReviewedAt));
+  const processed = new Set<string>();
+
+  for (const candidate of activeSources) {
+    const group = visitItems(items, candidate);
+    const groupKey = `${candidate.date || ""}|${normalizeText(candidate.name || "")}`;
+    if (processed.has(groupKey)) continue;
+    processed.add(groupKey);
+
+    const source = latestManualAction(group);
+    if (!source?.manualReviewedAt) continue;
+    const sourceTime = isoTime(source.manualReviewedAt);
+
+    for (const sibling of group) {
+      if (isoTime(sibling.manualReviewedAt) > sourceTime) continue;
       const sameStatus = String(sibling.confirmationStatus || "") === String(source.confirmationStatus || "");
-      if (sameStatus && isoTime(sibling.lastReplyAt) >= isoTime(source.manualReviewedAt)) continue;
+      const alreadySynced = sameStatus && isoTime(sibling.manualReviewedAt) === sourceTime;
+      if (alreadySynced) continue;
+
       const nowIso = new Date().toISOString();
       await setDoc(doc(db, "clinics", clinicId, "clinicAgenda", sibling.id), {
         confirmationStatus: source.confirmationStatus,
+        manualReviewedAt: source.manualReviewedAt,
+        manualReviewDecision: source.manualReviewDecision || source.confirmationStatus,
+        manualActionSource: sibling.id === source.id ? "manual_review" : "same_visit_manual_action",
         visitSyncedFrom: source.id,
         visitSyncedAt: nowIso,
         ...(source.confirmationStatus !== "confirmed" ? { vacancyReleasedAt: nowIso } : {}),
@@ -393,10 +422,14 @@ export function ClinicStatusBridge() {
 
         const appointment = candidates[0];
         if (!appointment) return;
+
+        const linkedVisit = visitItems(agendaRef.current, appointment);
+        const latestManual = latestManualAction(linkedVisit);
+        if (latestManual?.manualReviewedAt && isoTime(latestManual.manualReviewedAt) >= replyAtMs) return;
+
         let classified = classifyReply(chat.lastMessage || "");
         if (appointment.confirmationStatus === "released_unconfirmed" && classified === "confirmed") classified = "reschedule";
 
-        const linkedVisit = visitItems(agendaRef.current, appointment);
         linkedVisit.forEach((visitAppointment) => {
           void setDoc(doc(db, "clinics", currentClinic, "clinicAgenda", visitAppointment.id), {
             confirmationStatus: classified,
