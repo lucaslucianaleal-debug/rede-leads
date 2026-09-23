@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { ArrowLeft, CalendarDays, MessageCircle, RotateCcw, Search } from "lucide-react";
+import { ArrowLeft, CalendarDays, Landmark, MessageCircle, RotateCcw, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ClinicChip } from "@/components/ClinicChip";
 import { ClinicCalendar } from "@/components/crm/ClinicCalendar";
 import { ClinicConfirmationCenter } from "@/components/crm/ClinicConfirmationCenter";
+import { ClinicFinanceDashboard } from "@/components/crm/ClinicFinanceDashboard";
 import { ClinicVacancies } from "@/components/crm/ClinicVacancies";
 import { ClinicRebookings } from "@/components/crm/ClinicRebookings";
 import { ClinicStatusBridge } from "@/components/crm/ClinicStatusBridge";
 
-type ClinicView = "calendar" | "confirmations" | "vacancies" | "rebookings";
+type ClinicView = "calendar" | "confirmations" | "vacancies" | "rebookings" | "finance";
 
 export default function ClinicConfirmationsPage() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ export default function ClinicConfirmationsPage() {
               </Button>
               <div>
                 <div className="font-heading text-lg font-bold">Clínica</div>
-                <div className="text-xs text-muted-foreground">Agenda, confirmações, vagas e operação da clínica</div>
+                <div className="text-xs text-muted-foreground">Agenda, confirmações, vagas, financeiro e operação da clínica</div>
               </div>
             </div>
             <ClinicChip />
@@ -38,6 +39,7 @@ export default function ClinicConfirmationsPage() {
             <NavButton active={activeView === "confirmations"} onClick={() => setActiveView("confirmations")} icon={<MessageCircle className="h-4 w-4" />} label="Confirmações" />
             <NavButton active={activeView === "vacancies"} onClick={() => setActiveView("vacancies")} icon={<Search className="h-4 w-4" />} label="Vagas" />
             <NavButton active={activeView === "rebookings"} onClick={() => setActiveView("rebookings")} icon={<RotateCcw className="h-4 w-4" />} label="Reagendamentos" />
+            <NavButton active={activeView === "finance"} onClick={() => setActiveView("finance")} icon={<Landmark className="h-4 w-4" />} label="Financeiro" />
           </div>
         </div>
       </header>
@@ -47,6 +49,7 @@ export default function ClinicConfirmationsPage() {
         {activeView === "confirmations" && <ClinicConfirmationCenter />}
         {activeView === "vacancies" && <ClinicVacancies />}
         {activeView === "rebookings" && <ClinicRebookings />}
+        {activeView === "finance" && <ClinicFinanceDashboard />}
       </main>
     </div>
   );
