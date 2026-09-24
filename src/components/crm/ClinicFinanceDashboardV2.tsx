@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Banknote,
@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Phone,
   ReceiptText,
+  RotateCcw,
   Search,
   Unlink,
   Upload,
@@ -25,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import type { SaleItem } from "@/components/crm/ClinicSalesImportPanel";
 
-type FinanceView = "overview" | "delinquency";
+type FinanceView = "overview" | "delinquency" | "patients";
 type BucketKey = "1-30" | "31-60" | "61-90" | "91-180" | "181-365" | "365+";
 type MatchFilter = "all" | "matched" | "unmatched";
 
@@ -64,6 +65,8 @@ type ImportedReport = {
   period: string;
 };
 
+type ManualSettlements = Record<string, string>;
+
 const SNAPSHOT = {
   source: "Relatório de Cobrança",
   period: "01/01/2026 a 23/09/2026",
@@ -76,6 +79,7 @@ const SNAPSHOT = {
 
 const COLLECTION_CUTOFF = new Date(2025, 10, 1, 12, 0, 0);
 const COLLECTION_CUTOFF_LABEL = "01/11/2025";
+const SETTLEMENT_STORAGE_KEY = "clinic-finance-manual-settlements-v1";
 
 const AGING_SNAPSHOT: AgingBucket[] = [
   { key: "1-30", label: "1–30 dias", installments: 150, patients: 144, original: 35058.47, current: 36866.19 },
@@ -135,6 +139,10 @@ function baseDocument(value: string) {
   return (value.split("/")[0] || "").replace(/\D/g, "");
 }
 
+function installmentKey(item: Installment) {
+  return `${item.document}|${item.dueDate}`;
+}
+
 function normalizeSearch(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
@@ -187,8 +195,24 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
   const [period, setPeriod] = useState(SNAPSHOT.period);
   const [importing, setImporting] = useState(false);
   const [ignoredBeforeCutoff, setIgnoredBeforeCutoff] = useState(0);
+  const [manualSettlements, setManualSettlements] = useState<ManualSettlements>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      return JSON.parse(window.sessionStorage.getItem(SETTLEMENT_STORAGE_KEY) || "{}") as ManualSettlements;
+    } catch {
+      return {};
+    }
+  });
   const collectionInputRef = useRef<HTMLInputElement | null>(null);
   const receiptsInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(SETTLEMENT_STORAGE_KEY, JSON.stringify(manualSettlements));
+    } catch {
+      // Preview: se o navegador bloquear sessionStorage, a baixa continua válida até atualizar a página.
+    }
+  }, [manualSettlements]);
 
   const imported = patients.length > 0;
 
@@ -204,21 +228,34 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
     return map;
   }, [salesItems]);
 
+  const activePatients = useMemo(() => {
+    return patients
+      .map((patient) => ({
+        ...patient,
+        installments: patient.installments.filter((item) => !manualSettlements[installmentKey(item)]),
+      }))
+      .filter((patient) => patient.installments.length > 0);
+  }, [manualSettlements, patients]);
+
   const patientSearchResults = useMemo(() => {
     const term = normalizeSearch(patientSearch);
     if (!imported || term.length < 2) return [];
 
     return patients
       .filter((patient) => normalizeSearch(patient.name).includes(term))
-      .map((patient) => ({
-        patient,
-        current: patient.installments.reduce((sum, item) => sum + item.current, 0),
-        oldest: Math.max(...patient.installments.map((item) => item.daysLate)),
-        installments: patient.installments.length,
-      }))
-      .sort((a, b) => a.patient.name.localeCompare(b.patient.name, "pt-BR"))
-      .slice(0, 12);
-  }, [imported, patientSearch, patients]);
+      .map((patient) => {
+        const openItems = patient.installments.filter((item) => !manualSettlements[installmentKey(item)]);
+        const settledItems = patient.installments.filter((item) => manualSettlements[installmentKey(item)]);
+        return {
+          patient,
+          current: openItems.reduce((sum, item) => sum + item.current, 0),
+          oldest: openItems.length ? Math.max(...openItems.map((item) => item.daysLate)) : 0,
+          installments: openItems.length,
+          settled: settledItems.length,
+        };
+      })
+      .sort((a, b) => a.patient.name.localeCompare(b.patient.name, "pt-BR"));
+  }, [imported, manualSettlements, patientSearch, patients]);
 
   const dynamicAging = useMemo(() => {
     if (!imported) return AGING_SNAPSHOT;
@@ -231,7 +268,7 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       { key: "365+", label: "+1 ano" },
     ];
     return keys.map(({ key, label }) => {
-      const matches = patients
+      const matches = activePatients
         .flatMap((patient) => patient.installments.map((item) => ({ patientId: patient.id, item })))
         .filter(({ item }) => item.bucket === key);
       return {
@@ -243,22 +280,30 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
         current: matches.reduce((sum, match) => sum + match.item.current, 0),
       };
     });
-  }, [imported, patients]);
+  }, [activePatients, imported]);
 
   const totals = useMemo(() => {
     if (!imported) return SNAPSHOT;
-    const installments = patients.flatMap((patient) => patient.installments);
+    const installments = activePatients.flatMap((patient) => patient.installments);
     return {
       ...SNAPSHOT,
       source: collectionFile || "Relatório importado",
       period,
       generatedAt: "importado agora",
-      patients: patients.length,
+      patients: activePatients.length,
       installments: installments.length,
       original: installments.reduce((sum, item) => sum + item.original, 0),
       current: installments.reduce((sum, item) => sum + item.current, 0),
     };
-  }, [collectionFile, imported, patients, period]);
+  }, [activePatients, collectionFile, imported, period]);
+
+  const manualSettlementMetrics = useMemo(() => {
+    const settledItems = patients.flatMap((patient) => patient.installments).filter((item) => manualSettlements[installmentKey(item)]);
+    return {
+      count: settledItems.length,
+      value: settledItems.reduce((sum, item) => sum + item.current, 0),
+    };
+  }, [manualSettlements, patients]);
 
   const metrics = useMemo(() => {
     const increase = totals.current - totals.original;
@@ -270,7 +315,7 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
 
   const reconciliation = useMemo(() => {
     if (!imported) return { totalDocs: 0, matchedDocs: 0, unmatchedDocs: 0, matchedBalance: 0, percentage: 0 };
-    const allInstallments = patients.flatMap((patient) => patient.installments);
+    const allInstallments = activePatients.flatMap((patient) => patient.installments);
     const docSet = new Set(allInstallments.map((item) => baseDocument(item.document)).filter(Boolean));
     const matched = [...docSet].filter((doc) => salesIndex.has(doc));
     const matchedBalance = allInstallments
@@ -283,24 +328,24 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       matchedBalance,
       percentage: docSet.size ? (matched.length / docSet.size) * 100 : 0,
     };
-  }, [imported, patients, salesIndex]);
+  }, [activePatients, imported, salesIndex]);
 
   const queue = useMemo(() => {
     if (!selectedBucket || !imported) return [];
-    const term = search.trim().toLowerCase();
-    return patients
+    const term = normalizeSearch(search);
+    return activePatients
       .filter((patient) => patient.installments.some((item) => item.bucket === selectedBucket))
       .map((patient) => {
         const bucketItems = patient.installments.filter((item) => item.bucket === selectedBucket);
         const saleItems = bucketItems.flatMap((item) => salesIndex.get(baseDocument(item.document)) || []);
         const hasSale = saleItems.length > 0;
-        const searchable = [
+        const searchable = normalizeSearch([
           patient.name,
           patient.cpf,
           ...patient.phones,
           ...bucketItems.map((item) => item.document),
           ...saleItems.map((item) => item.description),
-        ].join(" ").toLowerCase();
+        ].join(" "));
         return {
           patient,
           bucketItems,
@@ -315,7 +360,25 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       .filter((row) => !term || row.searchable.includes(term))
       .filter((row) => matchFilter === "all" || (matchFilter === "matched" ? row.hasSale : !row.hasSale))
       .sort((a, b) => b.oldest - a.oldest);
-  }, [imported, matchFilter, patients, salesIndex, search, selectedBucket]);
+  }, [activePatients, imported, matchFilter, salesIndex, search, selectedBucket]);
+
+  function settleInstallment(item: Installment) {
+    const key = installmentKey(item);
+    if (manualSettlements[key]) return;
+    if (!window.confirm(`Confirmar baixa manual da parcela ${item.document} no valor atualizado de ${formatCurrency(item.current)}?`)) return;
+    setManualSettlements((current) => ({ ...current, [key]: new Date().toISOString() }));
+    toast.success(`Parcela ${item.document} baixada no Rede Leads.`);
+  }
+
+  function undoSettlement(item: Installment) {
+    const key = installmentKey(item);
+    setManualSettlements((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    toast.success(`Baixa da parcela ${item.document} desfeita.`);
+  }
 
   async function importCollectionReport(file?: File) {
     if (!file) return;
@@ -338,8 +401,8 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       setIgnoredBeforeCutoff(ignored);
       setPatientSearch("");
       setPeriod(parsed.period);
-      setView("delinquency");
-      setSelectedBucket("1-30");
+      setView("patients");
+      setSelectedBucket(null);
       setMatchFilter("all");
       toast.success(`${number.format(eligiblePatients.length)} pacientes e ${number.format(eligibleInstallments)} parcelas na carteira operacional. ${number.format(ignored)} parcelas anteriores a ${COLLECTION_CUTOFF_LABEL} foram ocultadas.`);
     } catch (error: any) {
@@ -380,6 +443,7 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" className="gap-2" disabled={importing} onClick={() => collectionInputRef.current?.click()}><Upload className="h-4 w-4" />{importing ? "Lendo relatório..." : "Importar Cobrança"}</Button>
           <Button size="sm" variant="outline" className="gap-2" onClick={() => receiptsInputRef.current?.click()}><FileDown className="h-4 w-4" />Importar Recebimentos</Button>
+          <Button size="sm" variant={view === "patients" ? "default" : "ghost"} onClick={() => { setView("patients"); setSelectedBucket(null); }}>Pacientes</Button>
           <Button size="sm" variant={view === "overview" ? "default" : "ghost"} onClick={() => { setView("overview"); setSelectedBucket(null); }}>Visão geral</Button>
           <Button size="sm" variant={view === "delinquency" ? "default" : "ghost"} onClick={() => setView("delinquency")}>Cobrança</Button>
         </div>
@@ -391,99 +455,56 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
         <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-semibold text-amber-800">Filtro ativo: emissão a partir de {COLLECTION_CUTOFF_LABEL}</span>
         {ignoredBeforeCutoff > 0 && <span>{number.format(ignoredBeforeCutoff)} parcelas antigas ocultadas</span>}
         {salesItems.length > 0 && <span className="font-medium text-emerald-700">Vendas carregadas: {number.format(new Set(salesItems.map((item) => item.document)).size)} DOCs</span>}
+        {manualSettlementMetrics.count > 0 && <span className="font-semibold text-emerald-700">Baixas manuais: {number.format(manualSettlementMetrics.count)} • {formatCurrency(manualSettlementMetrics.value)}</span>}
         {receiptsFile && <span className="font-medium text-emerald-700">Recebimentos: {receiptsFile}</span>}
-        <span className="ml-auto rounded-full border bg-background px-2.5 py-1 font-medium">Preview: dados ficam somente neste navegador</span>
+        <span className="ml-auto rounded-full border bg-background px-2.5 py-1 font-medium">Preview: baixas manuais ficam nesta sessão do navegador</span>
       </section>
 
-      {imported && (
-        <section className="relative rounded-xl border bg-card p-4 shadow-sm">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold">Buscar paciente</div>
-              <div className="text-xs text-muted-foreground">Digite o nome e abra a ficha completa, sem precisar entrar em uma faixa de atraso.</div>
-            </div>
-          </div>
-          <div className="relative max-w-xl">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={patientSearch}
-              onChange={(event) => setPatientSearch(event.target.value)}
-              placeholder="Buscar paciente pelo nome..."
-              className="pl-9 pr-9"
-            />
-            {patientSearch && (
-              <button
-                type="button"
-                aria-label="Limpar busca"
-                onClick={() => setPatientSearch("")}
-                className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {normalizeSearch(patientSearch).length >= 2 && (
-            <div className="mt-3 max-w-3xl overflow-hidden rounded-lg border bg-background">
-              {patientSearchResults.length ? (
-                <div className="divide-y">
-                  {patientSearchResults.map(({ patient, current, oldest, installments }) => (
-                    <button
-                      key={patient.id}
-                      type="button"
-                      onClick={() => setSelectedPatient(patient)}
-                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-muted/35"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate font-semibold">{patient.name}</div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">{patient.phones[0] || "Sem telefone"} • {installments} parcela(s)</div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div className="font-semibold">{formatCurrency(current)}</div>
-                        <div className="text-xs text-muted-foreground">Maior atraso: {oldest} dias</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="px-4 py-4 text-sm text-muted-foreground">Nenhum paciente encontrado na carteira operacional.</div>
-              )}
-            </div>
-          )}
-        </section>
+      {view === "patients" && imported && (
+        <PatientDirectory
+          patients={patients}
+          search={patientSearch}
+          results={patientSearchResults}
+          onSearch={setPatientSearch}
+          onPatient={setSelectedPatient}
+        />
       )}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard title="Saldo em cobrança" value={formatCurrency(totals.current)} helper="Valor atualizado da carteira operacional" icon={<CircleDollarSign className="h-5 w-5" />} tone="danger" />
-        <SummaryCard title="Valor original" value={formatCurrency(totals.original)} helper="Principal das parcelas visíveis" icon={<Banknote className="h-5 w-5" />} />
-        <SummaryCard title="Acréscimos" value={formatCurrency(metrics.increase)} helper={`+${metrics.increasePct.toFixed(1).replace(".", ",")}% sobre o original`} icon={<ReceiptText className="h-5 w-5" />} tone="warning" />
-        <SummaryCard title="Pacientes" value={number.format(totals.patients)} helper={`Emissões desde ${COLLECTION_CUTOFF_LABEL}`} icon={<UsersRound className="h-5 w-5" />} />
-        <SummaryCard title="Parcelas" value={number.format(totals.installments)} helper="Títulos da carteira operacional" icon={<CalendarClock className="h-5 w-5" />} />
-      </section>
+      {view !== "patients" && (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <SummaryCard title="Saldo em cobrança" value={formatCurrency(totals.current)} helper="Valor atualizado ainda em aberto" icon={<CircleDollarSign className="h-5 w-5" />} tone="danger" />
+            <SummaryCard title="Valor original" value={formatCurrency(totals.original)} helper="Principal das parcelas abertas" icon={<Banknote className="h-5 w-5" />} />
+            <SummaryCard title="Acréscimos" value={formatCurrency(metrics.increase)} helper={`+${metrics.increasePct.toFixed(1).replace(".", ",")}% sobre o original`} icon={<ReceiptText className="h-5 w-5" />} tone="warning" />
+            <SummaryCard title="Pacientes" value={number.format(totals.patients)} helper="Com parcelas ainda abertas" icon={<UsersRound className="h-5 w-5" />} />
+            <SummaryCard title="Parcelas" value={number.format(totals.installments)} helper="Títulos ainda em aberto" icon={<CalendarClock className="h-5 w-5" />} />
+          </section>
 
-      {imported && (
-        <Card className={salesItems.length ? "border-emerald-200" : "border-blue-200"}>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base"><Link2 className="h-4 w-4" />Conciliação cobrança × venda</CardTitle>
-            <CardDescription>O DOC da parcela é ligado ao DOC da venda para trazer tratamento, data e itens vendidos direto para a fila de cobrança.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!salesItems.length ? (
-              <div className="rounded-lg border border-dashed bg-blue-50/50 px-4 py-3 text-sm text-blue-900">Importe a base de vendas acima para transformar a cobrança em uma fila conciliada com o produto/tratamento.</div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <MiniMetric label="DOCs em cobrança" value={number.format(reconciliation.totalDocs)} helper="Documentos únicos" />
-                <MiniMetric label="Venda localizada" value={number.format(reconciliation.matchedDocs)} helper={`${reconciliation.percentage.toFixed(1).replace(".", ",")}% conciliado`} success />
-                <MiniMetric label="Sem venda localizada" value={number.format(reconciliation.unmatchedDocs)} helper="Precisam de período/base adicional" warning />
-                <MiniMetric label="Saldo com origem" value={formatCurrency(reconciliation.matchedBalance)} helper="Débitos com tratamento identificado" success />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {imported && (
+            <Card className={salesItems.length ? "border-emerald-200" : "border-blue-200"}>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base"><Link2 className="h-4 w-4" />Conciliação cobrança × venda</CardTitle>
+                <CardDescription>O DOC da parcela é ligado ao DOC da venda para trazer tratamento, data e itens vendidos direto para a fila de cobrança.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!salesItems.length ? (
+                  <div className="rounded-lg border border-dashed bg-blue-50/50 px-4 py-3 text-sm text-blue-900">Importe a base de vendas acima para transformar a cobrança em uma fila conciliada com o produto/tratamento.</div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <MiniMetric label="DOCs em cobrança" value={number.format(reconciliation.totalDocs)} helper="Documentos únicos abertos" />
+                    <MiniMetric label="Venda localizada" value={number.format(reconciliation.matchedDocs)} helper={`${reconciliation.percentage.toFixed(1).replace(".", ",")}% conciliado`} success />
+                    <MiniMetric label="Sem venda localizada" value={number.format(reconciliation.unmatchedDocs)} helper="Precisam de período/base adicional" warning />
+                    <MiniMetric label="Saldo com origem" value={formatCurrency(reconciliation.matchedBalance)} helper="Débitos abertos com tratamento identificado" success />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {!imported && (
-        <Card className="border-blue-200 bg-blue-50/60"><CardContent className="p-4 text-sm text-blue-900">Clique em <b>Importar Cobrança</b> para liberar nomes, documentos e filas reais. Na importação, cobranças com emissão anterior a <b>{COLLECTION_CUTOFF_LABEL}</b> são descartadas da carteira operacional.</CardContent></Card>
+        <Card className="border-blue-200 bg-blue-50/60"><CardContent className="p-4 text-sm text-blue-900">Clique em <b>Importar Cobrança</b> para liberar a base completa de pacientes. Na importação, cobranças com emissão anterior a <b>{COLLECTION_CUTOFF_LABEL}</b> são descartadas da carteira operacional.</CardContent></Card>
       )}
 
       {view === "overview" && (
@@ -520,8 +541,61 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
         <Card className="border-amber-200 bg-amber-50/50"><CardContent className="flex items-center gap-3 p-4"><AlertTriangle className="h-5 w-5 text-amber-700" /><div><div className="font-semibold">{metrics.overOneYearPct.toFixed(1).replace(".", ",")}% do saldo está acima de 1 ano</div><div className="text-xs text-muted-foreground">As faixas continuam sendo a régua operacional da cobrança.</div></div></CardContent></Card>
       )}
 
-      {selectedPatient && <PatientDetail patient={selectedPatient} salesIndex={salesIndex} onClose={() => setSelectedPatient(null)} />}
+      {selectedPatient && (
+        <PatientDetail
+          patient={selectedPatient}
+          salesIndex={salesIndex}
+          manualSettlements={manualSettlements}
+          onSettle={settleInstallment}
+          onUndoSettlement={undoSettlement}
+          onClose={() => setSelectedPatient(null)}
+        />
+      )}
     </div>
+  );
+}
+
+function PatientDirectory({ patients, search, results, onSearch, onPatient }: {
+  patients: PatientDebt[];
+  search: string;
+  results: Array<{ patient: PatientDebt; current: number; oldest: number; installments: number; settled: number }>;
+  onSearch: (value: string) => void;
+  onPatient: (patient: PatientDebt) => void;
+}) {
+  return (
+    <Card>
+      <CardHeader className="border-b pb-4">
+        <CardTitle className="text-lg">Base completa de pacientes</CardTitle>
+        <CardDescription>Busca geral em todos os {number.format(patients.length)} pacientes importados — sem depender de faixa de atraso.</CardDescription>
+        <div className="relative mt-3 max-w-2xl">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Digite o nome do paciente..." className="pl-9 pr-9" autoFocus />
+          {search && <button type="button" aria-label="Limpar busca" onClick={() => onSearch("")} className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>}
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {normalizeSearch(search).length < 2 ? (
+          <div className="px-5 py-10 text-center text-sm text-muted-foreground">Digite pelo menos 2 letras para pesquisar a base inteira.</div>
+        ) : results.length ? (
+          <div className="divide-y">
+            {results.map(({ patient, current, oldest, installments, settled }) => (
+              <button key={patient.id} type="button" onClick={() => onPatient(patient)} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-muted/35">
+                <div className="min-w-0">
+                  <div className="truncate font-semibold">{patient.name}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{patient.phones[0] || "Sem telefone"} • CPF {patient.cpf}</div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className={installments ? "font-semibold" : "font-semibold text-emerald-700"}>{installments ? formatCurrency(current) : "Sem saldo aberto"}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{installments} aberta(s){settled ? ` • ${settled} baixada(s)` : ""}{oldest ? ` • maior atraso ${oldest} dias` : ""}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="px-5 py-10 text-center text-sm text-muted-foreground">Nenhum paciente encontrado nessa base.</div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -585,7 +659,7 @@ function CollectionQueue({ bucket, queue, imported, salesLoaded, search, matchFi
                   <td className="px-4 py-3">{first?.dueDate}</td>
                   <td className="px-4 py-3 text-right font-semibold">{oldest} dias</td>
                   <td className="px-4 py-3 text-right font-semibold">{formatCurrency(current)}</td>
-                  <td className="px-4 py-3"><div className="flex justify-end gap-1"><Button size="icon" variant="outline" title="Detalhes" onClick={() => onPatient(patient)}><FileText className="h-4 w-4" /></Button><Button size="icon" variant="outline" title="WhatsApp" disabled={!wa} onClick={() => window.open(`https://wa.me/55${wa}`, "_blank")}><MessageCircle className="h-4 w-4" /></Button></div></td>
+                  <td className="px-4 py-3"><div className="flex justify-end gap-1"><Button size="icon" variant="outline" title="Detalhes e baixa" onClick={() => onPatient(patient)}><FileText className="h-4 w-4" /></Button><Button size="icon" variant="outline" title="WhatsApp" disabled={!wa} onClick={() => window.open(`https://wa.me/55${wa}`, "_blank")}><MessageCircle className="h-4 w-4" /></Button></div></td>
                 </tr>
               );
             })}
@@ -597,17 +671,31 @@ function CollectionQueue({ bucket, queue, imported, salesLoaded, search, matchFi
   );
 }
 
-function PatientDetail({ patient, salesIndex, onClose }: { patient: PatientDebt; salesIndex: Map<string, SaleItem[]>; onClose: () => void }) {
-  const totalOriginal = patient.installments.reduce((sum, item) => sum + item.original, 0);
-  const totalCurrent = patient.installments.reduce((sum, item) => sum + item.current, 0);
+function PatientDetail({ patient, salesIndex, manualSettlements, onSettle, onUndoSettlement, onClose }: {
+  patient: PatientDebt;
+  salesIndex: Map<string, SaleItem[]>;
+  manualSettlements: ManualSettlements;
+  onSettle: (item: Installment) => void;
+  onUndoSettlement: (item: Installment) => void;
+  onClose: () => void;
+}) {
+  const openItems = patient.installments.filter((item) => !manualSettlements[installmentKey(item)]);
+  const settledItems = patient.installments.filter((item) => manualSettlements[installmentKey(item)]);
+  const totalOriginal = openItems.reduce((sum, item) => sum + item.original, 0);
+  const totalCurrent = openItems.reduce((sum, item) => sum + item.current, 0);
   const patientDocs = Array.from(new Set(patient.installments.map((item) => baseDocument(item.document)).filter(Boolean)));
 
   return (
     <div className="fixed inset-0 z-[80] flex justify-end bg-black/40" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="h-full w-full max-w-4xl overflow-y-auto bg-background shadow-2xl">
+      <div className="h-full w-full max-w-5xl overflow-y-auto bg-background shadow-2xl">
         <div className="sticky top-0 z-10 flex items-start justify-between border-b bg-background/95 p-5 backdrop-blur"><div><div className="text-xs uppercase tracking-wide text-muted-foreground">Ficha de cobrança conciliada</div><h3 className="mt-1 text-xl font-bold">{patient.name}</h3><div className="mt-1 text-sm text-muted-foreground">CPF {patient.cpf}</div></div><Button size="icon" variant="ghost" onClick={onClose}><X className="h-5 w-5" /></Button></div>
         <div className="space-y-5 p-5">
-          <div className="grid gap-3 sm:grid-cols-3"><SummaryCard title="Saldo original" value={formatCurrency(totalOriginal)} helper="Parcelas em cobrança" icon={<Banknote className="h-4 w-4" />} /><SummaryCard title="Saldo atualizado" value={formatCurrency(totalCurrent)} helper="Conforme relatório" icon={<CircleDollarSign className="h-4 w-4" />} tone="danger" /><SummaryCard title="Parcelas" value={number.format(patient.installments.length)} helper="Débitos localizados" icon={<CalendarClock className="h-4 w-4" />} /></div>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <SummaryCard title="Saldo original" value={formatCurrency(totalOriginal)} helper="Parcelas ainda abertas" icon={<Banknote className="h-4 w-4" />} />
+            <SummaryCard title="Saldo atualizado" value={formatCurrency(totalCurrent)} helper="Ainda em cobrança" icon={<CircleDollarSign className="h-4 w-4" />} tone="danger" />
+            <SummaryCard title="Em aberto" value={number.format(openItems.length)} helper="Parcelas para cobrar" icon={<CalendarClock className="h-4 w-4" />} />
+            <SummaryCard title="Baixadas" value={number.format(settledItems.length)} helper="Baixas manuais nesta sessão" icon={<CheckCircle2 className="h-4 w-4" />} tone="success" />
+          </div>
 
           <Card><CardHeader className="pb-2"><CardTitle className="text-base">Contato</CardTitle></CardHeader><CardContent className="space-y-2">{patient.phones.length ? patient.phones.map((phone) => <div key={phone} className="flex items-center gap-2 text-sm"><Phone className="h-4 w-4 text-muted-foreground" />{phone}</div>) : <div className="text-sm text-muted-foreground">Telefone não identificado.</div>}</CardContent></Card>
 
@@ -623,7 +711,35 @@ function PatientDetail({ patient, salesIndex, onClose }: { patient: PatientDebt;
             </CardContent>
           </Card>
 
-          <Card><CardHeader className="pb-2"><CardTitle className="text-base">Parcelas do paciente</CardTitle></CardHeader><CardContent className="overflow-x-auto p-0"><table className="w-full min-w-[920px] text-sm"><thead><tr className="border-y bg-muted/40 text-xs uppercase text-muted-foreground"><th className="px-4 py-3 text-left">Parcela</th><th className="px-4 py-3 text-left">Venda</th><th className="px-4 py-3 text-left">Tratamento</th><th className="px-4 py-3 text-left">Vencimento</th><th className="px-4 py-3 text-right">Atraso</th><th className="px-4 py-3 text-right">Original</th><th className="px-4 py-3 text-right">Atualizado</th></tr></thead><tbody>{[...patient.installments].sort((a, b) => b.daysLate - a.daysLate).map((item) => { const doc = baseDocument(item.document); const sales = salesIndex.get(doc) || []; const descriptions = uniqueDescriptions(sales); return <tr key={`${item.document}-${item.dueDate}`} className="border-b"><td className="px-4 py-3 font-medium">{item.document}</td><td className="px-4 py-3">{doc || "—"}</td><td className="max-w-[300px] px-4 py-3">{descriptions.length ? descriptions.join(" • ") : <span className="text-amber-700">Não localizada</span>}</td><td className="px-4 py-3">{item.dueDate}</td><td className="px-4 py-3 text-right">{item.daysLate} dias</td><td className="px-4 py-3 text-right">{formatCurrency(item.original)}</td><td className="px-4 py-3 text-right font-semibold">{formatCurrency(item.current)}</td></tr>; })}</tbody></table></CardContent></Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Parcelas do paciente</CardTitle><CardDescription>Use “Dar baixa” quando receber ou confirmar o pagamento. A parcela sai imediatamente das filas e dos totais abertos.</CardDescription></CardHeader>
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full min-w-[1080px] text-sm">
+                <thead><tr className="border-y bg-muted/40 text-xs uppercase text-muted-foreground"><th className="px-4 py-3 text-left">Parcela</th><th className="px-4 py-3 text-left">Venda</th><th className="px-4 py-3 text-left">Tratamento</th><th className="px-4 py-3 text-left">Vencimento</th><th className="px-4 py-3 text-right">Atraso</th><th className="px-4 py-3 text-right">Atualizado</th><th className="px-4 py-3 text-center">Status</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
+                <tbody>
+                  {[...patient.installments].sort((a, b) => b.daysLate - a.daysLate).map((item) => {
+                    const doc = baseDocument(item.document);
+                    const sales = salesIndex.get(doc) || [];
+                    const descriptions = uniqueDescriptions(sales);
+                    const key = installmentKey(item);
+                    const settledAt = manualSettlements[key];
+                    return (
+                      <tr key={`${item.document}-${item.dueDate}`} className={`border-b ${settledAt ? "bg-emerald-50/35" : ""}`}>
+                        <td className="px-4 py-3 font-medium">{item.document}</td>
+                        <td className="px-4 py-3">{doc || "—"}</td>
+                        <td className="max-w-[300px] px-4 py-3">{descriptions.length ? descriptions.join(" • ") : <span className="text-amber-700">Não localizada</span>}</td>
+                        <td className="px-4 py-3">{item.dueDate}</td>
+                        <td className="px-4 py-3 text-right">{item.daysLate} dias</td>
+                        <td className="px-4 py-3 text-right font-semibold">{formatCurrency(item.current)}</td>
+                        <td className="px-4 py-3 text-center">{settledAt ? <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Baixada</span> : <span className="rounded-full border px-2 py-1 text-xs font-medium text-muted-foreground">Em aberto</span>}</td>
+                        <td className="px-4 py-3 text-right">{settledAt ? <Button size="sm" variant="outline" className="gap-1.5" onClick={() => onUndoSettlement(item)}><RotateCcw className="h-3.5 w-3.5" />Desfazer</Button> : <Button size="sm" className="gap-1.5" onClick={() => onSettle(item)}><CheckCircle2 className="h-3.5 w-3.5" />Dar baixa</Button>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
 
           <Card><CardHeader className="pb-2"><CardTitle className="text-base">Informações originais do relatório</CardTitle><CardDescription>Endereço, RG, observações, histórico e demais informações lidas diretamente do PDF.</CardDescription></CardHeader><CardContent><div className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 font-mono text-xs leading-relaxed">{patient.rawLines.join("\n")}</div></CardContent></Card>
         </div>
