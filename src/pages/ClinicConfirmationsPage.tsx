@@ -10,6 +10,7 @@ import { ClinicRebookings } from "@/components/crm/ClinicRebookings";
 import { ClinicStatusBridge } from "@/components/crm/ClinicStatusBridge";
 import { ClinicAutomationControl } from "@/components/crm/ClinicAutomationControl";
 import { ClinicProfessionalManager } from "@/components/crm/ClinicProfessionalManager";
+import { ClinicSyncReconciler } from "@/components/crm/ClinicSyncReconciler";
 import { OperationsBell } from "@/components/crm/OperationsBell";
 
 type ClinicView = "calendar" | "confirmations" | "vacancies" | "rebookings";
@@ -21,6 +22,7 @@ export default function ClinicConfirmationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <ClinicStatusBridge />
+      <ClinicSyncReconciler />
       <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-sm">
         <div className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
