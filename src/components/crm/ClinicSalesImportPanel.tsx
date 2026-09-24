@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
-type SaleItem = {
+export type SaleItem = {
   document: string;
   patientName: string;
   code: string;
@@ -37,7 +37,7 @@ function isPatientLine(line: string) {
   return words.length >= 2 && line === line.toUpperCase();
 }
 
-export function ClinicSalesImportPanel() {
+export function ClinicSalesImportPanel({ onImported }: { onImported?: (items: SaleItem[], fileName: string) => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [items, setItems] = useState<SaleItem[]>([]);
@@ -68,10 +68,12 @@ export function ClinicSalesImportPanel() {
       if (!parsed.length) throw new Error("Não consegui identificar as vendas nesse PDF.");
       setItems(parsed);
       setSearch("");
+      onImported?.(parsed, file.name);
       const docs = new Set(parsed.map((item) => item.document)).size;
       toast.success(`Vendas importadas: ${docs} documentos e ${parsed.length} itens reconhecidos.`);
     } catch (error: any) {
       setItems([]);
+      onImported?.([], file.name);
       toast.error(error?.message || "Falha ao ler o relatório de vendas.");
     } finally {
       setImporting(false);
