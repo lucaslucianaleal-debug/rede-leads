@@ -2,6 +2,8 @@ import { getAdminDb } from "../../../server/firebaseAdmin.js";
 import { requireWhatsAppAgent } from "../../../server/whatsappAgentAuth.js";
 import { findLeadIndex } from "../../../server/whatsappAgent.js";
 
+const CLINIC_AUTO_RECIPIENT_COOLDOWN_MS = 90 * 60 * 1000;
+
 function isAppointmentAutomation(value) {
   return [
     "appointment_confirmation",
@@ -11,6 +13,27 @@ function isAppointmentAutomation(value) {
     // legado: pode existir em filas antigas; ainda validamos para cancelar com segurança
     "appointment_reminder_today",
   ].includes(String(value || ""));
+}
+
+function isClinicAgendaAutomaticMessage(data = {}) {
+  const type = String(data.automationType || "");
+  return String(data.createdBy || "") === "clinic-agenda-automation" || [
+    "appointment_clinic_24h",
+    "appointment_clinic_6h",
+    "appointment_clinic_1h",
+    "appointment_clinic_released",
+  ].includes(type);
+}
+
+async function cancelQueueItem(queueRef, reason, extra = {}) {
+  const nowIso = new Date().toISOString();
+  await queueRef.set({
+    status: "cancelled",
+    cancelReason: reason,
+    cancelledAt: nowIso,
+    updatedAt: nowIso,
+    ...extra,
+  }, { merge: true });
 }
 
 export default async function handler(req, res) {
@@ -38,8 +61,51 @@ export default async function handler(req, res) {
       if (Number.isFinite(expiresAt) && expiresAt <= now) {
         allowed = false;
         reason = "expired";
-        const nowIso = new Date().toISOString();
-        await queueRef.set({ status: "cancelled", cancelReason: reason, cancelledAt: nowIso, updatedAt: nowIso }, { merge: true });
+        await cancelQueueItem(queueRef, reason);
+      }
+    }
+
+    // Última trava antes do envio real da régua da Clínica.
+    // Mesmo que um item já tenha sido enfileirado/leased, ele não sai se o usuário
+    // pausou a automação. Mensagens manuais não passam por esta regra.
+    if (allowed && isClinicAgendaAutomaticMessage(data)) {
+      const settingsSnap = await clinicRef.collection("settings").doc("clinicAutomation").get();
+      const settings = settingsSnap.exists ? (settingsSnap.data() || {}) : {};
+      const automationPaused = !settingsSnap.exists || settings.paused !== false;
+
+      if (automationPaused) {
+        allowed = false;
+        reason = "clinic_automation_paused_before_send";
+        await cancelQueueItem(queueRef, reason);
+      }
+    }
+
+    // Proteção anti-avalanche por destinatário: um mesmo telefone não recebe
+    // dois automáticos da agenda em sequência. Se houve envio automático nos
+    // últimos 90 minutos, o novo estágio é descartado (não fica represado para
+    // disparar depois). Isso protege especialmente a retomada após uma pausa.
+    if (allowed && data.phoneKey && isClinicAgendaAutomaticMessage(data)) {
+      const samePhoneSnap = await clinicRef.collection("whatsappQueue")
+        .where("phoneKey", "==", String(data.phoneKey))
+        .limit(80)
+        .get();
+
+      const recentSent = samePhoneSnap.docs
+        .filter((snapshotDoc) => snapshotDoc.id !== queueId)
+        .map((snapshotDoc) => ({ id: snapshotDoc.id, data: snapshotDoc.data() || {} }))
+        .filter((item) => isClinicAgendaAutomaticMessage(item.data) && String(item.data.status || "") === "sent")
+        .map((item) => ({ ...item, sentAtMs: Date.parse(String(item.data.sentAt || item.data.updatedAt || "")) }))
+        .filter((item) => Number.isFinite(item.sentAtMs) && now - item.sentAtMs < CLINIC_AUTO_RECIPIENT_COOLDOWN_MS)
+        .sort((a, b) => b.sentAtMs - a.sentAtMs)[0];
+
+      if (recentSent) {
+        allowed = false;
+        reason = "clinic_auto_recipient_cooldown";
+        const cooldownUntil = new Date(recentSent.sentAtMs + CLINIC_AUTO_RECIPIENT_COOLDOWN_MS).toISOString();
+        await cancelQueueItem(queueRef, reason, {
+          blockedByQueueId: recentSent.id,
+          cooldownUntil,
+        });
       }
     }
 
@@ -61,8 +127,7 @@ export default async function handler(req, res) {
       if (invalid) {
         allowed = false;
         reason = "appointment_changed_or_closed";
-        const nowIso = new Date().toISOString();
-        await queueRef.set({ status: "cancelled", cancelReason: reason, cancelledAt: nowIso, updatedAt: nowIso }, { merge: true });
+        await cancelQueueItem(queueRef, reason);
       }
     }
 
@@ -71,8 +136,7 @@ export default async function handler(req, res) {
       if (contactSnap.exists && contactSnap.data()?.optOut === true) {
         allowed = false;
         reason = "opt_out";
-        const nowIso = new Date().toISOString();
-        await queueRef.set({ status: "cancelled", cancelReason: "opt_out", cancelledAt: nowIso, updatedAt: nowIso }, { merge: true });
+        await cancelQueueItem(queueRef, "opt_out");
       }
     }
 
