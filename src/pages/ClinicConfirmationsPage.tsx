@@ -6,7 +6,7 @@ import { ClinicChip } from "@/components/ClinicChip";
 import { ClinicCalendar } from "@/components/crm/ClinicCalendar";
 import { ClinicConfirmationCenter } from "@/components/crm/ClinicConfirmationCenter";
 import { ClinicFinanceDashboardV2 } from "@/components/crm/ClinicFinanceDashboardV2";
-import { ClinicSalesImportPanel } from "@/components/crm/ClinicSalesImportPanel";
+import { ClinicSalesImportPanel, type SaleItem } from "@/components/crm/ClinicSalesImportPanel";
 import { ClinicVacancies } from "@/components/crm/ClinicVacancies";
 import { ClinicRebookings } from "@/components/crm/ClinicRebookings";
 import { ClinicStatusBridge } from "@/components/crm/ClinicStatusBridge";
@@ -16,6 +16,7 @@ type ClinicView = "calendar" | "confirmations" | "vacancies" | "rebookings" | "f
 export default function ClinicConfirmationsPage() {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState<ClinicView>("calendar");
+  const [salesItems, setSalesItems] = useState<SaleItem[]>([]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -52,8 +53,8 @@ export default function ClinicConfirmationsPage() {
         {activeView === "rebookings" && <ClinicRebookings />}
         {activeView === "finance" && (
           <div className="space-y-4">
-            <ClinicSalesImportPanel />
-            <ClinicFinanceDashboardV2 />
+            <ClinicSalesImportPanel onImported={(items) => setSalesItems(items)} />
+            <ClinicFinanceDashboardV2 salesItems={salesItems} />
           </div>
         )}
       </main>
