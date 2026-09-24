@@ -79,6 +79,14 @@ function appointmentDate(item: ClinicAppointment) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function appointmentEndDate(item: ClinicAppointment) {
+  const match = `${item.date} ${item.endTime || item.startTime}`.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (!match) return appointmentDate(item);
+  const [, d, m, y, h, min] = match;
+  const date = new Date(`${y}-${m}-${d}T${h}:${min}:00-03:00`);
+  return Number.isNaN(date.getTime()) ? appointmentDate(item) : date;
+}
+
 function brDayKey(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
 }
@@ -155,14 +163,16 @@ export function ClinicConfirmationCenter() {
     return appointments.filter((item) => {
       if (doctor !== "all" && prettyProfessional(item.professional) !== doctor) return false;
       const date = appointmentDate(item);
-      if (!date || date.getTime() <= now.getTime()) return false;
+      if (!date) return false;
+      const isToday = item.date === today;
+      const isFuture = date.getTime() > now.getTime();
       const status = String(item.confirmationStatus || "pending");
-      if (range === "today") return item.date === today;
+      if (range === "today") return isToday;
       if (range === "tomorrow") return item.date === tomorrow;
-      if (range === "48h") return date.getTime() <= plus48;
-      if (range === "7d") return date.getTime() <= plus7d;
-      if (range === "pending") return !["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"].includes(status);
-      if (range === "rebook") return ["reschedule", "wont_attend", "cancelled", "released_unconfirmed"].includes(status);
+      if (range === "48h") return isToday || (isFuture && date.getTime() <= plus48);
+      if (range === "7d") return isToday || (isFuture && date.getTime() <= plus7d);
+      if (range === "pending") return (isToday || isFuture) && !["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"].includes(status);
+      if (range === "rebook") return (isToday || isFuture) && ["reschedule", "wont_attend", "cancelled", "released_unconfirmed"].includes(status);
       return true;
     }).sort((a, b) => (appointmentDate(a)?.getTime() || 0) - (appointmentDate(b)?.getTime() || 0));
   }, [appointments, doctor, range]);
@@ -410,8 +420,12 @@ export function ClinicConfirmationCenter() {
                     const meta = statusMeta(item);
                     const Icon = meta.icon;
                     const needsReview = String(item.confirmationStatus || "") === "replied" || (Boolean(item.lastReplyAt) && !["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"].includes(String(item.confirmationStatus || "")));
+                    const endDate = appointmentEndDate(item);
+                    const timePassed = item.date === brDayKey(new Date()) && Boolean(endDate && endDate.getTime() <= Date.now());
+                    const status = String(item.confirmationStatus || "pending");
+                    const neverSent = timePassed && !item.lastReminderSentAt && !item.lastReplyAt && ["pending", "queued"].includes(status);
                     return (
-                      <div key={item.id} className="grid gap-2 px-4 py-3 md:grid-cols-[90px_1fr_220px] md:items-center">
+                      <div key={item.id} className={`grid gap-2 px-4 py-3 md:grid-cols-[90px_1fr_220px] md:items-center ${timePassed ? "bg-muted/10" : ""}`}>
                         <div className="font-semibold">{item.startTime}–{item.endTime}</div>
                         <div>
                           <div className="flex items-center gap-2 font-medium">
@@ -446,7 +460,12 @@ export function ClinicConfirmationCenter() {
                           >
                             <Icon className="h-3.5 w-3.5" />{meta.label}
                           </button>
-                          {item.confirmationDeadlineAt && !["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"].includes(String(item.confirmationStatus || "")) && (
+                          {timePassed && (
+                            <div className={`mt-1 text-[11px] ${neverSent ? "font-medium text-red-600" : "text-muted-foreground"}`}>
+                              {neverSent ? "Não enviado • horário passou" : "Horário passou"}
+                            </div>
+                          )}
+                          {!timePassed && item.confirmationDeadlineAt && !["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"].includes(String(item.confirmationStatus || "")) && (
                             <div className="mt-1 text-[11px] text-muted-foreground">Prazo: {formatDeadline(item.confirmationDeadlineAt)}</div>
                           )}
                         </div>
