@@ -6,6 +6,7 @@ import { ClinicChip } from "@/components/ClinicChip";
 import { ClinicCalendar } from "@/components/crm/ClinicCalendar";
 import { ClinicConfirmationCenter } from "@/components/crm/ClinicConfirmationCenter";
 import { ClinicFinanceDashboardV3 } from "@/components/crm/ClinicFinanceDashboardV3";
+import { ClinicFinanceSnapshotBridge } from "@/components/crm/ClinicFinanceSnapshotBridge";
 import { ClinicOverview } from "@/components/crm/ClinicOverview";
 import { ClinicSalesImportPanel, type SaleItem } from "@/components/crm/ClinicSalesImportPanel";
 import { ClinicVacancies } from "@/components/crm/ClinicVacancies";
@@ -29,6 +30,7 @@ export default function ClinicConfirmationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <ClinicStatusBridge />
+      <ClinicFinanceSnapshotBridge />
       <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-sm">
         <div className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-3">
