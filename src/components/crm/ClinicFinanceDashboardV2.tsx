@@ -74,6 +74,9 @@ const SNAPSHOT = {
   current: 1095838.93,
 };
 
+const COLLECTION_CUTOFF = new Date(2025, 10, 1, 12, 0, 0);
+const COLLECTION_CUTOFF_LABEL = "01/11/2025";
+
 const AGING_SNAPSHOT: AgingBucket[] = [
   { key: "1-30", label: "1–30 dias", installments: 150, patients: 144, original: 35058.47, current: 36866.19 },
   { key: "31-60", label: "31–60 dias", installments: 109, patients: 104, original: 25260.75, current: 28846.78 },
@@ -108,6 +111,11 @@ function parseBrDate(value: string) {
   if (!day || !month || !year) return null;
   const date = new Date(year, month - 1, day, 12, 0, 0);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isOperationalInstallment(item: Installment) {
+  const emission = parseBrDate(item.emission);
+  return Boolean(emission && emission.getTime() >= COLLECTION_CUTOFF.getTime());
 }
 
 function bucketFor(daysLate: number): BucketKey {
@@ -173,6 +181,7 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
   const [receiptsFile, setReceiptsFile] = useState<string | null>(null);
   const [period, setPeriod] = useState(SNAPSHOT.period);
   const [importing, setImporting] = useState(false);
+  const [ignoredBeforeCutoff, setIgnoredBeforeCutoff] = useState(0);
   const collectionInputRef = useRef<HTMLInputElement | null>(null);
   const receiptsInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -293,20 +302,27 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
     setCollectionFile(file.name);
     try {
       const parsed = await parseCollectionPdf(file);
-      const installments = parsed.patients.reduce((sum, patient) => sum + patient.installments.length, 0);
-      if (!parsed.patients.length || !installments) throw new Error("Não consegui identificar pacientes e parcelas nesse PDF.");
-      setPatients(parsed.patients);
+      const allInstallments = parsed.patients.flatMap((patient) => patient.installments);
+      const eligiblePatients = parsed.patients
+        .map((patient) => ({ ...patient, installments: patient.installments.filter(isOperationalInstallment) }))
+        .filter((patient) => patient.installments.length > 0);
+      const eligibleInstallments = eligiblePatients.reduce((sum, patient) => sum + patient.installments.length, 0);
+      const ignored = Math.max(0, allInstallments.length - eligibleInstallments);
+
+      if (!eligiblePatients.length || !eligibleInstallments) {
+        throw new Error(`Não encontrei cobranças com emissão a partir de ${COLLECTION_CUTOFF_LABEL}.`);
+      }
+
+      setPatients(eligiblePatients);
+      setIgnoredBeforeCutoff(ignored);
       setPeriod(parsed.period);
       setView("delinquency");
       setSelectedBucket("1-30");
       setMatchFilter("all");
-      if (parsed.patients.length === 288 && installments === 3272) {
-        toast.success("Importação validada: 288 pacientes e 3.272 parcelas reconhecidos.");
-      } else {
-        toast.warning(`Importado: ${parsed.patients.length} pacientes e ${number.format(installments)} parcelas. Confira o fechamento do relatório.`);
-      }
+      toast.success(`${number.format(eligiblePatients.length)} pacientes e ${number.format(eligibleInstallments)} parcelas na carteira operacional. ${number.format(ignored)} parcelas anteriores a ${COLLECTION_CUTOFF_LABEL} foram ocultadas.`);
     } catch (error: any) {
       setPatients([]);
+      setIgnoredBeforeCutoff(0);
       toast.error(error?.message || "Falha ao ler o relatório de cobrança.");
     } finally {
       setImporting(false);
@@ -349,17 +365,19 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border bg-muted/35 px-4 py-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" />Cobrança: {collectionFile || totals.source}</span>
         <span>Período: {totals.period}</span>
+        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-semibold text-amber-800">Filtro ativo: emissão a partir de {COLLECTION_CUTOFF_LABEL}</span>
+        {ignoredBeforeCutoff > 0 && <span>{number.format(ignoredBeforeCutoff)} parcelas antigas ocultadas</span>}
         {salesItems.length > 0 && <span className="font-medium text-emerald-700">Vendas carregadas: {number.format(new Set(salesItems.map((item) => item.document)).size)} DOCs</span>}
         {receiptsFile && <span className="font-medium text-emerald-700">Recebimentos: {receiptsFile}</span>}
         <span className="ml-auto rounded-full border bg-background px-2.5 py-1 font-medium">Preview: dados ficam somente neste navegador</span>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard title="Saldo em cobrança" value={formatCurrency(totals.current)} helper="Valor atualizado da carteira" icon={<CircleDollarSign className="h-5 w-5" />} tone="danger" />
-        <SummaryCard title="Valor original" value={formatCurrency(totals.original)} helper="Principal das parcelas" icon={<Banknote className="h-5 w-5" />} />
+        <SummaryCard title="Saldo em cobrança" value={formatCurrency(totals.current)} helper="Valor atualizado da carteira operacional" icon={<CircleDollarSign className="h-5 w-5" />} tone="danger" />
+        <SummaryCard title="Valor original" value={formatCurrency(totals.original)} helper="Principal das parcelas visíveis" icon={<Banknote className="h-5 w-5" />} />
         <SummaryCard title="Acréscimos" value={formatCurrency(metrics.increase)} helper={`+${metrics.increasePct.toFixed(1).replace(".", ",")}% sobre o original`} icon={<ReceiptText className="h-5 w-5" />} tone="warning" />
-        <SummaryCard title="Pacientes" value={number.format(totals.patients)} helper="Com valores em cobrança" icon={<UsersRound className="h-5 w-5" />} />
-        <SummaryCard title="Parcelas" value={number.format(totals.installments)} helper="Títulos em aberto" icon={<CalendarClock className="h-5 w-5" />} />
+        <SummaryCard title="Pacientes" value={number.format(totals.patients)} helper={`Emissões desde ${COLLECTION_CUTOFF_LABEL}`} icon={<UsersRound className="h-5 w-5" />} />
+        <SummaryCard title="Parcelas" value={number.format(totals.installments)} helper="Títulos da carteira operacional" icon={<CalendarClock className="h-5 w-5" />} />
       </section>
 
       {imported && (
@@ -384,7 +402,7 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       )}
 
       {!imported && (
-        <Card className="border-blue-200 bg-blue-50/60"><CardContent className="p-4 text-sm text-blue-900">Clique em <b>Importar Cobrança</b> para liberar nomes, documentos e filas reais. Depois a base de vendas será cruzada automaticamente.</CardContent></Card>
+        <Card className="border-blue-200 bg-blue-50/60"><CardContent className="p-4 text-sm text-blue-900">Clique em <b>Importar Cobrança</b> para liberar nomes, documentos e filas reais. Na importação, cobranças com emissão anterior a <b>{COLLECTION_CUTOFF_LABEL}</b> são descartadas da carteira operacional.</CardContent></Card>
       )}
 
       {view === "overview" && (
