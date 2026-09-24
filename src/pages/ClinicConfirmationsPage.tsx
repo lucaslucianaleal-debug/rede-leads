@@ -8,6 +8,8 @@ import { ClinicConfirmationCenter } from "@/components/crm/ClinicConfirmationCen
 import { ClinicVacancies } from "@/components/crm/ClinicVacancies";
 import { ClinicRebookings } from "@/components/crm/ClinicRebookings";
 import { ClinicStatusBridge } from "@/components/crm/ClinicStatusBridge";
+import { ClinicAutomationControl } from "@/components/crm/ClinicAutomationControl";
+import { ClinicProfessionalManager } from "@/components/crm/ClinicProfessionalManager";
 
 type ClinicView = "calendar" | "confirmations" | "vacancies" | "rebookings";
 
@@ -20,7 +22,7 @@ export default function ClinicConfirmationsPage() {
       <ClinicStatusBridge />
       <header className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-sm">
         <div className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Button variant="ghost" size="icon" onClick={() => navigate("/")} aria-label="Voltar ao Rede Leads">
                 <ArrowLeft className="h-4 w-4" />
@@ -30,7 +32,11 @@ export default function ClinicConfirmationsPage() {
                 <div className="text-xs text-muted-foreground">Agenda, confirmações, vagas e operação da clínica</div>
               </div>
             </div>
-            <ClinicChip />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <ClinicAutomationControl />
+              <ClinicProfessionalManager />
+              <ClinicChip />
+            </div>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
