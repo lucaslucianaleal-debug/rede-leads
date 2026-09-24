@@ -135,6 +135,10 @@ function baseDocument(value: string) {
   return (value.split("/")[0] || "").replace(/\D/g, "");
 }
 
+function normalizeSearch(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
 function uniqueDescriptions(items: SaleItem[]) {
   return Array.from(new Set(items.map((item) => item.description).filter(Boolean)));
 }
@@ -175,6 +179,7 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
   const [selectedBucket, setSelectedBucket] = useState<BucketKey | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<PatientDebt | null>(null);
   const [search, setSearch] = useState("");
+  const [patientSearch, setPatientSearch] = useState("");
   const [matchFilter, setMatchFilter] = useState<MatchFilter>("all");
   const [patients, setPatients] = useState<PatientDebt[]>([]);
   const [collectionFile, setCollectionFile] = useState<string | null>(null);
@@ -198,6 +203,22 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
     }
     return map;
   }, [salesItems]);
+
+  const patientSearchResults = useMemo(() => {
+    const term = normalizeSearch(patientSearch);
+    if (!imported || term.length < 2) return [];
+
+    return patients
+      .filter((patient) => normalizeSearch(patient.name).includes(term))
+      .map((patient) => ({
+        patient,
+        current: patient.installments.reduce((sum, item) => sum + item.current, 0),
+        oldest: Math.max(...patient.installments.map((item) => item.daysLate)),
+        installments: patient.installments.length,
+      }))
+      .sort((a, b) => a.patient.name.localeCompare(b.patient.name, "pt-BR"))
+      .slice(0, 12);
+  }, [imported, patientSearch, patients]);
 
   const dynamicAging = useMemo(() => {
     if (!imported) return AGING_SNAPSHOT;
@@ -315,6 +336,7 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
 
       setPatients(eligiblePatients);
       setIgnoredBeforeCutoff(ignored);
+      setPatientSearch("");
       setPeriod(parsed.period);
       setView("delinquency");
       setSelectedBucket("1-30");
@@ -323,6 +345,7 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
     } catch (error: any) {
       setPatients([]);
       setIgnoredBeforeCutoff(0);
+      setPatientSearch("");
       toast.error(error?.message || "Falha ao ler o relatório de cobrança.");
     } finally {
       setImporting(false);
@@ -371,6 +394,64 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
         {receiptsFile && <span className="font-medium text-emerald-700">Recebimentos: {receiptsFile}</span>}
         <span className="ml-auto rounded-full border bg-background px-2.5 py-1 font-medium">Preview: dados ficam somente neste navegador</span>
       </section>
+
+      {imported && (
+        <section className="relative rounded-xl border bg-card p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Buscar paciente</div>
+              <div className="text-xs text-muted-foreground">Digite o nome e abra a ficha completa, sem precisar entrar em uma faixa de atraso.</div>
+            </div>
+          </div>
+          <div className="relative max-w-xl">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={patientSearch}
+              onChange={(event) => setPatientSearch(event.target.value)}
+              placeholder="Buscar paciente pelo nome..."
+              className="pl-9 pr-9"
+            />
+            {patientSearch && (
+              <button
+                type="button"
+                aria-label="Limpar busca"
+                onClick={() => setPatientSearch("")}
+                className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {normalizeSearch(patientSearch).length >= 2 && (
+            <div className="mt-3 max-w-3xl overflow-hidden rounded-lg border bg-background">
+              {patientSearchResults.length ? (
+                <div className="divide-y">
+                  {patientSearchResults.map(({ patient, current, oldest, installments }) => (
+                    <button
+                      key={patient.id}
+                      type="button"
+                      onClick={() => setSelectedPatient(patient)}
+                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-muted/35"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold">{patient.name}</div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">{patient.phones[0] || "Sem telefone"} • {installments} parcela(s)</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="font-semibold">{formatCurrency(current)}</div>
+                        <div className="text-xs text-muted-foreground">Maior atraso: {oldest} dias</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 py-4 text-sm text-muted-foreground">Nenhum paciente encontrado na carteira operacional.</div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard title="Saldo em cobrança" value={formatCurrency(totals.current)} helper="Valor atualizado da carteira operacional" icon={<CircleDollarSign className="h-5 w-5" />} tone="danger" />
