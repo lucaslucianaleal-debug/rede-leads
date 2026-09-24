@@ -68,13 +68,13 @@ type ImportedReport = {
 type ManualSettlements = Record<string, string>;
 
 const SNAPSHOT = {
-  source: "Relatório de Cobrança",
-  period: "01/01/2026 a 23/09/2026",
-  generatedAt: "23/09/2026 17:56",
-  patients: 288,
-  installments: 3272,
-  original: 533645.87,
-  current: 1095838.93,
+  source: "Aguardando importação",
+  period: "—",
+  generatedAt: "—",
+  patients: 0,
+  installments: 0,
+  original: 0,
+  current: 0,
 };
 
 const COLLECTION_CUTOFF = new Date(2025, 10, 1, 12, 0, 0);
@@ -82,12 +82,12 @@ const COLLECTION_CUTOFF_LABEL = "01/11/2025";
 const SETTLEMENT_STORAGE_KEY = "clinic-finance-manual-settlements-v1";
 
 const AGING_SNAPSHOT: AgingBucket[] = [
-  { key: "1-30", label: "1–30 dias", installments: 150, patients: 144, original: 35058.47, current: 36866.19 },
-  { key: "31-60", label: "31–60 dias", installments: 109, patients: 104, original: 25260.75, current: 28846.78 },
-  { key: "61-90", label: "61–90 dias", installments: 102, patients: 97, original: 21123.87, current: 25770.57 },
-  { key: "91-180", label: "91–180 dias", installments: 319, patients: 127, original: 63803.12, current: 88300.14 },
-  { key: "181-365", label: "181–365 dias", installments: 846, patients: 179, original: 155245.32, current: 267209.81 },
-  { key: "365+", label: "+1 ano", installments: 1746, patients: 122, original: 233154.34, current: 648845.44 },
+  { key: "1-30", label: "1–30 dias", installments: 0, patients: 0, original: 0, current: 0 },
+  { key: "31-60", label: "31–60 dias", installments: 0, patients: 0, original: 0, current: 0 },
+  { key: "61-90", label: "61–90 dias", installments: 0, patients: 0, original: 0, current: 0 },
+  { key: "91-180", label: "91–180 dias", installments: 0, patients: 0, original: 0, current: 0 },
+  { key: "181-365", label: "181–365 dias", installments: 0, patients: 0, original: 0, current: 0 },
+  { key: "365+", label: "+1 ano", installments: 0, patients: 0, original: 0, current: 0 },
 ];
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -149,6 +149,10 @@ function normalizeSearch(value: string) {
 
 function uniqueDescriptions(items: SaleItem[]) {
   return Array.from(new Set(items.map((item) => item.description).filter(Boolean)));
+}
+
+function sortByDueDate(items: Installment[]) {
+  return [...items].sort((a, b) => (parseBrDate(a.dueDate)?.getTime() || 0) - (parseBrDate(b.dueDate)?.getTime() || 0));
 }
 
 function SummaryCard({ title, value, helper, icon, tone = "default" }: {
@@ -337,23 +341,25 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       .filter((patient) => patient.installments.some((item) => item.bucket === selectedBucket))
       .map((patient) => {
         const bucketItems = patient.installments.filter((item) => item.bucket === selectedBucket);
-        const saleItems = bucketItems.flatMap((item) => salesIndex.get(baseDocument(item.document)) || []);
+        const allItems = patient.installments;
+        const saleItems = allItems.flatMap((item) => salesIndex.get(baseDocument(item.document)) || []);
         const hasSale = saleItems.length > 0;
         const searchable = normalizeSearch([
           patient.name,
           patient.cpf,
           ...patient.phones,
-          ...bucketItems.map((item) => item.document),
+          ...allItems.map((item) => item.document),
           ...saleItems.map((item) => item.description),
         ].join(" "));
         return {
           patient,
           bucketItems,
+          allItems,
           saleItems,
           hasSale,
-          original: bucketItems.reduce((sum, item) => sum + item.original, 0),
-          current: bucketItems.reduce((sum, item) => sum + item.current, 0),
-          oldest: Math.max(...bucketItems.map((item) => item.daysLate)),
+          original: allItems.reduce((sum, item) => sum + item.original, 0),
+          current: allItems.reduce((sum, item) => sum + item.current, 0),
+          oldest: Math.max(...allItems.map((item) => item.daysLate)),
           searchable,
         };
       })
@@ -409,6 +415,8 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       setPatients([]);
       setIgnoredBeforeCutoff(0);
       setPatientSearch("");
+      setCollectionFile(null);
+      setPeriod(SNAPSHOT.period);
       toast.error(error?.message || "Falha ao ler o relatório de cobrança.");
     } finally {
       setImporting(false);
@@ -473,11 +481,11 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       {view !== "patients" && (
         <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <SummaryCard title="Saldo em cobrança" value={formatCurrency(totals.current)} helper="Valor atualizado ainda em aberto" icon={<CircleDollarSign className="h-5 w-5" />} tone="danger" />
-            <SummaryCard title="Valor original" value={formatCurrency(totals.original)} helper="Principal das parcelas abertas" icon={<Banknote className="h-5 w-5" />} />
-            <SummaryCard title="Acréscimos" value={formatCurrency(metrics.increase)} helper={`+${metrics.increasePct.toFixed(1).replace(".", ",")}% sobre o original`} icon={<ReceiptText className="h-5 w-5" />} tone="warning" />
-            <SummaryCard title="Pacientes" value={number.format(totals.patients)} helper="Com parcelas ainda abertas" icon={<UsersRound className="h-5 w-5" />} />
-            <SummaryCard title="Parcelas" value={number.format(totals.installments)} helper="Títulos ainda em aberto" icon={<CalendarClock className="h-5 w-5" />} />
+            <SummaryCard title="Saldo em cobrança" value={formatCurrency(totals.current)} helper={imported ? "Valor atualizado ainda em aberto" : "Aguardando importação"} icon={<CircleDollarSign className="h-5 w-5" />} tone="danger" />
+            <SummaryCard title="Valor original" value={formatCurrency(totals.original)} helper={imported ? "Principal das parcelas abertas" : "Aguardando importação"} icon={<Banknote className="h-5 w-5" />} />
+            <SummaryCard title="Acréscimos" value={formatCurrency(metrics.increase)} helper={imported ? `+${metrics.increasePct.toFixed(1).replace(".", ",")}% sobre o original` : "Aguardando importação"} icon={<ReceiptText className="h-5 w-5" />} tone="warning" />
+            <SummaryCard title="Pacientes" value={number.format(totals.patients)} helper={imported ? "Com parcelas ainda abertas" : "Aguardando importação"} icon={<UsersRound className="h-5 w-5" />} />
+            <SummaryCard title="Parcelas" value={number.format(totals.installments)} helper={imported ? "Títulos ainda em aberto" : "Aguardando importação"} icon={<CalendarClock className="h-5 w-5" />} />
           </section>
 
           {imported && (
@@ -504,21 +512,21 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
       )}
 
       {!imported && (
-        <Card className="border-blue-200 bg-blue-50/60"><CardContent className="p-4 text-sm text-blue-900">Clique em <b>Importar Cobrança</b> para liberar a base completa de pacientes. Na importação, cobranças com emissão anterior a <b>{COLLECTION_CUTOFF_LABEL}</b> são descartadas da carteira operacional.</CardContent></Card>
+        <Card className="border-blue-200 bg-blue-50/60"><CardContent className="p-4 text-sm text-blue-900">Financeiro zerado. Clique em <b>Importar Cobrança</b> para carregar a carteira real. Na importação, cobranças com emissão anterior a <b>{COLLECTION_CUTOFF_LABEL}</b> são descartadas da carteira operacional.</CardContent></Card>
       )}
 
       {view === "overview" && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Carteira por faixa de atraso</CardTitle><CardDescription>Clique em uma faixa para iniciar a cobrança já com a origem da venda.</CardDescription></CardHeader>
+          <CardHeader><CardTitle className="text-base">Carteira por faixa de atraso</CardTitle><CardDescription>{imported ? "Clique em uma faixa para iniciar a cobrança já com a origem da venda." : "As faixas serão preenchidas após importar a cobrança."}</CardDescription></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {dynamicAging.map((item) => <BucketCard key={item.key} item={item} onClick={() => openBucket(item.key)} />)}
+            {dynamicAging.map((item) => <BucketCard key={item.key} item={item} onClick={() => imported && openBucket(item.key)} disabled={!imported} />)}
           </CardContent>
         </Card>
       )}
 
       {view === "delinquency" && !selectedBucket && (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {dynamicAging.map((item) => <BucketCard key={item.key} item={item} onClick={() => openBucket(item.key)} />)}
+          {dynamicAging.map((item) => <BucketCard key={item.key} item={item} onClick={() => imported && openBucket(item.key)} disabled={!imported} />)}
         </section>
       )}
 
@@ -537,7 +545,7 @@ export function ClinicFinanceDashboardV2({ salesItems = [] }: { salesItems?: Sal
         />
       )}
 
-      {view === "overview" && metrics.overOneYearPct > 0 && (
+      {view === "overview" && imported && metrics.overOneYearPct > 0 && (
         <Card className="border-amber-200 bg-amber-50/50"><CardContent className="flex items-center gap-3 p-4"><AlertTriangle className="h-5 w-5 text-amber-700" /><div><div className="font-semibold">{metrics.overOneYearPct.toFixed(1).replace(".", ",")}% do saldo está acima de 1 ano</div><div className="text-xs text-muted-foreground">As faixas continuam sendo a régua operacional da cobrança.</div></div></CardContent></Card>
       )}
 
@@ -604,10 +612,10 @@ function MiniMetric({ label, value, helper, success, warning }: { label: string;
   return <div className={`rounded-xl border p-3 ${cls}`}><div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div><div className="mt-1 text-xl font-bold">{value}</div><div className="mt-1 text-xs text-muted-foreground">{helper}</div></div>;
 }
 
-function BucketCard({ item, onClick }: { item: AgingBucket; onClick: () => void }) {
+function BucketCard({ item, onClick, disabled = false }: { item: AgingBucket; onClick: () => void; disabled?: boolean }) {
   return (
-    <button className="text-left" onClick={onClick}>
-      <Card className="h-full transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
+    <button className="text-left disabled:cursor-default" onClick={onClick} disabled={disabled}>
+      <Card className={`h-full transition ${disabled ? "opacity-60" : "hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"}`}>
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold">{item.label}</div><div className="mt-1 text-2xl font-bold">{formatCurrency(item.current)}</div></div><ChevronRight className="h-5 w-5 text-muted-foreground" /></div>
           <div className="mt-3 flex gap-4 text-xs text-muted-foreground"><span>{number.format(item.installments)} parcelas</span><span>{number.format(item.patients)} pacientes</span></div>
@@ -619,7 +627,7 @@ function BucketCard({ item, onClick }: { item: AgingBucket; onClick: () => void 
 
 function CollectionQueue({ bucket, queue, imported, salesLoaded, search, matchFilter, onMatchFilter, onSearch, onBack, onPatient }: {
   bucket: AgingBucket;
-  queue: Array<{ patient: PatientDebt; bucketItems: Installment[]; saleItems: SaleItem[]; hasSale: boolean; original: number; current: number; oldest: number }>;
+  queue: Array<{ patient: PatientDebt; bucketItems: Installment[]; allItems: Installment[]; saleItems: SaleItem[]; hasSale: boolean; original: number; current: number; oldest: number }>;
   imported: boolean;
   salesLoaded: boolean;
   search: string;
@@ -633,7 +641,11 @@ function CollectionQueue({ bucket, queue, imported, salesLoaded, search, matchFi
     <Card>
       <CardHeader className="border-b pb-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div><div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={onBack}>← Faixas</Button><CardTitle className="text-lg">Fila de cobrança • {bucket.label}</CardTitle></div><CardDescription className="mt-1">{number.format(bucket.patients)} pacientes • {number.format(bucket.installments)} parcelas • {formatCurrency(bucket.current)}</CardDescription></div>
+          <div>
+            <div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={onBack}>← Faixas</Button><CardTitle className="text-lg">Fila de cobrança • {bucket.label}</CardTitle></div>
+            <CardDescription className="mt-1">{number.format(bucket.patients)} pacientes nesta prioridade • {number.format(bucket.installments)} parcela(s) nesta faixa • {formatCurrency(bucket.current)}</CardDescription>
+            <div className="mt-1 text-xs font-medium text-primary">Cada paciente mostra abaixo todas as parcelas atrasadas ainda abertas, mesmo que estejam em outras faixas.</div>
+          </div>
           <div className="flex flex-col gap-2 lg:flex-row">
             {salesLoaded && <div className="flex rounded-lg border bg-muted/20 p-1 text-xs"><button onClick={() => onMatchFilter("all")} className={`rounded-md px-2.5 py-1.5 ${matchFilter === "all" ? "bg-background font-semibold shadow-sm" : "text-muted-foreground"}`}>Todos</button><button onClick={() => onMatchFilter("matched")} className={`rounded-md px-2.5 py-1.5 ${matchFilter === "matched" ? "bg-background font-semibold shadow-sm" : "text-muted-foreground"}`}>Com venda</button><button onClick={() => onMatchFilter("unmatched")} className={`rounded-md px-2.5 py-1.5 ${matchFilter === "unmatched" ? "bg-background font-semibold shadow-sm" : "text-muted-foreground"}`}>Sem venda</button></div>}
             <div className="relative w-full lg:w-[320px]"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={search} onChange={(e) => onSearch(e.target.value)} placeholder="Paciente, DOC ou tratamento" className="pl-9" /></div>
@@ -641,25 +653,31 @@ function CollectionQueue({ bucket, queue, imported, salesLoaded, search, matchFi
         </div>
       </CardHeader>
       <CardContent className="overflow-x-auto p-0">
-        <table className="w-full min-w-[1180px] text-sm">
-          <thead><tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><th className="px-4 py-3">Paciente</th><th className="px-4 py-3">Telefone</th><th className="px-4 py-3">Parcela / DOC</th><th className="px-4 py-3">Venda / tratamento</th><th className="px-4 py-3">Vencimento</th><th className="px-4 py-3 text-right">Atraso</th><th className="px-4 py-3 text-right">Atualizado</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
+        <table className="w-full min-w-[1240px] text-sm">
+          <thead><tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground"><th className="px-4 py-3">Paciente</th><th className="px-4 py-3">Telefone</th><th className="px-4 py-3">Parcelas em atraso</th><th className="px-4 py-3">Venda / tratamento</th><th className="px-4 py-3">Vencimentos</th><th className="px-4 py-3 text-right">Atraso máx.</th><th className="px-4 py-3 text-right">Total aberto</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
           <tbody>
-            {queue.map(({ patient, bucketItems, saleItems, hasSale, current, oldest }) => {
-              const first = bucketItems[0];
+            {queue.map(({ patient, bucketItems, allItems, saleItems, hasSale, current, oldest }) => {
               const phone = patient.phones[0] || "—";
               const wa = phoneDigits(phone);
               const descriptions = uniqueDescriptions(saleItems);
-              const docs = Array.from(new Set(bucketItems.map((item) => baseDocument(item.document)).filter(Boolean)));
+              const ordered = sortByDueDate(allItems);
+              const oldestItem = ordered[0];
+              const newestItem = ordered[ordered.length - 1];
+              const docsPreview = ordered.slice(0, 3).map((item) => item.document);
               return (
-                <tr key={patient.id} className="border-b hover:bg-muted/25">
+                <tr key={patient.id} className="border-b align-top hover:bg-muted/25">
                   <td className="px-4 py-3"><button className="text-left font-semibold hover:underline" onClick={() => onPatient(patient)}>{patient.name}</button><div className="text-xs text-muted-foreground">{patient.cpf}</div></td>
                   <td className="px-4 py-3">{phone}</td>
-                  <td className="px-4 py-3"><div className="font-medium">{first?.document}{bucketItems.length > 1 && <span className="ml-1 text-xs text-muted-foreground">+{bucketItems.length - 1}</span>}</div><div className="mt-1 text-xs text-muted-foreground">Venda {docs.join(", ") || "—"}</div></td>
+                  <td className="px-4 py-3">
+                    <div className="font-semibold">{allItems.length} {allItems.length === 1 ? "parcela atrasada" : "parcelas atrasadas"}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Nesta faixa: {bucketItems.length}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{docsPreview.join(" • ")}{ordered.length > 3 ? ` +${ordered.length - 3}` : ""}</div>
+                  </td>
                   <td className="max-w-[360px] px-4 py-3">{hasSale ? <div><div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Venda localizada</div><div className="mt-1 font-medium">{descriptions.slice(0, 2).join(" • ")}{descriptions.length > 2 ? ` +${descriptions.length - 2}` : ""}</div></div> : <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700"><Unlink className="h-3.5 w-3.5" />Venda não localizada na base importada</div>}</td>
-                  <td className="px-4 py-3">{first?.dueDate}</td>
+                  <td className="px-4 py-3"><div className="font-medium">Mais antigo: {oldestItem?.dueDate || "—"}</div>{newestItem && newestItem !== oldestItem && <div className="mt-1 text-xs text-muted-foreground">Mais recente: {newestItem.dueDate}</div>}</td>
                   <td className="px-4 py-3 text-right font-semibold">{oldest} dias</td>
-                  <td className="px-4 py-3 text-right font-semibold">{formatCurrency(current)}</td>
-                  <td className="px-4 py-3"><div className="flex justify-end gap-1"><Button size="icon" variant="outline" title="Detalhes e baixa" onClick={() => onPatient(patient)}><FileText className="h-4 w-4" /></Button><Button size="icon" variant="outline" title="WhatsApp" disabled={!wa} onClick={() => window.open(`https://wa.me/55${wa}`, "_blank")}><MessageCircle className="h-4 w-4" /></Button></div></td>
+                  <td className="px-4 py-3 text-right"><div className="font-bold">{formatCurrency(current)}</div><div className="mt-1 text-xs text-muted-foreground">todas abertas</div></td>
+                  <td className="px-4 py-3"><div className="flex justify-end gap-1"><Button size="icon" variant="outline" title="Ver todas as parcelas e dar baixa" onClick={() => onPatient(patient)}><FileText className="h-4 w-4" /></Button><Button size="icon" variant="outline" title="WhatsApp" disabled={!wa} onClick={() => window.open(`https://wa.me/55${wa}`, "_blank")}><MessageCircle className="h-4 w-4" /></Button></div></td>
                 </tr>
               );
             })}
@@ -712,12 +730,12 @@ function PatientDetail({ patient, salesIndex, manualSettlements, onSettle, onUnd
           </Card>
 
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">Parcelas do paciente</CardTitle><CardDescription>Use “Dar baixa” quando receber ou confirmar o pagamento. A parcela sai imediatamente das filas e dos totais abertos.</CardDescription></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Parcelas do paciente</CardTitle><CardDescription>Todas as parcelas da carteira aparecem aqui. Use “Dar baixa” quando receber ou confirmar o pagamento.</CardDescription></CardHeader>
             <CardContent className="overflow-x-auto p-0">
               <table className="w-full min-w-[1080px] text-sm">
                 <thead><tr className="border-y bg-muted/40 text-xs uppercase text-muted-foreground"><th className="px-4 py-3 text-left">Parcela</th><th className="px-4 py-3 text-left">Venda</th><th className="px-4 py-3 text-left">Tratamento</th><th className="px-4 py-3 text-left">Vencimento</th><th className="px-4 py-3 text-right">Atraso</th><th className="px-4 py-3 text-right">Atualizado</th><th className="px-4 py-3 text-center">Status</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
                 <tbody>
-                  {[...patient.installments].sort((a, b) => b.daysLate - a.daysLate).map((item) => {
+                  {sortByDueDate(patient.installments).map((item) => {
                     const doc = baseDocument(item.document);
                     const sales = salesIndex.get(doc) || [];
                     const descriptions = uniqueDescriptions(sales);
@@ -762,7 +780,7 @@ async function parseCollectionPdf(file: File): Promise<ImportedReport> {
   const pdf = await pdfjs.getDocument({ data }).promise;
 
   let reportDate = new Date();
-  let period = SNAPSHOT.period;
+  let period = "—";
   const parsedPatients: PatientDebt[] = [];
   let current: PatientDebt | null = null;
 
