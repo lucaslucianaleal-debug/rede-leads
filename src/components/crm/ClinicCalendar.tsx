@@ -299,11 +299,18 @@ export function ClinicCalendar() {
     });
   }, [currentClinic]);
 
-  const professionals = useMemo(() => {
-    return Array.from(new Set(appointments.map((item) => prettyProfessional(item.professional)))).sort();
-  }, [appointments]);
-
   const monthAppointments = useMemo(() => appointments.filter((item) => sameMonth(item.date, currentMonth)), [appointments, currentMonth]);
+
+  const professionals = useMemo(() => {
+    return Array.from(new Set(monthAppointments.map((item) => prettyProfessional(item.professional)))).sort();
+  }, [monthAppointments]);
+
+  useEffect(() => {
+    if (selectedProfessional !== "all" && !professionals.includes(selectedProfessional)) {
+      setSelectedProfessional("all");
+    }
+  }, [professionals, selectedProfessional]);
+
   const filteredAppointments = useMemo(() => monthAppointments.filter((item) => selectedProfessional === "all" || prettyProfessional(item.professional) === selectedProfessional), [monthAppointments, selectedProfessional]);
 
   const appointmentsByDate = useMemo(() => {
