@@ -350,6 +350,62 @@ export function ClinicConfirmationCenter() {
     }
   };
 
+  const resetToScheduled = async () => {
+    if (!currentClinic || !reviewItem) return;
+    setSavingReview(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const nameKey = normalizeKey(reviewItem.name);
+      const visitItems = appointments.filter((item) => item.active !== false && item.date === reviewItem.date && normalizeKey(item.name) === nameKey);
+      const targets = visitItems.length ? visitItems : [reviewItem];
+      const batch = writeBatch(db);
+
+      targets.forEach((item) => {
+        batch.set(doc(db, "clinics", currentClinic, "clinicAgenda", item.id), {
+          confirmationStatus: "pending",
+          replyClassification: null,
+          manualReviewedAt: null,
+          manualReviewDecision: null,
+          manualActionSource: "restored_to_scheduled",
+          vacancyReleasedAt: null,
+          vacancyReleaseReason: null,
+          updatedAt: nowIso,
+        }, { merge: true });
+      });
+
+      const snapshots = await Promise.all(targets.flatMap((item) => [
+        getDocs(query(collection(db, "clinics", currentClinic, "whatsappQueue"), where("clinicAppointmentId", "==", item.id))),
+        getDocs(query(collection(db, "clinics", currentClinic, "whatsappSchedule"), where("clinicAppointmentId", "==", item.id))),
+      ]));
+
+      snapshots.forEach((snapshot) => {
+        snapshot.docs.forEach((snapshotDoc) => {
+          const data = snapshotDoc.data() || {};
+          const status = String(data.status || "");
+          const automationType = String(data.automationType || "");
+          const cancelReason = String(data.cancelReason || "");
+          const reversibleManualCancel = [
+            "clinic_manual_action",
+            "clinic_same_visit_manual_action",
+            "clinic_confirmed_manual_review",
+          ].includes(cancelReason);
+          if (status === "cancelled" && automationType.startsWith("appointment_clinic_") && reversibleManualCancel) {
+            batch.delete(snapshotDoc.ref);
+          }
+        });
+      });
+
+      await batch.commit();
+      toast.success(targets.length > 1 ? "Visita voltou para Programado em todos os atendimentos do dia." : "Consulta voltou para Programado.");
+      setReviewItem(null);
+    } catch (error) {
+      console.error("[clinic-reset-scheduled]", error);
+      toast.error("Não foi possível voltar a consulta para Programado.");
+    } finally {
+      setSavingReview(false);
+    }
+  };
+
   if (!currentClinic) return null;
   if (manualOpen) return (
     <div className="space-y-4">
@@ -557,7 +613,7 @@ export function ClinicConfirmationCenter() {
                 </div>
               )}
 
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 <Button onClick={() => void saveReview("confirmed")} disabled={savingReview} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                   <CheckCircle2 className="h-4 w-4" />Confirmar presença
                 </Button>
@@ -567,6 +623,11 @@ export function ClinicConfirmationCenter() {
                 <Button variant="outline" onClick={() => void saveReview("reschedule")} disabled={savingReview} className="gap-2 border-violet-200 text-violet-700 hover:bg-violet-50">
                   <RotateCcw className="h-4 w-4" />Reagendar
                 </Button>
+                {["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"].includes(String(reviewItem.confirmationStatus || "")) && (
+                  <Button variant="outline" onClick={() => void resetToScheduled()} disabled={savingReview} className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50">
+                    <Clock3 className="h-4 w-4" />Voltar para programado
+                  </Button>
+                )}
               </div>
             </div>
           )}
