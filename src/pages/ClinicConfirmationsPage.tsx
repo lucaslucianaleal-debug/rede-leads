@@ -10,6 +10,7 @@ import { ClinicRebookings } from "@/components/crm/ClinicRebookings";
 import { ClinicStatusBridge } from "@/components/crm/ClinicStatusBridge";
 import { ClinicAutomationControl } from "@/components/crm/ClinicAutomationControl";
 import { ClinicProfessionalManager } from "@/components/crm/ClinicProfessionalManager";
+import { OperationsBell } from "@/components/crm/OperationsBell";
 
 type ClinicView = "calendar" | "confirmations" | "vacancies" | "rebookings";
 
@@ -33,6 +34,7 @@ export default function ClinicConfirmationsPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
+              <OperationsBell />
               <ClinicAutomationControl />
               <ClinicProfessionalManager />
               <ClinicChip />
