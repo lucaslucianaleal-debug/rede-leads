@@ -4,6 +4,7 @@ import { canonicalPhoneKey, cancelPendingForLead, findLeadIndex, processInboundE
 import { recordWhatsAppChatMessage, updateWhatsAppMessageStatus } from "../../../server/whatsappChatStore.js";
 
 const IGNORED_TYPES = new Set(["notification_template", "e2e_notification", "protocol", "ciphertext", "revoked"]);
+const MANUAL_STATUSES = new Set(["confirmed", "wont_attend", "cancelled", "reschedule"]);
 
 function normalizeText(value) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -25,6 +26,25 @@ function classifyClinicReply(value) {
   if (noTerms.some((term) => text.includes(term))) return "wont_attend";
   if (yesTerms.some((term) => text === term || text.includes(term))) return "confirmed";
   return "replied";
+}
+
+function effectiveClinicStatus(data = {}) {
+  const current = String(data.confirmationStatus || "");
+  const saved = String(data.manualReviewDecision || "");
+  const manualAt = Date.parse(String(data.manualReviewedAt || ""));
+  const replyAt = Date.parse(String(data.lastReplyAt || ""));
+  const replyClassification = String(data.replyClassification || "");
+
+  const laterExplicitNegative = saved === "confirmed"
+    && Number.isFinite(manualAt)
+    && Number.isFinite(replyAt)
+    && replyAt > manualAt
+    && ["wont_attend", "reschedule", "cancelled"].includes(current)
+    && (replyClassification === current || current === "cancelled");
+
+  if (laterExplicitNegative) return current;
+  if (data.manualReviewedAt && MANUAL_STATUSES.has(saved)) return saved;
+  return current;
 }
 
 function resolveClinicReplyStatus(currentStatus, classification) {
@@ -98,7 +118,8 @@ async function updateClinicAppointmentFromInbound(db, clinicId, phoneKey, text, 
   if (!target) return null;
 
   const classification = classifyClinicReply(text);
-  const currentStatus = String(target.data.confirmationStatus || "");
+  const storedStatus = String(target.data.confirmationStatus || "");
+  const currentStatus = effectiveClinicStatus(target.data);
   const resolvedStatus = resolveClinicReplyStatus(currentStatus, classification);
 
   const nowIso = new Date(now).toISOString();
@@ -109,7 +130,7 @@ async function updateClinicAppointmentFromInbound(db, clinicId, phoneKey, text, 
     lastReplyText: String(text || "Mensagem recebida").slice(0, 500),
     updatedAt: nowIso,
     ...(currentStatus === "confirmed" && resolvedStatus === "confirmed" ? { postConfirmationReplyAt: nowIso } : {}),
-    ...(currentStatus === "released_unconfirmed" && resolvedStatus === "reschedule" ? { lateReplyAfterRelease: true } : {}),
+    ...(storedStatus === "released_unconfirmed" && resolvedStatus === "reschedule" ? { lateReplyAfterRelease: true } : {}),
   }, { merge: true });
 
   if (resolvedStatus === "confirmed") {
