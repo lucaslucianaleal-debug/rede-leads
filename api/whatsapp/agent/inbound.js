@@ -27,6 +27,19 @@ function classifyClinicReply(value) {
   return "replied";
 }
 
+function resolveClinicReplyStatus(currentStatus, classification) {
+  const current = String(currentStatus || "");
+
+  if (current === "confirmed") {
+    if (classification === "wont_attend" || classification === "reschedule") return classification;
+    return "confirmed";
+  }
+
+  if (["wont_attend", "cancelled", "reschedule"].includes(current)) return current;
+  if (current === "released_unconfirmed" && classification === "confirmed") return "reschedule";
+  return classification;
+}
+
 function parseClinicAppointment(data = {}) {
   const match = `${data.date || ""} ${data.startTime || ""}`.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
   if (!match) return null;
@@ -83,27 +96,29 @@ async function updateClinicAppointmentFromInbound(db, clinicId, phoneKey, text, 
 
   const target = candidates[0];
   if (!target) return null;
-  let classification = classifyClinicReply(text);
+
+  const classification = classifyClinicReply(text);
   const currentStatus = String(target.data.confirmationStatus || "");
-  if (currentStatus === "released_unconfirmed" && classification === "confirmed") classification = "reschedule";
+  const resolvedStatus = resolveClinicReplyStatus(currentStatus, classification);
 
   const nowIso = new Date(now).toISOString();
   await target.ref.set({
-    confirmationStatus: classification,
+    confirmationStatus: resolvedStatus,
     replyClassification: classification,
     lastReplyAt: nowIso,
     lastReplyText: String(text || "Mensagem recebida").slice(0, 500),
     updatedAt: nowIso,
-    ...(currentStatus === "released_unconfirmed" && classification === "reschedule" ? { lateReplyAfterRelease: true } : {}),
+    ...(currentStatus === "confirmed" && resolvedStatus === "confirmed" ? { postConfirmationReplyAt: nowIso } : {}),
+    ...(currentStatus === "released_unconfirmed" && resolvedStatus === "reschedule" ? { lateReplyAfterRelease: true } : {}),
   }, { merge: true });
 
-  if (classification === "confirmed") {
+  if (resolvedStatus === "confirmed") {
     await cancelClinicAutomation(db, clinicRef, target.id, { keepOneHour: true });
-  } else if (["wont_attend", "reschedule"].includes(classification)) {
+  } else if (["wont_attend", "reschedule"].includes(resolvedStatus)) {
     await cancelClinicAutomation(db, clinicRef, target.id, { keepOneHour: false });
   }
 
-  return { appointmentId: target.id, classification };
+  return { appointmentId: target.id, classification, resolvedStatus };
 }
 
 function referralContext(body = {}) {
