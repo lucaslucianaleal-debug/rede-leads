@@ -101,6 +101,26 @@ function classifyReply(value: string) {
   return "replied";
 }
 
+function resolveReplyStatus(currentStatus: string | undefined, classified: string) {
+  const current = String(currentStatus || "");
+
+  // Uma confirmação já consolidada não volta para "revisar" por causa de
+  // mensagens comuns como "ok", "obrigado" ou "beleza". Só uma desistência
+  // ou pedido explícito de reagendamento pode retirar o Confirmado.
+  if (current === "confirmed") {
+    if (classified === "wont_attend" || classified === "reschedule") return classified;
+    return "confirmed";
+  }
+
+  // Estados finais negativos só são revertidos por ação humana explícita.
+  if (["wont_attend", "cancelled", "reschedule"].includes(current)) return current;
+
+  // Depois da liberação, uma tentativa de confirmar não recupera a vaga.
+  if (current === "released_unconfirmed" && classified === "confirmed") return "reschedule";
+
+  return classified;
+}
+
 const FINAL_STATUSES = new Set(["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"]);
 const STATUS_RANK: Record<string, number> = {
   pending: 1,
@@ -150,7 +170,12 @@ function latestManualAction(items: AgendaItem[]) {
     .sort((a, b) => isoTime(b.manualReviewedAt) - isoTime(a.manualReviewedAt))[0] || null;
 }
 
-async function cancelPendingForAppointment(clinicId: string, appointmentId: string, reason: string) {
+async function cancelPendingForAppointment(
+  clinicId: string,
+  appointmentId: string,
+  reason: string,
+  { keepOneHour = false }: { keepOneHour?: boolean } = {},
+) {
   const clinicRef = doc(db, "clinics", clinicId);
   const [queueSnap, scheduleSnap] = await Promise.all([
     getDocs(query(collection(clinicRef, "whatsappQueue"), where("clinicAppointmentId", "==", appointmentId))),
@@ -163,12 +188,14 @@ async function cancelPendingForAppointment(clinicId: string, appointmentId: stri
   queueSnap.docs.forEach((queueDoc) => {
     const data = queueDoc.data() || {};
     if (!["pending", "leased"].includes(String(data.status || ""))) return;
+    if (keepOneHour && String(data.automationType || "") === "appointment_clinic_1h") return;
     batch.set(queueDoc.ref, { status: "cancelled", cancelReason: reason, cancelledAt: nowIso, updatedAt: nowIso }, { merge: true });
     writes += 1;
   });
   scheduleSnap.docs.forEach((scheduleDoc) => {
     const data = scheduleDoc.data() || {};
     if (["sent", "failed", "cancelled"].includes(String(data.status || ""))) return;
+    if (keepOneHour && String(data.automationType || "") === "appointment_clinic_1h") return;
     batch.set(scheduleDoc.ref, { status: "cancelled", cancelReason: reason, cancelledAt: nowIso, updatedAt: nowIso }, { merge: true });
     writes += 1;
   });
@@ -318,7 +345,12 @@ async function syncManualVisitActions(clinicId: string, items: AgendaItem[]) {
         ...(source.confirmationStatus !== "confirmed" ? { vacancyReleasedAt: nowIso } : {}),
         updatedAt: nowIso,
       }, { merge: true });
-      await cancelPendingForAppointment(clinicId, sibling.id, "clinic_same_visit_manual_action");
+      await cancelPendingForAppointment(
+        clinicId,
+        sibling.id,
+        "clinic_same_visit_manual_action",
+        { keepOneHour: source.confirmationStatus === "confirmed" },
+      );
     }
   }
 }
@@ -427,20 +459,25 @@ export function ClinicStatusBridge() {
         const latestManual = latestManualAction(linkedVisit);
         if (latestManual?.manualReviewedAt && isoTime(latestManual.manualReviewedAt) >= replyAtMs) return;
 
-        let classified = classifyReply(chat.lastMessage || "");
-        if (appointment.confirmationStatus === "released_unconfirmed" && classified === "confirmed") classified = "reschedule";
+        const classified = classifyReply(chat.lastMessage || "");
 
         linkedVisit.forEach((visitAppointment) => {
+          const nextStatus = resolveReplyStatus(visitAppointment.confirmationStatus, classified);
           void setDoc(doc(db, "clinics", currentClinic, "clinicAgenda", visitAppointment.id), {
-            confirmationStatus: classified,
+            confirmationStatus: nextStatus,
             lastReplyAt: chat.lastMessageAt,
             lastReplyText: String(chat.lastMessage || "Mensagem recebida").slice(0, 500),
             replyClassification: classified,
             visitReplyFrom: appointment.id,
             visitReplyAt: chat.lastMessageAt,
+            ...(visitAppointment.confirmationStatus === "confirmed" && nextStatus === "confirmed" ? { postConfirmationReplyAt: chat.lastMessageAt } : {}),
             updatedAt: chat.lastMessageAt,
           }, { merge: true });
-          if (["confirmed", "wont_attend", "reschedule"].includes(classified)) {
+
+          if (nextStatus === "confirmed") {
+            void cancelPendingForAppointment(currentClinic, visitAppointment.id, "clinic_same_visit_reply", { keepOneHour: true })
+              .catch((error) => console.error("[clinic-status-bridge][cancel-after-confirmed-reply]", error));
+          } else if (["wont_attend", "reschedule"].includes(nextStatus)) {
             void cancelPendingForAppointment(currentClinic, visitAppointment.id, "clinic_same_visit_reply")
               .catch((error) => console.error("[clinic-status-bridge][cancel-after-reply]", error));
           }
