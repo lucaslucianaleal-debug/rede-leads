@@ -8,7 +8,7 @@ import { ClinicConfirmationCenter } from "@/components/crm/ClinicConfirmationCen
 import { ClinicFinanceDashboardV4 } from "@/components/crm/ClinicFinanceDashboardV4";
 import { ClinicFinanceRecoveryCenter } from "@/components/crm/ClinicFinanceRecoveryCenter";
 import { ClinicFinanceStateGuard } from "@/components/crm/ClinicFinanceStateGuard";
-import { ClinicOverview } from "@/components/crm/ClinicOverview";
+import { ClinicOverviewV2 } from "@/components/crm/ClinicOverviewV2";
 import { ClinicSalesImportPanel, type SaleItem } from "@/components/crm/ClinicSalesImportPanel";
 import { ClinicVacancies } from "@/components/crm/ClinicVacancies";
 import { ClinicRebookings } from "@/components/crm/ClinicRebookings";
@@ -81,7 +81,7 @@ export default function ClinicConfirmationsPage() {
         )}
 
         {mainSection === "overview" && (
-          <ClinicOverview
+          <ClinicOverviewV2
             onOpenAgenda={openAgenda}
             onOpenFinance={() => setMainSection("finance")}
           />
