@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, CalendarDays, LayoutDashboard, Landmark, MessageCircle, RotateCcw, Search } from "lucide-react";
+import { ArrowLeft, CalendarDays, LayoutDashboard, Landmark, MessageCircle, RotateCcw, Search, Settings2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ClinicChip } from "@/components/ClinicChip";
@@ -15,6 +15,7 @@ import { OperationsBell } from "@/components/crm/OperationsBell";
 import { ClinicFinanceDailyDesk } from "@/components/crm/ClinicFinanceDailyDesk";
 import { ClinicFinancePersistentDashboard } from "@/components/crm/ClinicFinancePersistentDashboard";
 import { ClinicFinanceRecoveryCenterV2 } from "@/components/crm/ClinicFinanceRecoveryCenterV2";
+import { ClinicFinancePatientSheet } from "@/components/crm/ClinicFinancePatientSheet";
 import { ClinicFinanceStateGuard } from "@/components/crm/ClinicFinanceStateGuard";
 import { ClinicOverviewV2 } from "@/components/crm/ClinicOverviewV2";
 import { ClinicSalesImportPanel, type SaleItem } from "@/components/crm/ClinicSalesImportPanel";
@@ -22,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 type MainSection = "overview" | "agenda" | "finance";
 type AgendaView = "calendar" | "confirmations" | "vacancies" | "rebookings";
+type FinanceView = "today" | "recovery" | "data";
 
 function primaryClinicFromProfile(profile: any): string | null {
   if (!profile) return null;
@@ -38,6 +40,7 @@ export default function ClinicConfirmationsPage() {
   const { currentClinic, userProfile, setSelectedClinic } = useAuth();
   const [mainSection, setMainSection] = useState<MainSection>("overview");
   const [agendaView, setAgendaView] = useState<AgendaView>("calendar");
+  const [financeView, setFinanceView] = useState<FinanceView>("today");
   const [salesItems, setSalesItems] = useState<SaleItem[]>([]);
 
   useEffect(() => {
@@ -95,7 +98,7 @@ export default function ClinicConfirmationsPage() {
         {mainSection === "overview" && (
           <ClinicOverviewV2
             onOpenAgenda={openAgenda}
-            onOpenFinance={() => setMainSection("finance")}
+            onOpenFinance={() => { setMainSection("finance"); setFinanceView("today"); }}
           />
         )}
 
@@ -119,10 +122,30 @@ export default function ClinicConfirmationsPage() {
 
         {mainSection === "finance" && (
           <div className="space-y-4">
-            <ClinicSalesImportPanel onImported={(items) => setSalesItems(items)} />
-            <ClinicFinanceDailyDesk />
-            <ClinicFinanceRecoveryCenterV2 salesItems={salesItems} />
-            <ClinicFinancePersistentDashboard salesItems={salesItems} />
+            <section className="rounded-xl border bg-card p-2 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <FinanceNavButton active={financeView === "today"} onClick={() => setFinanceView("today")} label="Hoje" />
+                  <FinanceNavButton active={financeView === "recovery"} onClick={() => setFinanceView("recovery")} label="Recuperação" />
+                </div>
+                <Button size="sm" variant={financeView === "data" ? "default" : "ghost"} className="gap-2" onClick={() => setFinanceView("data")}><Settings2 className="h-4 w-4" />Base de dados</Button>
+              </div>
+            </section>
+
+            {financeView === "today" && <ClinicFinanceDailyDesk />}
+            {financeView === "recovery" && <ClinicFinanceRecoveryCenterV2 salesItems={salesItems} />}
+            {financeView === "data" && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-4 py-3 text-sm text-blue-900">
+                  Área administrativa. Use aqui apenas para atualizar as bases de cobrança, vendas e recebimentos. O trabalho diário fica em <b>Hoje</b> e <b>Recuperação</b>.
+                </div>
+                <ClinicSalesImportPanel onImported={(items) => setSalesItems(items)} />
+                <ClinicFinancePersistentDashboard salesItems={salesItems} />
+              </div>
+            )}
+
+            <div className="hidden"><ClinicSalesImportPanel onImported={(items) => setSalesItems(items)} /></div>
+            <ClinicFinancePatientSheet salesItems={salesItems} />
           </div>
         )}
       </main>
@@ -136,4 +159,8 @@ function MainNavButton({ active, onClick, icon, label }: { active: boolean; onCl
 
 function AgendaNavButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return <Button variant={active ? "secondary" : "ghost"} size="sm" className="gap-2" onClick={onClick}>{icon}{label}</Button>;
+}
+
+function FinanceNavButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return <Button variant={active ? "default" : "ghost"} size="sm" onClick={onClick}>{label}</Button>;
 }
