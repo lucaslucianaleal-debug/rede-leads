@@ -12,6 +12,7 @@ import { ClinicAutomationControl } from "@/components/crm/ClinicAutomationContro
 import { ClinicProfessionalManager } from "@/components/crm/ClinicProfessionalManager";
 import { ClinicSyncReconciler } from "@/components/crm/ClinicSyncReconciler";
 import { OperationsBell } from "@/components/crm/OperationsBell";
+import { ClinicFinanceDailyDesk } from "@/components/crm/ClinicFinanceDailyDesk";
 import { ClinicFinancePersistentDashboard } from "@/components/crm/ClinicFinancePersistentDashboard";
 import { ClinicFinanceRecoveryCenterV2 } from "@/components/crm/ClinicFinanceRecoveryCenterV2";
 import { ClinicFinanceStateGuard } from "@/components/crm/ClinicFinanceStateGuard";
@@ -119,6 +120,7 @@ export default function ClinicConfirmationsPage() {
         {mainSection === "finance" && (
           <div className="space-y-4">
             <ClinicSalesImportPanel onImported={(items) => setSalesItems(items)} />
+            <ClinicFinanceDailyDesk />
             <ClinicFinanceRecoveryCenterV2 salesItems={salesItems} />
             <ClinicFinancePersistentDashboard salesItems={salesItems} />
           </div>
