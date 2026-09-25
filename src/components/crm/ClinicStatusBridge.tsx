@@ -104,24 +104,18 @@ function classifyReply(value: string) {
 function resolveReplyStatus(currentStatus: string | undefined, classified: string) {
   const current = String(currentStatus || "");
 
-  // Uma confirmação já consolidada não volta para "revisar" por causa de
-  // mensagens comuns como "ok", "obrigado" ou "beleza". Só uma desistência
-  // ou pedido explícito de reagendamento pode retirar o Confirmado.
   if (current === "confirmed") {
     if (classified === "wont_attend" || classified === "reschedule") return classified;
     return "confirmed";
   }
 
-  // Estados finais negativos só são revertidos por ação humana explícita.
   if (["wont_attend", "cancelled", "reschedule"].includes(current)) return current;
-
-  // Depois da liberação, uma tentativa de confirmar não recupera a vaga.
   if (current === "released_unconfirmed" && classified === "confirmed") return "reschedule";
-
   return classified;
 }
 
 const FINAL_STATUSES = new Set(["confirmed", "wont_attend", "cancelled", "reschedule", "released_unconfirmed"]);
+const MANUAL_STATUSES = new Set(["confirmed", "wont_attend", "cancelled", "reschedule"]);
 const STATUS_RANK: Record<string, number> = {
   pending: 1,
   queued: 2,
@@ -135,9 +129,22 @@ const STATUS_RANK: Record<string, number> = {
   confirmed: 9,
 };
 
+function manualDecision(item: AgendaItem) {
+  const saved = String(item.manualReviewDecision || "");
+  if (item.manualReviewedAt && MANUAL_STATUSES.has(saved)) return saved;
+  const status = String(item.confirmationStatus || "");
+  return item.manualReviewedAt && MANUAL_STATUSES.has(status) ? status : "";
+}
+
+function effectiveStatus(item: AgendaItem) {
+  return manualDecision(item) || String(item.confirmationStatus || "pending");
+}
+
 function pickMergedStatus(items: AgendaItem[]) {
   return [...items]
-    .sort((a, b) => (STATUS_RANK[String(b.confirmationStatus || "pending")] || 0) - (STATUS_RANK[String(a.confirmationStatus || "pending")] || 0))[0]?.confirmationStatus || "pending";
+    .sort((a, b) => (STATUS_RANK[effectiveStatus(b)] || 0) - (STATUS_RANK[effectiveStatus(a)] || 0))[0]
+    ? effectiveStatus([...items].sort((a, b) => (STATUS_RANK[effectiveStatus(b)] || 0) - (STATUS_RANK[effectiveStatus(a)] || 0))[0])
+    : "pending";
 }
 
 function latestValue(items: AgendaItem[], field: "lastReminderSentAt" | "lastReplyAt") {
@@ -166,7 +173,7 @@ function visitItems(all: AgendaItem[], base: AgendaItem) {
 
 function latestManualAction(items: AgendaItem[]) {
   return [...items]
-    .filter((item) => item.manualReviewedAt && ["confirmed", "wont_attend", "cancelled", "reschedule"].includes(String(item.confirmationStatus || "")))
+    .filter((item) => item.manualReviewedAt && Boolean(manualDecision(item)))
     .sort((a, b) => isoTime(b.manualReviewedAt) - isoTime(a.manualReviewedAt))[0] || null;
 }
 
@@ -247,6 +254,7 @@ async function mergeAdjacentDuplicateAppointments(clinicId: string, items: Agend
         const lastReplyAt = latestValue(chain, "lastReplyAt");
         const replySource = lastReplyAt ? chain.find((item) => item.lastReplyAt === lastReplyAt) : undefined;
         const latestManual = latestManualAction(chain);
+        const latestManualDecision = latestManual ? manualDecision(latestManual) : "";
         const nowIso = new Date().toISOString();
         const clinicRef = doc(db, "clinics", clinicId);
         const batch = writeBatch(db);
@@ -255,7 +263,7 @@ async function mergeAdjacentDuplicateAppointments(clinicId: string, items: Agend
           endTime: mergedEnd,
           phone: mergedPhone,
           phoneKey: mergedPhoneKey,
-          confirmationStatus: latestManual?.confirmationStatus || mergedStatus,
+          confirmationStatus: latestManualDecision || mergedStatus,
           remindersSent: mergedReminders,
           ...(lastReminderSentAt ? { lastReminderSentAt } : {}),
           ...(lastReplyAt ? {
@@ -265,7 +273,7 @@ async function mergeAdjacentDuplicateAppointments(clinicId: string, items: Agend
           } : {}),
           ...(latestManual?.manualReviewedAt ? {
             manualReviewedAt: latestManual.manualReviewedAt,
-            manualReviewDecision: latestManual.manualReviewDecision || latestManual.confirmationStatus,
+            manualReviewDecision: latestManualDecision,
           } : {}),
           mergedAppointmentIds: duplicates.map((item) => item.id),
           mergedAt: nowIso,
@@ -314,7 +322,7 @@ async function mergeAdjacentDuplicateAppointments(clinicId: string, items: Agend
 
 async function syncManualVisitActions(clinicId: string, items: AgendaItem[]) {
   const activeSources = items
-    .filter((item) => item.active !== false && item.manualReviewedAt && ["confirmed", "wont_attend", "cancelled", "reschedule"].includes(String(item.confirmationStatus || "")))
+    .filter((item) => item.active !== false && item.manualReviewedAt && Boolean(manualDecision(item)))
     .sort((a, b) => isoTime(b.manualReviewedAt) - isoTime(a.manualReviewedAt));
   const processed = new Set<string>();
 
@@ -327,29 +335,32 @@ async function syncManualVisitActions(clinicId: string, items: AgendaItem[]) {
     const source = latestManualAction(group);
     if (!source?.manualReviewedAt) continue;
     const sourceTime = isoTime(source.manualReviewedAt);
+    const sourceDecision = manualDecision(source);
+    if (!sourceDecision) continue;
 
     for (const sibling of group) {
       if (isoTime(sibling.manualReviewedAt) > sourceTime) continue;
-      const sameStatus = String(sibling.confirmationStatus || "") === String(source.confirmationStatus || "");
-      const alreadySynced = sameStatus && isoTime(sibling.manualReviewedAt) === sourceTime;
+      const sameStatus = String(sibling.confirmationStatus || "") === sourceDecision;
+      const sameManualDecision = String(sibling.manualReviewDecision || "") === sourceDecision;
+      const alreadySynced = sameStatus && sameManualDecision && isoTime(sibling.manualReviewedAt) === sourceTime;
       if (alreadySynced) continue;
 
       const nowIso = new Date().toISOString();
       await setDoc(doc(db, "clinics", clinicId, "clinicAgenda", sibling.id), {
-        confirmationStatus: source.confirmationStatus,
+        confirmationStatus: sourceDecision,
         manualReviewedAt: source.manualReviewedAt,
-        manualReviewDecision: source.manualReviewDecision || source.confirmationStatus,
+        manualReviewDecision: sourceDecision,
         manualActionSource: sibling.id === source.id ? "manual_review" : "same_visit_manual_action",
         visitSyncedFrom: source.id,
         visitSyncedAt: nowIso,
-        ...(source.confirmationStatus !== "confirmed" ? { vacancyReleasedAt: nowIso } : {}),
+        ...(sourceDecision !== "confirmed" ? { vacancyReleasedAt: nowIso } : { vacancyReleasedAt: null, vacancyReleaseReason: null }),
         updatedAt: nowIso,
       }, { merge: true });
       await cancelPendingForAppointment(
         clinicId,
         sibling.id,
         "clinic_same_visit_manual_action",
-        { keepOneHour: source.confirmationStatus === "confirmed" },
+        { keepOneHour: sourceDecision === "confirmed" },
       );
     }
   }
@@ -390,13 +401,13 @@ export function ClinicStatusBridge() {
         if (!existing) return;
         const appointmentRef = doc(db, "clinics", currentClinic, "clinicAgenda", appointmentId);
         const status = String(item.status || "");
-        const keepFinal = FINAL_STATUSES.has(String(existing.confirmationStatus || ""));
+        const keepFinal = FINAL_STATUSES.has(effectiveStatus(existing));
 
         if (status === "sent") {
           const sentAt = item.sentAt || item.updatedAt || nowIso;
           const linkedVisit = visitItems(agendaRef.current, existing);
           linkedVisit.forEach((visitAppointment) => {
-            const visitFinal = FINAL_STATUSES.has(String(visitAppointment.confirmationStatus || ""));
+            const visitFinal = FINAL_STATUSES.has(effectiveStatus(visitAppointment));
             void setDoc(doc(db, "clinics", currentClinic, "clinicAgenda", visitAppointment.id), {
               ...(visitFinal ? {} : { confirmationStatus: "sent" }),
               remindersSent: { [String(item.automationType || "manual")]: sentAt },
@@ -462,7 +473,8 @@ export function ClinicStatusBridge() {
         const classified = classifyReply(chat.lastMessage || "");
 
         linkedVisit.forEach((visitAppointment) => {
-          const nextStatus = resolveReplyStatus(visitAppointment.confirmationStatus, classified);
+          const currentStatus = effectiveStatus(visitAppointment);
+          const nextStatus = resolveReplyStatus(currentStatus, classified);
           void setDoc(doc(db, "clinics", currentClinic, "clinicAgenda", visitAppointment.id), {
             confirmationStatus: nextStatus,
             lastReplyAt: chat.lastMessageAt,
@@ -470,7 +482,7 @@ export function ClinicStatusBridge() {
             replyClassification: classified,
             visitReplyFrom: appointment.id,
             visitReplyAt: chat.lastMessageAt,
-            ...(visitAppointment.confirmationStatus === "confirmed" && nextStatus === "confirmed" ? { postConfirmationReplyAt: chat.lastMessageAt } : {}),
+            ...(currentStatus === "confirmed" && nextStatus === "confirmed" ? { postConfirmationReplyAt: chat.lastMessageAt } : {}),
             updatedAt: chat.lastMessageAt,
           }, { merge: true });
 
