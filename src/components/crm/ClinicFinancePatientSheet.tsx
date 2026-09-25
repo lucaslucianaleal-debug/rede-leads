@@ -1,0 +1,353 @@
+import { useEffect, useMemo, useState } from "react";
+import { addDoc, collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { AlertTriangle, CheckCircle2, FileCheck2, FileWarning, MessageCircle, Phone, ShieldCheck, X } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FINANCE_SNAPSHOT_EVENT } from "@/components/crm/ClinicFinanceSnapshotBridge";
+import type { SaleItem } from "@/components/crm/ClinicSalesImportPanel";
+import { readLocalFinanceStore, type FinancePatient } from "@/lib/clinicFinanceStore";
+import { OPEN_FINANCE_PATIENT_EVENT } from "@/lib/clinicFinanceEvents";
+import { toast } from "sonner";
+
+type RecoveryStatus = "pending" | "contacted" | "no_response" | "promised" | "negotiating" | "settled";
+type RecoveryCase = {
+  patientId: string;
+  patientName?: string;
+  status?: RecoveryStatus;
+  nextActionDate?: string | null;
+  note?: string | null;
+  lastContactAt?: string | null;
+  promiseDate?: string | null;
+  promiseAmount?: number | null;
+  optOutWhatsapp?: boolean;
+  updatedAt?: string | null;
+};
+type RecoveryEvent = { id: string; type: string; channel: string; result: string; note?: string | null; createdAt: string; createdBy?: string };
+type PersistentSale = {
+  id: string;
+  patientId: string;
+  patientName?: string;
+  doc: string;
+  saleDate?: string;
+  professional?: string;
+  treatments?: string[];
+  originalValue?: number;
+  totalValue?: number;
+  condition?: string | null;
+  source?: "manual" | "pdf";
+  updatedAt?: string;
+};
+type ConsolidatedSale = {
+  doc: string;
+  date: string;
+  professional: string;
+  treatments: string[];
+  original: number;
+  total: number;
+  condition?: string | null;
+  sources: string[];
+};
+
+const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const STATUS_LABEL: Record<RecoveryStatus, string> = {
+  pending: "Pendente",
+  contacted: "Contatado",
+  no_response: "Sem resposta",
+  promised: "Prometeu pagar",
+  negotiating: "Em negociação",
+  settled: "Regularizado",
+};
+
+function normalize(value: string) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+function baseDocument(value: string) { return (String(value || "").split("/")[0] || "").replace(/\D/g, ""); }
+function parseBrDate(value: string) {
+  const [d, m, rawY] = String(value || "").split("/").map(Number);
+  const y = rawY && rawY < 100 ? 2000 + rawY : rawY;
+  if (!d || !m || !y) return null;
+  const date = new Date(y, m - 1, d, 12);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+function daysLate(value: string) {
+  const due = parseBrDate(value);
+  if (!due) return 0;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  return Math.max(0, Math.floor((today.getTime() - due.getTime()) / 86400000));
+}
+function phoneDigits(value: string) {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("55")) digits = digits.slice(2);
+  return digits.length >= 10 ? digits : "";
+}
+function firstName(value: string) {
+  const first = String(value || "").trim().split(/\s+/)[0] || "";
+  return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : "";
+}
+function isoToday() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+function fmtDateTime(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+
+export function ClinicFinancePatientSheet({ salesItems = [] }: { salesItems?: SaleItem[] }) {
+  const { currentClinic, user } = useAuth();
+  const [patientId, setPatientId] = useState<string | null>(null);
+  const [storeRevision, setStoreRevision] = useState(0);
+  const [cases, setCases] = useState<Record<string, RecoveryCase>>({});
+  const [persistentSales, setPersistentSales] = useState<PersistentSale[]>([]);
+  const [events, setEvents] = useState<RecoveryEvent[]>([]);
+  const [nextActionDate, setNextActionDate] = useState("");
+  const [promiseDate, setPromiseDate] = useState("");
+  const [promiseAmount, setPromiseAmount] = useState("");
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    const open = (event: Event) => {
+      const id = String((event as CustomEvent<{ patientId?: string }>).detail?.patientId || "");
+      if (id) setPatientId(id);
+    };
+    window.addEventListener(OPEN_FINANCE_PATIENT_EVENT, open as EventListener);
+    return () => window.removeEventListener(OPEN_FINANCE_PATIENT_EVENT, open as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const reload = () => setStoreRevision((value) => value + 1);
+    window.addEventListener(FINANCE_SNAPSHOT_EVENT, reload as EventListener);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener(FINANCE_SNAPSHOT_EVENT, reload as EventListener);
+      window.removeEventListener("storage", reload);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentClinic) return;
+    const unsubCases = onSnapshot(collection(db, "clinics", currentClinic, "financeRecoveryCases"), (snap) => {
+      const next: Record<string, RecoveryCase> = {};
+      snap.docs.forEach((item) => {
+        const data = item.data() as RecoveryCase;
+        next[data.patientId || item.id] = { ...data, patientId: data.patientId || item.id };
+      });
+      setCases(next);
+    });
+    const unsubSales = onSnapshot(collection(db, "clinics", currentClinic, "financeSales"), (snap) => {
+      setPersistentSales(snap.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<PersistentSale, "id">) })));
+    });
+    return () => { unsubCases(); unsubSales(); };
+  }, [currentClinic]);
+
+  const store = useMemo(() => currentClinic ? readLocalFinanceStore(currentClinic) : null, [currentClinic, storeRevision]);
+  const patient = useMemo(() => {
+    if (!patientId) return null;
+    return store?.patients.find((item) => item.id === patientId) || null;
+  }, [store, patientId]);
+
+  useEffect(() => {
+    if (!currentClinic || !patient) { setEvents([]); return; }
+    return onSnapshot(collection(db, "clinics", currentClinic, "financeRecoveryCases", patient.id, "events"), (snap) => {
+      setEvents(snap.docs.map((item) => ({ id: item.id, ...(item.data() as Omit<RecoveryEvent, "id">) })).sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))));
+    });
+  }, [currentClinic, patient]);
+
+  const recovery = patient ? (cases[patient.id] || { patientId: patient.id, patientName: patient.name, status: "pending" as RecoveryStatus }) : null;
+
+  useEffect(() => {
+    setNextActionDate(recovery?.nextActionDate || "");
+    setPromiseDate(recovery?.promiseDate || "");
+    setPromiseAmount(recovery?.promiseAmount ? String(recovery.promiseAmount) : "");
+    setNote(recovery?.note || "");
+  }, [recovery?.patientId, recovery?.updatedAt, recovery?.nextActionDate, recovery?.promiseDate, recovery?.promiseAmount, recovery?.note]);
+
+  const reportByDoc = useMemo(() => {
+    const map = new Map<string, SaleItem[]>();
+    salesItems.forEach((item) => {
+      const key = baseDocument(item.document);
+      if (!key) return;
+      const list = map.get(key) || [];
+      list.push(item);
+      map.set(key, list);
+    });
+    return map;
+  }, [salesItems]);
+
+  const sales = useMemo<ConsolidatedSale[]>(() => {
+    if (!patient) return [];
+    const docs = new Set(patient.installments.map((item) => baseDocument(item.document)).filter(Boolean));
+    const result: ConsolidatedSale[] = [];
+    docs.forEach((docKey) => {
+      const report = (reportByDoc.get(docKey) || []).filter((item) => !item.patientName || normalize(item.patientName) === normalize(patient.name));
+      const stored = persistentSales.filter((item) => item.patientId === patient.id && baseDocument(item.doc) === docKey);
+      if (!report.length && !stored.length) return;
+      const treatments = new Set<string>();
+      report.forEach((item) => item.description && treatments.add(item.description));
+      stored.forEach((item) => (item.treatments || []).forEach((treatment) => treatment && treatments.add(treatment)));
+      const best = [...stored].sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0];
+      const reportOriginal = report.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.value || 0), 0);
+      const reportTotal = report.reduce((sum, item) => sum + Number(item.total || 0), 0);
+      result.push({
+        doc: docKey,
+        date: best?.saleDate || report[0]?.date || "",
+        professional: best?.professional || "",
+        treatments: Array.from(treatments),
+        original: Number(best?.originalValue || reportOriginal || best?.totalValue || reportTotal || 0),
+        total: Number(best?.totalValue || reportTotal || best?.originalValue || reportOriginal || 0),
+        condition: best?.condition || null,
+        sources: Array.from(new Set([...(report.length ? ["Relatório"] : []), ...stored.map((item) => item.source === "pdf" ? "PDF individual" : "Manual")])).filter(Boolean),
+      });
+    });
+    return result;
+  }, [patient, reportByDoc, persistentSales]);
+
+  if (!currentClinic || !patient || !recovery) return null;
+
+  const overdue = patient.installments.filter((item) => daysLate(item.dueDate) > 0);
+  const totalOpen = patient.installments.reduce((sum, item) => sum + Number(item.current || 0), 0);
+  const overdueAmount = overdue.reduce((sum, item) => sum + Number(item.current || 0), 0);
+  const oldest = overdue.length ? Math.max(...overdue.map((item) => daysLate(item.dueDate))) : 0;
+  const docs = Array.from(new Set(overdue.map((item) => baseDocument(item.document)).filter(Boolean)));
+  const matchedDocs = docs.filter((docKey) => sales.some((sale) => sale.doc === docKey));
+  const missingDocs = docs.filter((docKey) => !matchedDocs.includes(docKey));
+  const missingTreatments = sales.filter((sale) => !sale.treatments.length).map((sale) => sale.doc);
+  const missingProfessional = sales.filter((sale) => !sale.professional).map((sale) => sale.doc);
+  const phone = patient.phones.find((item) => phoneDigits(item)) || patient.phones[0] || "";
+  const cpfOk = Boolean(String(patient.cpf || "").replace(/\D/g, ""));
+  const phoneOk = Boolean(phoneDigits(phone));
+  const lastroComplete = docs.length > 0 && matchedDocs.length === docs.length && missingTreatments.length === 0;
+  const promiseFuture = recovery.status === "promised" && recovery.promiseDate && recovery.promiseDate > isoToday();
+  const settled = recovery.status === "settled";
+
+  const decision = settled
+    ? { tone: "green", title: "Regularizado", helper: "Não enviar nova cobrança até existir nova pendência." }
+    : promiseFuture
+      ? { tone: "blue", title: `Aguardar promessa até ${recovery.promiseDate}`, helper: "Paciente já possui compromisso ativo. Não cobrar novamente antes da data." }
+      : !phoneOk
+        ? { tone: "red", title: "Bloqueado para cobrança", helper: "Falta telefone válido. Regularize o contato antes de enviar mensagem." }
+        : !lastroComplete
+          ? { tone: "amber", title: "Revisar lastro antes de cobrar", helper: "Existem parcelas sem origem comercial completa. Complete a ficha para cobrar com segurança." }
+          : { tone: "green", title: "Pronto para cobrança", helper: "Contato válido e lastro das parcelas vencidas localizado." };
+
+  const toneClass = decision.tone === "green" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : decision.tone === "blue" ? "border-blue-200 bg-blue-50 text-blue-900" : decision.tone === "amber" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-900";
+
+  async function logEvent(type: string, result: string, eventNote?: string) {
+    await addDoc(collection(db, "clinics", currentClinic, "financeRecoveryCases", patient.id, "events"), {
+      type,
+      channel: "internal",
+      result,
+      note: eventNote || null,
+      createdAt: new Date().toISOString(),
+      createdBy: user?.email || user?.uid || "clinic",
+    });
+  }
+
+  async function updateRecovery(patch: Partial<RecoveryCase>, result: string) {
+    const payload = {
+      ...recovery,
+      ...patch,
+      patientId: patient.id,
+      patientName: patient.name,
+      updatedAt: new Date().toISOString(),
+      updatedBy: user?.email || user?.uid || "clinic",
+    };
+    await setDoc(doc(db, "clinics", currentClinic, "financeRecoveryCases", patient.id), payload, { merge: true });
+    await logEvent("status", result, patch.note || undefined);
+  }
+
+  function openWhatsapp() {
+    const digits = phoneDigits(phone);
+    if (!digits) return toast.error("Paciente sem telefone válido.");
+    const text = overdue.length
+      ? `Olá, ${firstName(patient.name)}! 💚\n\nEstou entrando em contato pelo financeiro da OdontoCompany Olímpia. Identificamos ${overdue.length > 1 ? `${overdue.length} parcelas vencidas` : "uma parcela vencida"}, totalizando ${brl.format(overdueAmount)}.${oldest ? ` A pendência mais antiga está com ${oldest} dias.` : ""}\n\nPodemos conversar para organizar a regularização desses débitos?`
+      : `Olá, ${firstName(patient.name)}! 💚\n\nEstou entrando em contato pelo financeiro da OdontoCompany Olímpia para falar sobre seus próximos vencimentos. Posso te ajudar por aqui?`;
+    window.open(`https://wa.me/55${digits}?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
+  return (
+    <div className="fixed inset-0 z-[120] bg-black/45 p-3 sm:p-5">
+      <div className="mx-auto flex h-full max-w-[1380px] flex-col overflow-hidden rounded-2xl bg-background shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b p-5">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ficha financeira completa</div>
+            <h2 className="mt-1 text-2xl font-bold">{patient.name}</h2>
+            <div className="mt-1 text-sm text-muted-foreground">CPF {patient.cpf || "não informado"} • {patient.phones.join(" • ") || "sem telefone"}</div>
+          </div>
+          <Button size="icon" variant="ghost" onClick={() => setPatientId(null)}><X className="h-5 w-5" /></Button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-5">
+          <div className={`mb-4 rounded-xl border p-4 ${toneClass}`}>
+            <div className="flex items-start gap-3">
+              {decision.tone === "green" ? <CheckCircle2 className="mt-0.5 h-5 w-5" /> : decision.tone === "amber" ? <AlertTriangle className="mt-0.5 h-5 w-5" /> : decision.tone === "blue" ? <ShieldCheck className="mt-0.5 h-5 w-5" /> : <FileWarning className="mt-0.5 h-5 w-5" />}
+              <div><div className="font-bold">Decisão: {decision.title}</div><div className="mt-1 text-sm">{decision.helper}</div></div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <Metric title="Saldo em aberto" value={brl.format(totalOpen)} helper={`${patient.installments.length} parcela(s)`} />
+            <Metric title="Em atraso" value={brl.format(overdueAmount)} helper={`${overdue.length} vencida(s)`} danger />
+            <Metric title="Maior atraso" value={`${oldest} dias`} helper={oldest ? "parcela mais antiga" : "sem atraso"} />
+            <Metric title="Lastro" value={lastroComplete ? "Completo" : `${matchedDocs.length}/${docs.length || 0}`} helper={lastroComplete ? "origem localizada" : "precisa revisão"} />
+            <Metric title="Status" value={STATUS_LABEL[(recovery.status || "pending") as RecoveryStatus]} helper={recovery.nextActionDate ? `retorno ${recovery.nextActionDate}` : "sem retorno agendado"} />
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+            <section className="rounded-xl border bg-card">
+              <div className="border-b p-4"><h3 className="font-bold">Checklist para cobrança</h3><p className="mt-1 text-sm text-muted-foreground">O que está completo e o que precisa ser regularizado antes do contato.</p></div>
+              <div className="grid gap-2 p-4 sm:grid-cols-2">
+                <Check label="CPF identificado" ok={cpfOk} helper={cpfOk ? patient.cpf : "CPF ausente"} />
+                <Check label="Telefone válido" ok={phoneOk} helper={phoneOk ? phone : "Adicionar telefone"} />
+                <Check label="DOC / venda localizada" ok={missingDocs.length === 0 && docs.length > 0} helper={missingDocs.length ? `Faltam DOC ${missingDocs.join(", ")}` : `${matchedDocs.length} DOC(s) conciliado(s)`} />
+                <Check label="Tratamento identificado" ok={missingTreatments.length === 0 && sales.length > 0} helper={missingTreatments.length ? `Completar DOC ${missingTreatments.join(", ")}` : `${sales.length} venda(s) com contexto`} />
+              </div>
+              {missingProfessional.length > 0 && <div className="mx-4 mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Complemento recomendado: profissional não informado no(s) DOC {missingProfessional.join(", ")}.</div>}
+            </section>
+
+            <section className="rounded-xl border bg-card p-4">
+              <h3 className="font-bold">Próxima decisão</h3>
+              <div className="mt-3 space-y-3">
+                <label className="block text-sm"><span className="mb-1 block text-xs font-semibold text-muted-foreground">Status da cobrança</span><select className="h-10 w-full rounded-md border bg-background px-3" value={recovery.status || "pending"} onChange={(e) => void updateRecovery({ status: e.target.value as RecoveryStatus }, `Status alterado para ${STATUS_LABEL[e.target.value as RecoveryStatus]}`)}>{Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+                <label className="block text-sm"><span className="mb-1 block text-xs font-semibold text-muted-foreground">Próxima ação</span><Input type="date" value={nextActionDate} onChange={(e) => setNextActionDate(e.target.value)} /></label>
+                <div className="grid gap-2 sm:grid-cols-2"><label className="block text-sm"><span className="mb-1 block text-xs font-semibold text-muted-foreground">Promessa para</span><Input type="date" value={promiseDate} onChange={(e) => setPromiseDate(e.target.value)} /></label><label className="block text-sm"><span className="mb-1 block text-xs font-semibold text-muted-foreground">Valor prometido</span><Input value={promiseAmount} onChange={(e) => setPromiseAmount(e.target.value)} placeholder="0,00" /></label></div>
+                <label className="block text-sm"><span className="mb-1 block text-xs font-semibold text-muted-foreground">Observação interna</span><textarea className="min-h-20 w-full rounded-md border bg-background p-2 text-sm" value={note} onChange={(e) => setNote(e.target.value)} /></label>
+                <div className="flex flex-wrap gap-2"><Button onClick={() => void updateRecovery({ nextActionDate: nextActionDate || null, note: note || null }, "Próxima ação atualizada")}>Salvar ação</Button><Button variant="outline" disabled={!promiseDate} onClick={() => void updateRecovery({ status: "promised", promiseDate: promiseDate || null, promiseAmount: Number(String(promiseAmount).replace(".", "").replace(",", ".")) || null, nextActionDate: promiseDate || null, note: note || null }, `Promessa registrada para ${promiseDate}`)}>Registrar promessa</Button></div>
+              </div>
+            </section>
+          </div>
+
+          <section className="mt-4 rounded-xl border bg-card">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4"><div><h3 className="font-bold">Vendas / contratos vinculados</h3><p className="mt-1 text-sm text-muted-foreground">Lastro comercial que sustenta a cobrança.</p></div><span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${lastroComplete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>{lastroComplete ? "Lastro completo" : "Lastro incompleto"}</span></div>
+            <div className="divide-y">{sales.length ? sales.map((sale) => <div key={sale.doc} className="grid gap-3 p-4 md:grid-cols-[120px_1fr_160px_160px]"><div><div className="text-xs text-muted-foreground">DOC</div><div className="font-bold">{sale.doc}</div><div className="mt-1 text-xs text-muted-foreground">{sale.sources.join(" + ")}</div></div><div><div className="font-semibold">{sale.treatments.join(" • ") || "Tratamento não informado"}</div><div className="mt-1 text-xs text-muted-foreground">{sale.professional || "Profissional não informado"}{sale.condition ? ` • ${sale.condition}` : ""}</div></div><div><div className="text-xs text-muted-foreground">Data</div><div className="font-medium">{sale.date || "—"}</div></div><div><div className="text-xs text-muted-foreground">Original / fechado</div><div className="font-medium">{brl.format(sale.original)}</div><div className="text-xs text-muted-foreground">{brl.format(sale.total)}</div></div></div>) : <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma venda localizada para os DOCs deste paciente.</div>}</div>
+          </section>
+
+          <section className="mt-4 rounded-xl border bg-card">
+            <div className="border-b p-4"><h3 className="font-bold">Parcelas</h3><p className="mt-1 text-sm text-muted-foreground">Todas as parcelas abertas com indicação de origem.</p></div>
+            <div className="overflow-auto"><table className="w-full min-w-[850px] text-sm"><thead><tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground"><th className="px-4 py-3">Documento</th><th className="px-4 py-3">Vencimento</th><th className="px-4 py-3">Atraso</th><th className="px-4 py-3 text-right">Original</th><th className="px-4 py-3 text-right">Atualizado</th><th className="px-4 py-3">Origem</th></tr></thead><tbody>{patient.installments.map((item) => { const docKey = baseDocument(item.document); const linked = sales.some((sale) => sale.doc === docKey); return <tr key={`${item.document}-${item.dueDate}`} className="border-b"><td className="px-4 py-3 font-medium">{item.document}</td><td className="px-4 py-3">{item.dueDate}</td><td className="px-4 py-3">{daysLate(item.dueDate) ? `${daysLate(item.dueDate)} dias` : "A vencer"}</td><td className="px-4 py-3 text-right">{brl.format(item.original || 0)}</td><td className="px-4 py-3 text-right font-semibold">{brl.format(item.current || 0)}</td><td className="px-4 py-3">{linked ? <span className="inline-flex items-center gap-1 text-emerald-700"><FileCheck2 className="h-4 w-4" />DOC localizado</span> : <span className="inline-flex items-center gap-1 text-amber-700"><FileWarning className="h-4 w-4" />Sem lastro</span>}</td></tr>; })}</tbody></table></div>
+          </section>
+
+          <section className="mt-4 rounded-xl border bg-card">
+            <div className="border-b p-4"><h3 className="font-bold">Histórico de cobrança</h3><p className="mt-1 text-sm text-muted-foreground">Últimos contatos e decisões registrados pela equipe.</p></div>
+            <div className="divide-y">{events.length ? events.slice(0, 30).map((event) => <div key={event.id} className="grid gap-1 p-4 sm:grid-cols-[150px_1fr]"><div className="text-xs text-muted-foreground">{fmtDateTime(event.createdAt)}</div><div><div className="font-medium">{event.result}</div>{event.note && <div className="mt-1 text-sm text-muted-foreground">{event.note}</div>}<div className="mt-1 text-xs text-muted-foreground">{event.createdBy || "clínica"}</div></div></div>) : <div className="p-6 text-center text-sm text-muted-foreground">Nenhum contato registrado ainda.</div>}</div>
+          </section>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-card p-4">
+          <div className="text-xs text-muted-foreground">A ficha mostra a decisão recomendada, mas a ação final continua sendo humana.</div>
+          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => void updateRecovery({ status: "contacted", lastContactAt: new Date().toISOString() }, "Contato registrado")}>Registrar contato</Button><Button className="gap-2" onClick={openWhatsapp} disabled={!phoneOk || Boolean(recovery.optOutWhatsapp)}><MessageCircle className="h-4 w-4" />WhatsApp</Button><Button variant="ghost" onClick={() => setPatientId(null)}>Fechar</Button></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ title, value, helper, danger = false }: { title: string; value: string; helper: string; danger?: boolean }) {
+  return <div className={`rounded-xl border p-4 ${danger ? "border-red-200 bg-red-50/50" : "bg-card"}`}><div className="text-xs font-semibold uppercase text-muted-foreground">{title}</div><div className="mt-2 text-xl font-bold">{value}</div><div className="mt-1 text-xs text-muted-foreground">{helper}</div></div>;
+}
+function Check({ label, ok, helper }: { label: string; ok: boolean; helper: string }) {
+  return <div className={`rounded-lg border p-3 ${ok ? "border-emerald-200 bg-emerald-50/50" : "border-amber-200 bg-amber-50/60"}`}><div className="flex items-center gap-2 font-semibold">{ok ? <CheckCircle2 className="h-4 w-4 text-emerald-700" /> : <AlertTriangle className="h-4 w-4 text-amber-700" />}{label}</div><div className="mt-1 text-xs text-muted-foreground">{helper}</div></div>;
+}
