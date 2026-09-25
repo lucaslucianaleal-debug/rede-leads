@@ -79,10 +79,13 @@ function isPatientLine(line: string) {
 export function ClinicSalesImportPanel({ onImported }: { onImported?: (items: SaleItem[], fileName: string) => void }) {
   const { currentClinic } = useAuth();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const onImportedRef = useRef(onImported);
   const [fileName, setFileName] = useState<string | null>(null);
   const [items, setItems] = useState<SaleItem[]>([]);
   const [importing, setImporting] = useState(false);
   const [loadingSaved, setLoadingSaved] = useState(false);
+
+  useEffect(() => { onImportedRef.current = onImported; }, [onImported]);
 
   const documents = useMemo(() => new Set(items.map((item) => item.document)).size, [items]);
   const patients = useMemo(() => new Set(items.map((item) => item.patientName).filter(Boolean)).size, [items]);
@@ -104,7 +107,7 @@ export function ClinicSalesImportPanel({ onImported }: { onImported?: (items: Sa
         if (savedItems.length) {
           setItems(savedItems);
           setFileName(savedFileName);
-          onImported?.(savedItems, savedFileName);
+          onImportedRef.current?.(savedItems, savedFileName);
         }
       } catch (error) {
         console.error("[clinic-sales][hydrate]", error);
@@ -114,7 +117,7 @@ export function ClinicSalesImportPanel({ onImported }: { onImported?: (items: Sa
     })();
 
     return () => { cancelled = true; };
-  }, [currentClinic, onImported]);
+  }, [currentClinic]);
 
   async function persistSales(importedItems: SaleItem[], nextFileName: string) {
     if (!currentClinic) return;
@@ -147,7 +150,7 @@ export function ClinicSalesImportPanel({ onImported }: { onImported?: (items: Sa
       await persistSales(parsed, file.name);
       setFileName(file.name);
       setItems(merged);
-      onImported?.(merged, file.name);
+      onImportedRef.current?.(merged, file.name);
       const docs = new Set(merged.map((item) => item.document)).size;
       toast.success(`Base de vendas salva: ${number.format(docs)} DOCs disponíveis mesmo após atualizar a página.`);
     } catch (error: any) {
