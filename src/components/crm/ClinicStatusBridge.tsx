@@ -130,10 +130,24 @@ const STATUS_RANK: Record<string, number> = {
 };
 
 function manualDecision(item: AgendaItem) {
+  if (!item.manualReviewedAt) return "";
+
   const saved = String(item.manualReviewDecision || "");
-  if (item.manualReviewedAt && MANUAL_STATUSES.has(saved)) return saved;
-  const status = String(item.confirmationStatus || "");
-  return item.manualReviewedAt && MANUAL_STATUSES.has(status) ? status : "";
+  const current = String(item.confirmationStatus || "");
+  const replyClassification = String(item.replyClassification || "");
+  const replyAfterManual = isoTime(item.lastReplyAt) > isoTime(item.manualReviewedAt);
+
+  // Se o paciente cancelou ou pediu reagendamento DEPOIS da confirmação manual,
+  // essa resposta explícita vence a trava antiga de confirmação.
+  if (
+    saved === "confirmed"
+    && replyAfterManual
+    && ["wont_attend", "reschedule", "cancelled"].includes(current)
+    && (replyClassification === current || current === "cancelled")
+  ) return current;
+
+  if (MANUAL_STATUSES.has(saved)) return saved;
+  return MANUAL_STATUSES.has(current) ? current : "";
 }
 
 function effectiveStatus(item: AgendaItem) {
@@ -141,10 +155,9 @@ function effectiveStatus(item: AgendaItem) {
 }
 
 function pickMergedStatus(items: AgendaItem[]) {
-  return [...items]
-    .sort((a, b) => (STATUS_RANK[effectiveStatus(b)] || 0) - (STATUS_RANK[effectiveStatus(a)] || 0))[0]
-    ? effectiveStatus([...items].sort((a, b) => (STATUS_RANK[effectiveStatus(b)] || 0) - (STATUS_RANK[effectiveStatus(a)] || 0))[0])
-    : "pending";
+  const winner = [...items]
+    .sort((a, b) => (STATUS_RANK[effectiveStatus(b)] || 0) - (STATUS_RANK[effectiveStatus(a)] || 0))[0];
+  return winner ? effectiveStatus(winner) : "pending";
 }
 
 function latestValue(items: AgendaItem[], field: "lastReminderSentAt" | "lastReplyAt") {
