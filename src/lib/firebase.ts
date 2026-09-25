@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCzwAWRef44wB5tc98eFupuNK6C2Q7x4Eg",
@@ -17,11 +18,12 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
-// Expose debug helpers in development so dev console can inspect auth/db
+// Expose debug helpers in development so dev console can inspect auth/db/storage
 if (import.meta.env.MODE === 'development') {
   try {
-    (window as any).__REDE_LEADS__ = { auth, db };
+    (window as any).__REDE_LEADS__ = { auth, db, storage };
   } catch (e) {
     // safe noop in non-browser environments
   }
