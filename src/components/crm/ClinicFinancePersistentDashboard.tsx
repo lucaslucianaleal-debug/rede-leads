@@ -14,6 +14,33 @@ import {
   type FinanceStore,
 } from "@/lib/clinicFinanceStore";
 
+const MANAGEMENT_CUTOFF = "2025-11-01";
+
+function dateKey(value: string) {
+  const match = String(value || "").match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+}
+
+/**
+ * A base histórica continua persistida no Firestore. Para a operação de cobrança,
+ * porém, só entram contratos/documentos cuja emissão seja a partir de 01/11/2025.
+ * O corte é por parcela/contrato, nunca por paciente: um paciente pode ter dívida
+ * antiga fora da régua e, ao mesmo tempo, contratos atuais elegíveis.
+ */
+function operationalStore(store: FinanceStore | null): FinanceStore | null {
+  if (!store) return null;
+  const patients = (store.patients || [])
+    .map((patient) => ({
+      ...patient,
+      installments: (patient.installments || []).filter((item) => {
+        const emission = dateKey(item.emission);
+        return Boolean(emission && emission >= MANAGEMENT_CUTOFF);
+      }),
+    }))
+    .filter((patient) => patient.installments.length > 0);
+  return { ...store, patients };
+}
+
 export function ClinicFinancePersistentDashboard({ salesItems = [] }: { salesItems?: SaleItem[] }) {
   const { currentClinic } = useAuth();
   const [hydrating, setHydrating] = useState(true);
@@ -50,22 +77,23 @@ export function ClinicFinancePersistentDashboard({ salesItems = [] }: { salesIte
             return;
           }
 
-          const merged = mergeFinanceStores(canonicalRef.current, local) || local;
+          // canonicalRef mantém o histórico completo; a tela recebe apenas a carteira
+          // elegível da gestão atual. Assim não perdemos lastro antigo no Firestore.
+          const mergedFull = mergeFinanceStores(canonicalRef.current, local) || local;
+          const operational = operationalStore(mergedFull) || mergedFull;
           const localRaw = JSON.stringify(local);
-          const mergedRaw = JSON.stringify(merged);
+          const operationalRaw = JSON.stringify(operational);
           const previousRaw = canonicalRef.current ? JSON.stringify(canonicalRef.current) : "";
 
-          canonicalRef.current = merged;
+          canonicalRef.current = mergedFull;
 
-          if (localRaw !== mergedRaw) {
-            // Um novo PDF pode conter apenas parte da carteira. Recompõe a base acumulada
-            // antes de atualizar a tela, sem criar ciclo de eventos.
-            writeLocalFinanceStore(currentClinic, merged);
+          if (localRaw !== operationalRaw) {
+            writeLocalFinanceStore(currentClinic, operational);
             setRevision((value) => value + 1);
           }
 
-          if (previousRaw !== mergedRaw) {
-            await persistRemoteFinanceStore(currentClinic, merged);
+          if (previousRaw !== JSON.stringify(mergedFull)) {
+            await persistRemoteFinanceStore(currentClinic, mergedFull);
           }
         } catch (error) {
           console.error("[clinic-finance][persist]", error);
@@ -80,13 +108,19 @@ export function ClinicFinancePersistentDashboard({ salesItems = [] }: { salesIte
         const canonical = await hydrateFinanceStore(currentClinic);
         if (cancelled) return;
         canonicalRef.current = canonical;
+        const operational = operationalStore(canonical);
+        if (operational) writeLocalFinanceStore(currentClinic, operational);
       } catch (error) {
         console.error("[clinic-finance][hydrate]", error);
         if (cancelled) return;
-        canonicalRef.current = readLocalFinanceStore(currentClinic);
+        const local = readLocalFinanceStore(currentClinic);
+        canonicalRef.current = local;
+        const operational = operationalStore(local);
+        if (operational) writeLocalFinanceStore(currentClinic, operational);
       } finally {
         if (!cancelled) {
           readyRef.current = true;
+          setRevision((value) => value + 1);
           setHydrating(false);
         }
       }
