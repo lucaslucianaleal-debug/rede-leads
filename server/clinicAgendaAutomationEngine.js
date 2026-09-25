@@ -7,6 +7,7 @@ const PAUSED_CANCEL_REASONS = new Set([
   "clinic_automation_paused_for_safety",
   "clinic_automation_paused",
 ]);
+const MANUAL_STATUSES = new Set(["confirmed", "wont_attend", "cancelled", "reschedule"]);
 
 function safeId(value) {
   return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 140);
@@ -57,6 +58,25 @@ function isConfirmed(status) {
   return String(status || "") === "confirmed";
 }
 
+function effectiveAgendaStatus(data = {}) {
+  const current = String(data.confirmationStatus || "pending");
+  const saved = String(data.manualReviewDecision || "");
+  const manualAt = Date.parse(String(data.manualReviewedAt || ""));
+  const replyAt = Date.parse(String(data.lastReplyAt || ""));
+  const replyClassification = String(data.replyClassification || "");
+
+  const laterExplicitNegative = saved === "confirmed"
+    && Number.isFinite(manualAt)
+    && Number.isFinite(replyAt)
+    && replyAt > manualAt
+    && ["wont_attend", "reschedule", "cancelled"].includes(current)
+    && (replyClassification === current || current === "cancelled");
+
+  if (laterExplicitNegative) return current;
+  if (data.manualReviewedAt && MANUAL_STATUSES.has(saved)) return saved;
+  return current;
+}
+
 function statusRank(status) {
   return {
     pending: 1,
@@ -74,7 +94,8 @@ function statusRank(status) {
 }
 
 function visitStatus(items) {
-  return [...items].sort((a, b) => statusRank(b.data?.confirmationStatus) - statusRank(a.data?.confirmationStatus))[0]?.data?.confirmationStatus || "pending";
+  const winner = [...items].sort((a, b) => statusRank(effectiveAgendaStatus(b.data)) - statusRank(effectiveAgendaStatus(a.data)))[0];
+  return winner ? effectiveAgendaStatus(winner.data) : "pending";
 }
 
 function deadlineLabel(date) {
