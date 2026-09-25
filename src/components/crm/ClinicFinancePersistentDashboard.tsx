@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { ref as storageRef, uploadBytes } from "firebase/storage";
 import { useAuth } from "@/hooks/useAuth";
 import { ClinicFinanceDashboardV4 } from "@/components/crm/ClinicFinanceDashboardV4";
 import type { SaleItem } from "@/components/crm/ClinicSalesImportPanel";
 import { FINANCE_SNAPSHOT_EVENT } from "@/components/crm/ClinicFinanceSnapshotBridge";
+import { db, storage } from "@/lib/firebase";
+import { toast } from "sonner";
 
 type Installment = {
   document: string;
@@ -27,7 +31,18 @@ type FinanceStore = {
   importedAt: string;
   period: string;
   receiptsFile?: string | null;
+  receiptsStoragePath?: string | null;
+  receiptsImportedAt?: string | null;
+  receiptsSize?: number | null;
   patients: PatientDebt[];
+};
+
+type ReceiptsMeta = {
+  fileName: string;
+  storagePath: string;
+  importedAt: string;
+  size: number;
+  contentType: string;
 };
 
 const storeKey = (clinicId: string) => `clinic_finance_store_v4_${clinicId}`;
@@ -101,6 +116,9 @@ function mergeStores(base: FinanceStore | null, incoming: FinanceStore): Finance
     ...incoming,
     version: 1,
     receiptsFile: incoming.receiptsFile || base.receiptsFile || null,
+    receiptsStoragePath: incoming.receiptsStoragePath || base.receiptsStoragePath || null,
+    receiptsImportedAt: incoming.receiptsImportedAt || base.receiptsImportedAt || null,
+    receiptsSize: incoming.receiptsSize ?? base.receiptsSize ?? null,
     patients: mergePatients(base.patients || [], incoming.patients || []),
   };
 }
@@ -116,11 +134,17 @@ function readStore(clinicId: string): FinanceStore | null {
   }
 }
 
+function writeStore(clinicId: string, store: FinanceStore) {
+  localStorage.setItem(storeKey(clinicId), JSON.stringify(store));
+}
+
 export function ClinicFinancePersistentDashboard({ salesItems = [] }: { salesItems?: SaleItem[] }) {
   const { currentClinic } = useAuth();
   const [revision, setRevision] = useState(0);
   const baselineRef = useRef<FinanceStore | null>(null);
   const reconcilingRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const uploadingReceiptRef = useRef(false);
 
   useEffect(() => {
     if (!currentClinic) return;
@@ -145,7 +169,7 @@ export function ClinicFinancePersistentDashboard({ salesItems = [] }: { salesIte
 
       reconcilingRef.current = true;
       try {
-        localStorage.setItem(storeKey(currentClinic), mergedRaw);
+        writeStore(currentClinic, merged);
         setRevision((value) => value + 1);
         window.setTimeout(() => {
           window.dispatchEvent(new CustomEvent(FINANCE_SNAPSHOT_EVENT));
@@ -160,5 +184,98 @@ export function ClinicFinancePersistentDashboard({ salesItems = [] }: { salesIte
     return () => window.removeEventListener(FINANCE_SNAPSHOT_EVENT, reconcile as EventListener);
   }, [currentClinic]);
 
-  return <ClinicFinanceDashboardV4 key={`${currentClinic || "none"}-${revision}`} salesItems={salesItems} />;
+  // Recupera o último relatório de recebimentos salvo na nuvem, mesmo em outro acesso/origem.
+  useEffect(() => {
+    if (!currentClinic) return;
+    const metaRef = doc(db, "clinics", currentClinic, "financeImports", "receipts_current");
+    return onSnapshot(metaRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+      const meta = snapshot.data() as ReceiptsMeta;
+      const current = readStore(currentClinic);
+      if (!current?.patients?.length) return;
+
+      const alreadySynced = current.receiptsFile === meta.fileName
+        && current.receiptsStoragePath === meta.storagePath
+        && current.receiptsImportedAt === meta.importedAt;
+      if (alreadySynced) return;
+
+      const next: FinanceStore = {
+        ...current,
+        receiptsFile: meta.fileName,
+        receiptsStoragePath: meta.storagePath,
+        receiptsImportedAt: meta.importedAt,
+        receiptsSize: meta.size,
+      };
+      writeStore(currentClinic, next);
+      baselineRef.current = mergeStores(baselineRef.current, next);
+      setRevision((value) => value + 1);
+      window.dispatchEvent(new CustomEvent(FINANCE_SNAPSHOT_EVENT));
+    });
+  }, [currentClinic]);
+
+  async function persistReceiptsFile(file: File) {
+    if (!currentClinic || uploadingReceiptRef.current) return;
+    uploadingReceiptRef.current = true;
+    const importedAt = new Date().toISOString();
+    const path = `clinics/${currentClinic}/finance/receipts/current.pdf`;
+
+    try {
+      await uploadBytes(storageRef(storage, path), file, {
+        contentType: file.type || "application/pdf",
+        customMetadata: {
+          originalName: file.name,
+          clinicId: currentClinic,
+          importedAt,
+        },
+      });
+
+      const meta: ReceiptsMeta = {
+        fileName: file.name,
+        storagePath: path,
+        importedAt,
+        size: file.size,
+        contentType: file.type || "application/pdf",
+      };
+      await setDoc(doc(db, "clinics", currentClinic, "financeImports", "receipts_current"), meta, { merge: true });
+
+      const current = readStore(currentClinic);
+      if (current?.patients?.length) {
+        const next: FinanceStore = {
+          ...current,
+          receiptsFile: file.name,
+          receiptsStoragePath: path,
+          receiptsImportedAt: importedAt,
+          receiptsSize: file.size,
+        };
+        writeStore(currentClinic, next);
+        baselineRef.current = mergeStores(baselineRef.current, next);
+        setRevision((value) => value + 1);
+      }
+
+      toast.success("Relatório de recebimentos salvo no Firebase e vinculado à clínica.");
+    } catch (error) {
+      console.error("[finance-receipts-persist]", error);
+      toast.error("O relatório foi lido nesta sessão, mas não consegui salvá-lo no Firebase. Verifique a permissão do Storage.");
+    } finally {
+      uploadingReceiptRef.current = false;
+    }
+  }
+
+  // O Dashboard possui dois inputs PDF ocultos: Cobrança e Recebimentos.
+  // Capturamos somente o segundo para persistir o arquivo bruto na nuvem.
+  function handleFileChangeCapture(event: React.ChangeEvent<HTMLDivElement>) {
+    const input = event.target as HTMLInputElement;
+    if (!(input instanceof HTMLInputElement) || input.type !== "file") return;
+    const inputs = Array.from(rootRef.current?.querySelectorAll<HTMLInputElement>('input[type="file"]') || []);
+    const receiptsInput = inputs[inputs.length - 1];
+    if (input !== receiptsInput) return;
+    const file = input.files?.[0];
+    if (file) void persistReceiptsFile(file);
+  }
+
+  return (
+    <div ref={rootRef} onChangeCapture={handleFileChangeCapture}>
+      <ClinicFinanceDashboardV4 key={`${currentClinic || "none"}-${revision}`} salesItems={salesItems} />
+    </div>
+  );
 }
