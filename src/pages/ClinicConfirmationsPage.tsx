@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, CalendarDays, LayoutDashboard, Landmark, MessageCircle, RotateCcw, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,15 +12,33 @@ import { ClinicSalesImportPanel, type SaleItem } from "@/components/crm/ClinicSa
 import { ClinicVacancies } from "@/components/crm/ClinicVacancies";
 import { ClinicRebookings } from "@/components/crm/ClinicRebookings";
 import { ClinicStatusBridge } from "@/components/crm/ClinicStatusBridge";
+import { useAuth } from "@/hooks/useAuth";
 
 type MainSection = "overview" | "agenda" | "finance";
 type AgendaView = "calendar" | "confirmations" | "vacancies" | "rebookings";
 
+function primaryClinicFromProfile(profile: any): string | null {
+  if (!profile) return null;
+  if (typeof profile.clinicId === "string" && profile.clinicId.trim()) return profile.clinicId.trim();
+  const candidates = [
+    ...(Array.isArray(profile.clinicIds) ? profile.clinicIds : []),
+    ...(Array.isArray(profile.clinics) ? profile.clinics : []),
+  ].filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
+  return candidates[0]?.trim() || null;
+}
+
 export default function ClinicConfirmationsPage() {
   const navigate = useNavigate();
+  const { currentClinic, userProfile, setSelectedClinic } = useAuth();
   const [mainSection, setMainSection] = useState<MainSection>("overview");
   const [agendaView, setAgendaView] = useState<AgendaView>("calendar");
   const [salesItems, setSalesItems] = useState<SaleItem[]>([]);
+
+  useEffect(() => {
+    if (currentClinic || !userProfile) return;
+    const primaryClinic = primaryClinicFromProfile(userProfile);
+    if (primaryClinic) setSelectedClinic(primaryClinic);
+  }, [currentClinic, setSelectedClinic, userProfile]);
 
   const openAgenda = (view: AgendaView) => {
     setAgendaView(view);
@@ -55,6 +73,12 @@ export default function ClinicConfirmationsPage() {
       </header>
 
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
+        {!currentClinic && userProfile && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Recuperando a clínica vinculada ao seu perfil…
+          </div>
+        )}
+
         {mainSection === "overview" && (
           <ClinicOverview
             onOpenAgenda={openAgenda}
