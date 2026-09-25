@@ -198,6 +198,12 @@ export async function hydrateFinanceStore(clinicId: string) {
   if (!canonical) return null;
 
   writeLocalFinanceStore(clinicId, canonical);
-  await persistRemoteFinanceStore(clinicId, canonical);
+
+  const remoteRaw = remote ? JSON.stringify(remote) : "";
+  const canonicalRaw = JSON.stringify(canonical);
+  if (remoteRaw !== canonicalRaw) {
+    await persistRemoteFinanceStore(clinicId, canonical);
+  }
+
   return canonical;
 }
