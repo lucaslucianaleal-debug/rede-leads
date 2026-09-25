@@ -6,6 +6,7 @@ import { ClinicChip } from "@/components/ClinicChip";
 import { ClinicCalendar } from "@/components/crm/ClinicCalendar";
 import { ClinicConfirmationCenter } from "@/components/crm/ClinicConfirmationCenter";
 import { ClinicFinanceDashboardV4 } from "@/components/crm/ClinicFinanceDashboardV4";
+import { ClinicFinanceRecoveryCenter } from "@/components/crm/ClinicFinanceRecoveryCenter";
 import { ClinicFinanceStateGuard } from "@/components/crm/ClinicFinanceStateGuard";
 import { ClinicOverview } from "@/components/crm/ClinicOverview";
 import { ClinicSalesImportPanel, type SaleItem } from "@/components/crm/ClinicSalesImportPanel";
@@ -107,6 +108,7 @@ export default function ClinicConfirmationsPage() {
         {mainSection === "finance" && (
           <div className="space-y-4">
             <ClinicSalesImportPanel onImported={(items) => setSalesItems(items)} />
+            <ClinicFinanceRecoveryCenter salesItems={salesItems} />
             <ClinicFinanceDashboardV4 salesItems={salesItems} />
           </div>
         )}
